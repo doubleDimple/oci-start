@@ -182,13 +182,6 @@
                 <version>3.49.0</version>
             </dependency>
 
-            <!--<dependency>
-            <groupId>com.oracle.oci.sdk</groupId>
-            <artifactId>oci-java-sdk-shaded-full</artifactId>
-            &lt;!&ndash; replace the version below with the latest version &ndash;&gt;
-            <version>3.49.0</version>
-            </dependency>-->
-
             <dependency>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-configuration-processor</artifactId>
