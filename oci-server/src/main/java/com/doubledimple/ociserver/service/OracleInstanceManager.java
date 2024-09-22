@@ -2,11 +2,13 @@ package com.doubledimple.ociserver.service;
 
 import com.doubledimple.ociserver.config.OracleUsersConfig;
 import com.doubledimple.ociserver.domain.User;
+import com.doubledimple.ociserver.enums.MessageEnum;
+import com.doubledimple.ociserver.message.MessageService;
+import com.doubledimple.ociserver.message.factory.MessageFactory;
 import com.oracle.bmc.model.BmcException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.DependsOn;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
@@ -30,7 +32,7 @@ public class OracleInstanceManager {
     private final Map<String, CompletableFuture<Void>> accountTasks = new ConcurrentHashMap<>();
 
     @Autowired
-    MessageService messageService;
+    MessageFactory messageFactory;
 
     @Autowired
     public OracleInstanceManager(OracleCloudService oracleCloudService, OracleUsersConfig oracleUsersConfig) throws Exception{
@@ -100,8 +102,7 @@ public class OracleInstanceManager {
     }
 
     private void sendNotification(String userName, String message) {
-        // 在这里实现发送到钉钉或 Telegram 的逻辑
-        messageService.sendMessage("用户: "+userName+"===>"+message);
+        messageFactory.getType(MessageEnum.TELEGRAM).sendMessage("用户: "+userName+"===>"+message);
     }
 
 

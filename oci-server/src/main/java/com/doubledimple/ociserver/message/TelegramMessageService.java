@@ -1,6 +1,6 @@
-package com.doubledimple.ociserver.service.impl;
+package com.doubledimple.ociserver.message;
 
-import com.doubledimple.ociserver.service.MessageService;
+import com.doubledimple.ociserver.enums.MessageEnum;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -16,7 +16,7 @@ import java.net.URLEncoder;
  */
 @Service
 @Slf4j
-public class MessageServiceImpl implements MessageService {
+public class TelegramMessageService implements MessageService {
 
     private static final String TG_URL="https://api.telegram.org/bot%s/sendMessage?chat_id=%s&text=%s";
     @Value("${telegram.chatId}")
@@ -27,6 +27,7 @@ public class MessageServiceImpl implements MessageService {
 
     @Override
     public void sendMessage(String message) {
+        log.info("推送TG消息开始...");
         try {
             String encodedMessage = URLEncoder.encode(message, "UTF-8");
             String urlString = String.format(TG_URL,
@@ -39,14 +40,19 @@ public class MessageServiceImpl implements MessageService {
 
             int responseCode = connection.getResponseCode();
             if (responseCode == HttpURLConnection.HTTP_OK) {
-                System.out.println("Message sent successfully!");
+                log.info("Message sent successfully!");
             } else {
-                System.out.println("Failed to send message, response code: " + responseCode);
+                log.info("Failed to send message, response code: [{}]",responseCode);
             }
         } catch (UnsupportedEncodingException e) {
             e.printStackTrace();
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    @Override
+    public MessageEnum getMessageType() {
+        return MessageEnum.TELEGRAM;
     }
 }
