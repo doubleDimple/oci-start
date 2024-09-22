@@ -293,7 +293,6 @@ public class OracleCloudService {
             VirtualNetworkClient virtualNetworkClient, String compartmentId, String cidrBlock)
             throws Exception {
         String vcnName = "java-sdk-example-vcn";
-        //先查询是否存在,不存在在创建,存在直接返回
         ListVcnsRequest build = ListVcnsRequest.builder().compartmentId(compartmentId)
                 .displayName(vcnName)
                 .build();
@@ -497,14 +496,11 @@ public class OracleCloudService {
             // 如果找到已有的子网，返回其 ID
             for (Subnet subnet : listResponse.getItems()) {
                 if (subnet.getDisplayName().equals(subnetName)) {
-                    return subnet; // 返回已存在子网的 ID
+                    return subnet;
                 }
             }
         }
 
-
-        // In order to launch instances in a regional subnet, build this CreateSubnetDetails with
-        // the field availablityDomain set to null.
         CreateSubnetDetails createSubnetDetails =
                 CreateSubnetDetails.builder()
                         .availabilityDomain(availabilityDomain.getName())
@@ -530,9 +526,9 @@ public class OracleCloudService {
                         .execute();
         Subnet subnet = getSubnetResponse.getSubnet();
 
-        System.out.println("Created Subnet: " + subnet.getId());
-        System.out.println(subnet);
-        System.out.println();
+        log.info("Created Subnet: " + subnet.getId());
+        log.info("subnet: [{}]",subnet);
+        log.info("");
 
         return subnet;
     }
@@ -550,8 +546,8 @@ public class OracleCloudService {
                 .forSubnet(getSubnetRequest, Subnet.LifecycleState.Terminated)
                 .execute();
 
-        System.out.println("Deleted Subnet: " + subnet.getId());
-        System.out.println();
+        log.info("Deleted Subnet: [{}]",subnet.getId());
+        log.info("");
     }
 
     private static NetworkSecurityGroup createNetworkSecurityGroup(
