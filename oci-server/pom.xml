@@ -27,7 +27,7 @@
         <url/>
     </scm>
     <properties>
-        <java.version>23</java.version>
+        <java.version>8</java.version>
     </properties>
     <dependencies>
         <dependency>
@@ -40,6 +40,65 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+
+        <!-- Oracle OCI SDK -->
+        <dependency>
+            <groupId>com.oracle.oci.sdk</groupId>
+            <artifactId>oci-java-sdk-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.oracle.oci.sdk</groupId>
+            <artifactId>oci-java-sdk-identity</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.oracle.oci.sdk</groupId>
+            <artifactId>oci-java-sdk-common-httpclient</artifactId>
+        </dependency>
+
+        <!--<dependency>
+            <groupId>com.oracle.oci.sdk</groupId>
+            <artifactId>oci-java-sdk-shaded-full</artifactId>
+            &lt;!&ndash; replace the version below with the latest version &ndash;&gt;
+            <version>3.49.0</version>
+        </dependency>-->
+
+        <dependency>
+            <groupId>com.oracle.oci.sdk</groupId>
+            <artifactId>oci-java-sdk-common-httpclient-jersey</artifactId>
+        </dependency>
+
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+        </dependency>
+        <!--<dependency>
+            <groupId>jakarta.annotation</groupId>
+            <artifactId>jakarta.annotation-api</artifactId>
+            <version>2.0.0</version>
+        </dependency>-->
+
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+            <version>2.4.13</version>
+            <optional>true</optional>
+        </dependency>
+
     </dependencies>
 
     <build>

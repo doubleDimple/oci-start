@@ -43,6 +43,7 @@
             <dependency>
                 <groupId>org.projectlombok</groupId>
                 <artifactId>lombok</artifactId>
+                <version>1.18.24</version>
                 <scope>provided</scope>
             </dependency>
             <dependency>
@@ -137,41 +138,64 @@
             <dependency>
                 <groupId>com.fasterxml.jackson.core</groupId>
                 <artifactId>jackson-core</artifactId>
-                <version>2.9.8</version>
+                <version>2.13.3</version>
             </dependency>
             <dependency>
                 <groupId>com.fasterxml.jackson.core</groupId>
                 <artifactId>jackson-annotations</artifactId>
-                <version>2.9.10</version>
+                <version>2.13.3</version>
             </dependency>
             <dependency>
                 <groupId>com.fasterxml.jackson.core</groupId>
                 <artifactId>jackson-databind</artifactId>
-                <version>2.9.8</version>
-            </dependency>
-
-            <!-- gateway-->
-            <dependency>
-                <groupId>org.springframework.cloud</groupId>
-                <artifactId>spring-cloud-starter-gateway</artifactId>
-                <version>${netflix-eureka-server.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.springframework.cloud</groupId>
-                <artifactId>spring-cloud-starter-circuitbreaker-reactor-resilience4j</artifactId>
-                <version>${circuitbreaker-reactor-resilience4j.version}</version>
+                <version>2.13.3</version>
             </dependency>
 
             <dependency>
-                <groupId>org.springframework.cloud</groupId>
-                <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
-                <version>${netflix-eureka-server.version}</version>
+                <groupId>com.oracle.oci.sdk</groupId>
+                <artifactId>oci-java-sdk-core</artifactId>
+                <version>3.49.0</version>
             </dependency>
+
+            <!-- Oracle OCI SDK -->
             <dependency>
-                <groupId>org.springframework.cloud</groupId>
-                <artifactId>spring-cloud-starter-netflix-eureka-server</artifactId>
-                <version>${netflix-eureka-server.version}</version>
+                <groupId>com.oracle.oci.sdk</groupId>
+                <artifactId>oci-java-sdk-identity</artifactId>
+                <version>3.49.0</version>
             </dependency>
+
+            <dependency>
+                <groupId>com.oracle.oci.sdk</groupId>
+                <artifactId>oci-java-sdk-common-httpclient</artifactId>
+                <version>3.49.0</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.oracle.oci.sdk</groupId>
+                <artifactId>oci-java-sdk-core</artifactId>
+                <version>3.49.0</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.oracle.oci.sdk</groupId>
+                <artifactId>oci-java-sdk-common-httpclient-jersey</artifactId>
+                <version>3.49.0</version>
+            </dependency>
+
+            <!--<dependency>
+            <groupId>com.oracle.oci.sdk</groupId>
+            <artifactId>oci-java-sdk-shaded-full</artifactId>
+            &lt;!&ndash; replace the version below with the latest version &ndash;&gt;
+            <version>3.49.0</version>
+            </dependency>-->
+
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-configuration-processor</artifactId>
+                <version>2.4.13</version>
+                <optional>true</optional>
+            </dependency>
+
         </dependencies>
     </dependencyManagement>
 </project>
