@@ -1,5 +1,6 @@
 package com.doubledimple.ociserver.message;
 
+import com.doubledimple.ociserver.domain.OracleInstanceDetail;
 import com.doubledimple.ociserver.enums.MessageEnum;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -9,6 +10,8 @@ import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 /**
  * @author doubleDimple
@@ -26,8 +29,36 @@ public class TelegramMessageService implements MessageService {
     private String botToken;
 
     @Override
-    public void sendMessage(String message) {
+    public void sendMessage(OracleInstanceDetail instanceData) {
         log.info("推送TG消息开始...");
+        String message = formatMessage(instanceData);
+        doSend(message);
+    }
+
+    @Override
+    public MessageEnum getMessageType() {
+        return MessageEnum.TELEGRAM;
+    }
+
+    @Override
+    public void sendErrorMessage(String s) {
+        doSend(s);
+    }
+
+
+    public String formatMessage(OracleInstanceDetail instanceData){
+        String currentTime = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+
+        return String.format(LEGACY_MESSAGE_TEMPLATE,
+                currentTime,
+                instanceData.getPublicIp(),
+                instanceData.getShape(),
+                instanceData.getImage(),
+                instanceData.getUserName());
+    }
+
+
+    private void doSend(String message){
         try {
             String encodedMessage = URLEncoder.encode(message, "UTF-8");
             String urlString = String.format(TG_URL,
@@ -51,8 +82,12 @@ public class TelegramMessageService implements MessageService {
         }
     }
 
-    @Override
-    public MessageEnum getMessageType() {
-        return MessageEnum.TELEGRAM;
-    }
+
+    private static final String LEGACY_MESSAGE_TEMPLATE =
+            "🚀 *New Instance Deployed Successfully*\n\n" +
+                    "⏰ Timestamp: `%s`\n\n" +
+                    "📊 *Instance Details:*\n" +
+                    "• 🆔 IP: `%s`\n" +
+                    "The source code address is:(https://github.com/doubleDimple)\n\n" +
+                    "_Powered by oci-start";
 }

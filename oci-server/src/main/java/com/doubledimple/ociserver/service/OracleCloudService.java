@@ -2,8 +2,11 @@ package com.doubledimple.ociserver.service;
 
 import com.doubledimple.ociserver.config.MultiUserAuthenticationDetailsProvider;
 import com.doubledimple.ociserver.config.OracleUsersConfig;
+import com.doubledimple.ociserver.constant.SystemScriptShell;
+import com.doubledimple.ociserver.domain.OracleInstanceDetail;
 import com.doubledimple.ociserver.domain.User;
 import com.doubledimple.ociserver.enums.ArchitectureEnum;
+import com.doubledimple.ociserver.enums.OperationSystemEnum;
 import com.oracle.bmc.auth.SimpleAuthenticationDetailsProvider;
 import com.oracle.bmc.core.BlockstorageClient;
 import com.oracle.bmc.core.ComputeClient;
@@ -17,14 +20,18 @@ import com.oracle.bmc.identity.IdentityClient;
 import com.oracle.bmc.identity.model.AvailabilityDomain;
 import com.oracle.bmc.identity.requests.ListAvailabilityDomainsRequest;
 import com.oracle.bmc.identity.responses.ListAvailabilityDomainsResponse;
+import com.oracle.bmc.model.BmcException;
 import com.oracle.bmc.workrequests.WorkRequestClient;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
+
+import static com.oracle.bmc.core.model.Shape.BillingType.AlwaysFree;
 
 /**
  * @author doubleDimple
@@ -34,33 +41,41 @@ import java.util.stream.Collectors;
 @Slf4j
 public class OracleCloudService {
 
-    private static final String OPERATING_SYSTEM = "Oracle Linux";
+    private static final String OUT_OF_CAPACITY = "Out of capacity";
+    public static final String CAPACITY = "capacity";
+    public static final String LIMIT_EXCEEDED = "LimitExceeded";
     private final OracleUsersConfig oracleUsersConfig;
 
     @Autowired
     private MultiUserAuthenticationDetailsProvider multiUserAuthenticationDetailsProvider;
 
-    private final Map<String,Long> count = new ConcurrentHashMap<>();
+    private final Map<String, Long> count = new ConcurrentHashMap<>();
 
     @Autowired
     public OracleCloudService(OracleUsersConfig oracleUsersConfig) {
         this.oracleUsersConfig = oracleUsersConfig;
     }
 
-    public boolean createInstanceData(User user) throws Exception {
+    public OracleInstanceDetail createInstanceData(User user) throws Exception {
+        OracleInstanceDetail oracleInstanceDetail = new OracleInstanceDetail();
         Long aLong = 0L;
-        if (count.containsKey(user.getUserName())){
+        if (count.containsKey(user.getUserName())) {
             aLong = count.get(user.getUserName());
-            aLong +=1;
-            count.put(user.getUserName(),aLong);
-        }else{
-            aLong +=1;
-            count.put(user.getUserName(),aLong);
+            aLong += 1;
+            count.put(user.getUserName(), aLong);
+        } else {
+            aLong += 1;
+            count.put(user.getUserName(), aLong);
         }
 
-        log.info("用户:[{}] 开始执行第[{}]次创建实例操作......",user.getUserName(),aLong);
+        log.info("用户:[{}] 开始执行第[{}]次创建实例操作......", user.getUserName(), aLong);
 
-        Map<String, SimpleAuthenticationDetailsProvider> providerMap = multiUserAuthenticationDetailsProvider.simpleAuthenticationDetailsProvider();
+        Map<String, SimpleAuthenticationDetailsProvider> providerMap = null;
+        try {
+            providerMap = multiUserAuthenticationDetailsProvider.simpleAuthenticationDetailsProvider();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
 
         SimpleAuthenticationDetailsProvider authenticationDetailsProvider = providerMap.get(user.getUserId());
         String compartmentId = authenticationDetailsProvider.getTenantId();
@@ -82,13 +97,13 @@ public class OracleCloudService {
                 BlockstorageClient.builder().build(authenticationDetailsProvider);
         blockstorageClient.setRegion(user.getRegion());
 
-        AvailabilityDomain availablityDomain =
-                getAvailabilityDomains(identityClient, compartmentId);
-        log.info("<==================Start get Shape==================>");
-        Shape shape = getShape(computeClient, compartmentId, availablityDomain,user);
-        Image image = getImage(computeClient, compartmentId, shape);
-        String networkCidrBlock = getCidr(virtualNetworkClient,compartmentId);
-
+        List<AvailabilityDomain> availabilityDomains = null;
+        try {
+            availabilityDomains = getAvailabilityDomains(identityClient, compartmentId);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        int size = availabilityDomains.size();
         String kmsKeyId = null;
         Vcn vcn = null;
         InternetGateway internetGateway = null;
@@ -99,82 +114,86 @@ public class OracleCloudService {
         Instance instanceFromBootVolume = null;
         BootVolume bootVolume = null;
         try {
-            vcn = createVcn(virtualNetworkClient, compartmentId, networkCidrBlock);
+            for (AvailabilityDomain availablityDomain : availabilityDomains) {
+                try {
+                    log.info("<==================Start get Shape==================>");
+                    List<Shape> shapes = getShape(computeClient, compartmentId, availablityDomain, user);
+                    if (shapes.size() == 0)continue;
+                    for (Shape shape : shapes) {
+                        Image image = getImage(computeClient, compartmentId, shape, user);
+                        if (image == null) continue;
 
-            internetGateway = createInternetGateway(virtualNetworkClient, compartmentId, vcn);
-            addInternetGatewayToDefaultRouteTable(virtualNetworkClient, vcn, internetGateway);
+                        String networkCidrBlock = getCidr(virtualNetworkClient, compartmentId);
+                        vcn = createVcn(virtualNetworkClient, compartmentId, networkCidrBlock);
 
-            subnet = createSubnet(virtualNetworkClient, compartmentId, availablityDomain, networkCidrBlock, vcn);
-            networkSecurityGroup =
-                    createNetworkSecurityGroup(virtualNetworkClient, compartmentId, vcn);
-            addNetworkSecurityGroupSecurityRules(
-                    virtualNetworkClient, networkSecurityGroup, networkCidrBlock);
+                        internetGateway = createInternetGateway(virtualNetworkClient, compartmentId, vcn);
+                        addInternetGatewayToDefaultRouteTable(virtualNetworkClient, vcn, internetGateway);
 
-            log.info("current user:[{}] and region:[{}] Instance is being created via image and KMS key ...",user.getUserName(),user.getRegion());
-            String rootPassword = user.getRootPassword();
-            // 准备 cloud-init 脚本
-            String cloudInitScript =
-                    "#cloud-config\n" +
-                            "ssh_pwauth: yes\n" +
-                            "chpasswd:\n" +
-                            "  list: |\n" +
-                            "    root:"+rootPassword +
-                            "  expire: false\n" +
-                            "runcmd:\n" +
-                            "  - sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config\n" +
-                            "  - sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config\n" +
-                            "  - systemctl restart sshd";
-            launchInstanceDetails =
-                    createLaunchInstanceDetails(
-                            compartmentId,
-                            availablityDomain,
-                            shape,
-                            image,
-                            subnet,
-                            networkSecurityGroup,
-                            cloudInitScript);
-            instance = createInstance(computeWaiters, launchInstanceDetails);
-            printInstance(computeClient, virtualNetworkClient, instance);
+                        subnet = createSubnet(virtualNetworkClient, compartmentId, availablityDomain, networkCidrBlock, vcn);
+                        if (null == subnet){
+                            continue;
+                        }
+                        networkSecurityGroup =
+                                createNetworkSecurityGroup(virtualNetworkClient, compartmentId, vcn);
+                        addNetworkSecurityGroupSecurityRules(
+                                virtualNetworkClient, networkSecurityGroup, networkCidrBlock);
 
-            log.info("Current User:[{}] and Region:[{}] Instance is being created via boot volume ...",user.getUserName(),user.getRegion());
-            log.info("<================================================>");
-            bootVolume =
-                    createBootVolume(
-                            blockstorageClient, compartmentId, availablityDomain, image, kmsKeyId);
-            launchInstanceDetails =
-                    createLaunchInstanceDetailsFromBootVolume(launchInstanceDetails, bootVolume);
-            instanceFromBootVolume = createInstance(computeWaiters, launchInstanceDetails);
-            printInstance(computeClient, virtualNetworkClient, instanceFromBootVolume);
+                        log.info("current user:[{}] and region:[{}] Instance is being created via image and KMS key ...", user.getUserName(), user.getRegion());
 
+                        String cloudInitScript = SystemScriptShell.getShell(user.getRootPassword());
+                        launchInstanceDetails = createLaunchInstanceDetails(
+                                compartmentId, availablityDomain,
+                                shape, image,
+                                subnet, networkSecurityGroup,
+                                cloudInitScript, user);
+                        instance = createInstance(computeWaiters, launchInstanceDetails);
+                        printInstance(computeClient, virtualNetworkClient, instance, oracleInstanceDetail);
+
+                        log.info("Current User:[{}] and Region:[{}] Instance is being created via boot volume ...", user.getUserName(), user.getRegion());
+                        log.info("<================================================>");
+                        //bootVolume = createBootVolume(blockstorageClient, compartmentId, availablityDomain, image, kmsKeyId);
+                        launchInstanceDetails = createLaunchInstanceDetailsFromBootVolume(launchInstanceDetails, bootVolume);
+                        //instanceFromBootVolume = createInstance(computeWaiters, launchInstanceDetails);
+                        //printInstance(computeClient, virtualNetworkClient, instanceFromBootVolume, oracleInstanceDetail);
+                        oracleInstanceDetail.setImage(image.getId());
+                        oracleInstanceDetail.setUserName(user.getUserName());
+                        oracleInstanceDetail.setShape(shape.getShape());
+                    }
+                } catch (Exception e) {
+                    if (e instanceof BmcException) {
+                        BmcException error = (BmcException) e;
+                        if (error.getStatusCode() == 500 && error.getMessage().contains(CAPACITY)) {
+                            size--;
+                            if (size > 0) {
+                                log.warn("当前区域容量不足,换可用区继续执行....");
+                            } else {
+                                log.warn("所有区域都容量不足,稍后重试");
+                            }
+                        } else if (error.getStatusCode() == 400 && error.getMessage().contains(LIMIT_EXCEEDED)){
+                            log.warn("无法创建 always free 机器.配额已经超过免费额度");
+                            throw e;
+                        }
+                        else {
+                            //clearAllDetails(computeClient, virtualNetworkClient, instanceFromBootVolume, instance, networkSecurityGroup, internetGateway, subnet, vcn);
+                            log.warn("出现错误了,原因为:{}", e.getMessage());
+                        }
+                    } else {
+                        //clearAllDetails(computeClient, virtualNetworkClient, instanceFromBootVolume, instance, networkSecurityGroup, internetGateway, subnet, vcn);
+                        log.warn("出现错误了,原因为:{}", e.getMessage());
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error(e.getMessage());
+            throw e;
         } finally {
-            if (instanceFromBootVolume != null) {
-                terminateInstance(computeClient, instanceFromBootVolume);
-            }
-            if (instance != null) {
-                terminateInstance(computeClient, instance);
-            }
-            if (networkSecurityGroup != null) {
-                clearNetworkSecurityGroupSecurityRules(virtualNetworkClient, networkSecurityGroup);
-                deleteNetworkSecurityGroup(virtualNetworkClient, networkSecurityGroup);
-            }
-            if (internetGateway != null) {
-                clearRouteRulesFromDefaultRouteTable(virtualNetworkClient, vcn);
-                deleteInternetGateway(virtualNetworkClient, internetGateway);
-            }
-            if (subnet != null) {
-                deleteSubnet(virtualNetworkClient, subnet);
-            }
-            if (vcn != null) {
-                deleteVcn(virtualNetworkClient, vcn);
-            }
-
             identityClient.close();
             computeClient.close();
             workRequestClient.close();
             virtualNetworkClient.close();
             blockstorageClient.close();
         }
-        return true;
+        return oracleInstanceDetail;
     }
 
     private String getCidr(VirtualNetworkClient virtualNetworkClient, String compartmentId) {
@@ -200,30 +219,21 @@ public class OracleCloudService {
                     System.out.println("  " + cidr);
                 }
             }
-            log.info("<================================================>");        }
+            log.info("<================================================>");
+        }
         return listVcnsResponse.getItems().get(0).getCidrBlock();
     }
 
-    private static AvailabilityDomain getAvailabilityDomains(
+    private static List<AvailabilityDomain> getAvailabilityDomains(
             IdentityClient identityClient, String compartmentId) throws Exception {
         ListAvailabilityDomainsResponse listAvailabilityDomainsResponse =
-                identityClient.listAvailabilityDomains(
-                        ListAvailabilityDomainsRequest.builder()
-                                .compartmentId(compartmentId)
-                                .build());
-        List<AvailabilityDomain> availabilityDomains = listAvailabilityDomainsResponse.getItems();
-        // For demonstration, we just return the first availability domain but for Production code
-        // you should
-        // have a better way of determining what is needed
-        AvailabilityDomain availabilityDomain = availabilityDomains.get(0);
-
-        log.info("Found Availability Domain: " + availabilityDomain.getName());
-        log.info("<================================>");
-
-        return availabilityDomain;
+                identityClient.listAvailabilityDomains(ListAvailabilityDomainsRequest.builder()
+                        .compartmentId(compartmentId)
+                        .build());
+        return listAvailabilityDomainsResponse.getItems();
     }
 
-    private static Shape getShape(
+    private static List<Shape> getShape(
             ComputeClient computeClient,
             String compartmentId,
             AvailabilityDomain availabilityDomain,
@@ -245,35 +255,37 @@ public class OracleCloudService {
         if (vmShapes.isEmpty()) {
             throw new IllegalStateException("No available VM shape was found.");
         }
-        Shape shape = vmShapes.get(0);
-
+        List<Shape> shapesNewList = new ArrayList<>();
         ArchitectureEnum type = ArchitectureEnum.getType(user.getArchitecture());
-        if (type == null){
+        if (type == null) {
             type = ArchitectureEnum.ARM;
         }
         for (Shape vmShape : vmShapes) {
-            if (vmShape.getShape().equals(type.getShapeDetail())){
-                return vmShape;
+            if (type.getShapeDetail().equals(vmShape.getShape())) {
+                shapesNewList.add(vmShape);
             }
+
             log.info("Found Shape: " + vmShape.getShape());
             log.info("Billing Type: " + vmShape.getBillingType());
             log.info("<====================================>");
         }
-        return shape;
+        return shapesNewList;
     }
 
-    private static Image getImage(ComputeClient computeClient, String compartmentId, Shape shape)
+    private static Image getImage(ComputeClient computeClient, String compartmentId, Shape shape, User user)
             throws Exception {
+        OperationSystemEnum systemType = OperationSystemEnum.getSystemType(user.getOperationSystem());
         ListImagesRequest listImagesRequest =
                 ListImagesRequest.builder()
                         .shape(shape.getShape())
                         .compartmentId(compartmentId)
-                        .operatingSystem(OPERATING_SYSTEM)
+                        .operatingSystem(systemType.getType())
+                        .operatingSystemVersion(systemType.getVersion())
                         .build();
         ListImagesResponse response = computeClient.listImages(listImagesRequest);
         List<Image> images = response.getItems();
         if (images.isEmpty()) {
-            throw new IllegalStateException("No available image was found.");
+            return null;
         }
 
         // For demonstration, we just return the first image but for Production code you should have
@@ -298,7 +310,7 @@ public class OracleCloudService {
                 .build();
 
         ListVcnsResponse listVcnsResponse = virtualNetworkClient.listVcns(build);
-        if (listVcnsResponse.getItems().size() > 0){
+        if (listVcnsResponse.getItems().size() > 0) {
             return listVcnsResponse.getItems().get(0);
         }
         CreateVcnDetails createVcnDetails =
@@ -351,10 +363,11 @@ public class OracleCloudService {
         //查询网关是否存在,不存在再创建
         ListInternetGatewaysRequest build = ListInternetGatewaysRequest.builder()
                 .compartmentId(compartmentId)
-                .displayName(internetGatewayName).build();
+                .displayName(internetGatewayName)
+                .build();
 
         ListInternetGatewaysResponse listInternetGatewaysResponse = virtualNetworkClient.listInternetGateways(build);
-        if (listInternetGatewaysResponse.getItems().size() > 0){
+        if (listInternetGatewaysResponse.getItems().size() > 0) {
             return listInternetGatewaysResponse.getItems().get(0);
         }
 
@@ -417,6 +430,7 @@ public class OracleCloudService {
                 GetRouteTableRequest.builder().rtId(vcn.getDefaultRouteTableId()).build();
         GetRouteTableResponse getRouteTableResponse =
                 virtualNetworkClient.getRouteTable(getRouteTableRequest);
+
         List<RouteRule> routeRules = getRouteTableResponse.getRouteTable().getRouteRules();
 
         System.out.println("Current Route Rules in Default Route Table");
@@ -424,22 +438,39 @@ public class OracleCloudService {
         routeRules.forEach(System.out::println);
         System.out.println();
 
+        // 检查是否已有相同的路由规则
+        boolean ruleExists = routeRules.stream()
+                .anyMatch(rule -> "0.0.0.0/0".equals(rule.getDestination())
+                        && rule.getDestinationType() == RouteRule.DestinationType.CidrBlock);
+
+        if (ruleExists) {
+            System.out.println("The route rule for destination 0.0.0.0/0 already exists.");
+            return; // 退出方法，不添加新的规则
+        }
+
+        // 创建新的路由规则
         RouteRule internetAccessRoute =
                 RouteRule.builder()
                         .destination("0.0.0.0/0")
                         .destinationType(RouteRule.DestinationType.CidrBlock)
                         .networkEntityId(internetGateway.getId())
                         .build();
-        routeRules.add(internetAccessRoute);
+
+        // 将新的规则添加到新的列表中
+        List<RouteRule> updatedRouteRules = new ArrayList<>(routeRules);
+        updatedRouteRules.add(internetAccessRoute);
+
         UpdateRouteTableDetails updateRouteTableDetails =
-                UpdateRouteTableDetails.builder().routeRules(routeRules).build();
+                UpdateRouteTableDetails.builder().routeRules(updatedRouteRules).build();
         UpdateRouteTableRequest updateRouteTableRequest =
                 UpdateRouteTableRequest.builder()
                         .updateRouteTableDetails(updateRouteTableDetails)
                         .rtId(vcn.getDefaultRouteTableId())
                         .build();
+
         virtualNetworkClient.updateRouteTable(updateRouteTableRequest);
 
+        // 等待路由表更新完成
         getRouteTableResponse =
                 virtualNetworkClient
                         .getWaiters()
@@ -489,17 +520,28 @@ public class OracleCloudService {
         ListSubnetsRequest listRequest = ListSubnetsRequest.builder()
                 .compartmentId(compartmentId)
                 .vcnId(vcn.getId())
-                .displayName(subnetName)
+                //.displayName(subnetName)
                 .build();
         ListSubnetsResponse listResponse = virtualNetworkClient.listSubnets(listRequest);
-        if (listResponse.getItems().size() > 0){
+        if (listResponse.getItems().size() > 0) {
             // 如果找到已有的子网，返回其 ID
+            List<Subnet> items = listResponse.getItems();
+            int size = 0;
             for (Subnet subnet : listResponse.getItems()) {
-                if (subnet.getDisplayName().equals(subnetName)) {
+                if (subnet.getAvailabilityDomain().equals(availabilityDomain.getName()) && subnet.getDisplayName().equals(subnetName)) {
                     return subnet;
+                }else{
+                    //不匹配
+                    deleteSubnet(virtualNetworkClient,subnet);
+                    size ++;
                 }
             }
+            if (items.size() == size){
+                return  null;
+            }
         }
+
+
 
         CreateSubnetDetails createSubnetDetails =
                 CreateSubnetDetails.builder()
@@ -527,7 +569,7 @@ public class OracleCloudService {
         Subnet subnet = getSubnetResponse.getSubnet();
 
         log.info("Created Subnet: " + subnet.getId());
-        log.info("subnet: [{}]",subnet);
+        log.info("subnet: [{}]", subnet);
         log.info("");
 
         return subnet;
@@ -546,14 +588,14 @@ public class OracleCloudService {
                 .forSubnet(getSubnetRequest, Subnet.LifecycleState.Terminated)
                 .execute();
 
-        log.info("Deleted Subnet: [{}]",subnet.getId());
+        log.info("Deleted Subnet: [{}]", subnet.getId());
         log.info("");
     }
 
     private static NetworkSecurityGroup createNetworkSecurityGroup(
             VirtualNetworkClient virtualNetworkClient, String compartmentId, Vcn vcn)
             throws Exception {
-        String networkSecurityGroupName = "java-sdk-example-nsg";
+        String networkSecurityGroupName = System.currentTimeMillis() + "-nsg";
 
         CreateNetworkSecurityGroupDetails createNetworkSecurityGroupDetails =
                 CreateNetworkSecurityGroupDetails.builder()
@@ -571,7 +613,7 @@ public class OracleCloudService {
                 displayName(networkSecurityGroupName).vcnId(vcn.getId()).build();
 
         ListNetworkSecurityGroupsResponse listNetworkSecurityGroupsResponse = virtualNetworkClient.listNetworkSecurityGroups(build);
-        if (listNetworkSecurityGroupsResponse.getItems().size() > 0){
+        if (listNetworkSecurityGroupsResponse.getItems().size() > 0) {
             return listNetworkSecurityGroupsResponse.getItems().get(0);
         }
 
@@ -751,17 +793,15 @@ public class OracleCloudService {
             Image image,
             Subnet subnet,
             NetworkSecurityGroup networkSecurityGroup,
-            String script) {
-        String instanceName = "java-sdk-example-instance";
-        Map<String, String> metadata = new HashMap<>();
+            String script,
+            User user) {
+        String instanceName = System.currentTimeMillis() + "-instance";
         String encodedCloudInitScript = Base64.getEncoder().encodeToString(script.getBytes());
-        metadata.put("user_data",encodedCloudInitScript);
-        metadata = Collections.unmodifiableMap(metadata);
         Map<String, Object> extendedMetadata = new HashMap<>();
-        extendedMetadata.put(
+        /*extendedMetadata.put(
                 "java-sdk-example-extended-metadata-key",
                 "java-sdk-example-extended-metadata-value");
-        extendedMetadata = Collections.unmodifiableMap(extendedMetadata);
+        extendedMetadata = Collections.unmodifiableMap(extendedMetadata);*/
         InstanceSourceViaImageDetails instanceSourceViaImageDetails =
                 InstanceSourceViaImageDetails.builder()
                         .imageId(image.getId())
@@ -779,10 +819,10 @@ public class OracleCloudService {
                 .compartmentId(compartmentId)
                 .displayName(instanceName)
                 // faultDomain is optional parameter
-                .faultDomain("FAULT-DOMAIN-1")
+                //.faultDomain("FAULT-DOMAIN-2")
                 .sourceDetails(instanceSourceViaImageDetails)
-                .metadata(metadata)
-                .extendedMetadata(extendedMetadata)
+                .metadata(Collections.singletonMap("user_data", encodedCloudInitScript))
+                //.extendedMetadata(extendedMetadata)
                 .shape(shape.getShape())
                 .createVnicDetails(createVnicDetails)
                 // agentConfig is an optional parameter
@@ -790,13 +830,13 @@ public class OracleCloudService {
                 //配置核心和内存
                 .shapeConfig(LaunchInstanceShapeConfigDetails.
                         builder().
-                        ocpus(1F).
-                        memoryInGBs(1F).
+                        ocpus(user.getOcpus()).
+                        memoryInGBs(user.getMemory()).
                         build())
                 //配置磁盘大小
                 .sourceDetails(InstanceSourceViaImageDetails.builder()
                         .imageId(image.getId())
-                        .bootVolumeSizeInGBs(50L)
+                        .bootVolumeSizeInGBs(user.getDisk())
                         .build())
                 .build();
     }
@@ -822,7 +862,8 @@ public class OracleCloudService {
     private static void printInstance(
             ComputeClient computeClient,
             VirtualNetworkClient virtualNetworkClient,
-            Instance instance) {
+            Instance instance,
+            OracleInstanceDetail oracleInstanceDetail) {
         ListVnicAttachmentsRequest listVnicAttachmentsRequest =
                 ListVnicAttachmentsRequest.builder()
                         .compartmentId(instance.getCompartmentId())
@@ -841,9 +882,9 @@ public class OracleCloudService {
         log.info("Virtual Network Interface Card :" + vnic.getId());
         log.info("Public IP :" + vnic.getPublicIp());
         log.info("Private IP :" + vnic.getPrivateIp());
-        log.info("vnic: [{}]",vnic);
+        log.info("vnic: [{}]", vnic);
         log.info("<=======================================>");
-
+        oracleInstanceDetail.setPublicIp(vnic.getPublicIp());
         InstanceAgentConfig instanceAgentConfig = instance.getAgentConfig();
         boolean monitoringEnabled =
                 (instanceAgentConfig != null) && !instanceAgentConfig.getIsMonitoringDisabled();
@@ -930,5 +971,33 @@ public class OracleCloudService {
                 .sourceDetails(instanceSourceViaBootVolumeDetails)
                 .agentConfig(launchInstanceAgentConfigDetails)
                 .build();
+    }
+
+
+    private void clearAllDetails(ComputeClient computeClient, VirtualNetworkClient virtualNetworkClient, Instance instanceFromBootVolume, Instance instance, NetworkSecurityGroup networkSecurityGroup, InternetGateway internetGateway, Subnet subnet, Vcn vcn) {
+        try {
+            if (instanceFromBootVolume != null) {
+                terminateInstance(computeClient, instanceFromBootVolume);
+            }
+            if (instance != null) {
+                terminateInstance(computeClient, instance);
+            }
+            if (networkSecurityGroup != null) {
+                clearNetworkSecurityGroupSecurityRules(virtualNetworkClient, networkSecurityGroup);
+                deleteNetworkSecurityGroup(virtualNetworkClient, networkSecurityGroup);
+            }
+            if (internetGateway != null) {
+                clearRouteRulesFromDefaultRouteTable(virtualNetworkClient, vcn);
+                deleteInternetGateway(virtualNetworkClient, internetGateway);
+            }
+            if (subnet != null) {
+                deleteSubnet(virtualNetworkClient, subnet);
+            }
+            /*if (vcn != null) {
+                deleteVcn(virtualNetworkClient, vcn);
+            }*/
+        } catch (Exception e) {
+            log.warn("Clear is error reason:[{}]", e.getMessage());
+        }
     }
 }

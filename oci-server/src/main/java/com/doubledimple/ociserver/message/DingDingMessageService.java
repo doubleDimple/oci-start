@@ -1,5 +1,6 @@
 package com.doubledimple.ociserver.message;
 
+import com.doubledimple.ociserver.domain.OracleInstanceDetail;
 import com.doubledimple.ociserver.enums.MessageEnum;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,12 +22,17 @@ public class DingDingMessageService implements MessageService {
     private static final String DING_DING_URL="https://api.telegram.org/bot%s/sendMessage?chat_id=%s&text=%s";
 
     @Override
-    public void sendMessage(String message) {
+    public void sendMessage(OracleInstanceDetail instanceData) {
        log.info("推送钉钉消息开始.....");
     }
 
     @Override
     public MessageEnum getMessageType() {
         return MessageEnum.DING_DING;
+    }
+
+    @Override
+    public void sendErrorMessage(String s) {
+
     }
 }

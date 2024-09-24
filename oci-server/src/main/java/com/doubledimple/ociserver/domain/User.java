@@ -14,11 +14,12 @@ public class User {
     private String tenancy;
     private String region;
     private String keyFile;
-    private int ocpus;
-    private int memory;
-    private int disk;
+    private float ocpus = 1F;
+    private float memory = 1F;
+    private Long disk = 50L;
     private String architecture;
     private int interval;
     private String rootPassword;
+    private String operationSystem;
 
 }
