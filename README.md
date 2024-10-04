@@ -7,7 +7,9 @@
   2.1:登录linux服务器,切换到root用户下.
   2.2:创建文件
 
-  wget https://github.com/doubleDimple/oci-start/releases/tag/v-1.0.0/oci-start.shell
-  wget https://github.com/doubleDimple/oci-start/releases/tag/v-1.0.0/oci-start.properties
-  wget https://github.com/doubleDimple/oci-start/releases/tag/v-1.0.0/oci-start-release.jar
+ wget https://github.com/doubleDimple/oci-start/releases/download/v-1.0.0/oci-start.properties
+ 
+ wget https://github.com/doubleDimple/oci-start/releases/download/v-1.0.0/oci-start.shell
+ 
+ wget https://github.com/doubleDimple/oci-start/releases/download/v-1.0.0/oci-start-release.jar
 
