@@ -65,20 +65,17 @@
   spring.application.name=oci-server
 
 5:启动
+
   5.1:给oci-start.sh 执行权限添加
-  
   chmod 777 oci-start.sh
 
   5.2:启动程序
-
   ./oci-start.sh start
 
   5.3:查看程序启动状态
-
   ./oci-start.sh status
 
   5.4:停止程序
-
   ./oci-start.sh stop
   
     
