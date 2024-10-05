@@ -1,12 +1,12 @@
-1:说明:
+一:说明:
 
     1.1主要功能:使用api完成实例创建的程序,此程序支持多租户创建实例.
   
     1.2此程序免费开源,仅可用于测试和学习,不可用于其他所有商业或者非法用途.
 
-2:环境说明: 需要提前安装jdk8+版本
+二:环境说明: 需要提前安装jdk8+版本
 
-3:部署说明:
+三:部署说明:
 
       3.1:登录linux服务器,切换到root用户下.
   
@@ -26,7 +26,7 @@
     
           wget https://github.com/doubleDimple/oci-start/releases/download/v-1.0.0/oci-start.properties
 
-4:配置说明:oci-start.properties文件里面的配置需要自行去修改,如果需要配置多个api进行通时创建实例,直接将  ###oracle抢机配置下的内容复制一份,将里面的user1全部修改为user2即可
+四:配置说明:oci-start.properties文件里面的配置需要自行去修改,如果需要配置多个api进行通时创建实例,直接将  ###oracle抢机配置下的内容复制一份,将里面的user1全部修改为user2即可
   以此类推,配置多个api
  
   ###基本配置
@@ -66,7 +66,7 @@
   
     spring.application.name=oci-server
 
-5:启动
+五:启动
 
   5.1:给oci-start.sh 执行权限添加
     chmod 777 oci-start.sh
