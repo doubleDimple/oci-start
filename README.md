@@ -60,6 +60,24 @@
   oracle.users.user1.rootPassword=实例的root用户密码
   
   spring.application.name=oci-server
+
+4:启动
+  4.1:给oci-start.sh 执行权限添加
+  
+  chmod 777 oci-start.sh
+
+  4.2:启动程序
+
+  ./oci-start.sh start
+
+  4.3:查看程序启动状态
+
+  ./oci-start.sh status
+
+  4.4:停止程序
+
+  ./oci-start.sh stop
+  
     
 
  
