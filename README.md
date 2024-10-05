@@ -30,6 +30,8 @@
   以此类推,配置多个api
  
   ###基本配置
+
+    spring.application.name=oci-server
   
     server.port=23125(端口号,请自行指定)
   
@@ -38,6 +40,7 @@
     telegram.chatId=(tg的chatid,用户实例创建提醒,目前必须配置)
   
   ###oracle抢机配置
+  
     oracle.users.user1.userId=oracle租户名
   
     oracle.users.user1.userName=当前自定义的名称,当配置多个租户的api的时候不可重复
@@ -63,8 +66,7 @@
     oracle.users.user1.interval=50(创建实例循环时间,单位为秒)
   
     oracle.users.user1.rootPassword=实例的root用户密码
-  
-    spring.application.name=oci-server
+
 
 五:启动
 
