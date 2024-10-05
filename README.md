@@ -7,6 +7,7 @@
 2:环境说明: 需要提前安装jdk8+版本
 
 3:部署说明:
+
       3.1:登录linux服务器,切换到root用户下.
   
       3.2:创建文件夹 mkdir -p oci-start && cd oci-start
