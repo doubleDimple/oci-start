@@ -3,26 +3,28 @@
   1.1主要功能:使用api完成实例创建的程序,此程序支持多租户创建实例.
   1.2此程序免费开源,仅可用于测试和学习,不可用于其他所有商业或者非法用途.
 
-2:部署说明:
-  2.1:登录linux服务器,切换到root用户下.
+2:环境说明: 需要提前安装jdk8+版本
+
+3:部署说明:
+  3.1:登录linux服务器,切换到root用户下.
   
-  2.2:创建文件夹 mkdir -p oci-start && cd oci-start
+  3.2:创建文件夹 mkdir -p oci-start && cd oci-start
   
-  2.3:下载部署包文件
+  3.3:下载部署包文件
   
-    2.3.1:下载jar包
+    3.3.1:下载jar包
     
       wget https://github.com/doubleDimple/oci-start/releases/download/v-1.0.0/oci-start-release.jar
       
-    2.3.2:下载运行脚本
+    3.3.2:下载运行脚本
     
       wget https://github.com/doubleDimple/oci-start/releases/download/v-1.0.0/oci-start.sh
       
-    2.3.3:下载配置文件模板
+    3.3.3:下载配置文件模板
     
       wget https://github.com/doubleDimple/oci-start/releases/download/v-1.0.0/oci-start.properties
 
-3:配置说明:oci-start.properties文件里面的配置需要自行去修改,如果需要配置多个api进行通时创建实例,直接将  ###oracle抢机配置下的内容复制一份,将里面的user1全部修改为user2即可
+4:配置说明:oci-start.properties文件里面的配置需要自行去修改,如果需要配置多个api进行通时创建实例,直接将  ###oracle抢机配置下的内容复制一份,将里面的user1全部修改为user2即可
   以此类推,配置多个api
  
   ###基本配置
@@ -62,20 +64,20 @@
   
   spring.application.name=oci-server
 
-4:启动
-  4.1:给oci-start.sh 执行权限添加
+5:启动
+  5.1:给oci-start.sh 执行权限添加
   
   chmod 777 oci-start.sh
 
-  4.2:启动程序
+  5.2:启动程序
 
   ./oci-start.sh start
 
-  4.3:查看程序启动状态
+  5.3:查看程序启动状态
 
   ./oci-start.sh status
 
-  4.4:停止程序
+  5.4:停止程序
 
   ./oci-start.sh stop
   
