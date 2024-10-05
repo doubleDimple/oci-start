@@ -22,8 +22,9 @@
     
       wget https://github.com/doubleDimple/oci-start/releases/download/v-1.0.0/oci-start.properties
 
-3:配置说明:oci-start.properties文件里面的配置需要自行去修改,若果需要配置多个api进行通时创建实例,直接将  ###oracle抢机配置  下的复制一份,将里面的user1全部修改为user2即可
+3:配置说明:oci-start.properties文件里面的配置需要自行去修改,如果需要配置多个api进行通时创建实例,直接将  ###oracle抢机配置下的内容复制一份,将里面的user1全部修改为user2即可
   以此类推,配置多个api
+ 
   ###基本配置
   
   server.port=23125(端口号,请自行指定)
