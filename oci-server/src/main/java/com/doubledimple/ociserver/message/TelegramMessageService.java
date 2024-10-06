@@ -52,8 +52,6 @@ public class TelegramMessageService implements MessageService {
         return String.format(LEGACY_MESSAGE_TEMPLATE,
                 currentTime,
                 instanceData.getPublicIp(),
-                instanceData.getShape(),
-                instanceData.getImage(),
                 instanceData.getUserName());
     }
 
@@ -88,6 +86,7 @@ public class TelegramMessageService implements MessageService {
                     "Timestamp: `%s`\n\n" +
                     "Instance Details:*\n" +
                     "IP: `%s`\n" +
+                    "USER: `%s`\n" +
                     "The source code address is:(https://github.com/doubleDimple)\n\n" +
                     "_Powered by oci-start.sh-start";
 }

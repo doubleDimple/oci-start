@@ -58,6 +58,7 @@ public class OracleInstanceManager {
     }
 
     private void sendNotification(String userName, OracleInstanceDetail instanceData) {
+        instanceData.setUserName(userName);
         messageFactory.getType(MessageEnum.TELEGRAM).sendMessage(instanceData);
     }
 

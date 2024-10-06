@@ -120,7 +120,7 @@ public class OracleCloudService {
                 try {
                     log.info("<==================Start get Shape==================>");
                     List<Shape> shapes = getShape(computeClient, compartmentId, availablityDomain, user);
-                    if (shapes.size() == 0)continue;
+                    if (shapes.size() == 0) continue;
                     for (Shape shape : shapes) {
                         Image image = getImage(computeClient, compartmentId, shape, user);
                         if (image == null) continue;
@@ -132,7 +132,7 @@ public class OracleCloudService {
                         addInternetGatewayToDefaultRouteTable(virtualNetworkClient, vcn, internetGateway);
 
                         subnet = createSubnet(virtualNetworkClient, compartmentId, availablityDomain, networkCidrBlock, vcn);
-                        if (null == subnet){
+                        if (null == subnet) {
                             continue;
                         }
                         networkSecurityGroup =
@@ -168,15 +168,14 @@ public class OracleCloudService {
                                 (error.getMessage().contains(CAPACITY.getErrorType()) || error.getMessage().contains(CAPACITY_HOST.getErrorType()))) {
                             size--;
                             if (size > 0) {
-                                log.warn("当前区域容量不足,换可用区继续执行....,具体原因为:[{}]",e.getMessage());
+                                log.warn("当前区域容量不足,换可用区继续执行....,具体原因为:[{}]", e.getMessage());
                             } else {
-                                log.warn("所有区域都容量不足,稍后重试,具体原因为:[{}]",e.getMessage());
+                                log.warn("所有区域都容量不足,稍后重试,具体原因为:[{}]", e.getMessage());
                             }
-                        } else if (error.getStatusCode() == 400 && error.getMessage().contains(LIMIT_EXCEEDED.getErrorType())){
-                            log.warn("无法创建 always free 机器.配额已经超过免费额度,具体原因为:[{}]",error.getMessage());
+                        } else if (error.getStatusCode() == 400 && error.getMessage().contains(LIMIT_EXCEEDED.getErrorType())) {
+                            log.warn("无法创建 always free 机器.配额已经超过免费额度,具体原因为:[{}]", error.getMessage());
                             OciExceptionFactory.createException(LIMIT_EXCEEDED);
-                        }
-                        else {
+                        } else {
                             //clearAllDetails(computeClient, virtualNetworkClient, instanceFromBootVolume, instance, networkSecurityGroup, internetGateway, subnet, vcn);
                             log.warn("出现错误了,原因为:{}", e.getMessage());
                         }
@@ -205,14 +204,14 @@ public class OracleCloudService {
         // 发送请求并获取响应
         ListVcnsResponse listVcnsResponse = virtualNetworkClient.listVcns(listVcnsRequest);
 
-        // 遍历所有 VCN 并打印其 CIDR 块
-        for (Vcn vcn : listVcnsResponse.getItems()) {
-            log.info("VCN Name: " + vcn.getDisplayName());
-            log.info("VCN ID: " + vcn.getId());
-            log.info("CIDR Block: " + vcn.getCidrBlock());
+        if (log.isDebugEnabled()) {
+            // 遍历所有 VCN 并打印其 CIDR 块
+            for (Vcn vcn : listVcnsResponse.getItems()) {
+                log.info("VCN Name: " + vcn.getDisplayName());
+                log.info("VCN ID: " + vcn.getId());
+                log.info("CIDR Block: " + vcn.getCidrBlock());
 
-            // 如果 VCN 有多个 CIDR 块，也打印出来
-            if (log.isDebugEnabled()){
+                // 如果 VCN 有多个 CIDR 块，也打印出来
                 List<String> cidrBlocks = vcn.getCidrBlocks();
                 if (cidrBlocks != null && !cidrBlocks.isEmpty()) {
                     System.out.println("Additional CIDR Blocks:");
@@ -266,7 +265,7 @@ public class OracleCloudService {
                 shapesNewList.add(vmShape);
             }
 
-            if (log.isDebugEnabled()){
+            if (log.isDebugEnabled()) {
                 log.info("Found Shape: " + vmShape.getShape());
                 log.info("Billing Type: " + vmShape.getBillingType());
                 log.info("<====================================>");
@@ -427,7 +426,7 @@ public class OracleCloudService {
 
         List<RouteRule> routeRules = getRouteTableResponse.getRouteTable().getRouteRules();
 
-        if (log.isDebugEnabled()){
+        if (log.isDebugEnabled()) {
             System.out.println("Current Route Rules in Default Route Table");
             System.out.println("==========================================");
             System.out.println();
@@ -474,7 +473,7 @@ public class OracleCloudService {
                         .execute();
         routeRules = getRouteTableResponse.getRouteTable().getRouteRules();
 
-        if (log.isDebugEnabled()){
+        if (log.isDebugEnabled()) {
             System.out.println("Updated Route Rules in Default Route Table");
             System.out.println("==========================================");
             routeRules.forEach(System.out::println);
@@ -501,7 +500,7 @@ public class OracleCloudService {
                 .getWaiters()
                 .forRouteTable(getRouteTableRequest, RouteTable.LifecycleState.Available)
                 .execute();
-        if (log.isDebugEnabled()){
+        if (log.isDebugEnabled()) {
             System.out.println("Cleared route rules from route table: " + vcn.getDefaultRouteTableId());
             System.out.println();
         }
@@ -531,17 +530,16 @@ public class OracleCloudService {
             for (Subnet subnet : listResponse.getItems()) {
                 if (subnet.getAvailabilityDomain().equals(availabilityDomain.getName()) && subnet.getDisplayName().equals(subnetName)) {
                     return subnet;
-                }else{
+                } else {
                     //不匹配
-                    deleteSubnet(virtualNetworkClient,subnet);
-                    size ++;
+                    deleteSubnet(virtualNetworkClient, subnet);
+                    size++;
                 }
             }
-            if (items.size() == size){
-                return  null;
+            if (items.size() == size) {
+                return null;
             }
         }
-
 
 
         CreateSubnetDetails createSubnetDetails =
@@ -576,8 +574,7 @@ public class OracleCloudService {
         return subnet;
     }
 
-    private static void deleteSubnet(VirtualNetworkClient virtualNetworkClient, Subnet subnet)
-             {
+    private static void deleteSubnet(VirtualNetworkClient virtualNetworkClient, Subnet subnet) {
         try {
             DeleteSubnetRequest deleteSubnetRequest =
                     DeleteSubnetRequest.builder().subnetId(subnet.getId()).build();
@@ -642,7 +639,7 @@ public class OracleCloudService {
         NetworkSecurityGroup networkSecurityGroup =
                 getNetworkSecurityGroupResponse.getNetworkSecurityGroup();
 
-        if (log.isDebugEnabled()){
+        if (log.isDebugEnabled()) {
             System.out.println("Created Network Security Group: " + networkSecurityGroup.getId());
             System.out.println(networkSecurityGroup);
             System.out.println();
@@ -671,7 +668,7 @@ public class OracleCloudService {
                         NetworkSecurityGroup.LifecycleState.Terminated)
                 .execute();
 
-        if (log.isDebugEnabled()){
+        if (log.isDebugEnabled()) {
             System.out.println("Deleted Network Security Group: " + networkSecurityGroup.getId());
             System.out.println();
         }
@@ -692,7 +689,7 @@ public class OracleCloudService {
                         listNetworkSecurityGroupSecurityRulesRequest);
         List<SecurityRule> securityRules = listNetworkSecurityGroupSecurityRulesResponse.getItems();
 
-        if (log.isDebugEnabled()){
+        if (log.isDebugEnabled()) {
             System.out.println("Current Security Rules in Network Security Group");
             System.out.println("================================================");
             securityRules.forEach(System.out::println);
@@ -730,7 +727,7 @@ public class OracleCloudService {
                         listNetworkSecurityGroupSecurityRulesRequest);
         securityRules = listNetworkSecurityGroupSecurityRulesResponse.getItems();
 
-        if (log.isDebugEnabled()){
+        if (log.isDebugEnabled()) {
             System.out.println("Updated Security Rules in Network Security Group");
             System.out.println("================================================");
             securityRules.forEach(System.out::println);
