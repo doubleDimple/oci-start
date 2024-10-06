@@ -4,6 +4,7 @@ import com.doubledimple.ociserver.config.OracleUsersConfig;
 import com.doubledimple.ociserver.domain.OracleInstanceDetail;
 import com.doubledimple.ociserver.domain.User;
 import com.doubledimple.ociserver.enums.MessageEnum;
+import com.doubledimple.ociserver.exception.OciException;
 import com.doubledimple.ociserver.message.factory.MessageFactory;
 import com.oracle.bmc.model.BmcException;
 import lombok.extern.slf4j.Slf4j;
@@ -15,7 +16,7 @@ import javax.annotation.PostConstruct;
 import java.util.Map;
 import java.util.concurrent.*;
 
-import static com.doubledimple.ociserver.service.OracleCloudService.LIMIT_EXCEEDED;
+import static com.doubledimple.ociserver.exception.ErrorCode.LIMIT_EXCEEDED;
 
 /**
  * @author doubleDimple
@@ -34,7 +35,7 @@ public class OracleInstanceManager {
     MessageFactory messageFactory;
 
     @Autowired
-    public OracleInstanceManager(OracleCloudService oracleCloudService, OracleUsersConfig oracleUsersConfig) throws Exception{
+    public OracleInstanceManager(OracleCloudService oracleCloudService, OracleUsersConfig oracleUsersConfig) throws Exception {
         this.oracleCloudService = oracleCloudService;
         this.oracleUsersConfig = oracleUsersConfig;
     }
@@ -67,23 +68,21 @@ public class OracleInstanceManager {
                 while (true) {
                     OracleInstanceDetail instanceData = null;
                     try {
-                         instanceData = oracleCloudService.createInstanceData(user);
+                        instanceData = oracleCloudService.createInstanceData(user);
                     } catch (Exception e) {
-                        if (e instanceof BmcException){
-                            BmcException error = (BmcException) e;
-                            if (error.getStatusCode() == 400 && error.getServiceCode().equals(LIMIT_EXCEEDED)){
-                                handleException(user,error);
+                        if (e instanceof OciException) {
+                            OciException error = (OciException) e;
+                            if (error.getCode() == 400 && error.getMessage().equals(LIMIT_EXCEEDED.getMessage())) {
+                                handleException(user, error);
                                 break;
                             }
                         }
-
                     }
-
                     if (null != instanceData && null != instanceData.getPublicIp()) {
                         sendNotification(user.getUserName(), instanceData);
                         break; // 成功时退出循环
                     } else {
-                        log.info("账户: [{}] 创建实例失败，[{}] 秒后重试", user.getUserName(), user.getInterval());
+                        log.info("租户: [{}] 创建实例失败，[{}] 秒后重试", user.getUserName(), user.getInterval());
                         try {
                             TimeUnit.SECONDS.sleep(user.getInterval());
                         } catch (InterruptedException e) {
@@ -95,11 +94,11 @@ public class OracleInstanceManager {
             }, scheduler);
 
             accountTasks.put(user.getUserId(), future);
-            log.info("账户 " + user.getUserName() + " 的任务，每隔 " + user.getInterval() + " 秒执行一次");
+            log.info("租户 " + user.getUserName() + " 的任务，每隔 " + user.getInterval() + " 秒执行一次");
         }
     }
 
-    private void handleException(User user,Exception e) {
+    private void handleException(User user, Exception e) {
         if (e instanceof BmcException) {
             BmcException bmcException = (BmcException) e;
             log.info("originalMessage: " + bmcException.getOriginalMessage());
@@ -113,6 +112,6 @@ public class OracleInstanceManager {
     }
 
     private void sendErrorMessage(String userName, String originalMessage) {
-        messageFactory.getType(MessageEnum.TELEGRAM).sendErrorMessage("用户: " +userName+"===>" + " "+originalMessage );
+        messageFactory.getType(MessageEnum.TELEGRAM).sendErrorMessage("用户: " + userName + "===>" + " " + originalMessage);
     }
 }

@@ -85,9 +85,9 @@ public class TelegramMessageService implements MessageService {
 
     private static final String LEGACY_MESSAGE_TEMPLATE =
             "🚀 *New Instance Deployed Successfully*\n\n" +
-                    "⏰ Timestamp: `%s`\n\n" +
-                    "📊 *Instance Details:*\n" +
-                    "• 🆔 IP: `%s`\n" +
+                    "Timestamp: `%s`\n\n" +
+                    "Instance Details:*\n" +
+                    "IP: `%s`\n" +
                     "The source code address is:(https://github.com/doubleDimple)\n\n" +
-                    "_Powered by oci-start";
+                    "_Powered by oci-start.sh-start";
 }

@@ -57,8 +57,8 @@
         </dependency>
 
         <!--<dependency>
-            <groupId>com.oracle.oci.sdk</groupId>
-            <artifactId>oci-java-sdk-shaded-full</artifactId>
+            <groupId>com.oracle.oci-start.sh.sdk</groupId>
+            <artifactId>oci-start.sh-java-sdk-shaded-full</artifactId>
             &lt;!&ndash; replace the version below with the latest version &ndash;&gt;
             <version>3.49.0</version>
         </dependency>-->
@@ -102,12 +102,15 @@
     </dependencies>
 
     <build>
+        <finalName>oci-start-release</finalName>
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <mainClass>com.doubledimple.ociserver.OciServerApplication</mainClass> <!-- 替换为您的主类全限定名 -->
+                </configuration>
             </plugin>
         </plugins>
     </build>
-
 </project>

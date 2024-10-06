@@ -191,4 +191,17 @@
 
         </dependencies>
     </dependencyManagement>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <mainClass>com.doubledimple.ociserver.OciServerApplication</mainClass> <!-- 替换为您的主类全限定名 -->
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
 </project>
