@@ -168,9 +168,9 @@ public class OracleCloudService {
                                 (error.getMessage().contains(CAPACITY.getErrorType()) || error.getMessage().contains(CAPACITY_HOST.getErrorType()))) {
                             size--;
                             if (size > 0) {
-                                log.warn("当前区域容量不足,换可用区继续执行....");
+                                log.warn("当前区域容量不足,换可用区继续执行....,具体原因为:[{}]",e.getMessage());
                             } else {
-                                log.warn("所有区域都容量不足,稍后重试");
+                                log.warn("所有区域都容量不足,稍后重试,具体原因为:[{}]",e.getMessage());
                             }
                         } else if (error.getStatusCode() == 400 && error.getMessage().contains(LIMIT_EXCEEDED.getErrorType())){
                             log.warn("无法创建 always free 机器.配额已经超过免费额度,具体原因为:[{}]",error.getMessage());
