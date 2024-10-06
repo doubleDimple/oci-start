@@ -6,6 +6,21 @@
 
 二:环境说明: 需要提前安装jdk8+版本
 
+    2.1: Debian/Ubuntu
+    
+        sudo apt update
+        sudo apt install default-jdk
+        
+    2.2: CentOS/RHEL (Red Hat Enterprise Linux)
+
+        CentOS 7:
+            sudo yum install java-1.8.0-openjdk-devel
+            
+        CentOS 8 及之后版本（使用 dnf）：
+            sudo dnf install java-11-openjdk-devel
+
+    
+
 三:部署说明:
 
       3.1:登录linux服务器,切换到root用户下.
