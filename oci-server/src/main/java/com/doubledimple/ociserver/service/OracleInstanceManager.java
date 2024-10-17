@@ -64,7 +64,7 @@ public class OracleInstanceManager {
 
 
     public void addUser2(User user) {
-        if (!accountTasks.containsKey(user.getUserId())) {
+        if (!accountTasks.containsKey(user.getUserName())) {
             CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
                 while (true) {
                     OracleInstanceDetail instanceData = null;
@@ -94,7 +94,7 @@ public class OracleInstanceManager {
                 }
             }, scheduler);
 
-            accountTasks.put(user.getUserId(), future);
+            accountTasks.put(user.getUserName(), future);
             log.info("租户 " + user.getUserName() + " 的任务，每隔 " + user.getInterval() + " 秒执行一次");
         }
     }
