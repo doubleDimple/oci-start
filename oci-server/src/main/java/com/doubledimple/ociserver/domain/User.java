@@ -20,6 +20,6 @@ public class User {
     private String architecture;
     private int interval;
     private String rootPassword;
-    private String operationSystem;
+    private String operationSystem = "Ubuntu";
 
 }

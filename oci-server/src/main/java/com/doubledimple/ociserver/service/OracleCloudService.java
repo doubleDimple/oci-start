@@ -19,8 +19,11 @@ import com.oracle.bmc.core.requests.*;
 import com.oracle.bmc.core.responses.*;
 import com.oracle.bmc.identity.IdentityClient;
 import com.oracle.bmc.identity.model.AvailabilityDomain;
+import com.oracle.bmc.identity.model.Compartment;
 import com.oracle.bmc.identity.requests.ListAvailabilityDomainsRequest;
+import com.oracle.bmc.identity.requests.ListCompartmentsRequest;
 import com.oracle.bmc.identity.responses.ListAvailabilityDomainsResponse;
+import com.oracle.bmc.identity.responses.ListCompartmentsResponse;
 import com.oracle.bmc.model.BmcException;
 import com.oracle.bmc.workrequests.WorkRequestClient;
 import lombok.extern.slf4j.Slf4j;
@@ -80,9 +83,10 @@ public class OracleCloudService {
         }
 
         SimpleAuthenticationDetailsProvider authenticationDetailsProvider = providerMap.get(user.getUserId());
-        String compartmentId = authenticationDetailsProvider.getTenantId();
+        //String compartmentId = authenticationDetailsProvider.getTenantId();
         IdentityClient identityClient =
                 IdentityClient.builder().build(authenticationDetailsProvider);
+        String compartmentId = findRootCompartment(identityClient, authenticationDetailsProvider.getTenantId());
         identityClient.setRegion(user.getRegion());
         ComputeClient computeClient = ComputeClient.builder().build(authenticationDetailsProvider);
         computeClient.setRegion(user.getRegion());
@@ -173,7 +177,7 @@ public class OracleCloudService {
                                 log.warn("所有区域都容量不足,稍后重试,具体原因为:[{}]", e.getMessage());
                             }
                         } else if (error.getStatusCode() == 400 && error.getMessage().contains(LIMIT_EXCEEDED.getErrorType())) {
-                            log.warn("无法创建 always free 机器.配额已经超过免费额度,具体原因为:[{}]", error.getMessage());
+                            log.warn("当前区间:[{}]无法创建实例.配额已经超过限制,具体原因为:[{}]", compartmentId,error.getMessage());
                             OciExceptionFactory.createException(LIMIT_EXCEEDED);
                         } else {
                             //clearAllDetails(computeClient, virtualNetworkClient, instanceFromBootVolume, instance, networkSecurityGroup, internetGateway, subnet, vcn);
@@ -515,7 +519,7 @@ public class OracleCloudService {
             Vcn vcn)
             throws Exception {
         String subnetName = "java-sdk-example-subnet";
-
+        Subnet subnet = null;
         //检查子网是否存在
         ListSubnetsRequest listRequest = ListSubnetsRequest.builder()
                 .compartmentId(compartmentId)
@@ -527,12 +531,12 @@ public class OracleCloudService {
             // 如果找到已有的子网，返回其 ID
             List<Subnet> items = listResponse.getItems();
             int size = 0;
-            for (Subnet subnet : listResponse.getItems()) {
-                if (subnet.getAvailabilityDomain().equals(availabilityDomain.getName()) && subnet.getDisplayName().equals(subnetName)) {
-                    return subnet;
+            for (Subnet subnetOld : listResponse.getItems()) {
+                if (subnetOld.getAvailabilityDomain().equals(availabilityDomain.getName()) && subnet.getDisplayName().equals(subnetName)) {
+                    return subnetOld;
                 } else {
                     //不匹配
-                    deleteSubnet(virtualNetworkClient, subnet);
+                    deleteSubnet(virtualNetworkClient, subnetOld);
                     size++;
                 }
             }
@@ -540,37 +544,38 @@ public class OracleCloudService {
                 return null;
             }
         }
+        else {
 
+            CreateSubnetDetails createSubnetDetails =
+                    CreateSubnetDetails.builder()
+                            .availabilityDomain(availabilityDomain.getName())
+                            .compartmentId(compartmentId)
+                            .displayName(subnetName)
+                            .cidrBlock(networkCidrBlock)
+                            .vcnId(vcn.getId())
+                            .routeTableId(vcn.getDefaultRouteTableId())
+                            .build();
+            CreateSubnetRequest createSubnetRequest =
+                    CreateSubnetRequest.builder().createSubnetDetails(createSubnetDetails).build();
+            CreateSubnetResponse createSubnetResponse =
+                    virtualNetworkClient.createSubnet(createSubnetRequest);
 
-        CreateSubnetDetails createSubnetDetails =
-                CreateSubnetDetails.builder()
-                        .availabilityDomain(availabilityDomain.getName())
-                        .compartmentId(compartmentId)
-                        .displayName(subnetName)
-                        .cidrBlock(networkCidrBlock)
-                        .vcnId(vcn.getId())
-                        .routeTableId(vcn.getDefaultRouteTableId())
-                        .build();
-        CreateSubnetRequest createSubnetRequest =
-                CreateSubnetRequest.builder().createSubnetDetails(createSubnetDetails).build();
-        CreateSubnetResponse createSubnetResponse =
-                virtualNetworkClient.createSubnet(createSubnetRequest);
+            GetSubnetRequest getSubnetRequest =
+                    GetSubnetRequest.builder()
+                            .subnetId(createSubnetResponse.getSubnet().getId())
+                            .build();
+            GetSubnetResponse getSubnetResponse =
+                    virtualNetworkClient
+                            .getWaiters()
+                            .forSubnet(getSubnetRequest, Subnet.LifecycleState.Available)
+                            .execute();
+            subnet = getSubnetResponse.getSubnet();
 
-        GetSubnetRequest getSubnetRequest =
-                GetSubnetRequest.builder()
-                        .subnetId(createSubnetResponse.getSubnet().getId())
-                        .build();
-        GetSubnetResponse getSubnetResponse =
-                virtualNetworkClient
-                        .getWaiters()
-                        .forSubnet(getSubnetRequest, Subnet.LifecycleState.Available)
-                        .execute();
-        Subnet subnet = getSubnetResponse.getSubnet();
+            log.info("Created Subnet: " + subnet.getId());
+            log.info("subnet: [{}]", subnet);
+            log.info("");
 
-        log.info("Created Subnet: " + subnet.getId());
-        log.info("subnet: [{}]", subnet);
-        log.info("");
-
+        }
         return subnet;
     }
 
@@ -983,6 +988,28 @@ public class OracleCloudService {
                 .sourceDetails(instanceSourceViaBootVolumeDetails)
                 .agentConfig(launchInstanceAgentConfigDetails)
                 .build();
+    }
+
+    public static String findRootCompartment(IdentityClient identityClient, String tenantId) {
+        // 使用`compartmentIdInSubtree`参数来获取所有子区间
+        ListCompartmentsRequest request = ListCompartmentsRequest.builder()
+                .compartmentId(tenantId)
+                .compartmentIdInSubtree(true)
+                .accessLevel(ListCompartmentsRequest.AccessLevel.Accessible)
+                .build();
+
+        ListCompartmentsResponse response = identityClient.listCompartments(request);
+        List<Compartment> compartments = response.getItems();
+
+        // 根区间是没有parentCompartmentId的区间
+        for (Compartment compartment : compartments) {
+            if (compartment.getCompartmentId().equals(tenantId) && compartment.getId().equals(compartment.getCompartmentId())) {
+                return compartment.getId(); // 返回根区间ID
+            }
+        }
+
+        // 如果没有找到根区间，返回租户ID作为默认值
+        return tenantId;
     }
 
 
