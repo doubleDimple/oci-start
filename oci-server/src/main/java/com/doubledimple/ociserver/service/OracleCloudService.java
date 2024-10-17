@@ -536,7 +536,6 @@ public class OracleCloudService {
                     return subnetOld;
                 } else {
                     //不匹配
-                    deleteSubnet(virtualNetworkClient, subnetOld);
                     size++;
                 }
             }
