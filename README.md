@@ -31,56 +31,47 @@
   
         3.3.1:下载jar包
     
-          wget https://github.com/doubleDimple/oci-start/releases/download/v-1.0.0/oci-start-release.jar
+          wget https://github.com/doubleDimple/oci-start/releases/download/v-1.0.1/oci-start-release.jar
       
         3.3.2:下载运行脚本
     
-          wget https://github.com/doubleDimple/oci-start/releases/download/v-1.0.0/oci-start.sh
+          wget https://github.com/doubleDimple/oci-start/releases/download/v-1.0.1/oci-start.sh
       
         3.3.3:下载配置文件模板
     
-          wget https://github.com/doubleDimple/oci-start/releases/download/v-1.0.0/oci-start.properties
+          wget https://github.com/doubleDimple/oci-start/releases/download/v-1.0.1/oci-start.yml
 
-四:配置说明:oci-start.properties文件里面的配置需要自行去修改,如果需要配置多个api进行通时创建实例,直接将  ###oracle抢机配置下的内容复制一份,将里面的user1全部修改为user2即可
-  以此类推,配置多个api
+四:配置说明:
+
+    #端口自行指定
+    server:
+      port: 23125
+
+    spring:
+      security:
+    ##页面的用户名和密码
+    user:
+      #登录用户名 ,请自行指定
+      name: admin
+      #登录密码 ,请自行指定
+      password: admin
+      datasource:
+        ##数据库的用户名和密码,目前只支持h2
+        url: jdbc:h2:file:/root/oci-start/data/vps_db
+        #用户名,请自行指定
+        username: sa
+        #密码,请自行指定
+        password: password
+
+    telegram:
+      token: 
+      chatId: 
+
+    #文件路径
+    baseFile:
+      filePath: /root/oci-start/upload/
  
-  ###基本配置
-
-    spring.application.name=oci-server
   
-    server.port=23125(端口号,请自行指定)
-  
-    telegram.token=(tg的token,用户实例创建提醒,目前必须配置)
-  
-    telegram.chatId=(tg的chatid,用户实例创建提醒,目前必须配置)
-  
-  ###oracle抢机配置
-  
-    oracle.users.user1.userId=oracle租户名
-  
-    oracle.users.user1.userName=当前自定义的名称,当配置多个租户的api的时候不可重复
-  
-    oracle.users.user1.fingerprint=oracle的fingerprint
-  
-    oracle.users.user1.tenancy=oracle的tenancy
-  
-    oracle.users.user1.region=oracle的region
-  
-    oracle.users.user1.keyFile=oracle的keyFile,上传后的真实路径
-  
-    oracle.users.user1.ocpus=1(cpu大小)
-  
-    oracle.users.user1.memory=1(内存大小)
-  
-    oracle.users.user1.disk=50(磁盘大小)
-  
-    oracle.users.user1.architecture=AMD(oracle的架构类型,ARM或者AMD)
-  
-    oracle.users.user1.operationSystem=Ubuntu(系统类型,目前只支持Ubuntu)
-  
-    oracle.users.user1.interval=50(创建实例循环时间,单位为秒)
-  
-    oracle.users.user1.rootPassword=实例的root用户密码
 
 
 五:启动
