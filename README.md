@@ -116,6 +116,14 @@ API私钥在你部署的服务器上的h2数据库里，你可以随时关闭服
 
 六:访问
     http://ip:port  访问应用,输入配置的用户名密码
+    <img width="1183" alt="企业微信20241022-112850@2x" src="https://github.com/user-attachments/assets/696c9908-5c0e-49a6-bb20-e98d3b4dc466">
+    <img width="1177" alt="企业微信20241022-112944@2x" src="https://github.com/user-attachments/assets/34bff1d9-23ed-428b-b3b9-775afc50d180">
+    <img width="1112" alt="企业微信20241022-113025@2x" src="https://github.com/user-attachments/assets/f9b647b1-154f-47e4-824b-4ac0ca735041">
+    <img width="1136" alt="企业微信20241022-113048@2x" src="https://github.com/user-attachments/assets/361c669c-6b7d-4da9-85cc-426d527c13ac">
+
+
+
+
 七:文件位置说明
     本系统默认的脚本根路径为/root/oci-start,如果想自己修改文件路径,请修改配置文件,脚本相关的路径即可
 
