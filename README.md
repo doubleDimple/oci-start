@@ -130,7 +130,7 @@ API私钥在你部署的服务器上的h2数据库里，你可以随时关闭服
 
 八:关于数据存储
     1:数据库登录
-    当项目启动成功后,访问http://ip:port/h2-console,输入你的配置文件的数据库密码即可登录
+    当项目启动成功后,访问http://ip:port/h2-console  输入你的配置文件的数据库密码即可登录
     ![image](https://github.com/user-attachments/assets/ee0fc955-d860-4143-828a-e17a1203f67f)
     ![image](https://github.com/user-attachments/assets/366f8e27-3427-4f39-8e8e-faf0c94dd257)
     
