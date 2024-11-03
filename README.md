@@ -57,15 +57,15 @@ API私钥在你部署的服务器上的h2数据库里，你可以随时关闭服
   
         3.3.1:下载jar包
     
-          wget https://github.com/doubleDimple/oci-start/releases/download/v-1.0.2/oci-start-release.jar
+          wget https://github.com/doubleDimple/oci-start/releases/download/v-1.0.4/oci-start-release.jar
       
         3.3.2:下载运行脚本
     
-          wget https://github.com/doubleDimple/oci-start/releases/download/v-1.0.2/oci-start.sh
+          wget https://github.com/doubleDimple/oci-start/releases/download/v-1.0.4/oci-start.sh
       
         3.3.3:下载配置文件模板
     
-          wget https://github.com/doubleDimple/oci-start/releases/download/v-1.0.2/oci-start.yml
+          wget https://github.com/doubleDimple/oci-start/releases/download/v-1.0.4/oci-start.yml
 
 四:配置说明:
 
