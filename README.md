@@ -77,21 +77,12 @@ API私钥在你部署的服务器上的h2数据库里，你可以随时关闭服
       security:
     ##页面的用户名和密码
         user:
-          #登录用户名 ,请自行指定
-          name: admin
-          #登录密码 ,请自行指定
-          password: admin
-      datasource:
-        ##数据库的用户名和密码,目前只支持h2
-        url: jdbc:h2:file:/root/oci-start/data/vps_db
-        #用户名,请自行指定
-        username: sa
-        #密码,请自行指定
-        password: password
+          name: 登录用户名 ,请自行指定
+          password: 登录密码,请自行指定
 
     telegram:
-      token: 
-      chatId: 
+      token: xxxxx
+      chatId: xxxxxx
 
     #文件路径
     baseFile:
