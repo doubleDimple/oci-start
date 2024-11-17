@@ -57,7 +57,7 @@ API私钥在你部署的服务器上的h2数据库里，你可以随时关闭服
   
         3.3.1:下载jar包
     
-          wget https://github.com/doubleDimple/oci-start/releases/download/v-1.0.5/oci-start-release.jar
+          wget https://github.com/doubleDimple/oci-start/releases/download/v-1.0.6/oci-start-release.jar
       
         3.3.2:下载运行脚本
     
@@ -66,6 +66,10 @@ API私钥在你部署的服务器上的h2数据库里，你可以随时关闭服
         3.3.3:下载配置文件模板
     
           wget https://github.com/doubleDimple/oci-start/releases/download/v-1.0.4/oci-start.yml
+          
+        3.3.4:下载探针脚本
+    
+          wget https://github.com/doubleDimple/oci-start/releases/download/v-1.0.6/monitor.sh
 
 四:配置说明:
 
@@ -87,6 +91,7 @@ API私钥在你部署的服务器上的h2数据库里，你可以随时关闭服
     #文件路径
     baseFile:
       filePath: /root/oci-start/upload/
+
  
   
 
@@ -119,7 +124,19 @@ API私钥在你部署的服务器上的h2数据库里，你可以随时关闭服
 
     本系统默认的脚本根路径为/root/oci-start,如果想自己修改文件路径,请修改配置文件,脚本相关的路径即可
 
-八:如有问题,欢迎加群交流
+八:探针使用说明
+
+    1:增加探针功能,下载monitor.sh脚本,执行chmod +x monitor.sh
+
+    2:执行 ./monitor.sh start
+    
+    3:参数说明
+        
+        serverId (自定义的vps名称) 
+        
+        url http://ip:port/api/metrics/reportMetrics (ip:port替换成你实际部署oci-start的真实ip端口即可)
+
+九:如有问题,欢迎加群交流
     qq群:
     ![IMG_3730](https://github.com/user-attachments/assets/d1f840fd-d8de-4e78-9a02-f85b779b885f)
 
