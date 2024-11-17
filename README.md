@@ -61,7 +61,7 @@ API私钥在你部署的服务器上的h2数据库里，你可以随时关闭服
       
         3.3.2:下载运行脚本
     
-          wget https://github.com/doubleDimple/oci-start/releases/download/v-1.0.4/oci-start.sh
+          wget -N --no-check-certificate "https://github.com/doubleDimple/oci-start/releases/download/v-1.0.4/oci-start.sh" && chmod +x oci-start.sh
       
         3.3.3:下载配置文件模板
     
@@ -69,7 +69,7 @@ API私钥在你部署的服务器上的h2数据库里，你可以随时关闭服
           
         3.3.4:下载探针脚本
     
-          wget https://github.com/doubleDimple/oci-start/releases/download/v-1.0.6/monitor.sh
+          wget -N --no-check-certificate "https://github.com/doubleDimple/oci-start/releases/download/v-1.0.6/monitor.sh" && chmod +x monitor.sh
 
 四:配置说明:
 
