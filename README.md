@@ -48,6 +48,7 @@ API私钥在你部署的服务器上的h2数据库里，你可以随时关闭服
     
 
 三:部署说明:
+   一: 脚本部署
 
       3.1:登录linux服务器,切换到root用户下.
   
@@ -70,6 +71,40 @@ API私钥在你部署的服务器上的h2数据库里，你可以随时关闭服
         3.3.4:下载探针脚本
     
           wget -N --no-check-certificate "https://github.com/doubleDimple/oci-start/releases/download/v-1.0.7/monitor.sh" && chmod +x monitor.sh
+    二: docker部署
+        # 拉取镜像
+        docker pull lovele/oci-start:2.0.1
+
+        # 使用步骤
+
+            # 0. 创建文件件
+            mkdir oci-start-docker
+
+            # 1. 进入指定目录
+            cd oci-start-docker
+
+            # 2. 创建数据和日志目录
+            mkdir -p data logs
+
+            # 3. 拉取镜像
+            docker pull lovele/oci-start:2.0.1
+
+            # 4. 运行容器，使用绝对路径挂载
+            docker run -d \
+                --name oci-start \
+                -p 9856:9856 \
+                -v /root/oci-start-docker/data:/oci-start/data \
+                -v /root/oci-start-docker/logs:/oci-start/logs \
+                -e SERVER_PORT=9856 \
+                -e DATA_PATH=/oci-start/data \
+                -e LOG_HOME=/oci-start/logs \
+                lovele/oci-start:2.0.1
+
+            # 查看容器状态
+            docker ps -a
+
+            # 查看容器日志
+            docker logs oci-start
 
 四:配置说明(对于已经部署之前的版本的,除了security配置完全删除外,其他配置可以暂时不要动,否则会导致找不到文件路径导致api失败):
 
