@@ -82,10 +82,7 @@ API私钥在你部署的服务器上的h2数据库里，你可以随时关闭服
             # 2. 创建数据和日志目录
             mkdir -p data logs
 
-            # 3. 拉取镜像
-            docker pull lovele/oci-start:2.0.1
-
-            # 4. 运行容器，使用绝对路径挂载
+            # 3. 运行容器，使用绝对路径挂载
             docker stop oci-start || true && docker run -d \
                 --pull always \
                 --name oci-start \
