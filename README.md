@@ -72,10 +72,6 @@ API私钥在你部署的服务器上的h2数据库里，你可以随时关闭服
     
           wget -N --no-check-certificate "https://github.com/doubleDimple/oci-start/releases/download/v-1.0.7/monitor.sh" && chmod +x monitor.sh
     二: docker部署
-        # 拉取镜像
-        docker pull lovele/oci-start:2.0.1
-
-        # 使用步骤
 
             # 0. 创建文件件
             mkdir oci-start-docker
