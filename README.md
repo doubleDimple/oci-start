@@ -73,24 +73,9 @@ API私钥在你部署的服务器上的h2数据库里，你可以随时关闭服
 
 四:配置说明:
 
-    #端口自行指定
+    #端口自行指定(默认端口为9856如果不想改默认端口,不需要下载oci-start.yml)
     server:
-      port: 23125
-
-    spring:
-      security:
-    ##页面的用户名和密码
-        user:
-          name: 登录用户名 ,请自行指定
-          password: 登录密码,请自行指定
-
-    telegram:
-      token: xxxxx
-      chatId: xxxxxx
-
-    #文件路径
-    baseFile:
-      filePath: /root/oci-start/upload/
+      port: 9856
 
  
   
