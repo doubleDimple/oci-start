@@ -90,7 +90,8 @@ API私钥在你部署的服务器上的h2数据库里，你可以随时关闭服
             docker pull lovele/oci-start:2.0.1
 
             # 4. 运行容器，使用绝对路径挂载
-            docker run -d \
+            docker stop oci-start || true && docker run -d \
+                --pull always \
                 --name oci-start \
                 -p 9856:9856 \
                 -v /root/oci-start-docker/data:/oci-start/data \
@@ -98,7 +99,8 @@ API私钥在你部署的服务器上的h2数据库里，你可以随时关闭服
                 -e SERVER_PORT=9856 \
                 -e DATA_PATH=/oci-start/data \
                 -e LOG_HOME=/oci-start/logs \
-                lovele/oci-start:2.0.1
+                --rm \
+                lovele/oci-start:latest
 
             # 查看容器状态
             docker ps -a
