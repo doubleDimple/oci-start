@@ -71,7 +71,7 @@ API私钥在你部署的服务器上的h2数据库里，你可以随时关闭服
     
           wget -N --no-check-certificate "https://github.com/doubleDimple/oci-start/releases/download/v-1.0.7/monitor.sh" && chmod +x monitor.sh
 
-四:配置说明:
+四:配置说明(对于已经部署之前的版本的,除了security配置完全删除外,其他配置可以暂时不要动,否则会导致找不到文件路径导致api失败):
 
     #端口自行指定(默认端口为9856如果不想改默认端口,不需要下载oci-start.yml)
     server:
