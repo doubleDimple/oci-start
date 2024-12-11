@@ -149,10 +149,6 @@ API私钥在你部署的服务器上的h2数据库里，你可以随时关闭服
         
         url http://ip:port/api/metrics/reportMetrics (ip:port替换成你实际部署oci-start的真实ip端口即可)
 
-九:如有问题,欢迎加群交流
-    qq群:
-    ![IMG_3730](https://github.com/user-attachments/assets/d1f840fd-d8de-4e78-9a02-f85b779b885f)
-
 
 
  
