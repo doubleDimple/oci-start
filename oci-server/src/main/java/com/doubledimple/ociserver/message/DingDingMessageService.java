@@ -19,7 +19,6 @@ import java.net.URLEncoder;
 @Slf4j
 public class DingDingMessageService implements MessageService {
 
-    private static final String DING_DING_URL="https://api.telegram.org/bot%s/sendMessage?chat_id=%s&text=%s";
 
     @Override
     public void sendMessage(OracleInstanceDetail instanceData) {
@@ -33,6 +32,6 @@ public class DingDingMessageService implements MessageService {
 
     @Override
     public void sendErrorMessage(String s) {
-
+        log.info("开始发送错误消息,发送的错误信息是:{}",s);
     }
 }
