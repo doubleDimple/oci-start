@@ -152,7 +152,13 @@ API私钥在你部署的服务器上的h2数据库里，你可以随时关闭服
 
 九: Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=doubleDimple/oci-start&type=Date)](https://star-history.com/#doubleDimple/oci-start&Date)
+<a href="https://star-history.com/#doubleDimple/oci-start&Date">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=doubleDimple/oci-start&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=doubleDimple/oci-start&type=Date" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=doubleDimple/oci-start&type=Date" />
+ </picture>
+</a>
  
  
  
