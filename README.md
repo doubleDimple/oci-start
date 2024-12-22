@@ -129,6 +129,7 @@ API私钥在你部署的服务器上的h2数据库里，你可以随时关闭服
     http://ip:port  访问应用,输入配置的用户名密码
     <img width="1430" alt="1" src="https://github.com/user-attachments/assets/a283758f-9a98-42be-8234-6ba8b5d8a2c0" />
 
+    <img width="1423" alt="2" src="https://github.com/user-attachments/assets/23b9ab72-6212-42c3-a02c-3efa795ca9ea" />
 
 
 七:文件位置说明
