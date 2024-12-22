@@ -129,7 +129,34 @@ API私钥在你部署的服务器上的h2数据库里，你可以随时关闭服
     http://ip:port  访问应用,输入配置的用户名密码
     <img width="1430" alt="1" src="https://github.com/user-attachments/assets/a283758f-9a98-42be-8234-6ba8b5d8a2c0" />
 
-    <img width="1423" alt="2" src="https://github.com/user-attachments/assets/23b9ab72-6212-42c3-a02c-3efa795ca9ea" />
+<img width="1423" alt="2" src="https://github.com/user-attachments/assets/23b9ab72-6212-42c3-a02c-3efa795ca9ea" />
+
+<img width="1420" alt="3" src="https://github.com/user-attachments/assets/af1ef632-84b9-4f08-a7d3-39480d518384" />
+
+<img width="1211" alt="4" src="https://github.com/user-attachments/assets/306f307b-61b7-4e7c-b786-3d9e39471c91" />
+
+<img width="1432" alt="5" src="https://github.com/user-attachments/assets/15994398-0bc9-4bef-aa81-7b44c75021fb" />
+
+<img width="1420" alt="6" src="https://github.com/user-attachments/assets/bf98973a-d3f6-4f2a-836f-3698647b8f3f" />
+
+<img width="1427" alt="7" src="https://github.com/user-attachments/assets/3e8c0ce8-6077-4748-bc39-fc1fa70da08e" />
+
+<img width="1430" alt="8" src="https://github.com/user-attachments/assets/0794298d-702f-4af7-ad5b-6cb5c206fa54" />
+
+<img width="1230" alt="9" src="https://github.com/user-attachments/assets/e40bded6-31d1-4ecc-9e31-0329f185ad3c" />
+
+<img width="1415" alt="10" src="https://github.com/user-attachments/assets/7fa23938-d6b8-4ebf-9445-8a450446c8ea" />
+
+<img width="1264" alt="11" src="https://github.com/user-attachments/assets/72a5c4da-35c6-4be2-a60c-5989aefb74af" />
+
+
+
+
+
+
+
+
+
 
 
 七:文件位置说明
