@@ -68,9 +68,6 @@ API私钥在你部署的服务器上的h2数据库里，你可以随时关闭服
     
           wget https://github.com/doubleDimple/oci-start/releases/download/v-2.0.1/oci-start.yml
           
-        3.3.4:下载探针脚本
-    
-          wget -N --no-check-certificate "https://github.com/doubleDimple/oci-start/releases/download/v-1.0.7/monitor.sh" && chmod +x monitor.sh
     二: docker部署
 
             # 0. 创建文件件
