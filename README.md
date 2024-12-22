@@ -127,9 +127,11 @@ API私钥在你部署的服务器上的h2数据库里，你可以随时关闭服
 
 六:访问
     http://ip:port  访问应用,输入配置的用户名密码
-    ![image](https://github.com/user-attachments/assets/84ca9ac9-d019-4f96-984c-892546441a61)
+    
 
+<img width="1430" alt="1" src="https://github.com/user-attachments/assets/a0fbbc71-35a9-40f5-b124-24f40953f59e" />
 
+<img width="1418" alt="13" src="https://github.com/user-attachments/assets/d335f1ca-a4e8-42bb-9b91-ad78aaefd1d9" />
 
 
 
