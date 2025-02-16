@@ -2,29 +2,35 @@ name: Release Notification
 
 on:
   release:
-    types: [published]
+    types: [published, created, edited, released]  # 添加更多的 release 事件类型
+  push:
+    tags:
+      - 'v*'  # 匹配所有以 v 开头的标签
+  workflow_dispatch:  # 保留手动触发选项
 
 jobs:
-  notify:
+  build-and-notify:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
+      
       - name: Send Telegram Message
         uses: appleboy/telegram-action@v0.1.1
         with:
           to: ${{ secrets.TELEGRAM_TO }}
           token: ${{ secrets.TELEGRAM_TOKEN }}
           message: |
-            🎉 新版本发布通知
+            🔄 Release 更新通知
             
             项目: ${{ github.repository }}
-            版本: ${{ github.event.release.tag_name }}
+            版本: ${{ github.ref_name }}
+            事件类型: ${{ github.event_name }}
             
-            更新说明:
+            更新内容:
             ${{ github.event.release.body }}
             
-            发布链接: ${{ github.event.release.html_url }}
+            链接: ${{ github.event.release.html_url || github.server_url }}/${{ github.repository }}
