@@ -1,0 +1,25 @@
+name: Release Notification
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Telegram Message
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_TO }}
+          token: ${{ secrets.TELEGRAM_TOKEN }}
+          message: |
+            🎉 新版本发布通知
+            
+            项目: ${{ github.repository }}
+            版本: ${{ github.event.release.tag_name }}
+            
+            更新说明:
+            ${{ github.event.release.body }}
+            
+            发布链接: ${{ github.event.release.html_url }}
