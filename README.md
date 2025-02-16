@@ -49,6 +49,43 @@ API私钥在你部署的服务器上的h2数据库里，你可以随时关闭服
 
 三:部署说明:
 
+    一: 脚本部署(注意,新版本会检测安装redis,之前安装了redis的会有影响)
+
+        1 切换到root用户下. 创建文件夹 mkdir -p oci-start && cd oci-start
+
+        2 下载执行脚本 wget -N --no-check-certificate "https://github.com/doubleDimple/oci-start/releases/download/v-2.0.6/oci-start.sh" && chmod +x oci-start.sh
+
+        3 直接运行脚本,即可自动安装部署,安装命令如下
+
+        # 启动应用程序
+        ./oci-start.sh start
+
+        # 停止应用程序
+        ./oci-start.sh stop
+
+        # 重启应用程序
+        ./oci-start.sh restart    
+
+        # 更新到最新版本
+        ./oci-start.sh update
+
+        # 完全卸载应用
+        ./oci-start.sh uninstall
+        
+    二: docker部署
+    
+        1 下载执行脚本
+        
+        wget -N --no-check-certificate "https://github.com/doubleDimple/oci-start/releases/download/v-2.0.6/docker.sh" && chmod +x docker.sh
+
+        2 执行脚本
+        
+        安装应用
+        ./docker.sh install
+
+        卸载应用
+        ./docker.sh uninstall
+
    2.0.6版本之前部署步骤
   
    一: 脚本部署
@@ -100,44 +137,6 @@ API私钥在你部署的服务器上的h2数据库里，你可以随时关闭服
 
             # 查看容器日志
             docker logs oci-start
-    2.0.6版本之后(包括2.0.6)部署步骤(注意,新版本会检测安装redis,之前安装了redis的会有影响)
-
-    一: 脚本部署
-
-        1 切换到root用户下. 创建文件夹 mkdir -p oci-start && cd oci-start
-
-        2 下载执行脚本 wget -N --no-check-certificate "https://github.com/doubleDimple/oci-start/releases/download/v-2.0.6/oci-start.sh" && chmod +x oci-start.sh
-
-        3 直接运行脚本,即可自动安装部署,安装命令如下
-
-        # 启动应用程序
-        ./oci-start.sh start
-
-        # 停止应用程序
-        ./oci-start.sh stop
-
-        # 重启应用程序
-        ./oci-start.sh restart    
-
-        # 更新到最新版本
-        ./oci-start.sh update
-
-        # 完全卸载应用
-        ./oci-start.sh uninstall
-        
-    二: docker部署
-    
-        1 下载执行脚本
-        
-        wget -N --no-check-certificate "https://github.com/doubleDimple/oci-start/releases/download/v-2.0.6/docker.sh" && chmod +x docker.sh
-
-        2 执行脚本
-        
-        安装应用
-        ./docker.sh install
-
-        卸载应用
-        ./docker.sh uninstall
         
 四:配置说明(对于已经部署之前的版本的,除了security配置完全删除外,其他配置可以暂时不要动,否则会导致找不到文件路径导致api失败):
 
