@@ -74,7 +74,7 @@ API私钥在你部署的服务器上的h2数据库里，你可以随时关闭服
         
     二: docker部署
 
-        mkdir -p oci-start && cd oci-start
+        mkdir -p oci-start-docker && cd oci-start-docker
     
         1 下载执行脚本
         
