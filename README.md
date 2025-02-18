@@ -53,7 +53,7 @@ API私钥在你部署的服务器上的h2数据库里，你可以随时关闭服
 
         1 切换到root用户下. 创建文件夹 mkdir -p oci-start && cd oci-start
 
-        2 下载执行脚本 wget -N --no-check-certificate "https://github.com/doubleDimple/oci-start/releases/download/v-2.0.7/oci-start.sh" && chmod +x oci-start.sh
+        2 下载执行脚本 wget https://raw.githubusercontent.com/doubleDimple/shell-tools/master/oci-start.sh && chmod +x oci-start.sh
 
         3 直接运行脚本,即可自动安装部署,安装命令如下
 
@@ -78,7 +78,7 @@ API私钥在你部署的服务器上的h2数据库里，你可以随时关闭服
     
         1 下载执行脚本
         
-        wget -N --no-check-certificate "https://github.com/doubleDimple/oci-start/releases/download/v-2.0.7/docker.sh" && chmod +x docker.sh
+        wget https://raw.githubusercontent.com/doubleDimple/shell-tools/master/docker.sh && chmod +x docker.sh
 
         2 执行脚本
         
