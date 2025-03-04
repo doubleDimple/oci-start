@@ -171,25 +171,12 @@ chmod 777 oci-start.sh
 
 通过 `http://ip:port` 访问应用，输入配置的用户名密码。
 
-## 文件位置说明
-
-本系统默认的脚本根路径为`/root/oci-start`，如果想自己修改文件路径，请修改配置文件，脚本相关的路径即可。
-
-## 探针使用说明
-
-1. 增加探针功能，下载`monitor.sh`脚本，执行`chmod +x monitor.sh`
-2. 执行 `./monitor.sh start`
-3. 参数说明：
-   - `serverId`（自定义的VPS名称）
-   - `url http://ip:port/api/metrics/reportMetrics`（ip:port替换成你实际部署oci-start的真实IP和端口）
 
 ## Star历史
 
 [![Star History Chart](https://api.star-history.com/svg?repos=doubleDimple/oci-start&type=Date)](https://star-history.com/#doubleDimple/oci-start&Date)
 
-## 访问
-    http://ip:port  访问应用,输入配置的用户名密码
-    <img width="1430" alt="1" src="https://github.com/user-attachments/assets/a283758f-9a98-42be-8234-6ba8b5d8a2c0" />
+## 程序演示图片
 
 <img width="1423" alt="2" src="https://github.com/user-attachments/assets/23b9ab72-6212-42c3-a02c-3efa795ca9ea" />
 
