@@ -99,51 +99,6 @@ wget https://raw.githubusercontent.com/doubleDimple/shell-tools/master/docker.sh
 ./docker.sh uninstall
 ```
 
-### 旧版部署（2.0.6版本之前）
-
-#### 脚本部署
-```bash
-# 1. 登录Linux服务器，切换到root用户下
-
-# 2. 创建文件夹 
-mkdir -p oci-start && cd oci-start
-
-# 3. 下载部署包文件
-
-# 3.1 下载JAR包
-wget https://github.com/doubleDimple/oci-start/releases/download/v-2.0.5/oci-start-release.jar
-
-# 3.2 下载运行脚本
-wget -N --no-check-certificate "https://github.com/doubleDimple/oci-start/releases/download/v-2.0.1/oci-start.sh" && chmod +x oci-start.sh
-
-# 3.3 下载配置文件模板
-wget https://github.com/doubleDimple/oci-start/releases/download/v-2.0.1/oci-start.yml
-```
-
-#### Docker部署
-```bash
-# 0. 创建文件件
-mkdir oci-start-docker
-
-# 1. 进入指定目录
-cd oci-start-docker
-
-# 2. 创建数据和日志目录
-mkdir -p data logs
-
-# 3. 运行容器，使用绝对路径挂载
-docker stop oci-start || true && docker run -d \
-    --pull always \
-    --name oci-start \
-    -p 9856:9856 \
-    -v /root/oci-start-docker/data:/oci-start/data \
-    -v /root/oci-start-docker/logs:/oci-start/logs \
-    -e SERVER_PORT=9856 \
-    -e DATA_PATH=/oci-start/data \
-    -e LOG_HOME=/oci-start/logs \
-    --rm \
-    lovele/oci-start:latest
-
 # 查看容器状态
 docker ps -a
 
