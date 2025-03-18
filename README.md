@@ -64,7 +64,7 @@ sudo dnf install java-11-openjdk-devel
 mkdir -p oci-start && cd oci-start
 
 # 2. 下载执行脚本
-wget -O https://raw.githubusercontent.com/doubleDimple/shell-tools/master/oci-start.sh && chmod +x oci-start.sh
+wget -O oci-start.sh https://raw.githubusercontent.com/doubleDimple/shell-tools/master/oci-start.sh && chmod +x oci-start.sh
 
 # 3. 直接运行脚本，即可自动安装部署
 
@@ -89,7 +89,7 @@ wget -O https://raw.githubusercontent.com/doubleDimple/shell-tools/master/oci-st
 mkdir -p oci-start-docker && cd oci-start-docker
 
 # 1. 下载执行脚本
-wget -O https://raw.githubusercontent.com/doubleDimple/shell-tools/master/docker.sh && chmod +x docker.sh
+wget -O docker.sh https://raw.githubusercontent.com/doubleDimple/shell-tools/master/docker.sh && chmod +x docker.sh
 
 # 2. 执行脚本
 # 安装应用
