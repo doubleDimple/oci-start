@@ -5,9 +5,9 @@ on:
   release:
     types: [published, created, edited]
   # 监听 tag 推送
-  push:
-    tags:
-      - 'v-*'
+  #push:
+  #  tags:
+  #    - 'v-*'
   # 允许手动触发
   workflow_dispatch:
 
