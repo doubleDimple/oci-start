@@ -190,7 +190,10 @@ chmod 777 oci-start.sh
 *如需将您的名字添加到捐赠者名单中，请在捐赠后联系项目维护者。*
 
 ## 赞助
+赞助说明
+本项目大力感谢YxVM提供的服务器资源，也感谢NodeSeek论坛和社区的大力支持
 
-[![NodeSupport](https://i.111666.best/image/RNlXNgXA287rWVzsRdcjGJ.png)](https://yxvm.com/)  
-[NodeSupport](https://github.com/NodeSeekDev/NodeSupport) 赞助了本项目 🎉
+YxVM服务器：https://yxvm.com/aff.php?aff=762
+
+NodeSeek交流论坛提供的NodeSupport项目：https://github.com/NodeSeekDev/NodeSupport 赞助了本项目
 
