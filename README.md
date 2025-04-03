@@ -189,5 +189,5 @@ chmod 777 oci-start.sh
 
 *如需将您的名字添加到捐赠者名单中，请在捐赠后联系项目维护者。*
 
-[![image](https://i.111666.best/image/RNlXNgXA287rWVzsRdcjGJ.png)](https://yxvm.com/)
+(https://i.111666.best/image/RNlXNgXA287rWVzsRdcjGJ.png)](https://yxvm.com/)
 [NodeSupport](https://github.com/NodeSeekDev/NodeSupport)赞助了本项目
