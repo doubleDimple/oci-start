@@ -51,7 +51,6 @@ sudo apt install default-jdk
 ### 方法一：脚本部署
 *注意：新版本会检测安装Redis，之前安装了Redis的会有影响*
 
-```bash
 # 1. 切换到root用户下并创建文件夹
 mkdir -p oci-start && cd oci-start
 
