@@ -44,14 +44,6 @@
 sudo apt update
 sudo apt install default-jdk
 ```
-
-### CentOS/RHEL
-```bash
-# CentOS 7
-sudo yum install java-1.8.0-openjdk-devel
-
-# CentOS 8及之后版本（使用dnf）
-sudo dnf install java-11-openjdk-devel
 ```
 
 ## 部署方法
@@ -114,6 +106,18 @@ docker logs oci-start
 # 端口自行指定（默认端口为9856，如果不想改默认端口，不需要下载oci-start.yml）
 server:
   port: 9856
+
+# 如果配置了域名访问,需要在ng上面配置如下配置
+  location ~ ^/websockify/(\d+)$ {
+        proxy_pass http://yourIp:$1;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_read_timeout 86400;
+    }
 ```
 
 ## 操作命令
