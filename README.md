@@ -205,3 +205,4 @@ YxVM服务器：https://yxvm.com/aff.php?aff=762
 
 NodeSeek交流论坛提供的NodeSupport项目：https://github.com/NodeSeekDev/NodeSupport 赞助了本项目
 
+[![Powered by DartNode](https://dartnode.com/branding/DN-Open-Source-sm.png)](https://dartnode.com "Powered by DartNode - Free VPS for Open Source")
