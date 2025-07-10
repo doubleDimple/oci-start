@@ -9,7 +9,7 @@ jobs:
   notify:
     runs-on: ubuntu-latest
     steps:
-      - name: 发送精美Telegram通知
+      - name: 发送Telegram通知
         uses: appleboy/telegram-action@v0.1.1
         with:
           to: ${{ secrets.MY_OCI_START_GROUP_ID }}
