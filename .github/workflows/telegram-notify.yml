@@ -1,7 +1,7 @@
-name: Star and Issue Notifications
+name: GitHub项目活动通知
 on:
   issues:
-    types: [opened, closed]
+    types: [opened, closed, reopened]
   watch:
     types: [started]
   
@@ -9,14 +9,30 @@ jobs:
   notify:
     runs-on: ubuntu-latest
     steps:
-      - name: Send Telegram notification
-        uses: appleboy/telegram-action@v0.1.1  # 改为具体版本
+      - name: 发送精美Telegram通知
+        uses: appleboy/telegram-action@v0.1.1
         with:
           to: ${{ secrets.MY_OCI_START_GROUP_ID }}
           token: ${{ secrets.MY_OCI_START_GROUP_MANAGER_BOT_TOKEN }}
+          format: markdown
+          disable_web_page_preview: false
           message: |
-            📢 Repository: ${{ github.repository }}
-            🔔 Event: ${{ github.event_name }}
-            👤 User: ${{ github.actor }}
-            ⚡ Action: ${{ github.event.action }}
-            🔗 Link: ${{ github.server_url }}/${{ github.repository }}
+            ${{ github.event_name == 'watch' && '🌟 *恭喜！获得新的Star*' || 
+                github.event_name == 'issues' && github.event.action == 'opened' && '🐛 *收到新Issue*' ||
+                github.event_name == 'issues' && github.event.action == 'closed' && '✅ *Issue已解决*' ||
+                github.event_name == 'issues' && github.event.action == 'reopened' && '🔄 *Issue被重新打开*' }}
+            
+            📂 *项目：* [`${{ github.repository }}`](${{ github.server_url }}/${{ github.repository }})
+            
+            👤 *操作者：* [${{ github.actor }}](https://github.com/${{ github.actor }})
+            
+            ${{ github.event.issue.title && format('📋 *标题：* {0}', github.event.issue.title) || '' }}
+            
+            ${{ github.event.issue.body && github.event.action == 'opened' && format('💬 *描述：* {0}', github.event.issue.body) || '' }}
+            
+            ${{ github.event_name == 'watch' && format('⭐ 项目现在有 *{0}* 个Star了！', github.event.repository.stargazers_count) || '' }}
+            
+            🔗 [${{ github.event_name == 'watch' && '查看项目' || 
+                   github.event_name == 'issues' && '查看Issue' }}](${{ github.event.issue.html_url || format('{0}/{1}', github.server_url, github.repository) }})
+            
+            ⏰ *时间：* `${{ github.event.repository.updated_at }}`
