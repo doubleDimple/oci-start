@@ -12,7 +12,7 @@ jobs:
       - name: Send Telegram notification
         uses: appleboy/telegram-action@master
         with:
-          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          to: ${{ secrets.TELEGRAM_CHAT_ISSUE_ID }}
           token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           message: |
             📢 ${{ github.repository }}
