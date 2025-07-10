@@ -1,4 +1,4 @@
-name: Telegram Notifications
+name: Star and Issue Notifications
 on:
   issues:
     types: [opened, closed]
@@ -10,12 +10,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Send Telegram notification
-        uses: appleboy/telegram-action@master
+        uses: appleboy/telegram-action@v0.1.1  # 改为具体版本
         with:
           to: ${{ secrets.MY_OCI_START_GROUP_ID }}
           token: ${{ secrets.MY_OCI_START_GROUP_MANAGER_BOT_TOKEN }}
           message: |
-            📢 ${{ github.repository }}
-            Event: ${{ github.event_name }}
-            User: ${{ github.actor }}
-            Action: ${{ github.event.action }}
+            📢 Repository: ${{ github.repository }}
+            🔔 Event: ${{ github.event_name }}
+            👤 User: ${{ github.actor }}
+            ⚡ Action: ${{ github.event.action }}
+            🔗 Link: ${{ github.server_url }}/${{ github.repository }}
