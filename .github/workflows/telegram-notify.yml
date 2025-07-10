@@ -1,0 +1,21 @@
+name: Telegram Notifications
+on:
+  issues:
+    types: [opened, closed]
+  watch:
+    types: [started]
+  
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Telegram notification
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          message: |
+            📢 ${{ github.repository }}
+            Event: ${{ github.event_name }}
+            User: ${{ github.actor }}
+            Action: ${{ github.event.action }}
