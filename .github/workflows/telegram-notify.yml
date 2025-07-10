@@ -13,7 +13,7 @@ jobs:
         uses: appleboy/telegram-action@master
         with:
           to: ${{ secrets.TELEGRAM_CHAT_ISSUE_ID }}
-          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          token: ${{ secrets.TELEGRAM_TOKEN }}
           message: |
             📢 ${{ github.repository }}
             Event: ${{ github.event_name }}
