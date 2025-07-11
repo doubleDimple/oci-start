@@ -25,14 +25,10 @@ jobs:
             📂 *项目：* [`${{ github.repository }}`](${{ github.server_url }}/${{ github.repository }})
             
             👤 *操作者：* [${{ github.actor }}](https://github.com/${{ github.actor }})
-            
             ${{ github.event.issue.title && format('📋 *标题：* {0}', github.event.issue.title) || '' }}
-            
             ${{ github.event.issue.body && github.event.action == 'opened' && format('💬 *描述：* {0}', github.event.issue.body) || '' }}
-            
             ${{ github.event_name == 'watch' && format('⭐ 项目现在有 *{0}* 个Star了！', github.event.repository.stargazers_count) || '' }}
             
             🔗 [${{ github.event_name == 'watch' && '查看项目' || 
                    github.event_name == 'issues' && '查看Issue' }}](${{ github.event.issue.html_url || format('{0}/{1}', github.server_url, github.repository) }})
             
-            ⏰ *时间：* `${{ github.event.repository.updated_at }}`
