@@ -9,17 +9,12 @@
 [![Java](https://img.shields.io/badge/Java-8+-orange?style=flat-square&logo=java)](https://www.java.com)
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue?style=flat-square&logo=docker)](https://www.docker.com)
 
-### 🚀 一键部署
-
-[![Deploy to EdgeOne](https://img.shields.io/badge/Deploy%20to-EdgeOne-1976d2?style=for-the-badge&logo=tencent-cloud&logoColor=white)](https://console.cloud.tencent.com/edgeone/pages/project?github=https://github.com/doubleDimple/oci-start)
-
 </div>
 
 ---
 
 ## 📋 目录
 
-- [一键部署](#-一键部署)
 - [功能特性](#-功能特性)
 - [快速开始](#-快速开始)
 - [部署方法](#-部署方法)
@@ -28,82 +23,6 @@
 - [截图展示](#-截图展示)
 - [赞助支持](#-赞助支持)
 - [免责声明](#️-免责声明)
-
----
-
-## 🚀 一键部署
-
-### 🌟 EdgeOne Pages 部署
-
-<div align="center">
-
-[![Deploy to EdgeOne](https://img.shields.io/badge/Deploy%20to-EdgeOne%20Pages-1976d2?style=for-the-badge&logo=tencent-cloud&logoColor=white)](https://console.cloud.tencent.com/edgeone/pages/project?github=https://github.com/doubleDimple/oci-start)
-
-**本项目 CDN 加速及安全防护由 [Tencent EdgeOne](https://edgeone.ai/zh?from=github) 赞助**
-
-<img src="https://edgeone.ai/_nuxt/img/logo-edgeone-horizontal.svg" alt="EdgeOne Logo" width="200"/>
-
-</div>
-
-#### 🎯 EdgeOne 部署优势
-
-- ⚡ **全球加速** - 3200+ 边缘节点，国内访问延迟降低 60%-80%
-- 🛡️ **安全防护** - 智能拦截 SQL 注入、XSS 等 17 类 Web 攻击
-- 📊 **实时监控** - 可视化监控面板，实时展示带宽、缓存命中率
-- 🆓 **免费套餐** - 无需信用卡，邮箱注册即可使用
-
-#### 📝 使用 EdgeOne 部署步骤
-
-1. 点击上方 **Deploy to EdgeOne** 按钮
-2. 登录或注册 EdgeOne 账号（支持Gmail快速注册）
-3. 授权 GitHub 仓库访问权限
-4. 选择本项目仓库进行部署
-5. 配置构建命令和环境变量
-6. 开始自动化部署
-
-#### 🔧 GitHub Actions 自动化部署
-
-你也可以使用 GitHub Actions 进行自动化部署：
-
-```yaml
-name: Deploy to EdgeOne Pages
-
-on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-      
-    - name: Setup Java
-      uses: actions/setup-java@v3
-      with:
-        java-version: '8'
-        distribution: 'temurin'
-        
-    - name: Build Application
-      run: |
-        ./gradlew build
-        # 或 mvn clean package
-        
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-        
-    - name: Deploy to EdgeOne
-      run: |
-        npx edgeone pages deploy ./build -n oci-start -t ${{ secrets.EDGEONE_API_TOKEN }}
-      env:
-        EDGEONE_API_TOKEN: ${{ secrets.EDGEONE_API_TOKEN }}
-```
-
-> 💡 **提示**: 需要在 GitHub 仓库的 Settings > Secrets 中配置 `EDGEONE_API_TOKEN`
 
 ---
 
@@ -163,17 +82,7 @@ sudo apt install default-jdk
 
 ## 🛠️ 部署方法
 
-### 方法一：🌐 EdgeOne 一键部署（推荐）
-
-<div align="center">
-
-[![Deploy to EdgeOne](https://img.shields.io/badge/Deploy%20to-EdgeOne%20Pages-1976d2?style=for-the-badge&logo=tencent-cloud&logoColor=white)](https://console.cloud.tencent.com/edgeone/pages/project?github=https://github.com/doubleDimple/oci-start)
-
-</div>
-
-点击上方按钮，享受全球 CDN 加速和安全防护！
-
-### 方法二：📜 脚本部署
+### 方法一：📜 脚本部署（推荐）
 
 > ⚠️ **注意**：新版本会检测安装Redis，之前安装了Redis的可能会有影响
 
@@ -207,7 +116,7 @@ wget -O oci-start.sh https://raw.githubusercontent.com/doubleDimple/shell-tools/
 ./oci-start.sh uninstall
 ```
 
-### 方法三：🐳 Docker部署
+### 方法二：🐳 Docker部署
 
 ```bash
 # 📁 创建工作目录
@@ -379,12 +288,6 @@ chmod 777 oci-start.sh
 [![NodeSeek](https://img.shields.io/badge/NodeSeek-社区支持-green?style=for-the-badge&logo=discourse&logoColor=white)](https://github.com/NodeSeekDev/NodeSupport)
 
 [![DartNode](https://dartnode.com/branding/DN-Open-Source-sm.png)](https://dartnode.com "Powered by DartNode - Free VPS for Open Source")
-
-### 🚀 CDN 加速赞助商
-
-[![EdgeOne](https://img.shields.io/badge/Tencent-EdgeOne-1976d2?style=for-the-badge&logo=tencent-cloud&logoColor=white)](https://edgeone.ai/zh?from=github)
-
-**本项目 CDN 加速及安全防护由 Tencent EdgeOne 赞助**
 
 </div>
 
