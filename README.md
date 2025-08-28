@@ -9,6 +9,10 @@
 [![Java](https://img.shields.io/badge/Java-8+-orange?style=flat-square&logo=java)](https://www.java.com)
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue?style=flat-square&logo=docker)](https://www.docker.com)
 
+[![Deploy to EdgeOne](https://img.shields.io/badge/Deploy%20to-EdgeOne-1976d2?style=for-the-badge&logo=tencent-cloud&logoColor=white)](https://console.cloud.tencent.com/edgeone/pages/project?github=https://github.com/doubleDimple/oci-start)
+
+**本项目 CDN 加速及安全防护由 [Tencent EdgeOne](https://edgeone.ai/zh?from=github) 赞助**
+
 </div>
 
 ---
@@ -116,7 +120,7 @@ wget -O oci-start.sh https://raw.githubusercontent.com/doubleDimple/shell-tools/
 ./oci-start.sh uninstall
 ```
 
-### 方法二：🐳 Docker部署
+### 方法三：🐳 Docker部署
 
 ```bash
 # 📁 创建工作目录
@@ -288,6 +292,12 @@ chmod 777 oci-start.sh
 [![NodeSeek](https://img.shields.io/badge/NodeSeek-社区支持-green?style=for-the-badge&logo=discourse&logoColor=white)](https://github.com/NodeSeekDev/NodeSupport)
 
 [![DartNode](https://dartnode.com/branding/DN-Open-Source-sm.png)](https://dartnode.com "Powered by DartNode - Free VPS for Open Source")
+
+### 🚀 CDN 加速赞助商
+
+[![EdgeOne](https://img.shields.io/badge/Tencent-EdgeOne-1976d2?style=for-the-badge&logo=tencent-cloud&logoColor=white)](https://edgeone.ai/zh?from=github)
+
+**本项目 CDN 加速及安全防护由 Tencent EdgeOne 赞助**
 
 </div>
 
