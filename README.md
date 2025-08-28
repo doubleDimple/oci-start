@@ -13,6 +13,10 @@
 
 **本项目 CDN 加速及安全防护由 [Tencent EdgeOne](https://edgeone.ai/zh?from=github) 赞助**
 
+<a href="https://edgeone.ai/zh?from=github" target="_blank">
+  <img src="https://edgeone.ai/media/34fe3a45-492d-4ea4-ae5d-ea1087ca7b4b.png" alt="EdgeOne Logo" width="200"/>
+</a>
+
 </div>
 
 ---
@@ -120,7 +124,7 @@ wget -O oci-start.sh https://raw.githubusercontent.com/doubleDimple/shell-tools/
 ./oci-start.sh uninstall
 ```
 
-### 方法三：🐳 Docker部署
+### 方法二：🐳 Docker部署
 
 ```bash
 # 📁 创建工作目录
@@ -295,9 +299,11 @@ chmod 777 oci-start.sh
 
 ### 🚀 CDN 加速赞助商
 
-[![EdgeOne](https://img.shields.io/badge/Tencent-EdgeOne-1976d2?style=for-the-badge&logo=tencent-cloud&logoColor=white)](https://edgeone.ai/zh?from=github)
+<a href="https://edgeone.ai/zh?from=github" target="_blank">
+  <img src="https://edgeone.ai/media/34fe3a45-492d-4ea4-ae5d-ea1087ca7b4b.png" alt="EdgeOne Logo" width="200"/>
+</a>
 
-**本项目 CDN 加速及安全防护由 Tencent EdgeOne 赞助**
+**本项目 CDN 加速及安全防护由 [Tencent EdgeOne](https://edgeone.ai/zh?from=github) 赞助**
 
 </div>
 
