@@ -98,6 +98,8 @@ mkdir -p oci-start && cd oci-start
 
 # 2. 📥 下载执行脚本
 wget -O oci-start.sh https://raw.githubusercontent.com/doubleDimple/shell-tools/master/oci-start.sh && chmod +x oci-start.sh
+# 3. 📥 gitee下载执行脚本
+wget -O oci-start.sh https://gitee.com/xaioxin_convoy/shell-tools/raw/master/oci-start.sh && chmod +x oci-start.sh
 
 # 3. 🎯 直接运行脚本，即可自动安装部署
 ./oci-start.sh install
