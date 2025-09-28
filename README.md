@@ -89,9 +89,6 @@ sudo apt install default-jdk
 ## 🛠️ 部署方法
 
 ### 方法一：📜 脚本部署（推荐）
-
-> ⚠️ **注意**：新版本会检测安装Redis，之前安装了Redis的可能会有影响
-
 ```bash
 # 1. 🗂️ 切换到root用户并创建文件夹
 mkdir -p oci-start && cd oci-start
@@ -198,8 +195,7 @@ chmod 777 oci-start.sh
 
 通过浏览器访问：`http://your-ip:port`
 
-输入配置的用户名和密码即可开始使用！
-
+第一步部署成功后,需要执行注册即可登录(注册页面只在第一次部署的时候才会出现)
 ---
 
 ## 📸 截图展示
