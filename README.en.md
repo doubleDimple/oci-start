@@ -89,9 +89,6 @@ sudo apt install default-jdk
 ## 🛠️ Deployment Methods
 
 ### Method 1: 📜 Script Deployment (Recommended)
-
-> ⚠️ **Note**: The new version will detect and install Redis, which may affect previous Redis installations
-
 ```bash
 # 1. 🗂️ Switch to root user and create folder
 mkdir -p oci-start && cd oci-start
@@ -196,7 +193,7 @@ chmod 777 oci-start.sh
 
 Access through browser: `http://your-ip:port`
 
-Enter your configured username and password to start using!
+If it is the first deployment, you need to register the account and password yourself. The registration page will only appear during the first deployment.
 
 ---
 
