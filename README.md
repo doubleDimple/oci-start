@@ -158,7 +158,7 @@ docker logs oci-start
 server:
   port: 9856
 
-# 🔗 域名访问配置（需要在nginx上配置）
+# 🔗 域名访问配置（需要在nginx上配置）说明:此为访问面板cloud shell的必须配置
 location ~ ^/websockify/(\d+)$ {
     proxy_pass http://yourIp:$1;
     proxy_http_version 1.1;
