@@ -242,6 +242,7 @@ Thanks to the following users for their generous support (in chronological order
 
 | 👤 Donor | 💰 Amount/Item | 📅 Date |
 |:----------:|:------------:|:--------:|
+| @xwbay | ¥88 | 2025-10-18 |
 | Anonymous | ¥10 | 2025-09-21 |
 | Conan | ¥100 | 2025-09-13 |
 | Conan | GCP Account | 2025-07-15 |
