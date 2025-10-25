@@ -242,7 +242,7 @@ Thanks to the following users for their generous support (in chronological order
 
 | 👤 Donor | 💰 Amount/Item | 📅 Date |
 |:----------:|:------------:|:--------:|
-| 安安(@ananitsme) | ¥9.2 | 2025-10-25 |
+| 安安(@ananitsme) | ¥50 | 2025-10-25 |
 | Conan(@KN_001) | ¥200 | 2025-10-25 |
 | @xwbay | ¥88 | 2025-10-18 |
 | Anonymous | ¥10 | 2025-09-21 |
