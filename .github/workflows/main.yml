@@ -2,14 +2,14 @@ name: Release Notification
 
 on:
   # 监听 release 事件
-  release:
-    types: [published, created, edited]
+  #release:
+  #  types: [published, created, edited]
   # 监听 tag 推送
   #push:
   #  tags:
   #    - 'v-*'
   # 允许手动触发
-  workflow_dispatch:
+  #workflow_dispatch:
 
 jobs:
   notify:
