@@ -99,7 +99,7 @@ wget -O oci-start.sh https://raw.githubusercontent.com/doubleDimple/shell-tools/
 wget -O oci-start.sh https://gitee.com/xaioxin_convoy/shell-tools/raw/master/oci-start.sh && chmod +x oci-start.sh
 
 # 3. 🎯 直接运行脚本，即可自动安装部署
-./oci-start.sh install
+./oci-start.sh start
 ```
 
 #### 🎮 脚本操作命令
