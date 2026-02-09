@@ -97,7 +97,7 @@ mkdir -p oci-start && cd oci-start
 wget -O oci-start.sh https://raw.githubusercontent.com/doubleDimple/shell-tools/master/oci-start.sh && chmod +x oci-start.sh
 
 # 3. 🎯 Run script directly for automatic installation and deployment
-./oci-start.sh install
+./oci-start.sh start
 ```
 
 #### 🎮 Script Commands
