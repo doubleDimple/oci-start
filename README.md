@@ -8,6 +8,8 @@
 
 **一个使用API集成创建和管理甲骨文云的强大系统**
 
+代码已完全开源,请各位开发者务必遵守基本的操守,请勿fork代码修改功能盗取他人账号,勿以恶小而为之,勿以善小而不为.
+
 [![GitHub stars](https://img.shields.io/github/stars/doubleDimple/oci-start?style=flat-square&logo=github)](https://github.com/doubleDimple/oci-start)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 [![Java](https://img.shields.io/badge/Java-8+-orange?style=flat-square&logo=java)](https://www.java.com)
