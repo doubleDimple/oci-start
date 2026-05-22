@@ -1,0 +1,1071 @@
+
+:root {
+    --top-nav-bg: #1f1f1f;
+    --sidebar-bg: #1e2124;
+    --sidebar-hover: #292d30;
+    --sidebar-active: #1abc9c;
+    --sidebar-text: #a9b7c6;
+    --sidebar-active-text: #ffffff;
+    --submenu-bg: #292d30;
+    --border-color: #383c40;
+    --main-bg: #ffffff;
+    --text-primary: #333333;
+    --text-secondary: #666666;
+    --text-light: #ffffff;
+    --accent-blue: #2196f3;
+    --accent-green: #1abc9c;
+    --accent-red: #ff6b6b;
+    --hover-bg: #f5f5f5;
+    --card-border: #e0e0e0;
+    --shadow-color: rgba(0, 0, 0, 0.1);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background-color: var(--main-bg);
+    color: var(--text-primary);
+    line-height: 1.4;
+    font-size: 12px;
+}
+
+/* Top Navigation */
+.top-nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 45px;
+    background-color: var(--top-nav-bg);
+    color: var(--text-light);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 20px;
+    z-index: 1000;
+}
+
+.brand {
+    color: var(--accent-green);
+    font-size: 14px;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.top-nav-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    font-size: 12px;
+}
+
+.top-nav-right a {
+    color: var(--text-light);
+    text-decoration: none;
+}
+
+/* Layout */
+/*.layout {
+    display: flex;
+    min-height: 100vh;
+    padding-top: 45px;
+}*/
+
+/* Sidebar */
+/*.sidebar {
+    width: 200px;
+    background: var(--sidebar-bg);
+    position: fixed;
+    height: calc(100vh - 45px);
+    color: var(--sidebar-text);
+    padding-top: 0;
+    font-size: 13px;
+    border-right: 1px solid var(--border-color);
+}*/
+
+.nav-parent {
+    border-bottom: 1px solid var(--border-color);
+}
+
+.nav-parent > .nav-link {
+    padding: 12px 20px;
+    color: var(--sidebar-text);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: all 0.3s;
+    cursor: pointer;
+    font-weight: 500;
+    text-decoration: none;
+    user-select: none;
+}
+
+.nav-parent > .nav-link span {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.nav-parent > .nav-link:hover {
+    color: var(--sidebar-active-text);
+    background: var(--sidebar-hover);
+}
+
+.nav-parent.expanded > .nav-link {
+    color: var(--sidebar-active-text);
+    background: var(--sidebar-hover);
+}
+
+.nav-parent > .nav-link i.arrow {
+    transition: transform 0.3s;
+    opacity: 0.7;
+}
+
+.nav-parent.expanded > .nav-link i.arrow {
+    transform: rotate(180deg);
+    opacity: 1;
+}
+
+.nav-children {
+    display: none;
+    background: var(--submenu-bg);
+}
+
+.nav-parent.expanded .nav-children {
+    display: block;
+}
+
+.nav-children .nav-link {
+    padding: 10px 20px 10px 40px;
+    color: var(--sidebar-text);
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+    transition: all 0.3s;
+}
+
+.nav-children .nav-link:hover {
+    color: var(--sidebar-active-text);
+    background: var(--sidebar-hover);
+    padding-left: 45px;
+}
+
+.nav-children .nav-link.active {
+    color: var(--sidebar-active-text);
+    background: var(--sidebar-active);
+    padding-left: 45px;
+}
+
+.nav-link i:not(.arrow) {
+    width: 16px;
+    margin-right: 8px;
+    text-align: center;
+}
+
+/* Main Content */
+.main-content {
+    flex: 1;
+    margin-left: 200px;
+    padding: 15px;
+    background-color: var(--main-bg);
+}
+
+.page-header {
+    margin-bottom: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.page-title {
+    font-size: 16px;
+    font-weight: normal;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.page-title i {
+    color: var(--accent-green);
+}
+
+/* View Controls */
+.view-actions {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+}
+
+.view-toggle {
+    display: flex;
+    gap: 4px;
+    background: var(--hover-bg);
+    padding: 4px;
+    border-radius: 2px;
+}
+
+.view-toggle .btn {
+    background: none;
+    border: none;
+    padding: 4px 8px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: 2px;
+}
+
+.view-toggle .btn.active {
+    background: var(--main-bg);
+    color: var(--accent-green);
+}
+
+/* Table View */
+.table-view {
+    background: white;
+    border-radius: 3px;
+    border: 1px solid var(--card-border);
+    margin-bottom: 15px;
+    overflow-x: auto;
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 1200px;
+}
+
+.table th {
+    background-color: var(--hover-bg);
+    font-weight: normal;
+    text-align: left;
+    padding: 10px 15px;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--card-border);
+}
+
+.table td {
+    padding: 10px 15px;
+    border-bottom: 1px solid var(--card-border);
+}
+
+.table tr:hover {
+    background-color: var(--hover-bg);
+}
+
+/* Grid View */
+.grid-view {
+    display: none;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.instance-card {
+    background: var(--main-bg);
+    border-radius: 3px;
+    border: 1px solid var(--card-border);
+    overflow: hidden;
+    transition: all 0.2s ease;
+}
+
+.instance-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px var(--shadow-color);
+}
+
+.instance-card-header {
+    padding: 15px;
+    background: var(--hover-bg);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.instance-icon {
+    width: 40px;
+    height: 40px;
+    background: var(--accent-blue);
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-light);
+    font-size: 20px;
+}
+
+.instance-title {
+    flex: 1;
+    min-width: 0;
+}
+
+.instance-name {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.instance-id {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.instance-content {
+    padding: 15px;
+}
+
+.instance-info-item {
+    display: flex;
+    align-items: flex-start;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--card-border);
+}
+
+.instance-info-item:last-child {
+    border-bottom: none;
+}
+
+.info-label {
+    font-size: 11px;
+    color: var(--text-secondary);
+    width: 80px;
+    flex-shrink: 0;
+}
+
+.info-value {
+    font-size: 12px;
+    color: var(--text-primary);
+    flex: 1;
+    min-width: 0;
+    word-break: break-all;
+}
+
+.instance-actions {
+    padding: 15px;
+    background: var(--hover-bg);
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+/* Button Styles */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 12px;
+    border: none;
+    border-radius: 2px;
+    font-size: 12px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.2s;
+}
+
+.btn-primary { background-color: var(--accent-blue); color: white; }
+.btn-success { background-color: var(--accent-green); color: white; }
+.btn-danger { background-color: var(--accent-red); color: white; }
+.btn-info { background-color: var(--accent-blue); color: white; }
+
+.btn:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+.btn-group {
+    display: flex;
+    gap: 6px;
+}
+
+.btn-icon {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Modal Styles */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: none;
+    z-index: 1050;
+    justify-content: center;
+    align-items: center;
+}
+
+/* 普通模态框样式 */
+.modal-overlay .modal-container {
+    background: white;
+    border-radius: 4px;
+    width: 90%;
+    max-width: 500px;
+    /* 移除之前的height: 100%等样式 */
+    padding: 20px;
+    position: relative;
+}
+
+/* 全屏模态框样式(仅用于SSH和救援) */
+#sshModal .modal-container,
+#systemRescueModal .modal-container {
+    position: fixed;
+    top: 45px;  /* 顶部导航栏高度 */
+    left: 200px; /* 侧边栏宽度 */
+    right: 20px; /* 添加右侧边距 */
+    bottom: 20px; /* 添加底部边距 */
+    width: auto; /* 让宽度自动计算 */
+    height: auto; /* 让高度自动计算 */
+    max-width: none;
+    padding: 0;
+    border-radius: 4px; /* 添加圆角 */
+    display: flex;
+    flex-direction: column;
+    background: var(--terminal-bg, #1a1b26);
+}
+
+.modal-container {
+    background: white;
+    border-radius: 0; /* 移除圆角以实现完美接壤 */
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.modal-header {
+    margin-bottom: 15px;
+}
+
+.modal-title {
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.status-message {
+    padding: 10px;
+    border-radius: 2px;
+    margin-top: 10px;
+    font-size: 12px;
+}
+
+.status-message.success {
+    background-color: rgba(26, 188, 156, 0.1);
+    color: var(--accent-green);
+}
+.status-message.error {
+    background-color: rgba(239, 68, 68, 0.1);
+    color: var(--accent-red);
+}
+.status-message.syncing {
+    background-color: rgba(33, 150, 243, 0.1);
+    color: var(--accent-blue);
+}
+
+/* Utilities */
+.truncate {
+    max-width: 150px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+}
+
+/* Loading Spinner */
+.loading-spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.75s linear infinite;
+    margin-right: 8px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Pagination */
+.pagination {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 15px;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+    .grid-view {
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    }
+}
+
+@media (max-width: 768px) {
+    #sshModal .modal-container,
+    #systemRescueModal .modal-container {
+        left: 20px;
+    }
+
+    .modal-overlay .modal-container {
+        width: 95%;
+        margin: 10px;
+    }
+
+    .modal-overlay {
+        left: 0; /* 当侧边栏隐藏时从左侧边缘开始 */
+    }
+    .sidebar {
+        display: none;
+    }
+
+    .main-content {
+        margin-left: 0;
+    }
+
+    .view-actions {
+        flex-direction: column;
+    }
+
+    .btn-group {
+        flex-wrap: wrap;
+    }
+
+    .instance-actions {
+        justify-content: center;
+    }
+}
+
+.logout-link {
+    background: none;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    padding: 0;
+    font: inherit;
+    text-decoration: none;
+}
+
+.logout-link:hover {
+    text-decoration: underline;
+}
+
+/* 这些样式与oci_monitor.ftl页面中的样式相同 */
+.filter-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 15px;
+}
+
+.filter-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.filter-label {
+    white-space: nowrap;
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+.form-select {
+    padding: 6px 10px;
+    border: 1px solid var(--card-border);
+    border-radius: 2px;
+    background: var(--main-bg);
+    color: var(--text-primary);
+    font-size: 12px;
+    min-width: 250px;
+}
+
+@media (max-width: 768px) {
+    .filter-controls {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .filter-item {
+        width: 100%;
+    }
+
+    .form-select {
+        width: 100%;
+    }
+}
+
+/* 级联下拉框样式 */
+.cascade-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.cascade-selects {
+    display: flex;
+    gap: 10px;
+    flex: 1;
+}
+
+.cascade-select {
+    flex: 1;
+    min-width: 180px;
+    max-width: 300px;
+}
+
+#goToInstanceBtn {
+    white-space: nowrap;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+    .cascade-container {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .cascade-selects {
+        flex-direction: column;
+    }
+
+    .cascade-select {
+        max-width: 100%;
+    }
+
+    #goToInstanceBtn {
+        align-self: flex-end;
+        margin-top: 10px;
+    }
+}
+
+
+.input-group label {
+    color: var(--terminal-text, #a9b1d6);
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.input-group input {
+    padding: 8px 10px;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(0, 0, 0, 0.2);
+    color: var(--terminal-text, #a9b1d6);
+    font-family: 'Fira Code', monospace;
+    font-size: 12px;
+    transition: all 0.2s;
+}
+
+.input-group input:focus {
+    outline: none;
+    border-color: var(--accent-blue, #2196f3);
+    box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
+}
+
+.ssh-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.ssh-btn {
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+}
+
+
+.log-info {
+    display: flex;
+    gap: 15px;
+}
+
+.log-stat {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* 动画 */
+@keyframes blink {
+    0% { opacity: 0; }
+    50% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .ssh-inputs {
+        grid-template-columns: 1fr !important;
+    }
+
+    .ssh-actions {
+        flex-wrap: wrap;
+    }
+
+    .ssh-btn {
+        flex: 1;
+        min-width: 120px;
+    }
+
+    .ssh-btn.close {
+        margin-left: 0;
+        order: -1;
+        width: 100%;
+        margin-bottom: 8px;
+    }
+
+    .terminal-footer {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .log-info {
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+
+    .modal-overlay {
+        left: 0; /* 从屏幕左侧开始 */
+    }
+
+    .modal-container {
+        max-width: 95%; /* 在没有侧边栏时的宽度比例 */
+    }
+}
+
+/* 新增：普通模态框样式覆盖 */
+.modal-overlay:not(#sshModal):not(#systemRescueModal) {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1050;
+    justify-content: center;
+    align-items: center;
+    padding: 60px 220px;
+}
+
+.modal-overlay:not(#sshModal):not(#systemRescueModal) .modal-container {
+    background: white;
+    border-radius: 4px;
+    width: 100%;
+    max-width: 800px;
+    min-height: 200px;
+    max-height: 400px;
+    padding: 20px;
+    position: relative;
+    overflow-y: auto;
+}
+
+@media (max-width: 768px) {
+    .modal-overlay:not(#sshModal):not(#systemRescueModal) {
+        padding: 20px;
+    }
+
+    .modal-overlay:not(#sshModal):not(#systemRescueModal) .modal-container {
+        width: 95%;
+        max-width: none;
+        margin: 10px;
+    }
+}
+
+
+/* 优化后的数据列样式 */
+.data-cell {
+    position: relative;
+}
+
+.data-content {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 32px;
+}
+
+.data-text {
+    flex: 1;
+    min-width: 0;
+}
+
+/* 优化操作链接样式 */
+.action-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 12px;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+    opacity: 0.6;
+    flex-shrink: 0;
+}
+
+.action-link:hover {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+/* 不同类型的操作链接颜色 */
+.action-link.edit {
+    color: #666;
+}
+
+.action-link.edit:hover {
+    background-color: rgba(102, 102, 102, 0.1);
+    color: #333;
+}
+
+.action-link.config {
+    color: var(--accent-green);
+}
+
+.action-link.config:hover {
+    background-color: rgba(26, 188, 156, 0.1);
+    color: var(--accent-green);
+}
+
+.action-link.danger {
+    color: var(--accent-red);
+}
+
+.action-link.danger:hover {
+    background-color: rgba(255, 107, 107, 0.1);
+    color: var(--accent-red);
+}
+
+.action-link.network {
+    color: var(--accent-blue);
+}
+
+.action-link.network:hover {
+    background-color: rgba(33, 150, 243, 0.1);
+    color: var(--accent-blue);
+}
+
+.action-link.storage {
+    color: #ff9800;
+}
+
+.action-link.storage:hover {
+    background-color: rgba(255, 152, 0, 0.1);
+    color: #ff9800;
+}
+
+/* IPv6状态样式优化 */
+.ipv6-empty {
+    color: var(--text-secondary);
+    font-style: italic;
+    font-size: 11px;
+}
+
+/* 表格行悬停效果优化 */
+.table tr:hover .action-link {
+    opacity: 0.8;
+}
+
+.table tr:hover .action-link:hover {
+    opacity: 1;
+}
+
+/* 数据文本样式优化 */
+.data-text.truncate {
+    font-size: 13px;
+    font-weight: 400;
+}
+
+/* 为不同数据类型添加特殊样式 */
+.cpu-memory-text {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 12px;
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.ip-text {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 12px;
+    color: var(--text-primary);
+}
+
+.storage-text {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 12px;
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+/* 响应式优化 */
+@media (max-width: 768px) {
+    .action-link {
+        width: 28px;
+        height: 28px;
+        font-size: 14px;
+    }
+
+    .data-content {
+        gap: 4px;
+    }
+}
+
+/* 复制按钮样式 */
+.action-link.copy {
+    color: #9c27b0;
+}
+
+.action-link.copy:hover {
+    background-color: rgba(156, 39, 176, 0.1);
+    color: #9c27b0;
+}
+
+/* 复制成功提示 */
+.copy-success {
+    animation: copySuccess 0.3s ease;
+}
+
+@keyframes copySuccess {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.2); }
+    100% { transform: scale(1); }
+}
+
+/* 添加到现有CSS中的状态指示器样式 */
+.status-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 8px;
+    flex-shrink: 0;
+}
+
+.status-running {
+    background-color: #4caf50; /* 绿色 - 运行中 */
+    box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.3);
+}
+
+.status-stopped {
+    background-color: #f44336; /* 红色 - 停止中 */
+    box-shadow: 0 0 0 2px rgba(244, 67, 54, 0.3);
+}
+
+.status-starting {
+    background-color: #ff9800; /* 橙色 - 启动中 */
+    box-shadow: 0 0 0 2px rgba(255, 152, 0, 0.3);
+    animation: pulse 1.5s infinite;
+}
+
+.status-stopping {
+    background-color: #9e9e9e; /* 灰色 - 停止中 */
+    box-shadow: 0 0 0 2px rgba(158, 158, 158, 0.3);
+    animation: pulse 1.5s infinite;
+}
+
+.status-terminated {
+    background-color: #607d8b; /* 蓝灰色 - 已终止 */
+    box-shadow: 0 0 0 2px rgba(96, 125, 139, 0.3);
+}
+
+/* 状态指示器的脉冲动画 */
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.2);
+        opacity: 0.7;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+/* 实例名称容器样式优化 */
+.instance-name-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    flex: 1;
+}
+
+
+/* ============================================================
+   移动端适配 — OCI 实例总列表 (iframe 内无 header/sidebar)
+   Author: doubleDimple
+   ============================================================ */
+@media (max-width: 768px) {
+    .layout { padding-top: 0; }
+    .main-content { margin-left: 0; padding: 10px; }
+
+    .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        margin-bottom: 10px;
+    }
+
+    /* 表格横向滚动增强 */
+    .table-view { -webkit-overflow-scrolling: touch; }
+
+    /* 触摸友好按钮 */
+    .btn { min-height: 34px; }
+    .btn:hover { transform: none; }
+
+    /* SSH / Rescue Modal 移动端全屏 */
+    #sshModal .modal-container,
+    #systemRescueModal .modal-container {
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+    }
+
+    .instance-actions { flex-wrap: wrap; }
+}
+
+@media (max-width: 480px) {
+    .main-content { padding: 8px; }
+    .page-title { font-size: 14px; }
+    .btn { font-size: 11px; }
+    .status-badge { font-size: 10px; padding: 2px 5px; }
+}

@@ -1,0 +1,417 @@
+/* ============================================================
+   oci_cost.css — Dark / Light Theme
+   ============================================================ */
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+/* ── Dark defaults ── */
+:root {
+    --bg:              #0f1117;
+    --surface:         #1a1d27;
+    --surface-2:       #1f2233;
+    --card-border:     #2a2d3a;
+    --text-primary:    #e2e8f0;
+    --text-secondary:  #8892a4;
+    --accent-blue:     #4d9eff;
+    --accent-green:    #34d399;
+    --accent-red:      #f87171;
+    --hover-bg:        rgba(255,255,255,0.04);
+    --shadow-color:    rgba(0,0,0,0.4);
+    --input-bg:        #161820;
+    --input-border:    #2a2d3a;
+    --focus-ring:      rgba(77,158,255,0.20);
+    --table-head-bg:   #1f2233;
+    --table-row-hover: rgba(255,255,255,0.04);
+    --table-row-sep:   #2a2d3a;
+    --trend-card-bg:   #1a1d27;
+    --cost-positive-bg:       rgba(255,183,77,0.08);
+    --cost-positive-hover-bg: rgba(255,183,77,0.14);
+    --loading-overlay-bg: rgba(15,17,23,0.75);
+    --loading-border:  rgba(255,255,255,0.1);
+    --modal-bg:        rgba(0,0,0,0.6);
+}
+
+/* ── Light overrides ── */
+[data-theme="light"] {
+    --bg:              #f3f6fa;
+    --surface:         #ffffff;
+    --surface-2:       #f8f9fa;
+    --card-border:     #e2e8f0;
+    --text-primary:    #222222;
+    --text-secondary:  #555555;
+    --accent-blue:     #2196f3;
+    --accent-green:    #1abc9c;
+    --accent-red:      #ff6b6b;
+    --hover-bg:        #f5f5f5;
+    --shadow-color:    rgba(0,0,0,0.06);
+    --input-bg:        #ffffff;
+    --input-border:    #d5d9df;
+    --focus-ring:      rgba(33,150,243,0.15);
+    --table-head-bg:   #f8f9fa;
+    --table-row-hover: #f5f5f5;
+    --table-row-sep:   #e0e0e0;
+    --trend-card-bg:   #dfe3e8;
+    --cost-positive-bg:       #fff7e6;
+    --cost-positive-hover-bg: #ffefd2;
+    --loading-overlay-bg: rgba(255,255,255,0.8);
+    --loading-border:  #f3f3f3;
+    --modal-bg:        rgba(0,0,0,0.5);
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text-primary);
+    line-height: 1.4;
+    font-size: 13px;
+}
+
+/* ── Layout ── */
+.layout       { display: flex; min-height: 100vh; }
+.main-content { flex: 1; margin-left: 0; padding: 15px; background: var(--bg); }
+
+/* ── 外框卡片（同 dashboard 风格） ── */
+.page-card {
+    background: var(--surface);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    box-shadow: 0 2px 8px var(--shadow-color);
+    padding: 20px 24px;
+}
+
+/* ── Page Header ── */
+.page-header  { margin-bottom: 15px; }
+.page-title   { font-size: 20px; font-weight: 600; color: var(--text-primary); letter-spacing: .3px; }
+
+/* ── Filter Controls ── */
+.filter-controls {
+    background: var(--surface);
+    border-radius: 10px;
+    padding: 15px 20px;
+    margin-bottom: 25px;
+    box-shadow: 0 2px 8px var(--shadow-color);
+    border: 1px solid var(--card-border);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 15px;
+}
+
+.filter-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.filter-label {
+    font-weight: 600;
+    white-space: nowrap;
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+.time-filter-container,
+.date-range-picker {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.time-presets { display: flex; gap: 8px; }
+
+.date-range-picker input {
+    padding: 6px 10px;
+    border: 1px solid var(--input-border);
+    border-radius: 4px;
+    width: 130px;
+    background: var(--input-bg);
+    color: var(--text-primary);
+}
+
+.return-btn-container { margin-left: auto; }
+
+.text-center { text-align: center; }
+
+/* ── Buttons ── */
+.btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: opacity 0.2s, transform 0.15s;
+}
+.btn:hover { opacity: 0.88; transform: translateY(-1px); }
+
+.btn-primary { background: var(--accent-blue);  color: #fff; }
+.btn-success { background: var(--accent-green); color: #fff; }
+.btn-danger  { background: var(--accent-red);   color: #fff; }
+.btn-info    { background: var(--accent-blue);  color: #fff; }
+
+.btn-outline {
+    border: 1px solid var(--accent-green);
+    background: transparent;
+    color: var(--accent-green);
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.btn-outline:hover,
+.btn-outline.active {
+    background: var(--accent-green);
+    color: #fff;
+}
+
+/* ── Stats Cards ── */
+.stats-cards {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 20px;
+    justify-content: space-between;
+    max-width: 1200px;
+    margin: 20px auto;
+}
+
+.stat-card {
+    width: 220px;
+    padding: 15px;
+    background: var(--surface);
+    border-radius: 10px;
+    border: 1px solid var(--card-border);
+    box-shadow: 0 2px 6px var(--shadow-color);
+    display: grid;
+    grid-template-columns: 40px 1fr 60px;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+.stat-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px var(--shadow-color);
+}
+
+.stat-icon {
+    width: 36px;
+    text-align: center;
+    flex-shrink: 0;
+    color: var(--accent-blue);
+    font-size: 18px;
+}
+
+.stat-content {
+    width: 110px;
+    flex-shrink: 0;
+}
+
+.stat-content h3 {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+    font-weight: 500;
+}
+
+.stat-value {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.stat-pie {
+    width: 50px;
+    height: 50px;
+    position: relative;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+.stat-pie .pie-text {
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 12px;
+    font-weight: 600;
+    pointer-events: none;
+}
+
+.stat-pie-percent {
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 13px;
+    font-weight: 600;
+    pointer-events: none;
+}
+
+.pie-container { width: 60px; height: 60px; }
+
+/* ── Cards (trend + table) ── */
+.card {
+    background: var(--surface);
+    border-radius: 10px;
+    margin: 20px auto 30px;
+    box-shadow: 0 2px 8px var(--shadow-color);
+    border: 1px solid var(--card-border);
+    max-width: 1200px;
+    overflow: hidden;
+}
+
+.card-header {
+    padding: 16px 20px 8px;
+    text-align: center;
+    border-bottom: 1px solid var(--card-border);
+}
+
+.card-title {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.card-body { padding: 10px 24px 22px; }
+
+#costTrendChart { width: 100%; height: 420px; }
+
+.trend-card { background: var(--trend-card-bg); }
+
+/* ── Data Table ── */
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+}
+
+.data-table thead { background: var(--table-head-bg); }
+
+.data-table th,
+.data-table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--table-row-sep);
+    font-size: 14px;
+    color: var(--text-primary);
+}
+
+.data-table th { color: var(--text-secondary); font-weight: 600; }
+
+.data-table tr:hover { background: var(--table-row-hover); }
+
+.cost-detail-table th { text-align: left; }
+
+.cost-positive       { background: var(--cost-positive-bg) !important; }
+.cost-positive:hover { background: var(--cost-positive-hover-bg) !important; }
+
+.cost-table-card { background: var(--surface-2); }
+
+.mono-text { font-family: monospace; font-size: 13px; }
+
+.col-date { white-space: nowrap; }
+
+/* ── Modal ── */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    inset: 0;
+    background: var(--modal-bg);
+}
+
+.modal-content {
+    background: var(--surface);
+    color: var(--text-primary);
+    margin: 10% auto;
+    padding: 20px;
+    border-radius: 4px;
+    border: 1px solid var(--card-border);
+    width: 400px;
+    position: relative;
+}
+
+.close {
+    position: absolute;
+    right: 20px; top: 15px;
+    font-size: 24px;
+    cursor: pointer;
+    color: var(--text-secondary);
+}
+
+/* ── Form Select / Multi-select ── */
+.form-select {
+    padding: 6px 10px;
+    border: 1px solid var(--input-border);
+    border-radius: 2px;
+    background: var(--input-bg);
+    color: var(--text-primary);
+    font-size: 12px;
+    min-width: 250px;
+}
+
+.multi-select-container {
+    position: relative;
+    width: 250px;
+    font-size: 14px;
+}
+
+.multi-select-display {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border: 1px solid var(--input-border);
+    padding: 8px 10px;
+    border-radius: 4px;
+    background: var(--input-bg);
+    color: var(--text-primary);
+    cursor: pointer;
+}
+
+.multi-select-options {
+    position: absolute;
+    top: 100%; left: 0; right: 0;
+    background: var(--surface);
+    border: 1px solid var(--card-border);
+    border-radius: 4px;
+    max-height: 250px;
+    overflow-y: auto;
+    box-shadow: 0 2px 8px var(--shadow-color);
+    display: none;
+    z-index: 10;
+}
+.multi-select-options.show { display: block; }
+
+/* ── Loading Overlay ── */
+.loading-overlay {
+    position: fixed;
+    inset: 0;
+    background: var(--loading-overlay-bg);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+}
+
+.loading-spinner {
+    width: 50px; height: 50px;
+    border: 3px solid var(--loading-border);
+    border-radius: 50%;
+    border-top: 3px solid var(--accent-green);
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── SweetAlert2 dark theme ── */
+:root .swal2-popup {
+    background: var(--surface);
+    color: var(--text-primary);
+    border: 1px solid var(--card-border);
+}
+:root .swal2-title,
+:root .swal2-html-container { color: var(--text-primary); }
+:root .swal2-confirm { background: var(--accent-blue)  !important; }
+:root .swal2-cancel  { background: var(--accent-red)   !important; }

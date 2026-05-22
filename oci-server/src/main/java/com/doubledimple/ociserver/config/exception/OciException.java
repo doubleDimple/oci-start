@@ -1,4 +1,4 @@
-package com.doubledimple.ociserver.exception;
+package com.doubledimple.ociserver.config.exception;
 
 /**
  * @author doubleDimple
