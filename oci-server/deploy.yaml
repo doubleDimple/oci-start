@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: oci-start
+  labels:
+    app: oci-start
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+
+  selector:
+    matchLabels:
+      app: oci-start
+
+  template:
+    metadata:
+      labels:
+        app: oci-start
+    spec:
+      # Default 在 K8s 中意味着“继承宿主机的 DNS”
+      dnsPolicy: Default
+      # 指定节点运行服务
+      #nodeSelector:
+      #  kubernetes.io/hostname: ccs-la
+      containers:
+        - name: oci-start
+          image: lovele/oci-start:latest
+          imagePullPolicy: Always
+
+          ports:
+            - containerPort: 9856
+
+          env:
+            - name: SERVER_PORT
+              value: "9856"
+          readinessProbe:
+            tcpSocket:
+              port: 9856
+            initialDelaySeconds: 20
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 3
+          livenessProbe:
+            tcpSocket:
+              port: 9856
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sh", "-c", "sleep 10"]

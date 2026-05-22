@@ -1,0 +1,116 @@
+.dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.dropdown-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px; height: 32px;
+    padding: 0;
+    background: var(--accent-blue);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.15s, color 0.15s, opacity 0.15s;
+}
+
+.dropdown-toggle:hover {
+    opacity: 0.85;
+}
+
+.dropdown-toggle span {
+    margin-left: 4px;
+    font-size: 13px;
+}
+
+.dropdown-panel {
+    position: absolute;
+    top: 0;
+    right: calc(100% + 8px);
+    transform: none;
+    display: none;
+    background: var(--surface, #ffffff);
+    border: 1px solid var(--card-border, #e8ecf0);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.10);
+    border-radius: 12px;
+    z-index: 2000;
+    padding: 6px;
+    width: 224px;
+    flex-wrap: wrap;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+.dropdown-panel.show {
+    display: flex;
+    opacity: 1;
+}
+
+.dropdown-item {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    flex: 0 0 calc(50% - 2px);
+    min-width: 0;
+    overflow: hidden;
+    box-sizing: border-box;
+    padding: 8px 10px;
+    font-size: 12px;
+    border-radius: 8px;
+    gap: 7px;
+    color: var(--text-primary, #374151);
+    text-decoration: none;
+    transition: background 0.12s, color 0.12s;
+    font-weight: 500;
+}
+
+.dropdown-item:hover {
+    background: var(--hover-bg, #f0f7ff);
+    color: var(--accent-blue, #3b82f6);
+}
+
+/* 删除项 — 红色 hover */
+.dropdown-item.danger:hover,
+.dropdown-item[onclick*="Delete"]:hover,
+.dropdown-item[onclick*="delete"]:hover,
+.dropdown-item[title*="删除"]:hover {
+    background: rgba(239, 68, 68, 0.12);
+    color: var(--accent-red, #ef4444);
+}
+
+.dropdown-item i {
+    font-size: 13px;
+    width: 14px; text-align: center; flex-shrink: 0;
+}
+
+.dropdown-item span {
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dropdown-panel.floating {
+    position: fixed !important;
+    right: auto !important;
+    left: 0;
+    top: 0;
+    max-height: calc(100vh - 16px);
+    overflow: auto;
+    z-index: 9999;
+}
+
+.dropdown-divider {
+    flex: 0 0 100%;
+    height: 1px;
+    background: var(--card-border, #e8ecf0);
+    margin: 3px 0;
+}
