@@ -12,7 +12,7 @@
         <relativePath/>
     </parent>
 
-    <groupId>com.doubleDimple.ocistart</groupId>
+    <groupId>com.doubleDimple.ocistartpro</groupId>
     <artifactId>oci-start</artifactId>
     <packaging>pom</packaging>
     <version>1.0.0-SNAPSHOT</version>
@@ -31,11 +31,19 @@
         <security.version>2.3.12.RELEASE</security.version>
         <netflix-eureka-server.version>2.2.9.RELEASE</netflix-eureka-server.version>
         <circuitbreaker-reactor-resilience4j.version>1.0.6.RELEASE</circuitbreaker-reactor-resilience4j.version>
+        <oci-java-sdk.version>3.82.0</oci-java-sdk.version>
+        <caffeine.version>2.9.2</caffeine.version>
+        <disruptor.version>3.4.4</disruptor.version>
+        <openapi.version>1.7.0</openapi.version>
     </properties>
 
     <modules>
         <module>oci-common</module>
         <module>oci-server</module>
+        <module>oci-ai</module>
+        <module>oci-dao</module>
+        <module>oci-message</module>
+        <module>oci-monitor</module>
     </modules>
 
     <dependencyManagement>
@@ -127,7 +135,7 @@
             <dependency>
                 <groupId>io.springfox</groupId>
                 <artifactId>springfox-swagger2</artifactId>
-                <version>2.10.5</version>
+                <version>2.9.2</version>
             </dependency>
             <dependency>
                 <groupId>io.springfox</groupId>
@@ -153,33 +161,169 @@
 
             <dependency>
                 <groupId>com.oracle.oci.sdk</groupId>
+                <artifactId>oci-java-sdk-common</artifactId>
+                <version>${oci-java-sdk.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.oracle.oci.sdk</groupId>
                 <artifactId>oci-java-sdk-core</artifactId>
-                <version>3.49.0</version>
+                <version>${oci-java-sdk.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.oracle.oci.sdk</groupId>
+                <artifactId>oci-java-sdk-audit</artifactId>
+                <version>${oci-java-sdk.version}</version>
             </dependency>
 
             <!-- Oracle OCI SDK -->
             <dependency>
                 <groupId>com.oracle.oci.sdk</groupId>
                 <artifactId>oci-java-sdk-identity</artifactId>
-                <version>3.49.0</version>
+                <version>${oci-java-sdk.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.oracle.oci.sdk</groupId>
+                <artifactId>oci-java-sdk-identitydomains</artifactId>
+                <version>${oci-java-sdk.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>com.oracle.oci.sdk</groupId>
                 <artifactId>oci-java-sdk-common-httpclient</artifactId>
-                <version>3.49.0</version>
+                <version>${oci-java-sdk.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>com.oracle.oci.sdk</groupId>
                 <artifactId>oci-java-sdk-core</artifactId>
-                <version>3.49.0</version>
+                <version>${oci-java-sdk.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.oracle.oci.sdk</groupId>
+                <artifactId>oci-java-sdk-limits</artifactId>
+                <version>${oci-java-sdk.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.oracle.oci.sdk</groupId>
+                <artifactId>oci-java-sdk-networkloadbalancer</artifactId>
+                <version>${oci-java-sdk.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>com.oracle.oci.sdk</groupId>
                 <artifactId>oci-java-sdk-common-httpclient-jersey</artifactId>
-                <version>3.49.0</version>
+                <version>${oci-java-sdk.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.oracle.oci.sdk</groupId>
+                <artifactId>oci-java-sdk-monitoring</artifactId>
+                <version>${oci-java-sdk.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.oracle.oci.sdk</groupId>
+                <artifactId>oci-java-sdk-onesubscription</artifactId>
+                <version>${oci-java-sdk.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.oracle.oci.sdk</groupId>
+                <artifactId>oci-java-sdk-usageapi</artifactId>
+                <version>${oci-java-sdk.version}</version>
+            </dependency>
+
+            <!-- OCI 对象存储依赖 -->
+            <dependency>
+                <groupId>com.oracle.oci.sdk</groupId>
+                <artifactId>oci-java-sdk-objectstorage</artifactId>
+                <version>${oci-java-sdk.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.oracle.oci.sdk</groupId>
+                <artifactId>oci-java-sdk-resourcemanager</artifactId>
+                <version>${oci-java-sdk.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.oracle.oci.sdk</groupId>
+                <artifactId>oci-java-sdk-computeinstanceagent</artifactId>
+                <version>${oci-java-sdk.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.oracle.oci.sdk</groupId>
+                <artifactId>oci-java-sdk-bastion</artifactId>
+                <version>${oci-java-sdk.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.oracle.oci.sdk</groupId>
+                <artifactId>oci-java-sdk-ospgateway</artifactId>
+                <version>${oci-java-sdk.version}</version>
+            </dependency>
+
+            <!-- 日志管理相关 - LogGroup等类在这个包中 -->
+            <dependency>
+                <groupId>com.oracle.oci.sdk</groupId>
+                <artifactId>oci-java-sdk-logging</artifactId>
+                <version>${oci-java-sdk.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.oracle.oci.sdk</groupId>
+                <artifactId>oci-java-sdk-artifacts</artifactId>
+                <version>${oci-java-sdk.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.oracle.oci.sdk</groupId>
+                <artifactId>oci-java-sdk-nosql</artifactId>
+                <version>${oci-java-sdk.version}</version>
+            </dependency>
+
+            <!-- 日志搜索相关 -->
+            <dependency>
+                <groupId>com.oracle.oci.sdk</groupId>
+                <artifactId>oci-java-sdk-loggingsearch</artifactId>
+                <version>${oci-java-sdk.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.oracle.oci.sdk</groupId>
+                <artifactId>oci-java-sdk-aivision</artifactId>
+                <version>${oci-java-sdk.version}</version>
+            </dependency>
+
+            <!-- 生成式AI推理服务 -->
+            <dependency>
+                <groupId>com.oracle.oci.sdk</groupId>
+                <artifactId>oci-java-sdk-generativeaiinference</artifactId>
+                <version>${oci-java-sdk.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.oracle.oci.sdk</groupId>
+                <artifactId>oci-java-sdk-generativeai</artifactId>
+                <version>${oci-java-sdk.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.oracle.oci.sdk</groupId>
+                <artifactId>oci-java-sdk-email</artifactId>
+                <version>${oci-java-sdk.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.oracle.oci.sdk</groupId>
+                <artifactId>oci-java-sdk-mysql</artifactId>
+                <version>${oci-java-sdk.version}</version>
             </dependency>
 
             <dependency>
@@ -189,19 +333,183 @@
                 <optional>true</optional>
             </dependency>
 
+            <dependency>
+                <groupId>cn.hutool</groupId>
+                <artifactId>hutool-all</artifactId>
+                <version>5.8.32</version> <!-- 请使用最新版本 -->
+            </dependency>
+
+            <dependency>
+                <groupId>com.doubleDimple</groupId>
+                <artifactId>oci-common</artifactId>
+                <version>0.0.1-SNAPSHOT</version>
+            </dependency>
+
+            <dependency>
+                <groupId>commons-io</groupId>
+                <artifactId>commons-io</artifactId>
+                <version>2.11.0</version>
+            </dependency>
+
+
+            <!-- JSch SSH客户端 -->
+            <dependency>
+                <groupId>com.jcraft</groupId>
+                <artifactId>jsch</artifactId>
+                <version>0.1.55</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.google.guava</groupId>
+                <artifactId>guava</artifactId>
+                <version>31.1-jre</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.squareup.okhttp3</groupId>
+                <artifactId>okhttp</artifactId>
+                <version>4.9.3</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-lang3</artifactId>
+                <version>3.14.0</version>
+            </dependency>
+
+            <!-- 系统监控相关 -->
+            <dependency>
+                <groupId>com.github.oshi</groupId>
+                <artifactId>oshi-core</artifactId>
+                <version>6.6.5</version>
+            </dependency>
+
+            <dependency>
+                <groupId>net.java.dev.jna</groupId>
+                <artifactId>jna</artifactId>
+                <version>5.13.0</version> <!-- 或更高版本 -->
+            </dependency>
+            <dependency>
+                <groupId>net.java.dev.jna</groupId>
+                <artifactId>jna-platform</artifactId>
+                <version>5.13.0</version> <!-- 与 JNA 主库版本匹配 -->
+            </dependency>
+
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-validation</artifactId>
+                <version>2.6.0</version>
+            </dependency>
+
+            <dependency>
+                <groupId>redis.clients</groupId>
+                <artifactId>jedis</artifactId>
+                <version>3.8.0</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.telegram</groupId>
+                <artifactId>telegrambots</artifactId>
+                <version>6.8.0</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.hierynomus</groupId>
+                <artifactId>sshj</artifactId>
+                <version>0.35.0</version>
+            </dependency>
+
+            <!-- JSch SSH客户端 -->
+            <dependency>
+                <groupId>com.jcraft</groupId>
+                <artifactId>jsch</artifactId>
+                <version>0.1.55</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-cache</artifactId>
+                <version>${spring.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.github.ben-manes.caffeine</groupId>
+                <artifactId>caffeine</artifactId>
+                <version>${caffeine.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.google.zxing</groupId>
+                <artifactId>core</artifactId>
+                <version>3.3.3</version>
+            </dependency>
+            <dependency>
+                <groupId>com.google.zxing</groupId>
+                <artifactId>javase</artifactId>
+                <version>3.3.3</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.warrenstrange</groupId>
+                <artifactId>googleauth</artifactId>
+                <version>1.5.0</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.tencentcloudapi</groupId>
+                <artifactId>tencentcloud-sdk-java-teo</artifactId>
+                <version>3.1.1262</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.alibaba.fastjson2</groupId>
+                <artifactId>fastjson2</artifactId>
+                <version>2.0.40</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.lmax</groupId>
+                <artifactId>disruptor</artifactId>
+                <version>${disruptor.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.maxmind.geoip2</groupId>
+                <artifactId>geoip2</artifactId>
+                <version>2.15.0</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.shredzone.acme4j</groupId>
+                <artifactId>acme4j</artifactId>
+                <version>2.16</version>
+            </dependency>
+
+            <!-- 如果要做证书导出（PEM/PKCS12） -->
+            <dependency>
+                <groupId>org.shredzone.acme4j</groupId>
+                <artifactId>acme4j-utils</artifactId>
+                <version>2.16</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-ui</artifactId>
+                <version>${openapi.version}</version>
+            </dependency>
+
+
         </dependencies>
     </dependencyManagement>
 
-    <build>
+    <!--<build>
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
-                    <mainClass>com.doubledimple.ociserver.OciServerApplication</mainClass> <!-- 替换为您的主类全限定名 -->
+                    <mainClass>com.doubledimple.ociserver.OciServerApplication</mainClass> &lt;!&ndash; 替换为您的主类全限定名 &ndash;&gt;
                 </configuration>
             </plugin>
         </plugins>
-    </build>
-
+    </build>-->
 </project>
