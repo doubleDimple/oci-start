@@ -1,0 +1,316 @@
+/* ============================================================
+   client-pagination.css
+   配套 client-pagination.js 使用，样式与 pagination.ftl 保持一致
+   ============================================================ */
+
+.pagination-container {
+    margin: 20px 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    user-select: none;
+}
+
+.pagination-wrapper {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 24px;
+    padding: 16px 20px;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    flex-wrap: wrap;
+}
+
+/* ── 每页条数 ── */
+.page-size-selector {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: #6b7280;
+    white-space: nowrap;
+}
+
+.page-size-label { font-weight: 500; }
+
+.select-wrapper {
+    position: relative;
+    display: inline-block;
+}
+
+.page-size-select {
+    appearance: none;
+    -webkit-appearance: none;
+    background: #f9fafb;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    padding: 8px 32px 8px 12px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #374151;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 70px;
+}
+
+.page-size-select:hover { border-color: #1abc9c; background: #ffffff; }
+.page-size-select:focus {
+    outline: none;
+    border-color: #1abc9c;
+    box-shadow: 0 0 0 3px rgba(26,188,156,0.1);
+    background: #ffffff;
+}
+
+.select-arrow {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #9ca3af;
+    font-size: 12px;
+    pointer-events: none;
+    transition: color 0.2s ease;
+}
+.select-wrapper:hover .select-arrow { color: #1abc9c; }
+
+/* ── 分页导航 ── */
+.pagination-nav {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.page-numbers {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin: 0 8px;
+}
+
+/* ── 按钮基础 ── */
+.pagination-btn {
+    border: none;
+    background: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: inherit;
+    text-decoration: none;
+    outline: none;
+    user-select: none;
+    position: relative;
+    overflow: hidden;
+}
+
+.pagination-btn::before {
+    content: '';
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 0; height: 0;
+    background: rgba(255,255,255,0.2);
+    border-radius: 50%;
+    transform: translate(-50%,-50%);
+    transition: width 0.3s ease, height 0.3s ease;
+}
+.pagination-btn:active::before { width: 100px; height: 100px; }
+
+/* ── 上一页 / 下一页 ── */
+.nav-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 14px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    color: #64748b;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.nav-btn:hover:not(.disabled) {
+    background: #1abc9c;
+    border-color: #1abc9c;
+    color: white;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(26,188,156,0.3);
+}
+
+.nav-btn.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    background: #f1f5f9;
+    color: #94a3b8;
+}
+
+.nav-btn .btn-text { font-weight: 500; }
+
+/* ── 页码按钮 ── */
+.page-btn {
+    min-width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #64748b;
+    background: transparent;
+}
+
+.page-btn:hover:not(.active) {
+    background: #f1f5f9;
+    color: #374151;
+    transform: translateY(-1px);
+}
+
+.page-btn.active {
+    background: linear-gradient(135deg, #1abc9c 0%, #16a085 100%);
+    color: white;
+    box-shadow: 0 4px 12px rgba(26,188,156,0.4);
+    transform: translateY(-1px);
+}
+
+/* ── 省略号 ── */
+.pagination-ellipsis {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px; height: 40px;
+    color: #9ca3af;
+    font-size: 12px;
+}
+
+/* ── 信息区域 ── */
+.pagination-info {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.page-jump {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: #6b7280;
+}
+
+.jump-label { font-weight: 500; white-space: nowrap; }
+
+.jump-input {
+    width: 60px;
+    padding: 8px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: #f9fafb;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 500;
+    color: #374151;
+    transition: all 0.2s ease;
+}
+
+.jump-input:focus {
+    outline: none;
+    border-color: #1abc9c;
+    background: white;
+    box-shadow: 0 0 0 3px rgba(26,188,156,0.1);
+}
+
+.jump-input::placeholder { color: #9ca3af; }
+
+.jump-btn {
+    width: 32px; height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #1abc9c 0%, #16a085 100%);
+    border: none;
+    border-radius: 8px;
+    color: white;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 12px;
+}
+.jump-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(26,188,156,0.4); }
+.jump-btn:active { transform: translateY(0); }
+
+.total-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 14px;
+    color: #6b7280;
+}
+
+.page-info { white-space: nowrap; }
+
+/* ── 深色模式 ── */
+[data-theme="dark"] .pagination-wrapper {
+    background: #22262b;
+    border-color: #31363d;
+    color: #cdd9e5;
+}
+
+[data-theme="dark"] .page-size-label,
+[data-theme="dark"] .page-size-selector { color: #768390; }
+
+[data-theme="dark"] .page-size-select {
+    background: #292d32;
+    border-color: #31363d;
+    color: #cdd9e5;
+}
+
+[data-theme="dark"] .page-size-select:hover,
+[data-theme="dark"] .page-size-select:focus {
+    background: #31363d;
+    border-color: #4d9eff;
+}
+
+[data-theme="dark"] .select-arrow { color: #768390; }
+
+[data-theme="dark"] .nav-btn {
+    background: #292d32;
+    border-color: #31363d;
+    color: #cdd9e5;
+}
+
+[data-theme="dark"] .nav-btn.disabled {
+    background: #1e2227;
+    color: #4a5568;
+}
+
+[data-theme="dark"] .page-btn { color: #cdd9e5; }
+
+[data-theme="dark"] .page-btn:hover:not(.active) {
+    background: #292d32;
+    color: #cdd9e5;
+}
+
+[data-theme="dark"] .pagination-ellipsis { color: #4a5568; }
+
+[data-theme="dark"] .jump-label,
+[data-theme="dark"] .page-jump { color: #768390; }
+
+[data-theme="dark"] .jump-input {
+    background: #292d32;
+    border-color: #31363d;
+    color: #cdd9e5;
+}
+
+[data-theme="dark"] .jump-input:focus {
+    background: #31363d;
+    border-color: #4d9eff;
+    box-shadow: 0 0 0 3px rgba(77,158,255,.12);
+}
+
+[data-theme="dark"] .jump-input::placeholder { color: #4a5568; }
+
+[data-theme="dark"] .total-info,
+[data-theme="dark"] .page-info { color: #768390; }
+
+[data-theme="dark"] .total-info strong,
+[data-theme="dark"] .page-info strong { color: #cdd9e5; }

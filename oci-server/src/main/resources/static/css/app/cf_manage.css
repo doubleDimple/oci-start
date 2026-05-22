@@ -1,0 +1,497 @@
+/* ============================================================
+   cf_manage.css — 暗色/亮色双主题
+   ============================================================ */
+
+:root {
+    --bg:         #1a1d21;
+    --surface:    #22262b;
+    --surface-2:  #292d32;
+    --border:     #31363d;
+    --text:       #cdd9e5;
+    --muted:      #768390;
+    --accent:     #4d9eff;
+    --accent-g:   #3fb950;
+    --accent-r:   #ff6b6b;
+    --accent-o:   #f78166;
+    --hover:      #2d3138;
+    --shadow:     0 4px 24px rgba(0,0,0,.4);
+    --shadow-sm:  0 2px 8px rgba(0,0,0,.3);
+    --radius:     10px;
+    --radius-sm:  6px;
+}
+
+[data-theme="light"] {
+    --bg:         #f0f4f8;
+    --surface:    #ffffff;
+    --surface-2:  #f8fafc;
+    --border:     #dde3ec;
+    --text:       #1a202c;
+    --muted:      #64748b;
+    --accent:     #2563eb;
+    --accent-g:   #16a34a;
+    --accent-r:   #dc2626;
+    --accent-o:   #ea580c;
+    --hover:      #f1f5f9;
+    --shadow:     0 4px 20px rgba(0,0,0,.08);
+    --shadow-sm:  0 2px 8px rgba(0,0,0,.06);
+}
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+html { background: var(--bg); }
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 13px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* ── Layout ── */
+.layout { display: flex; min-height: 100vh; }
+
+.main-content { flex: 1; padding: 20px 24px; background: var(--bg); }
+
+/* ── 页面外框卡片 ── */
+.page-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 24px 28px;
+}
+
+/* ── Page Header ── */
+.page-header {
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+}
+
+.page-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    letter-spacing: -.3px;
+}
+
+.page-title i { color: #f38020; }
+
+/* ── Toolbar ── */
+.toolbar-section {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 14px 16px;
+    margin-bottom: 16px;
+}
+
+.toolbar-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 12px;
+}
+
+.toolbar-row:last-child { margin-bottom: 0; }
+
+/* ── Zone Section ── */
+.zone-section {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.zone-section label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--muted);
+    white-space: nowrap;
+}
+
+/* ── 自定义域名下拉（已有自定义实现） ── */
+.custom-select-wrapper {
+    position: relative;
+    width: 240px;
+}
+
+.select-trigger {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 7px 12px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    transition: border-color .2s;
+    user-select: none;
+}
+
+.select-trigger:hover { border-color: var(--accent); }
+
+.select-trigger i { color: var(--muted); font-size: 11px; transition: transform .2s; }
+
+.select-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    z-index: 1000;
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+}
+
+.dropdown-search {
+    padding: 8px;
+    border-bottom: 1px solid var(--border);
+}
+
+.dropdown-search input {
+    width: 100%;
+    padding: 6px 10px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    font-size: 12px;
+    outline: none;
+}
+
+.dropdown-search input:focus { border-color: var(--accent); }
+
+#zoneList {
+    max-height: 240px;
+    overflow-y: auto;
+    list-style: none;
+    margin: 0;
+    padding: 4px 0;
+}
+
+#zoneList li {
+    padding: 8px 14px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text);
+    transition: background .15s;
+}
+
+#zoneList li:hover { background: var(--hover); color: var(--accent); }
+
+/* ── Action Buttons ── */
+.action-buttons { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ── Search Section ── */
+.search-section {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.search-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.search-group label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--muted);
+    white-space: nowrap;
+}
+
+.search-group input {
+    width: 180px;
+    padding: 7px 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-size: 13px;
+    outline: none;
+    transition: border-color .2s, box-shadow .2s;
+}
+
+.search-group input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(77,158,255,.12);
+}
+
+.search-group input::placeholder { color: var(--muted); }
+
+.search-buttons { display: flex; gap: 6px; }
+
+/* ── Buttons ── */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all .2s;
+    white-space: nowrap;
+}
+
+.btn-sm { padding: 5px 10px; font-size: 12px; }
+
+.btn-primary   { background: var(--accent);   color: #fff; }
+.btn-success   { background: var(--accent-g);  color: #fff; }
+.btn-danger    { background: var(--accent-r);  color: #fff; }
+.btn-warning   { background: var(--accent-o);  color: #fff; }
+.btn-info      { background: var(--accent);    color: #fff; }
+.btn-secondary { background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); }
+
+.btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
+.btn:active { transform: translateY(0); }
+.btn-secondary:hover { color: var(--text); border-color: var(--muted); filter: none; }
+
+.btn-group { display: flex; gap: 6px; justify-content: center; align-items: center; }
+
+.btn-icon {
+    padding: 6px 8px;
+    min-width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+}
+
+/* ── Table ── */
+.table-view {
+    background: var(--surface-2);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    margin-bottom: 14px;
+    overflow: hidden;
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.table th {
+    background: var(--surface);
+    font-weight: 600;
+    text-align: center;
+    padding: 11px 8px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+}
+
+.table td {
+    padding: 11px 8px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+    text-align: center;
+    font-size: 13px;
+    color: var(--text);
+}
+
+.table th:nth-child(1), .table td:nth-child(1) { width: 8%; }
+.table th:nth-child(2), .table td:nth-child(2) { width: 25%; }
+.table th:nth-child(3), .table td:nth-child(3) { width: 25%; }
+.table th:nth-child(4), .table td:nth-child(4) { width: 10%; }
+.table th:nth-child(5), .table td:nth-child(5) { width: 12%; }
+.table th:nth-child(6), .table td:nth-child(6) { width: 20%; }
+
+.table tr:hover td { background: var(--hover); }
+.table tr:last-child td { border-bottom: none; }
+
+/* ── Record Type Badges ── */
+.record-type {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3px 7px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    min-width: 36px;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+}
+
+.record-type.A    { background: rgba(77,158,255,.14);  color: var(--accent); }
+.record-type.AAAA { background: rgba(188,140,255,.14); color: #bc8cff; }
+.record-type.CNAME{ background: rgba(63,185,80,.14);   color: var(--accent-g); }
+.record-type.MX   { background: rgba(247,129,102,.14); color: var(--accent-o); }
+.record-type.TXT  { background: rgba(118,131,144,.14); color: var(--muted); }
+
+/* ── Status Badges ── */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 9px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 500;
+    min-width: 52px;
+    justify-content: center;
+    text-transform: uppercase;
+}
+
+.status-badge.active   { background: rgba(63,185,80,.14);  color: var(--accent-g); }
+.status-badge.proxied  { background: rgba(247,129,102,.14); color: var(--accent-o); }
+.status-connected      { background: rgba(63,185,80,.14);  color: var(--accent-g); }
+.status-disconnected   { background: rgba(255,107,107,.14); color: var(--accent-r); }
+.status-pending        { background: rgba(247,129,102,.14); color: var(--accent-o); }
+
+/* ── Truncate ── */
+.truncate {
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+    display: block;
+}
+
+/* ── Modal ── */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.6);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 1050;
+}
+
+.modal-container {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 24px;
+    border-radius: var(--radius);
+    width: 90%;
+    max-width: 500px;
+    box-shadow: var(--shadow);
+}
+
+.modal-header { margin-bottom: 18px; }
+
+.modal-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* ── Form ── */
+.form-group { margin-bottom: 14px; }
+
+.form-group label {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.form-control {
+    width: 100%;
+    padding: 8px 12px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-size: 13px;
+    transition: border-color .2s, box-shadow .2s;
+    outline: none;
+}
+
+.form-control:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(77,158,255,.12);
+}
+
+.form-control option { background: var(--surface-2); color: var(--text); }
+
+.form-control[readonly] { opacity: .7; cursor: not-allowed; }
+
+.form-tip { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+}
+
+/* ── Password Field ── */
+.password-input-wrapper { position: relative; display: flex; align-items: center; }
+.password-input-wrapper .form-control { padding-right: 72px; }
+
+.password-actions { position: absolute; right: 5px; display: flex; gap: 2px; }
+
+.password-btn {
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 3px 5px;
+    border-radius: 4px;
+    font-size: 12px;
+    transition: all .2s;
+}
+
+.password-btn:hover { background: var(--hover); color: var(--text); }
+
+/* ── Switch ── */
+.switch { position: relative; display: inline-block; width: 36px; height: 18px; }
+.switch input { opacity: 0; width: 0; height: 0; }
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    inset: 0;
+    background: var(--border);
+    border-radius: 18px;
+    transition: .3s;
+}
+
+.slider::before {
+    position: absolute;
+    content: '';
+    height: 14px; width: 14px;
+    left: 2px; bottom: 2px;
+    background: #fff;
+    border-radius: 50%;
+    transition: .3s;
+}
+
+input:checked + .slider { background: var(--accent-g); }
+input:checked + .slider::before { transform: translateX(18px); }
+
+/* ── Pagination override ── */
+.pagination { display: flex; justify-content: center; margin-top: 14px; }
