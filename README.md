@@ -347,3 +347,256 @@ chmod 777 oci-start.sh
 Made with ❤️ by [doubleDimple](https://github.com/doubleDimple)
 
 </div>
+
+# Contributing to OCI-START
+
+感谢你对 `oci-start` 项目的关注与支持 ❤️
+
+OCI-START 致力于打造一个更简单、更高效的 OCI（Oracle Cloud Infrastructure）管理与自动化平台。
+
+我们欢迎：
+
+- Bug 修复
+- 新功能开发
+- 文档优化
+- UI/UX 改进
+- 性能优化
+- 国际化支持
+- K8s / Docker / DevOps 能力增强
+- 云平台生态集成
+
+---
+
+# 📌 开发环境要求
+
+| 软件 | 版本 |
+|---|---|
+| JDK | 8+ |
+| Maven | 3.6+ |
+| Git | 最新版本 |
+| Docker | 可选 |
+
+---
+
+# 🚀 本地启动
+
+## 1. Fork 项目
+
+点击右上角 Fork 到自己的 GitHub 仓库。
+
+---
+
+## 2. Clone 项目
+
+```bash
+git clone https://github.com/YOUR_USERNAME/oci-start.git
+```
+
+进入项目：
+
+```bash
+cd oci-start
+```
+
+---
+
+## 3. 添加上游仓库
+
+```bash
+git remote add upstream https://://github.com/doubleDimple/oci-start.git
+```
+
+查看远程：
+
+```bash
+git remote -v
+```
+
+---
+
+## 4. 拉取最新代码
+
+```bash
+git checkout master
+git pull upstream master
+```
+
+---
+
+# 🌿 分支规范
+
+请不要直接向 `master` 分支提交代码。
+
+## 新功能
+
+```bash
+git checkout -b feature/your-feature-name
+```
+
+例如：
+
+```bash
+git checkout -b feature/k8s-install
+```
+
+---
+
+## Bug 修复
+
+```bash
+git checkout -b fix/your-fix-name
+```
+
+例如：
+
+```bash
+git checkout -b fix/ssh-terminal-wrap
+```
+
+---
+
+## 紧急修复
+
+```bash
+git checkout -b hotfix/your-hotfix-name
+```
+
+---
+
+# 📝 Commit 提交规范
+
+请尽量使用规范化 Commit Message：
+
+```bash
+feat: add k8s install support
+fix: repair websocket reconnect issue
+docs: update README
+refactor: optimize oci sdk client
+style: improve terminal ui layout
+```
+
+---
+
+# 🔀 Pull Request 流程
+
+## 1. 推送分支
+
+```bash
+git push origin feature/your-feature-name
+```
+
+---
+
+## 2. 创建 Pull Request
+
+前往 GitHub 创建 PR：
+
+- PR 标题请简洁清晰
+- 描述问题背景
+- 描述解决方案
+- 如有 UI 修改，请附截图
+- 如涉及重大改动，请说明兼容性影响
+
+---
+
+# ✅ PR 检查清单
+
+提交前请确认：
+
+- [ ] 代码可以正常编译
+- [ ] 不影响已有功能
+- [ ] 已删除调试日志
+- [ ] 命名规范清晰
+- [ ] 无敏感信息（Token / 密钥）
+- [ ] 文档已同步更新（如需要）
+
+---
+
+# 🚫 不建议的提交内容
+
+请不要提交：
+
+- IDE 配置文件
+- 编译产物
+- Token / 密钥
+- 无关文件
+
+例如：
+
+```bash
+.idea/
+target/
+node_modules/
+*.log
+```
+
+---
+
+# 🐛 Bug 提交建议
+
+Issue 建议包含：
+
+- 操作系统
+- JDK 版本
+- Docker 版本
+- OCI 区域
+- 完整错误日志
+- 复现步骤
+
+---
+
+# 💡 功能建议
+
+欢迎提出：
+
+- OCI 新功能支持
+- 多云能力
+- K8s 集成
+- Harbor 集成
+- SSH/VNC 优化
+- 监控系统
+- 自动化部署能力
+
+---
+
+# 🔐 安全规范
+
+请不要：
+
+- 提交 OCI 私钥
+- 提交 Access Token
+- 提交生产配置
+- 提交数据库账号密码
+
+---
+
+# ❤️ 感谢贡献者
+
+感谢每一位参与贡献的开发者。
+
+无论是：
+
+- 一行代码
+- 一个文档修复
+- 一个建议
+- 一个 Issue
+
+都会让 OCI-START 变得更好。
+
+---
+
+# 🌟 Star 支持
+
+如果这个项目对你有帮助，欢迎点一个 Star ⭐
+
+---
+
+# 🤝 Maintainer
+
+GitHub:
+
+👉 https://github.com/doubleDimple
+
+项目地址：
+
+👉 https://github.com/doubleDimple/oci-start
