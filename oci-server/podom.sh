@@ -1,13 +1,33 @@
 #!/bin/bash
 
 # 设置变量
-USERNAME="lovele"
-IMAGE_NAME="oci-start"
-VERSION="2.0.6"
+REGISTRY="${REGISTRY:-docker.io}"
+NAMESPACE="${NAMESPACE:-lovele}"
+IMAGE_NAME="${IMAGE_NAME:-oci-start}"
+IMAGE_REPO="${IMAGE_REPO:-${NAMESPACE}/${IMAGE_NAME}}"
+VERSION="${1:-${VERSION:-5.7.70}}"
+APPLICATION_YML="src/main/resources/application.yml"
+
+if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    echo "Error: VERSION must be in x.y.z format, got: ${VERSION}"
+    echo "Usage: VERSION=5.7.70 ./podom.sh"
+    echo "   or: ./podom.sh 5.7.70"
+    exit 1
+fi
+
+if [ ! -f "$APPLICATION_YML" ]; then
+    echo "Error: ${APPLICATION_YML} not found. Please run this script from oci-server directory."
+    exit 1
+fi
+
+echo "Syncing application version..."
+sed -i.bak -E "s/^([[:space:]]*)version:[[:space:]]*.*/\\1version: ${VERSION}/" "$APPLICATION_YML"
+sed -i.bak -E "s/^([[:space:]]*)ssh-version:[[:space:]]*.*/\\1ssh-version: v-${VERSION}/" "$APPLICATION_YML"
+rm -f "${APPLICATION_YML}.bak"
 
 echo "======================================"
 echo "Starting build process..."
-echo "Image: ${USERNAME}/${IMAGE_NAME}"
+echo "Image: ${IMAGE_REPO}"
 echo "Version: ${VERSION}"
 echo "======================================"
 
@@ -36,14 +56,14 @@ timer_pid=$!
 # 构建多平台镜像
 podman build \
     --platform linux/amd64,linux/arm64 \
-    -t docker.io/${USERNAME}/${IMAGE_NAME}:${VERSION} \
-    -t docker.io/${USERNAME}/${IMAGE_NAME}:latest \
-    --manifest docker.io/${USERNAME}/${IMAGE_NAME} .
+    -t ${IMAGE_REPO}:${VERSION} \
+    -t ${IMAGE_REPO}:latest \
+    --manifest ${IMAGE_REPO} .
 
 # 推送版本标签和最新标签
-echo "Pushing images to Docker Hub..."
-podman push docker.io/${USERNAME}/${IMAGE_NAME}:${VERSION}
-podman push docker.io/${USERNAME}/${IMAGE_NAME}:latest
+echo "Pushing images to registry..."
+podman push ${IMAGE_REPO}:${VERSION}
+podman push ${IMAGE_REPO}:latest
 
 # 获取构建命令的退出状态
 build_status=$?
@@ -61,10 +81,10 @@ echo -e "\n总运行时间: $(printf "%02d:%02d:%02d" $((total_elapsed/3600)) $(
 if [ $build_status -eq 0 ]; then
     echo "======================================"
     echo "Build and push successful! 🚀"
-    echo "Image: ${USERNAME}/${IMAGE_NAME}"
+    echo "Image: ${IMAGE_REPO}"
     echo "Tags: ${VERSION}, latest"
     echo "Platforms: linux/amd64, linux/arm64"
-    echo "Docker Hub URL: docker.io/${USERNAME}/${IMAGE_NAME}"
+    echo "Registry URL: ${IMAGE_REPO}"
     echo "======================================"
 else
     echo "======================================"

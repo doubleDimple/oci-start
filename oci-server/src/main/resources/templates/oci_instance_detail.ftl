@@ -15,6 +15,7 @@
     </script>
     <link rel="stylesheet" href="/css/all.min.css">
     <link href="/css/sweetalert2.min.css" rel="stylesheet">
+    <link href="/css/common/sweetalert-overrides.css" rel="stylesheet">
     <script src="/js/sweetalert2.min.js"></script>
     <link rel="stylesheet" href="/css/common/loading.css">
     <link rel="stylesheet" href="/css/app/oci_instance_detail.css">

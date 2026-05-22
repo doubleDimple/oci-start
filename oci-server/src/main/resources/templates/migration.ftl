@@ -17,6 +17,7 @@
     <link rel="stylesheet" href="/css/app/migration.css">
     <link rel="stylesheet" href="/css/common/loading.css">
     <link href="/css/sweetalert2.min.css" rel="stylesheet">
+    <link href="/css/common/sweetalert-overrides.css" rel="stylesheet">
     <script src="/js/sweetalert2.min.js"></script>
 </head>
 

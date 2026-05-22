@@ -13,6 +13,7 @@
     <script>(function(){var t=localStorage.getItem('oci_theme');if(t)document.documentElement.dataset.theme=t;})();</script>
     <link rel="stylesheet" href="/css/all.min.css">
     <link href="/css/sweetalert2.min.css" rel="stylesheet">
+    <link href="/css/common/sweetalert-overrides.css" rel="stylesheet">
     <script src="/js/sweetalert2.min.js"></script>
     <link rel="stylesheet" href="/css/app/vpn_proxy.css">
     <link rel="stylesheet" href="/css/common/dropdown-menu.css">

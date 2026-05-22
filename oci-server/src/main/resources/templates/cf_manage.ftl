@@ -13,6 +13,7 @@
     <script>(function(){var t=localStorage.getItem('oci_theme')||'dark';if(t==='system')t=window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';document.documentElement.dataset.theme=t;})();</script>
     <link rel="stylesheet" href="/css/all.min.css">
     <link href="/css/sweetalert2.min.css" rel="stylesheet">
+    <link href="/css/common/sweetalert-overrides.css" rel="stylesheet">
     <script src="/js/sweetalert2.min.js"></script>
     <link rel="stylesheet" href="/css/app/cf_manage.css">
     <link rel="stylesheet" href="/css/common/custom-select.css">
@@ -860,10 +861,14 @@
     function deleteDnsRecord(recordId, recordName) {
         Swal.fire({
             title: '${msg.get("mfa.confirm.delete_title")}',
+            html: '确认删除 DNS 记录 <strong style="color:var(--text);word-break:break-all;">' + recordName + '</strong> 吗？<br><span style="color:var(--muted);">删除后将无法恢复。</span>',
             icon: 'warning',
             showCancelButton: true,
-            confirmButtonColor: 'var(--accent-red)',
-            cancelButtonColor: 'var(--accent-blue)',
+            customClass: {
+                popup: 'compact-confirm'
+            },
+            confirmButtonColor: 'var(--accent-r)',
+            cancelButtonColor: 'var(--surface-2)',
             confirmButtonText: '${msg.get("common.confirm")}',
             cancelButtonText: '${msg.get("common.cancel")}'
         }).then((result) => {
@@ -877,7 +882,10 @@
                     }
                 });
 
-                fetch(`/dns/cloudflare/api/records/`+recordId, {
+                const currentZoneId = '${selectedZoneId!""}';
+                const deleteUrl = `/dns/cloudflare/api/records/` + recordId
+                    + (currentZoneId ? `?zoneId=` + encodeURIComponent(currentZoneId) : '');
+                fetch(deleteUrl, {
                     method: 'DELETE',
                     headers: {
                         'Content-Type': 'application/json',
@@ -889,12 +897,11 @@
                         if (apiResponse.success) {
                             const currentPage = ${currentPage!0};
                             const currentSize = ${size!20};
-                            const currentZoneId = '${selectedZoneId!""}';
                             window.location.href = `/dns/cloudflare?zoneId=`+ currentZoneId+`&page=`+ currentPage+`&size=`+ currentSize+``;+``;
                         } else {
                             Swal.fire({
-                                title: 'error',
-                                text: '${msg.get("common.network.error")}',
+                                title: '删除失败',
+                                text: apiResponse.message || '${msg.get("common.network.error")}',
                                 icon: 'error',
                                 confirmButtonColor: 'var(--accent-red)'
                             });
@@ -927,9 +934,8 @@
         }
 
         // 从当前选择的下拉框获取域名名称
-        const zoneSelect = document.getElementById('zoneSelect');
-        const selectedOption = zoneSelect.options[zoneSelect.selectedIndex];
-        const currentZoneName = selectedOption ? selectedOption.dataset.zoneName : '';
+        const currentZone = allZonesData.find(zone => zone.id === currentZoneId);
+        const currentZoneName = currentZone ? currentZone.name : getSelectedZoneNameFromText();
 
         Swal.fire({
             title: '${msg.get("cf.confirmSync")}',
@@ -1005,6 +1011,11 @@
         }
 
         loadDnsRecords();
+    }
+
+    function getSelectedZoneNameFromText() {
+        const text = document.getElementById('selectedZoneText').textContent || '';
+        return text.replace(/\s*\([^)]*\)\s*$/, '').trim();
     }
 
     // 获取CSRF令牌

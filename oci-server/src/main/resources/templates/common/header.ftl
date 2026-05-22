@@ -64,7 +64,7 @@
 
         <div class="user-profile-widget" id="userWidget">
             <div class="user-trigger" onclick="toggleUserMenu(event)">
-                <img src="/images/default-avatar.png"
+                <img src="/images/default-avatar.png?v=${ociVersion!'1'}"
                      onerror="this.src='https://ui-avatars.com/api/?name=Admin&background=random&color=fff'"
                      class="user-avatar" alt="User">
 
@@ -144,6 +144,7 @@
 </div>
 
 <link href="/css/sweetalert2.min.css" rel="stylesheet">
+    <link href="/css/common/sweetalert-overrides.css" rel="stylesheet">
 <script src="/js/sweetalert2.min.js"></script>
 <link rel="preload" href="/css/all.min.css" as="style" onload="this.rel='stylesheet'">
 <link rel="preload" href="/css/common/loading.css" as="style" onload="this.rel='stylesheet'">

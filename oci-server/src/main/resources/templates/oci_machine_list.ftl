@@ -35,6 +35,7 @@
 
     <!-- SweetAlert2 CSS -->
     <link href="/css/sweetalert2.min.css" rel="stylesheet">
+    <link href="/css/common/sweetalert-overrides.css" rel="stylesheet">
     <!-- SweetAlert2 JS -->
     <script src="/js/sweetalert2.min.js"></script>
     <script src="/js/common/dropdown-menu.js"></script>
@@ -812,8 +813,85 @@
         Swal.fire({
             icon: 'error',
             title: title,
-            text: text
+            text: text,
+            timer: 3000,
+            showConfirmButton: false
         });
+    }
+
+    const modalStatusTimers = new Map();
+
+    function clearModalStatusTimer(modal) {
+        const key = modal && modal.id ? modal.id : 'default';
+        if (modalStatusTimers.has(key)) {
+            clearTimeout(modalStatusTimers.get(key));
+            modalStatusTimers.delete(key);
+        }
+    }
+
+    function parseXhrJson(xhr) {
+        if (!xhr.responseText) return {};
+        try {
+            return JSON.parse(xhr.responseText);
+        } catch (e) {
+            return {};
+        }
+    }
+
+    function isPlainErrorMessage(message) {
+        return !message || String(message).trim().toLowerCase() === 'error';
+    }
+
+    function getFriendlyHttpMessage(status, fallback) {
+        const code = Number(status);
+        if (!code) return fallback + '，请稍后重试。';
+        if (code === 400) return fallback + '，提交的内容有误，请检查后再试。';
+        if (code === 401) return fallback + '，登录状态已过期，请重新登录。';
+        if (code === 403) return fallback + '，当前账号没有权限执行此操作。';
+        if (code === 404) return fallback + '，相关资源不存在或已被删除。';
+        if (code === 408) return fallback + '，请求等待时间过长，请稍后重试。';
+        if (code === 409) return fallback + '，当前数据状态已变化，请刷新后再试。';
+        if (code === 413) return fallback + '，提交的内容过大，请减少内容后再试。';
+        if (code === 429) return fallback + '，操作过于频繁，请稍后再试。';
+        if (code >= 500) return fallback + '，服务器处理时出现异常，请稍后重试。';
+        return fallback + '，请求没有成功完成，请稍后重试。';
+    }
+
+    function getXhrFailureMessage(xhr, fallback) {
+        const data = parseXhrJson(xhr);
+        const backendMessage = data.message || data.msg || data.error || data.reason;
+        if (!isPlainErrorMessage(backendMessage)) {
+            return backendMessage;
+        }
+        if (xhr.status && xhr.status !== 200) {
+            return getFriendlyHttpMessage(xhr.status, fallback);
+        }
+        return fallback + '，请稍后重试。';
+    }
+
+    function getPayloadFailureMessage(data, fallback) {
+        const backendMessage = data && (data.message || data.msg || data.error || data.reason);
+        return !isPlainErrorMessage(backendMessage) ? backendMessage : fallback + '，请稍后重试。';
+    }
+
+    function showModalStatusError(modal, statusMessage, statusText, message, options = {}) {
+        const closeModal = options.closeModal !== false;
+        const key = modal && modal.id ? modal.id : 'default';
+
+        clearModalStatusTimer(modal);
+        statusMessage.className = 'status-message error';
+        statusMessage.style.display = 'block';
+        statusText.textContent = message + (closeModal ? ' 弹窗将在3秒后自动关闭。' : '');
+
+        const timer = setTimeout(() => {
+            if (closeModal && modal) {
+                modal.style.display = 'none';
+            } else {
+                statusMessage.style.display = 'none';
+            }
+            modalStatusTimers.delete(key);
+        }, 3000);
+        modalStatusTimers.set(key, timer);
     }
 
     // 租户名遮罩切换
@@ -943,7 +1021,7 @@
         xhr.onreadystatechange = function() {
             if (xhr.readyState === 4) {
                 if (xhr.status === 200) {
-                    const data = JSON.parse(xhr.responseText);
+                    const data = parseXhrJson(xhr);
 
                     if (data.status === 'success') {
                         statusMessage.className = 'status-message success';
@@ -963,18 +1041,16 @@
                             location.reload();
                         }, 3000);
                     } else {
-                        throw new Error(data.message || 'error');
+                        showModalStatusError(modal, statusMessage, statusText, getPayloadFailureMessage(data, 'IP切换失败'));
                     }
                 } else {
-                    statusMessage.className = 'status-message error';
-                    statusText.textContent = 'error';
+                    showModalStatusError(modal, statusMessage, statusText, getXhrFailureMessage(xhr, 'IP切换失败'));
                 }
             }
         };
 
         xhr.onerror = function() {
-            statusMessage.className = 'status-message error';
-            statusText.textContent = 'error';
+            showModalStatusError(modal, statusMessage, statusText, '网络异常，IP切换请求未发送成功。');
         };
 
         // 发送数据
@@ -1082,7 +1158,7 @@
         xhr.onreadystatechange = function() {
             if (xhr.readyState === 4) {
                 if (xhr.status === 200) {
-                    const data = JSON.parse(xhr.responseText);
+                    const data = parseXhrJson(xhr);
 
                     if (data.status === 'success') {
                         statusMessage.className = 'status-message success';
@@ -1101,18 +1177,16 @@
                             location.reload();
                         }, 3000);
                     } else {
-                        throw new Error(data.message || 'error');
+                        showModalStatusError(modal, statusMessage, statusText, getPayloadFailureMessage(data, 'IPv6开启失败'));
                     }
                 } else {
-                    statusMessage.className = 'status-message error';
-                    statusText.textContent = 'error';
+                    showModalStatusError(modal, statusMessage, statusText, getXhrFailureMessage(xhr, 'IPv6开启失败'));
                 }
             }
         };
 
         xhr.onerror = function() {
-            statusMessage.className = 'status-message error';
-            statusText.textContent = 'IPv6 error';
+            showModalStatusError(modal, statusMessage, statusText, '网络异常，IPv6开启请求未发送成功。');
         };
 
         xhr.send(JSON.stringify({
@@ -1169,21 +1243,23 @@
         xhr.onreadystatechange = function() {
             if (xhr.readyState === 4) {
                 if (xhr.status === 200) {
-                    const data = JSON.parse(xhr.responseText);
+                    const data = parseXhrJson(xhr);
                     if (data.success) {
                         // 显示验证码输入步骤
                         confirmStep.style.display = 'none';
                         document.getElementById('verifyStep').style.display = 'block';
                         statusMessage.style.display = 'none';
                     } else {
-                        statusMessage.className = 'status-message error';
-                        statusText.textContent = data.message || 'error';
+                        showModalStatusError(modal, statusMessage, statusText, getPayloadFailureMessage(data, '验证码发送失败'));
                     }
                 } else {
-                    statusMessage.className = 'status-message error';
-                    statusText.textContent = 'error';
+                    showModalStatusError(modal, statusMessage, statusText, getXhrFailureMessage(xhr, '验证码发送失败'));
                 }
             }
+        };
+
+        xhr.onerror = function() {
+            showModalStatusError(modal, statusMessage, statusText, '网络异常，验证码发送请求未发送成功。');
         };
 
         xhr.send(JSON.stringify({
@@ -1200,9 +1276,7 @@
         const statusText = document.getElementById('terminateText');
 
         if (!verificationCode) {
-            statusMessage.className = 'status-message error';
-            statusMessage.style.display = 'block';
-            statusText.textContent = i18n.machine_placeholder;
+            showModalStatusError(modal, statusMessage, statusText, i18n.machine_placeholder, { closeModal: false });
             return;
         }
 
@@ -1222,7 +1296,7 @@
         xhr.onreadystatechange = function() {
             if (xhr.readyState === 4) {
                 if (xhr.status === 200) {
-                    const data = JSON.parse(xhr.responseText);
+                    const data = parseXhrJson(xhr);
                     if (data.success) {
                         statusMessage.className = 'status-message success';
                         statusText.textContent = 'success';
@@ -1233,14 +1307,16 @@
                             location.reload();
                         }, 3000);
                     } else {
-                        statusMessage.className = 'status-message error';
-                        statusText.textContent =  'error';
+                        showModalStatusError(modal, statusMessage, statusText, getPayloadFailureMessage(data, '终止实例失败'));
                     }
                 } else {
-                    statusMessage.className = 'status-message error';
-                    statusText.textContent = 'error';
+                    showModalStatusError(modal, statusMessage, statusText, getXhrFailureMessage(xhr, '终止实例失败'));
                 }
             }
+        };
+
+        xhr.onerror = function() {
+            showModalStatusError(modal, statusMessage, statusText, '网络异常，终止实例请求未发送成功。');
         };
 
         xhr.send(JSON.stringify({
@@ -1281,9 +1357,7 @@
 
         // 验证输入
         if (!newCpu || !newMemory) {
-            statusMessage.className = 'status-message error';
-            statusMessage.style.display = 'block';
-            statusText.textContent = i18n.notification_plzInputGlobalInfo;
+            showModalStatusError(modal, statusMessage, statusText, i18n.notification_plzInputGlobalInfo, { closeModal: false });
             return;
         }
 
@@ -1303,7 +1377,7 @@
         xhr.onreadystatechange = function() {
             if (xhr.readyState === 4) {
                 if (xhr.status === 200) {
-                    const data = JSON.parse(xhr.responseText);
+                    const data = parseXhrJson(xhr);
                     if (data.success) {
                         statusMessage.className = 'status-message success';
                         statusText.textContent =  'success';
@@ -1314,14 +1388,16 @@
                             location.reload();
                         }, 3000);
                     } else {
-                        statusMessage.className = 'status-message error';
-                        statusText.textContent =  'error';
+                        showModalStatusError(modal, statusMessage, statusText, getPayloadFailureMessage(data, '实例配置更新失败'));
                     }
                 } else {
-                    statusMessage.className = 'status-message error';
-                    statusText.textContent = 'error';
+                    showModalStatusError(modal, statusMessage, statusText, getXhrFailureMessage(xhr, '实例配置更新失败'));
                 }
             }
+        };
+
+        xhr.onerror = function() {
+            showModalStatusError(modal, statusMessage, statusText, '网络异常，实例配置更新请求未发送成功。');
         };
 
         xhr.send(JSON.stringify({
@@ -1359,9 +1435,7 @@
 
         // 验证输入
         if (!newName) {
-            statusMessage.className = 'status-message error';
-            statusMessage.style.display = 'block';
-            statusText.textContent = i18n.machine_plzInsName;
+            showModalStatusError(modal, statusMessage, statusText, i18n.machine_plzInsName, { closeModal: false });
             return;
         }
 
@@ -1381,7 +1455,7 @@
         xhr.onreadystatechange = function() {
             if (xhr.readyState === 4) {
                 if (xhr.status === 200) {
-                    const data = JSON.parse(xhr.responseText);
+                    const data = parseXhrJson(xhr);
                     if (data.success) {
                         statusMessage.className = 'status-message success';
                         statusText.textContent =  'success';
@@ -1392,14 +1466,16 @@
                             location.reload();
                         }, 3000);
                     } else {
-                        statusMessage.className = 'status-message error';
-                        statusText.textContent =  'error';
+                        showModalStatusError(modal, statusMessage, statusText, getPayloadFailureMessage(data, '实例名称更新失败'));
                     }
                 } else {
-                    statusMessage.className = 'status-message error';
-                    statusText.textContent = 'error';
+                    showModalStatusError(modal, statusMessage, statusText, getXhrFailureMessage(xhr, '实例名称更新失败'));
                 }
             }
+        };
+
+        xhr.onerror = function() {
+            showModalStatusError(modal, statusMessage, statusText, '网络异常，实例名称更新请求未发送成功。');
         };
 
         xhr.send(JSON.stringify({
@@ -1505,7 +1581,7 @@
         xhr.onreadystatechange = function() {
             if (xhr.readyState === 4) {
                 if (xhr.status === 200) {
-                    const data = JSON.parse(xhr.responseText);
+                    const data = parseXhrJson(xhr);
                     if (data.success) {
                         statusMessage.className = 'status-message success';
                         if (!data.message) {
@@ -1524,22 +1600,16 @@
                             location.reload();
                         }, 3000);
                     } else {
-                        statusMessage.className = 'status-message error';
-                        if (!data.message) {
-                            if (isExpand) {
-                                statusText.textContent = "error";
-                            } else {
-                                statusText.textContent = "error";
-                            }
-                        } else {
-                            statusText.textContent = data.message;
-                        }
+                        showModalStatusError(modal, statusMessage, statusText, getPayloadFailureMessage(data, '启动盘容量更新失败'));
                     }
                 } else {
-                    statusMessage.className = 'status-message error';
-                    statusText.textContent = 'error';
+                    showModalStatusError(modal, statusMessage, statusText, getXhrFailureMessage(xhr, '启动盘容量更新失败'));
                 }
             }
+        };
+
+        xhr.onerror = function() {
+            showModalStatusError(modal, statusMessage, statusText, '网络异常，启动盘容量更新请求未发送成功。');
         };
 
         xhr.send(JSON.stringify({
@@ -1592,7 +1662,7 @@
         xhr.onreadystatechange = function() {
             if (xhr.readyState === 4) {
                 if (xhr.status === 200) {
-                    const data = JSON.parse(xhr.responseText);
+                    const data = parseXhrJson(xhr);
                     if (data.success) {
                         statusMessage.className = 'status-message success';
                         statusText.textContent = 'successful';
@@ -1603,14 +1673,16 @@
                             location.reload();
                         }, 3000);
                     } else {
-                        statusMessage.className = 'status-message error';
-                        statusText.textContent = 'error';
+                        showModalStatusError(modal, statusMessage, statusText, getPayloadFailureMessage(data, '备注更新失败'));
                     }
                 } else {
-                    statusMessage.className = 'status-message error';
-                    statusText.textContent = 'error';
+                    showModalStatusError(modal, statusMessage, statusText, getXhrFailureMessage(xhr, '备注更新失败'));
                 }
             }
+        };
+
+        xhr.onerror = function() {
+            showModalStatusError(modal, statusMessage, statusText, '网络异常，备注更新请求未发送成功。');
         };
 
         xhr.send(JSON.stringify({
@@ -2110,7 +2182,7 @@
         xhr.onreadystatechange = function() {
             if (xhr.readyState === 4) {
                 if (xhr.status === 200) {
-                    const data = JSON.parse(xhr.responseText);
+                    const data = parseXhrJson(xhr);
                     if (data.success) {
                         statusMessage.className = 'status-message success';
                         statusText.textContent = 'success';
@@ -2119,19 +2191,16 @@
                             location.reload();
                         }, 3000);
                     } else {
-                        statusMessage.className = 'status-message error';
-                        statusText.textContent = 'error';
+                        showModalStatusError(modal, statusMessage, statusText, getPayloadFailureMessage(data, '启动实例失败'));
                     }
                 } else {
-                    statusMessage.className = 'status-message error';
-                    statusText.textContent = 'error';
+                    showModalStatusError(modal, statusMessage, statusText, getXhrFailureMessage(xhr, '启动实例失败'));
                 }
             }
         };
 
         xhr.onerror = function() {
-            statusMessage.className = 'status-message error';
-            statusText.textContent = 'error and try';
+            showModalStatusError(modal, statusMessage, statusText, '网络异常，启动实例请求未发送成功。');
         };
 
         xhr.send(JSON.stringify({
@@ -2173,7 +2242,7 @@
         xhr.onreadystatechange = function() {
             if (xhr.readyState === 4) {
                 if (xhr.status === 200) {
-                    const data = JSON.parse(xhr.responseText);
+                    const data = parseXhrJson(xhr);
                     if (data.success) {
                         statusMessage.className = 'status-message success';
                         statusText.textContent = 'success';
@@ -2184,19 +2253,16 @@
                             location.reload();
                         }, 3000);
                     } else {
-                        statusMessage.className = 'status-message error';
-                        statusText.textContent = 'error';
+                        showModalStatusError(modal, statusMessage, statusText, getPayloadFailureMessage(data, '停止实例失败'));
                     }
                 } else {
-                    statusMessage.className = 'status-message error';
-                    statusText.textContent = 'error';
+                    showModalStatusError(modal, statusMessage, statusText, getXhrFailureMessage(xhr, '停止实例失败'));
                 }
             }
         };
 
         xhr.onerror = function() {
-            statusMessage.className = 'status-message error';
-            statusText.textContent = 'error';
+            showModalStatusError(modal, statusMessage, statusText, '网络异常，停止实例请求未发送成功。');
         };
 
         xhr.send(JSON.stringify({
@@ -2368,10 +2434,22 @@
                         Swal.fire({ icon: 'success', title: '删除成功', timer: 1200, showConfirmButton: false })
                             .then(function() { location.reload(); });
                     } else {
-                        Swal.fire({ icon: 'error', title: '删除失败', text: data.message || data.msg || '' });
+                        Swal.fire({
+                            icon: 'error',
+                            title: '删除失败',
+                            text: getPayloadFailureMessage(data, '本地记录删除失败'),
+                            timer: 3000,
+                            showConfirmButton: false
+                        });
                     }
                 }).catch(function(e) {
-                    Swal.fire({ icon: 'error', title: '请求失败', text: e.message });
+                    Swal.fire({
+                        icon: 'error',
+                        title: '请求失败',
+                        text: e.message || '网络异常，本地记录删除请求未发送成功。',
+                        timer: 3000,
+                        showConfirmButton: false
+                    });
                 });
             }
         });
@@ -2618,20 +2696,22 @@
             headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
             body: JSON.stringify({ vpusPerGB: vpus, tenantId: tenantId, instanceDetailId: instanceDetailId })
         })
-        .then(r => r.json())
-        .then(data => {
+        .then(r => r.json().catch(() => ({})).then(data => ({ ok: r.ok, status: r.status, statusText: r.statusText, data })))
+        .then(({ ok, status, data }) => {
+            if (!ok) {
+                showModalStatusError(modal, statusMessage, statusText, getFriendlyHttpMessage(status, 'VPU更新失败'));
+                return;
+            }
             if (data.success) {
                 statusMessage.className = 'status-message success';
                 statusText.textContent = data.message || 'success';
                 setTimeout(() => { modal.style.display = 'none'; location.reload(); }, 3000);
             } else {
-                statusMessage.className = 'status-message error';
-                statusText.textContent = data.message || 'error';
+                showModalStatusError(modal, statusMessage, statusText, getPayloadFailureMessage(data, 'VPU更新失败'));
             }
         })
         .catch(() => {
-            statusMessage.className = 'status-message error';
-            statusText.textContent = 'error';
+            showModalStatusError(modal, statusMessage, statusText, '网络异常，VPU更新请求未发送成功。');
         });
     }
 

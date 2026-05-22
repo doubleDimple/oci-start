@@ -1,19 +1,39 @@
 #!/bin/bash
 
 # 设置变量
-USERNAME="lovele"
-IMAGE_NAME="oci-start"
-VERSION="2.0.6"
+REGISTRY="${REGISTRY:-docker.io}"
+NAMESPACE="${NAMESPACE:-lovele}"
+IMAGE_NAME="${IMAGE_NAME:-oci-start}"
+IMAGE_REPO="${IMAGE_REPO:-${NAMESPACE}/${IMAGE_NAME}}"
+VERSION="${1:-${VERSION:-5.7.70}}"
+APPLICATION_YML="src/main/resources/application.yml"
+
+if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    echo "Error: VERSION must be in x.y.z format, got: ${VERSION}"
+    echo "Usage: VERSION=5.7.70 ./build.sh"
+    echo "   or: ./build.sh 5.7.70"
+    exit 1
+fi
+
+if [ ! -f "$APPLICATION_YML" ]; then
+    echo "Error: ${APPLICATION_YML} not found. Please run this script from oci-server directory."
+    exit 1
+fi
+
+echo "Syncing application version..."
+sed -i.bak -E "s/^([[:space:]]*)version:[[:space:]]*.*/\\1version: ${VERSION}/" "$APPLICATION_YML"
+sed -i.bak -E "s/^([[:space:]]*)ssh-version:[[:space:]]*.*/\\1ssh-version: v-${VERSION}/" "$APPLICATION_YML"
+rm -f "${APPLICATION_YML}.bak"
 
 echo "======================================"
 echo "Starting build process..."
-echo "Image: ${USERNAME}/${IMAGE_NAME}"
+echo "Image: ${IMAGE_REPO}"
 echo "Version: ${VERSION}"
 echo "======================================"
 
 # 确保使用 buildx
 echo "Setting up buildx..."
-docker buildx create --name ociStartBuilder206 --use || echo "Builder already exists"
+docker buildx create --name ociStartBuilder --use || echo "Builder already exists"
 docker buildx inspect --bootstrap
 
 # 定义计时器函数
@@ -41,8 +61,8 @@ timer_pid=$!
 # 执行构建命令
 docker buildx build \
     --platform linux/amd64,linux/arm64 \
-    -t ${USERNAME}/${IMAGE_NAME}:${VERSION} \
-    -t ${USERNAME}/${IMAGE_NAME}:latest \
+    -t ${IMAGE_REPO}:${VERSION} \
+    -t ${IMAGE_REPO}:latest \
     --push . \
     --progress=plain
 
@@ -62,7 +82,7 @@ echo -e "\n总运行时间: $(printf "%02d:%02d:%02d" $((total_elapsed/3600)) $(
 if [ $build_status -eq 0 ]; then
     echo "======================================"
     echo "Build and push successful!"
-    echo "Image: ${USERNAME}/${IMAGE_NAME}"
+    echo "Image: ${IMAGE_REPO}"
     echo "Tags: ${VERSION}, latest"
     echo "Platforms: linux/amd64, linux/arm64"
     echo "======================================"

@@ -22,12 +22,28 @@ const swalConfig = {
 
 // 通用错误处理
 async function handleApiError(error, title = '操作失败') {
+    if (window.OciRequestUtils && typeof window.OciRequestUtils.showApiError === 'function') {
+        await window.OciRequestUtils.showApiError(error, title);
+        return;
+    }
+
     await Swal.fire({
         icon: 'error',
         title: title,
-        text: error.message,
+        text: (error && error.message) || error || '网络异常或服务器无响应，请稍后重试',
         confirmButtonColor: '#2196f3'
     });
+}
+
+async function assertResponseOk(response, fallbackMessage = '操作失败') {
+    if (window.OciRequestUtils && typeof window.OciRequestUtils.assertApiResponse === 'function') {
+        return await window.OciRequestUtils.assertApiResponse(response, fallbackMessage);
+    }
+    if (!response.ok) {
+        throw new Error(await response.text() || fallbackMessage);
+    }
+    const text = await response.text();
+    return text ? JSON.parse(text) : null;
 }
 
 async function updateTelegramConfig() {
@@ -68,9 +84,7 @@ async function updateTelegramConfig() {
                 })
             });
 
-            if (!response.ok) {
-                throw new Error(await response.text() || i18n.common_confirmUpdateFail);
-            }
+            await assertResponseOk(response, i18n.common_confirmUpdateFail);
 
             const Toast = Swal.mixin(swalConfig.toast);
             Toast.fire({
@@ -155,9 +169,7 @@ async function updateDingTalkConfig(button) {
                 body: JSON.stringify(config)
             });
 
-            if (!response.ok) {
-                throw new Error(await response.text() || '钉钉配置更新失败');
-            }
+            await assertResponseOk(response, '钉钉配置更新失败');
 
             const Toast = Swal.mixin(swalConfig.toast);
             Toast.fire({
@@ -183,9 +195,7 @@ async function testDingTalk() {
             }
         });
 
-        if (!response.ok) {
-            throw new Error(await response.text() || i18n.common_sendFail);
-        }
+        await assertResponseOk(response, i18n.common_sendFail);
 
         const Toast = Swal.mixin(swalConfig.toast);
         Toast.fire({
@@ -207,9 +217,7 @@ async function testTgTalk() {
             }
         });
 
-        if (!response.ok) {
-            throw new Error(await response.text() || i18n.common_sendFail);
-        }
+        await assertResponseOk(response, i18n.common_sendFail);
 
         const Toast = Swal.mixin(swalConfig.toast);
         Toast.fire({
@@ -953,4 +961,3 @@ document.addEventListener('keydown', function(event) {
         if (modal && modal.classList.contains('show')) closeAiConfigModal();
     }
 });
-

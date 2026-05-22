@@ -48,6 +48,7 @@ log_success() {
 
 # 配置变量
 APP_DIR="${OCI_APP_DIR:-/root/oci-start-docker}"
+APP_TZ="${TZ:-Asia/Shanghai}"
 APP_CONTAINER_NAME="oci-start"
 SCRIPT_PATH=$(realpath "$0")
 SYMLINK_PATH="/usr/local/bin/oci-start-docker"
@@ -388,6 +389,7 @@ deploy_app() {
         -e OCI_APP_DIR=/oci-start \
         -e DATA_PATH=/oci-start/data \
         -e LOG_HOME=/oci-start/logs \
+        -e TZ="$APP_TZ" \
         --restart always \
         lovele/oci-start:latest; then
 
@@ -625,6 +627,7 @@ update() {
         -e OCI_APP_DIR=/oci-start \
         -e DATA_PATH=/oci-start/data \
         -e LOG_HOME=/oci-start/logs \
+        -e TZ="$APP_TZ" \
         --network host \
         --restart always \
         lovele/oci-start:latest; then

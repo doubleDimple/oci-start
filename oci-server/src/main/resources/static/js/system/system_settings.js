@@ -24,10 +24,15 @@ const swalConfig = {
 
 // 通用错误处理
 async function handleApiError(error, title = 'error') {
+    if (window.OciRequestUtils && typeof window.OciRequestUtils.showApiError === 'function') {
+        await window.OciRequestUtils.showApiError(error, title);
+        return;
+    }
+
     await Swal.fire({
         icon: 'error',
         title: title,
-        text: error.message,
+        text: (error && error.message) || error || '网络异常或服务器无响应，请稍后重试',
         confirmButtonColor: '#2196f3'
     });
 }

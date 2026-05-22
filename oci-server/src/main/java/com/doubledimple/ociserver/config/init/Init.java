@@ -95,18 +95,65 @@ public class Init implements CommandLineRunner {
         try {
             AppVersion version = versionRepository.findFirstByOrderByIdAsc()
                     .orElseThrow(() -> new RuntimeException("未找到版本信息"));
-            //库里更新的最新版本
-            String latestVersion = version.getLatestVersion();
-            //已经更新的最新版本
-            String currentVersion = version.getCurrentVersion();
-            //比对库里的最新版本和当前配置文件的最新版本是否一致,不一致则更新
+            String runtimeVersion = version.getDeployType() == AppVersion.DeployType.DOCKER ? dockerVersion : sshVersion;
+
             log.debug("获取到的配置文件版本:dockerVersion:{}", dockerVersion);
             log.debug("获取到的配置文件版本:sshVersion:{}", sshVersion);
+
+            if (StringUtils.isNotBlank(runtimeVersion)) {
+                boolean changed = false;
+                if (!StringUtils.equals(runtimeVersion, version.getCurrentVersion())) {
+                    log.info("检测到当前运行版本变化, 数据库版本:{} -> 运行版本:{}",
+                            version.getCurrentVersion(), runtimeVersion);
+                    version.setCurrentVersion(runtimeVersion);
+                    changed = true;
+                }
+                if (StringUtils.isBlank(version.getLatestVersion())
+                        || compareVersion(runtimeVersion, version.getLatestVersion()) >= 0) {
+                    version.setLatestVersion(runtimeVersion);
+                    changed = true;
+                }
+                if (changed) {
+                    versionRepository.save(version);
+                }
+            }
 
             log.info("版本已更新到: {}", version.getCurrentVersion());
         } catch (RuntimeException e) {
             log.warn("未找到版本信息");
         }
+    }
+
+    private int compareVersion(String left, String right) {
+        String[] leftParts = normalizeVersion(left).split("\\.");
+        String[] rightParts = normalizeVersion(right).split("\\.");
+        int length = Math.max(leftParts.length, rightParts.length);
+        for (int i = 0; i < length; i++) {
+            int leftValue = i < leftParts.length ? parseVersionPart(leftParts[i]) : 0;
+            int rightValue = i < rightParts.length ? parseVersionPart(rightParts[i]) : 0;
+            if (leftValue != rightValue) {
+                return Integer.compare(leftValue, rightValue);
+            }
+        }
+        return 0;
+    }
+
+    private String normalizeVersion(String version) {
+        if (version == null) {
+            return "";
+        }
+        return version.trim().replaceFirst("^[vV][-_]?", "");
+    }
+
+    private int parseVersionPart(String part) {
+        if (part == null) {
+            return 0;
+        }
+        String digits = part.replaceAll("[^0-9].*$", "");
+        if (digits.isEmpty()) {
+            return 0;
+        }
+        return Integer.parseInt(digits);
     }
 
     /**

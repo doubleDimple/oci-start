@@ -23,12 +23,28 @@ const swalConfig = {
 
 // 通用错误处理
 async function handleApiError(error, title = 'error') {
+    if (window.OciRequestUtils && typeof window.OciRequestUtils.showApiError === 'function') {
+        await window.OciRequestUtils.showApiError(error, title);
+        return;
+    }
+
     await Swal.fire({
         icon: 'error',
         title: title,
-        text: error.message || error,
+        text: (error && error.message) || error || '网络异常或服务器无响应，请稍后重试',
         confirmButtonColor: '#2196f3'
     });
+}
+
+async function assertResponseOk(response, fallbackMessage = 'error') {
+    if (window.OciRequestUtils && typeof window.OciRequestUtils.assertApiResponse === 'function') {
+        return await window.OciRequestUtils.assertApiResponse(response, fallbackMessage);
+    }
+    if (!response.ok) {
+        throw new Error(await response.text() || fallbackMessage);
+    }
+    const text = await response.text();
+    return text ? JSON.parse(text) : null;
 }
 
 // 更新状态标识
@@ -157,9 +173,7 @@ async function saveCloudflareConfig() {
                 body: JSON.stringify(config)
             });
 
-            if (!response.ok) {
-                throw new Error(await response.text() || 'error');
-            }
+            await assertResponseOk(response, 'Cloudflare配置保存失败');
 
             updateStatus('cloudflare','connected');
 
@@ -213,27 +227,17 @@ async function testCloudflareConnection() {
             })
         });
 
-        const result = await response.json();
-
-        if (response.ok) {
-            updateStatus('cloudflare','connected');
-            Swal.fire({
-                icon: 'success',
-                title: 'Successful',
-                confirmButtonColor: '#2196f3'
-            });
-        } else {
-            throw new Error(result.message || 'error');
-        }
+        await assertResponseOk(response, 'Cloudflare连接测试失败');
+        updateStatus('cloudflare','connected');
+        Swal.fire({
+            icon: 'success',
+            title: 'Successful',
+            confirmButtonColor: '#2196f3'
+        });
 
     } catch (error) {
         updateStatus('cloudflare','disconnected');
-        Swal.fire({
-            icon: 'error',
-            title: 'test error',
-            text: error.message,
-            confirmButtonColor: '#2196f3'
-        });
+        await handleApiError(error, 'test error');
     }
 }
 
@@ -289,9 +293,7 @@ async function saveEdgeOneConfig() {
                 body: JSON.stringify(config)
             });
 
-            if (!response.ok) {
-                throw new Error(await response.text() || 'error');
-            }
+            await assertResponseOk(response, '腾讯云EdgeOne配置保存失败');
 
             updateStatus('edgeone', 'connected');
 
@@ -344,27 +346,17 @@ async function testEdgeOneConnection() {
             })
         });
 
-        const result = await response.json();
-
-        if (response.ok) {
-            updateStatus('edgeone', 'connected');
-            Swal.fire({
-                icon: 'success',
-                title: 'Successful',
-                confirmButtonColor: '#2196f3'
-            });
-        } else {
-            throw new Error(result.message || 'error');
-        }
+        await assertResponseOk(response, 'EdgeOne连接测试失败');
+        updateStatus('edgeone', 'connected');
+        Swal.fire({
+            icon: 'success',
+            title: 'Successful',
+            confirmButtonColor: '#2196f3'
+        });
 
     } catch (error) {
         updateStatus('edgeone', 'disconnected');
-        Swal.fire({
-            icon: 'error',
-            title: 'error',
-            text: error.message,
-            confirmButtonColor: '#2196f3'
-        });
+        await handleApiError(error, 'error');
     }
 }
 

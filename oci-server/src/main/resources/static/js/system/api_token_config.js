@@ -23,12 +23,28 @@ const swalConfig = {
 
 // 通用错误处理
 async function handleApiError(error, title = '操作失败') {
+    if (window.OciRequestUtils && typeof window.OciRequestUtils.showApiError === 'function') {
+        await window.OciRequestUtils.showApiError(error, title);
+        return;
+    }
+
     await Swal.fire({
         icon: 'error',
         title: title,
-        text: error.message || error,
+        text: (error && error.message) || error || '网络异常或服务器无响应，请稍后重试',
         confirmButtonColor: '#2196f3'
     });
+}
+
+async function assertResponseOk(response, fallbackMessage = '操作失败') {
+    if (window.OciRequestUtils && typeof window.OciRequestUtils.assertApiResponse === 'function') {
+        return await window.OciRequestUtils.assertApiResponse(response, fallbackMessage);
+    }
+    if (!response.ok) {
+        throw new Error(await response.text() || fallbackMessage);
+    }
+    const text = await response.text();
+    return text ? JSON.parse(text) : null;
 }
 
 // 生成新Token
@@ -73,11 +89,7 @@ async function generateToken() {
                 body: JSON.stringify(config)
             });
 
-            if (!response.ok) {
-                throw new Error(await response.text() || i18n.token_genFail);
-            }
-
-            const tokenResponse = await response.json();
+            const tokenResponse = await assertResponseOk(response, i18n.token_genFail);
 
             // 显示生成的Token
             displayGeneratedToken(tokenResponse);
@@ -156,9 +168,7 @@ async function revokeToken() {
                 }
             });
 
-            if (!response.ok) {
-                throw new Error(await response.text() || 'Token撤销失败');
-            }
+            await assertResponseOk(response, 'Token撤销失败');
 
             const Toast = Swal.mixin(swalConfig.toast);
             Toast.fire({

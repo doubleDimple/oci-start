@@ -28,6 +28,7 @@ docker stop oci-start || true && docker run -d \
     -e SERVER_PORT=9856 \
     -e DATA_PATH=/oci-start/data \
     -e LOG_HOME=/oci-start/logs \
+    -e TZ=Asia/Shanghai \
     --rm \
     lovele/oci-start:latest
 
@@ -63,5 +64,4 @@ docker rm $(docker ps -a -q)
 
 # 删除所有镜像:
 docker rmi $(docker images -q)
-
 
