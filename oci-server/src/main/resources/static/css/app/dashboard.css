@@ -1,0 +1,580 @@
+/* ============================================================
+   Dashboard — Professional Dark Theme
+   只影响 .main-content 及以内的内容区，不改动 nav / sidebar
+   ============================================================ */
+
+:root {
+    /* ── 保留原有 sidebar/nav 变量，供 styles.css 兼容 ── */
+    --top-nav-bg:           #1f1f1f;
+    --sidebar-bg:           #1e2124;
+    --sidebar-hover:        #292d30;
+    --sidebar-active:       #1abc9c;
+    --sidebar-text:         #a9b7c6;
+    --sidebar-active-text:  #ffffff;
+    --submenu-bg:           #292d30;
+    --border-color:         #383c40;
+
+    /* ── Dashboard 暗色（默认） ── */
+    --db-bg:        #1a1d21;
+    --db-surface:   #22262b;
+    --db-surface-2: #292d32;
+    --db-border:    #31363d;
+    --db-text:      #cdd9e5;
+    --db-muted:     #768390;
+    --db-blue:      #4d9eff;
+    --db-green:     #3fb950;
+    --db-orange:    #f78166;
+    --db-red:       #ff6b6b;
+    --db-purple:    #bc8cff;
+    --db-cyan:      #39c5cf;
+    --db-shadow:    0 4px 24px rgba(0,0,0,0.4);
+    --db-radius:    12px;
+    --db-gauge-track:  #252a30;
+    --db-gauge-center: #22262b;
+
+    /* ── 旧版 compat（JS/其他页面引用） ── */
+    --main-bg:        var(--db-bg);
+    --text-primary:   var(--db-text);
+    --text-secondary: var(--db-muted);
+    --accent-blue:    var(--db-blue);
+    --accent-green:   var(--db-green);
+    --accent-red:     var(--db-red);
+    --card-border:    var(--db-border);
+    --shadow-color:   rgba(0,0,0,0.08);
+}
+
+/* ── 亮色模式覆盖 ── */
+[data-theme="light"] {
+    --db-bg:           #f0f4f8;
+    --db-surface:      #ffffff;
+    --db-surface-2:    #f8fafc;
+    --db-border:       #dde3ec;
+    --db-text:         #1a202c;
+    --db-muted:        #64748b;
+    --db-blue:         #2563eb;
+    --db-green:        #16a34a;
+    --db-orange:       #ea580c;
+    --db-red:          #dc2626;
+    --db-purple:       #7c3aed;
+    --db-cyan:         #0891b2;
+    --db-shadow:       0 4px 20px rgba(0,0,0,0.08);
+    --db-gauge-track:  #e8edf3;
+    --db-gauge-center: #ffffff;
+}
+
+/* 亮色模式 body 去掉科技背景，保持干净 */
+[data-theme="light"] body {
+    background: var(--db-bg);
+    background-image: none;
+}
+
+/* ── 全局基础 ── */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html {
+    background: var(--db-bg);
+    min-height: 100%;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--db-bg);
+    background-image:
+        radial-gradient(ellipse 80% 50% at 50% -10%, rgba(77,158,255,0.08) 0%, transparent 60%),
+        radial-gradient(circle, rgba(77,158,255,0.025) 1px, transparent 1px);
+    background-size: 100% 100%, 28px 28px;
+    color: var(--db-text);
+    line-height: 1.5;
+    font-size: 13px;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* ── Layout / Sidebar（保留，供 iframe 外使用） ── */
+.layout {
+    display: flex;
+    min-height: 100vh;
+    padding-top: 0;
+}
+
+.sidebar {
+    width: 200px;
+    background: var(--sidebar-bg);
+    position: fixed;
+    height: calc(100vh - 45px);
+    color: var(--sidebar-text);
+    font-size: 13px;
+    border-right: 1px solid var(--border-color);
+    overflow-y: auto;
+}
+
+.nav-parent { border-bottom: 1px solid var(--border-color); }
+
+.nav-parent > .nav-link {
+    padding: 12px 20px;
+    color: var(--sidebar-text);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: all 0.3s;
+    cursor: pointer;
+    font-weight: 500;
+    text-decoration: none;
+    user-select: none;
+}
+
+.nav-parent > .nav-link span { display: flex; align-items: center; gap: 8px; }
+.nav-parent > .nav-link:hover,
+.nav-parent.expanded > .nav-link { color: var(--sidebar-active-text); background: var(--sidebar-hover); }
+
+.nav-parent > .nav-link i.arrow { transition: transform 0.3s; font-size: 12px; opacity: 0.7; }
+.nav-parent.expanded > .nav-link i.arrow { transform: rotate(180deg); opacity: 1; }
+
+.nav-children { display: none; background: var(--submenu-bg); overflow: hidden; }
+.nav-parent.expanded .nav-children { display: block; }
+
+.nav-children .nav-link {
+    padding: 10px 20px 10px 40px;
+    color: var(--sidebar-text);
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+    transition: all 0.3s;
+}
+.nav-children .nav-link:hover { color: var(--sidebar-active-text); background: var(--sidebar-hover); padding-left: 45px; }
+.nav-children .nav-link.active { color: var(--sidebar-active-text); background: var(--sidebar-active); padding-left: 45px; }
+
+/* ─────────────────────────────────────────────────────────
+   以下为本次优化重点：Main Content 内容区
+   ───────────────────────────────────────────────────────── */
+
+.main-content {
+    flex: 1;
+    padding: 20px 24px;
+    background: var(--db-bg);
+    min-height: 100vh;
+}
+
+/* ── 页面外框卡片（对齐 add_boot 风格） ── */
+.page-card {
+    background: var(--db-surface);
+    border: 1px solid var(--db-border);
+    border-radius: var(--db-radius);
+    box-shadow: var(--db-shadow);
+    padding: 24px 28px;
+}
+
+/* ── Page Header ── */
+.page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 28px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid var(--db-border);
+}
+
+.page-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--db-text);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    letter-spacing: -0.4px;
+    margin: 0;
+}
+
+.page-title i {
+    width: 40px;
+    height: 40px;
+    background: rgba(59,130,246,0.14);
+    border-radius: 11px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--db-blue);
+    font-size: 17px;
+    flex-shrink: 0;
+    font-style: normal;
+}
+
+#last-update {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+    color: var(--db-muted);
+    background: var(--db-surface);
+    border: 1px solid var(--db-border);
+    padding: 6px 14px;
+    border-radius: 20px;
+    white-space: nowrap;
+}
+
+#last-update::before {
+    content: '';
+    width: 7px;
+    height: 7px;
+    background: var(--db-green);
+    border-radius: 50%;
+    flex-shrink: 0;
+    animation: liveDot 2.4s ease-in-out infinite;
+}
+
+@keyframes liveDot {
+    0%,100% { opacity: 1; transform: scale(1); }
+    50%      { opacity: 0.5; transform: scale(0.85); }
+}
+
+/* ════════════════════════════════════════════════
+   Stats Grid — 5 数据卡片
+   ════════════════════════════════════════════════ */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 14px;
+    margin-bottom: 20px;
+}
+
+.stat-card {
+    background: var(--db-surface);
+    border: 1px solid var(--db-border);
+    border-radius: var(--db-radius);
+    padding: 20px 18px 16px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+}
+
+.stat-card:hover {
+    border-color: rgba(77,158,255,0.35);
+    transform: translateY(-2px);
+    box-shadow: 0 0 0 1px rgba(77,158,255,0.15), var(--db-shadow);
+}
+
+.stat-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    gap: 8px;
+}
+
+.stat-icon {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    font-size: 16px;
+    flex-shrink: 0;
+}
+
+.stat-icon.api     { background: rgba(59,130,246,0.14); color: var(--db-blue); }
+.stat-icon.boot    { background: rgba(34,197,94,0.14);  color: var(--db-green); }
+.stat-icon.total   { background: rgba(249,115,22,0.14); color: var(--db-orange); }
+.stat-icon.success { background: rgba(6,182,212,0.14);  color: var(--db-cyan); }
+.stat-icon.fail    { background: rgba(239,68,68,0.14);  color: var(--db-red); }
+
+.stat-title {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--db-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    margin: 0;
+    line-height: 1.4;
+    text-align: right;
+}
+
+.stat-value {
+    font-size: 30px;
+    font-weight: 700;
+    color: var(--db-text);
+    letter-spacing: -0.5px;
+    line-height: 1;
+    margin: 0;
+    font-variant-numeric: tabular-nums;
+}
+
+/* 失败数醒目红色 */
+.stat-card:nth-child(5) .stat-value { color: var(--db-red); }
+
+/* ════════════════════════════════════════════════
+   Monitor Grid — 5 监控卡片 (3 列布局)
+   ════════════════════════════════════════════════ */
+.monitor-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+}
+
+/* 网络卡片（第4个）横跨 2 列，给图表更多空间 */
+.monitor-card:nth-child(4) {
+    grid-column: span 2;
+}
+
+.monitor-card {
+    background: var(--db-surface);
+    border: 1px solid var(--db-border);
+    border-radius: var(--db-radius);
+    padding: 22px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.monitor-card:hover {
+    border-color: rgba(77,158,255,0.3);
+    box-shadow: 0 0 0 1px rgba(77,158,255,0.1), 0 8px 32px rgba(0,0,0,0.5);
+}
+
+/* 每张卡片图标颜色 */
+.monitor-card:nth-child(1) .monitor-icon { background: rgba(59,130,246,0.12);  color: var(--db-blue); }
+.monitor-card:nth-child(2) .monitor-icon { background: rgba(168,85,247,0.12);  color: var(--db-purple); }
+.monitor-card:nth-child(3) .monitor-icon { background: rgba(34,197,94,0.12);   color: var(--db-green); }
+.monitor-card:nth-child(4) .monitor-icon { background: rgba(6,182,212,0.12);   color: var(--db-cyan); }
+.monitor-card:nth-child(5) .monitor-icon { background: rgba(249,115,22,0.12);  color: var(--db-orange); }
+
+.monitor-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 18px;
+}
+
+.monitor-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+}
+
+.monitor-info { flex: 1; min-width: 0; }
+
+.monitor-info h3 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--db-text);
+    margin: 0;
+}
+
+.monitor-subtitle {
+    font-size: 11px;
+    color: var(--db-muted);
+    display: block;
+    margin-top: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ── 仪表盘环形 ── */
+.gauge-container {
+    position: relative;
+    width: 148px;
+    height: 148px;
+    margin: 0 auto 20px;
+}
+
+.gauge {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    position: relative;
+}
+
+.gauge-fill {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    border-radius: 50%;
+    background: var(--db-gauge-track, #22282f);
+    transform: rotate(-90deg);
+}
+
+.gauge-center {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 68%; height: 68%;
+    background: var(--db-gauge-center, #1c2128);
+    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+}
+
+.gauge-value {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--db-text);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── 详情列表 ── */
+.monitor-details {
+    border-top: 1px solid var(--db-border);
+    padding-top: 4px;
+}
+
+.detail-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--db-border);
+    font-size: 12px;
+    gap: 8px;
+}
+
+.detail-item:last-child { border-bottom: none; }
+
+.detail-item span:first-child {
+    color: var(--db-muted);
+    white-space: nowrap;
+}
+
+.detail-item span:last-child {
+    color: var(--db-text);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+/* ── 网络状态（旧版兼容） ── */
+.network-stats { display: flex; justify-content: space-around; margin-top: 20px; }
+.network-stat  { text-align: center; }
+.network-stat i { font-size: 24px; margin-bottom: 8px; color: var(--db-blue); }
+.stat-label { display: block; font-size: 12px; color: var(--db-muted); }
+
+/* ── 网络图表容器 ── */
+.network-chart {
+    height: 200px;
+    margin: 0 0 16px;
+    position: relative;
+}
+
+/* 宽屏时网络卡片图表更高 */
+.monitor-card:nth-child(4) .network-chart {
+    height: 220px;
+}
+
+/* ── 进度条（旧版兼容） ── */
+.progress-bar {
+    width: 100%;
+    height: 5px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 12px;
+}
+.progress {
+    height: 100%;
+    background: var(--db-green);
+    transition: width 0.4s ease;
+}
+
+/* ════════════════════════════════════════════════
+   Footer
+   ════════════════════════════════════════════════ */
+.page-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 24px 0 0;
+    padding: 18px 4px;
+    border-top: 1px solid var(--db-border);
+    font-size: 12px;
+    color: var(--db-muted);
+}
+
+.page-footer strong { color: var(--db-text); }
+
+.page-footer a {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--db-blue);
+    text-decoration: none;
+    transition: opacity 0.2s;
+}
+
+.page-footer a:hover { opacity: 0.75; }
+
+.page-footer a i { font-size: 14px; }
+
+/* ════════════════════════════════════════════════
+   图标动画
+   ════════════════════════════════════════════════ */
+.rotating { animation: db-rotate 4s linear infinite; }
+.pulse    { animation: db-pulse  2.5s ease-in-out infinite; }
+.bounce   { animation: db-bounce 3s ease infinite; }
+.flash    { animation: db-flash  2.4s ease infinite; }
+
+@keyframes db-rotate { from { transform: rotate(0deg); }   to { transform: rotate(360deg); } }
+@keyframes db-pulse  { 0%,100% { opacity:1; transform:scale(1); }   50% { opacity:.8; transform:scale(1.1); } }
+@keyframes db-bounce { 0%,100% { transform:translateY(0); }         50% { transform:translateY(-4px); } }
+@keyframes db-flash  { 0%,100% { opacity:1; }                       50% { opacity:.55; } }
+
+/* ════════════════════════════════════════════════
+   移动端适配（iframe 内：无 header/sidebar）
+   ════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+    .layout       { padding-top: 0; }
+    .main-content { padding: 12px; }
+
+    .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        margin-bottom: 16px;
+        padding-bottom: 12px;
+    }
+
+    .page-title { font-size: 16px; }
+    .page-title i { width: 32px; height: 32px; font-size: 14px; }
+
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+        margin-bottom: 14px;
+    }
+
+    .stat-card { padding: 14px 12px 12px; }
+    .stat-value { font-size: 24px; }
+    .stat-icon  { width: 34px; height: 34px; font-size: 14px; }
+
+    .monitor-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .monitor-card:nth-child(4) { grid-column: span 1; }
+    .monitor-card { padding: 16px; }
+    .monitor-card:hover { border-color: var(--db-border); box-shadow: none; }
+
+    .gauge-container { width: 120px; height: 120px; }
+    .gauge-value { font-size: 18px; }
+    .network-chart { height: 160px; }
+    .monitor-card:nth-child(4) .network-chart { height: 160px; }
+
+    .page-card { padding: 16px; }
+}
+
+@media (max-width: 480px) {
+    .main-content { padding: 8px; }
+    .stats-grid { gap: 8px; }
+    .stat-card { padding: 12px 10px; }
+    .stat-value { font-size: 20px; }
+    .gauge-container { width: 100px; height: 100px; }
+    .gauge-value { font-size: 15px; }
+}

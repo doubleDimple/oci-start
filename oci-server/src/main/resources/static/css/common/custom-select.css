@@ -1,0 +1,248 @@
+/* ============================================================
+   Custom Select 公共组件
+   依赖 CSS 变量（页面需定义 --surface / --border / --text /
+   --muted / --accent / --surface-2 / --shadow / --radius-sm）
+   若未定义则回落到暗色默认值
+   ============================================================ */
+
+.cs-wrapper {
+    position: relative;
+    display: block;
+    width: 100%;
+}
+
+/* ── 触发器 ── */
+.cs-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--surface, #22262b);
+    border: 1px solid var(--border, #31363d);
+    border-radius: var(--radius-sm, 6px);
+    cursor: pointer;
+    user-select: none;
+    transition: border-color .2s, box-shadow .2s;
+    min-height: 36px;
+}
+
+.cs-trigger:hover {
+    border-color: var(--accent, #4d9eff);
+}
+
+.cs-wrapper.open .cs-trigger {
+    border-color: var(--accent, #4d9eff);
+    box-shadow: 0 0 0 3px rgba(77, 158, 255, .15);
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+/* 禁用态 */
+.cs-wrapper.disabled .cs-trigger {
+    opacity: .55;
+    cursor: not-allowed;
+}
+
+/* ── 显示文字 ── */
+.cs-text {
+    flex: 1;
+    font-size: 13px;
+    color: var(--text, #cdd9e5);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cs-text.placeholder {
+    color: var(--muted, #768390);
+}
+
+/* ── 箭头 ── */
+.cs-arrow {
+    font-size: 11px;
+    color: var(--muted, #768390);
+    flex-shrink: 0;
+    transition: transform .22s, color .2s;
+}
+
+.cs-wrapper.open .cs-arrow {
+    transform: rotate(180deg);
+    color: var(--accent, #4d9eff);
+}
+
+/* ── 下拉列表 ── */
+.cs-dropdown {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--surface, #22262b);
+    border: 1px solid var(--accent, #4d9eff);
+    border-top: none;
+    border-bottom-left-radius: var(--radius-sm, 6px);
+    border-bottom-right-radius: var(--radius-sm, 6px);
+    box-shadow: var(--shadow, 0 4px 24px rgba(0,0,0,.4));
+    z-index: 500;
+    max-height: 240px;
+    overflow-y: auto;
+}
+
+.cs-wrapper.open .cs-dropdown {
+    display: block;
+    animation: csDropIn .15s ease;
+}
+
+@keyframes csDropIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── 搜索框（可选，通过 data-searchable 启用） ── */
+.cs-search {
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--border, #31363d);
+}
+
+.cs-search input {
+    width: 100%;
+    padding: 5px 8px;
+    background: var(--surface-2, #292d32);
+    border: 1px solid var(--border, #31363d);
+    border-radius: 4px;
+    font-size: 12px;
+    color: var(--text, #cdd9e5);
+    outline: none;
+}
+
+.cs-search input:focus {
+    border-color: var(--accent, #4d9eff);
+}
+
+/* ── 选项 ── */
+.cs-option {
+    padding: 9px 14px;
+    font-size: 13px;
+    color: var(--text, #cdd9e5);
+    cursor: pointer;
+    transition: background .1s;
+    border-bottom: 1px solid var(--border, #31363d);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cs-option:last-child {
+    border-bottom: none;
+}
+
+.cs-option:hover {
+    background: rgba(77, 158, 255, .1);
+    color: var(--accent, #4d9eff);
+}
+
+.cs-option.selected {
+    background: rgba(77, 158, 255, .13);
+    color: var(--accent, #4d9eff);
+    font-weight: 600;
+}
+
+.cs-option.is-placeholder {
+    color: var(--muted, #768390);
+    font-style: italic;
+}
+
+.cs-option.hidden {
+    display: none;
+}
+
+/* ── 亮色主题覆盖（不依赖页面 CSS 变量命名）── */
+[data-theme="light"] .cs-trigger {
+    background: #ffffff;
+    border-color: #cbd5e1;
+    color: #1a202c;
+}
+[data-theme="light"] .cs-trigger:hover,
+[data-theme="light"] .cs-wrapper.open .cs-trigger {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37,99,235,.12);
+}
+[data-theme="light"] .cs-text { color: #1a202c; }
+[data-theme="light"] .cs-text.placeholder { color: #94a3b8; }
+[data-theme="light"] .cs-arrow { color: #94a3b8; }
+[data-theme="light"] .cs-wrapper.open .cs-arrow { color: #2563eb; }
+[data-theme="light"] .cs-wrapper.disabled .cs-trigger { background: #f1f5f9; }
+
+[data-theme="light"] .cs-dropdown {
+    background: #ffffff;
+    border-color: #2563eb;
+    box-shadow: 0 4px 20px rgba(0,0,0,.10);
+}
+[data-theme="light"] .cs-search { border-bottom-color: #e2e8f0; }
+[data-theme="light"] .cs-search input {
+    background: #f8fafc;
+    border-color: #e2e8f0;
+    color: #1a202c;
+}
+[data-theme="light"] .cs-search input:focus { border-color: #2563eb; }
+[data-theme="light"] .cs-search input::placeholder { color: #94a3b8; }
+
+[data-theme="light"] .cs-option {
+    color: #1a202c;
+    border-bottom-color: #f1f5f9;
+}
+[data-theme="light"] .cs-option:hover {
+    background: #eff6ff;
+    color: #2563eb;
+}
+[data-theme="light"] .cs-option.selected {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+[data-theme="light"] .cs-option.is-placeholder { color: #94a3b8; }
+[data-theme="light"] .cs-no-result { color: #94a3b8; }
+
+
+[data-theme="light"] .cs-dropdown::-webkit-scrollbar-track { background: #f8fafc; }
+[data-theme="light"] .cs-dropdown::-webkit-scrollbar-thumb { background: #cbd5e1; }
+[data-theme="light"] .cs-items::-webkit-scrollbar-track { background: #f8fafc; }
+[data-theme="light"] .cs-items::-webkit-scrollbar-thumb { background: #cbd5e1; }
+
+/* ── 滚动分页模式 ── */
+.cs-dropdown:has(.cs-items) {
+    display: none;
+    flex-direction: column;
+    max-height: 280px;
+    overflow: hidden;
+}
+
+.cs-wrapper.open .cs-dropdown:has(.cs-items) {
+    display: flex;
+}
+
+.cs-items {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+}
+
+.cs-items::-webkit-scrollbar { width: 4px; }
+.cs-items::-webkit-scrollbar-track { background: var(--surface-2, #292d32); }
+.cs-items::-webkit-scrollbar-thumb { background: var(--border, #31363d); border-radius: 2px; }
+
+
+
+/* 无结果提示 */
+.cs-no-result {
+    padding: 10px 14px;
+    font-size: 12px;
+    color: var(--muted, #768390);
+    text-align: center;
+}
+
+/* ── 滚动条 ── */
+.cs-dropdown::-webkit-scrollbar { width: 4px; }
+.cs-dropdown::-webkit-scrollbar-track { background: var(--surface-2, #292d32); }
+.cs-dropdown::-webkit-scrollbar-thumb { background: var(--border, #31363d); border-radius: 2px; }
+.cs-dropdown::-webkit-scrollbar-thumb:hover { background: var(--muted, #768390); }
