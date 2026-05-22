@@ -1,0 +1,15 @@
+${AnsiColor.BRIGHT_CYAN}
+ ██████╗  ██████╗██╗      ███████╗████████╗ █████╗ ██████╗ ████████╗
+██╔═══██╗██╔════╝██║      ██╔════╝╚══██╔══╝██╔══██╗██╔══██╗╚══██╔══╝
+██║   ██║██║     ██║█████╗███████╗   ██║   ███████║██████╔╝   ██║
+██║   ██║██║     ██║╚════╝╚════██║   ██║   ██╔══██║██╔══██╗   ██║
+╚██████╔╝╚██████╗██║      ███████║   ██║   ██║  ██║██║  ██║   ██║
+ ╚═════╝  ╚═════╝╚═╝      ╚══════╝   ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝
+${AnsiColor.BRIGHT_GREEN}
+ >> Version    : v${oci.version}
+ >> Maintainer : doubleDimple <https://github.com/doubleDimple>
+ >> Source     : https://github.com/doubleDimple/oci-start
+${AnsiColor.BRIGHT_GREEN} -----------------------------------------------------------------------
+ >> Spring Boot   :: ${spring-boot.version}
+ >> Java Version  :: ${java.version}
+${AnsiColor.DEFAULT}
