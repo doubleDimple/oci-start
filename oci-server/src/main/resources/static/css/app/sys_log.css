@@ -1,0 +1,222 @@
+/* ============================================================
+   sys_log.css — dark default + light override
+   Note: terminal card stays black/green (rescue terminal style)
+   ============================================================ */
+
+:root {
+    --bg:             #0f1117;
+    --surface:        #1a1d27;
+    --surface-2:      #1f2233;
+    --card-border:    #2a2d3a;
+    --text-primary:   #e2e8f0;
+    --text-secondary: #8892a4;
+    --accent-blue:    #4a9eff;
+    --accent-green:   #1abc9c;
+    --accent-red:     #ff6b6b;
+    --shadow-color:   rgba(0,0,0,0.4);
+}
+
+[data-theme="light"] {
+    --bg:             #f0f2f5;
+    --surface:        #ffffff;
+    --surface-2:      #f8f9fa;
+    --card-border:    #e0e0e0;
+    --text-primary:   #333333;
+    --text-secondary: #666666;
+    --accent-blue:    #2196f3;
+    --accent-green:   #1abc9c;
+    --accent-red:     #ff6b6b;
+    --shadow-color:   rgba(0,0,0,0.05);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background-color: var(--bg);
+    color: var(--text-primary);
+    line-height: 1.4;
+    font-size: 12px;
+}
+
+/* Layout */
+.layout { display: flex; min-height: 100vh; }
+.main-content { flex: 1; padding: 15px; }
+
+/* Page Header */
+.page-header {
+    margin-bottom: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--surface);
+    padding: 15px;
+    border-radius: 3px;
+    border: 1px solid var(--card-border);
+    box-shadow: 0 2px 8px var(--shadow-color);
+}
+
+.page-title {
+    font-size: 16px;
+    font-weight: normal;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Action Buttons */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 12px;
+    border: none;
+    border-radius: 2px;
+    font-size: 12px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.2s;
+}
+
+.btn-primary { background-color: var(--accent-blue); color: white; }
+.btn-info    { background-color: var(--accent-blue); color: white; }
+
+.btn:hover { opacity: 0.9; transform: translateY(-1px); }
+
+/* ============================================================
+   Terminal Card — always black/green (rescue console style)
+   ============================================================ */
+.terminal-card {
+    background: #000000 !important;
+    border-radius: 3px;
+    overflow: hidden;
+    height: calc(100vh - 160px);
+    display: flex;
+    flex-direction: column;
+    border: 1px solid #0f0 !important;
+    box-shadow: 0 2px 8px rgba(0,255,0,0.15);
+}
+
+.terminal-header {
+    background: #000000 !important;
+    border-bottom: 1px solid #0f0 !important;
+    padding: 10px 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: 'Fira Code', monospace;
+}
+
+.terminal-title {
+    color: #00ff00 !important;
+    font-size: 12px;
+    font-family: 'Fira Code', monospace;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.terminal-content {
+    flex: 1;
+    padding: 15px;
+    font-family: 'Fira Code', monospace;
+    font-size: 13px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    background: #000000 !important;
+    color: #00ff00 !important;
+    position: relative;
+}
+
+.terminal-content::-webkit-scrollbar { width: 6px; }
+.terminal-content::-webkit-scrollbar-track { background: #000; }
+.terminal-content::-webkit-scrollbar-thumb { background: rgba(0,255,0,0.3); border-radius: 3px; }
+
+/* Log entries — all green by default; warn/error override */
+.log-entry {
+    margin: 0;
+    padding: 0;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #00ff00;
+    white-space: pre-wrap;
+    word-break: break-all;
+    overflow-wrap: break-word;
+    transition: color 0.2s ease;
+}
+.log-entry p { margin: 0; padding: 0; }
+
+.log-entry.warn-entry  { color: #ffa500 !important; }
+.log-entry.error-entry { color: #ff4c4c !important; }
+.log-entry.new { animation: fadeIn 0.3s ease-out; }
+
+/* Remove prefix symbols */
+.log-entry::before,
+.log-entry.success-entry::before,
+.log-entry.warn-entry::before,
+.log-entry.error-entry::before { content: none !important; }
+
+.terminal-footer {
+    background: #000000 !important;
+    border-top: 1px solid #0f0 !important;
+    padding: 10px 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: #00ff00 !important;
+    font-size: 12px;
+    font-family: 'Fira Code', monospace;
+}
+
+.log-info  { display: flex; gap: 15px; }
+.log-stat  { display: flex; align-items: center; gap: 6px; color: #00ff00 !important; }
+
+.connection-status { display: flex; align-items: center; gap: 8px; color: #00ff00 !important; }
+.connection-status.disconnected { color: #ff4c4c !important; }
+.connection-status.connected    { color: #00ff00 !important; }
+
+.auto-scroll { display: flex; align-items: center; gap: 5px; }
+.auto-scroll span { color: #00ff00 !important; }
+
+#connection-status,
+#log-count { color: #00ff00 !important; }
+
+/* Terminal cursor */
+.terminal-cursor {
+    display: inline-block;
+    width: 6px;
+    height: 12px;
+    background: #00ff00 !important;
+    margin-left: 4px;
+    animation: blink 1s infinite;
+    vertical-align: middle;
+}
+
+/* Status indicator dot */
+.status-indicator {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: #00ff00;
+    box-shadow: 0 0 5px #00ff00;
+    animation: pulse 2s infinite;
+}
+
+/* Animations */
+@keyframes blink {
+    0%   { opacity: 0; }
+    50%  { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(5px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse {
+    0%   { transform: scale(1); opacity: 1; }
+    50%  { transform: scale(1.2); opacity: 0.7; }
+    100% { transform: scale(1); opacity: 1; }
+}

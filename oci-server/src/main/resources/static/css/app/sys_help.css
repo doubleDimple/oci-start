@@ -1,0 +1,298 @@
+/* ============================================================
+   sys_help.css — dark default + light override
+   Note: terminal card stays black/green (rescue terminal style)
+   ============================================================ */
+
+:root {
+    --bg:             #0f1117;
+    --surface:        #1a1d27;
+    --surface-2:      #1f2233;
+    --card-border:    #2a2d3a;
+    --text-primary:   #e2e8f0;
+    --text-secondary: #8892a4;
+    --accent-blue:    #4a9eff;
+    --accent-green:   #1abc9c;
+    --accent-red:     #ff6b6b;
+    --shadow-color:   rgba(0,0,0,0.4);
+}
+
+[data-theme="light"] {
+    --bg:             #f0f2f5;
+    --surface:        #ffffff;
+    --surface-2:      #f8f9fa;
+    --card-border:    #e0e0e0;
+    --text-primary:   #333333;
+    --text-secondary: #666666;
+    --accent-blue:    #2196f3;
+    --accent-green:   #1abc9c;
+    --accent-red:     #ff6b6b;
+    --shadow-color:   rgba(0,0,0,0.05);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background-color: var(--bg);
+    color: var(--text-primary);
+    line-height: 1.4;
+    font-size: 12px;
+}
+
+/* Layout */
+.layout { display: flex; min-height: 100vh; }
+.main-content { flex: 1; padding: 15px; }
+
+/* Control Panel */
+.control-panel {
+    margin-bottom: 15px;
+    padding: 15px;
+    background: var(--surface);
+    border-radius: 8px;
+    border: 1px solid var(--card-border);
+    box-shadow: 0 2px 8px var(--shadow-color);
+}
+
+.control-panel h2 {
+    font-size: 14px;
+    margin-bottom: 10px;
+    color: var(--text-primary);
+}
+
+.control-panel-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Instance Info Card */
+.instance-info-card {
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+    background: var(--surface-2);
+    border-radius: 8px;
+    padding: 18px;
+    box-shadow: 0 1px 3px var(--shadow-color);
+}
+
+.instance-info-row {
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+    gap: 20px;
+}
+
+.instance-info-item {
+    flex: 1;
+    min-width: 180px;
+    background: var(--surface);
+    border-radius: 6px;
+    padding: 8px 14px;
+    box-shadow: 0 1px 2px var(--shadow-color);
+    transition: all 0.2s ease;
+    border-left: none;
+}
+
+.instance-info-item:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px var(--shadow-color);
+}
+
+.instance-info-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+}
+
+.instance-info-value {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+    word-break: break-word;
+}
+
+/* Action Buttons */
+.action-buttons {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin-left: auto;
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 12px;
+    border: none;
+    border-radius: 2px;
+    font-size: 12px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.2s;
+}
+
+.btn-primary { background-color: var(--accent-blue); color: white; }
+.btn-success { background-color: var(--accent-green); color: white; }
+.btn-danger  { background-color: var(--accent-red);   color: white; }
+.btn-info    { background-color: var(--accent-blue);  color: white; }
+
+.btn:hover    { opacity: 0.9; transform: translateY(-1px); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+/* State badges */
+.state-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    background-color: rgba(26,188,156,0.1);
+    color: var(--accent-green);
+    border-radius: 10px;
+    font-size: 11px;
+}
+
+.state-badge.running      { background-color: rgba(26,188,156,0.1); color: var(--accent-green); }
+.state-badge.stopped      { background-color: rgba(255,107,107,0.1); color: var(--accent-red); }
+.state-badge.provisioning { background-color: rgba(241,196,15,0.1); color: #f1c40f; }
+
+/* ============================================================
+   Terminal Card — always black/green (rescue console style)
+   ============================================================ */
+.terminal-card {
+    background: #000000 !important;
+    border-radius: 3px;
+    overflow: hidden;
+    height: calc(100vh - 200px);
+    display: flex;
+    flex-direction: column;
+    border: 1px solid #0f0 !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+}
+
+.terminal-header,
+.terminal-footer {
+    background: #000000 !important;
+    border-color: #0f0 !important;
+    color: #00ff00 !important;
+}
+
+.terminal-header {
+    padding: 10px 15px;
+    border-bottom: 1px solid #0f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.terminal-title {
+    color: #00ff00 !important;
+    font-size: 12px;
+    font-family: 'Fira Code', monospace;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.terminal-content {
+    flex: 1;
+    padding: 15px;
+    font-family: 'Fira Code', monospace;
+    font-size: 13px;
+    overflow-y: auto;
+    background: #000000 !important;
+    color: #00ff00 !important;
+    position: relative;
+}
+
+.terminal-content::-webkit-scrollbar { width: 6px; }
+.terminal-content::-webkit-scrollbar-track { background: #000; }
+.terminal-content::-webkit-scrollbar-thumb { background: rgba(0,255,0,0.2); border-radius: 3px; }
+
+.terminal-footer {
+    padding: 10px 15px;
+    border-top: 1px solid #0f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    font-family: 'Fira Code', monospace;
+    height: 40px;
+}
+
+/* All terminal text green */
+.terminal-title,
+.terminal-content,
+.connection-status,
+.log-entry,
+.log-info,
+.log-stat,
+.auto-scroll span,
+#connection-status,
+#log-count { color: #00ff00 !important; }
+
+.log-entry {
+    padding: 4px 0 4px 20px;
+    font-size: 13px;
+    line-height: 1.4;
+    position: relative;
+}
+
+.log-entry::before {
+    content: ">";
+    color: #00ff00 !important;
+    opacity: 0.5;
+    position: absolute;
+    left: 0;
+}
+
+.log-entry.success-entry,
+.log-entry.warn-entry,
+.log-entry.error-entry,
+.log-entry.process-entry,
+.log-entry.complete-entry { color: #00ff00 !important; }
+
+.log-entry.success-entry::before { content: "✓"; opacity: 1; }
+.log-entry.warn-entry::before    { content: "⚠"; opacity: 1; }
+.log-entry.error-entry::before   { content: "✗"; opacity: 1; }
+.log-entry.process-entry::before { content: "⏳"; opacity: 1; }
+.log-entry.complete-entry::before{ content: "✓"; opacity: 1; }
+
+.log-entry.new { animation: fadeIn 0.3s ease-out; }
+
+.log-info  { display: flex; gap: 15px; }
+.log-stat  { display: flex; align-items: center; gap: 6px; }
+
+.connection-status { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+
+.terminal-cursor {
+    display: inline-block;
+    width: 6px;
+    height: 12px;
+    background: #00ff00 !important;
+    margin-left: 4px;
+    animation: blink 1s infinite;
+    vertical-align: middle;
+}
+
+.auto-scroll {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+}
+
+/* Animations */
+@keyframes blink {
+    0%   { opacity: 0; }
+    50%  { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+}

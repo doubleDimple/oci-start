@@ -1,0 +1,221 @@
+:root {
+    --top-nav-bg: #1f1f1f;
+    --sidebar-bg: #1e2124;
+    --sidebar-hover: #292d30;
+    --sidebar-active: #1abc9c;
+    --sidebar-text: #a9b7c6;
+    --sidebar-active-text: #ffffff;
+    --submenu-bg: #292d30;
+    --border-color: #383c40;
+}
+
+/* 亮色模式：导航栏保持深色，只改侧边栏 */
+[data-theme="light"] {
+    --sidebar-bg:          #f0f4f8;
+    --sidebar-hover:       #e2e8f0;
+    --sidebar-text:        #475569;
+    --sidebar-active-text: #1e293b;
+    --submenu-bg:          #e8edf3;
+    --border-color:        #cbd5e1;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
+
+/* Top Navigation */
+.top-nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 45px;
+    background-color: var(--top-nav-bg);
+    color: var(--sidebar-active-text);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 20px;
+    z-index: 1000;
+}
+
+.brand {
+    color: var(--sidebar-active);
+    font-size: 14px;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.top-nav-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    font-size: 12px;
+}
+
+.top-nav-right a {
+    color: var(--sidebar-active-text);
+    text-decoration: none;
+}
+
+/* Sidebar */
+.sidebar {
+    width: 200px;
+    background: var(--sidebar-bg);
+    position: fixed;
+    height: calc(100vh - 45px);
+    top: 45px; /* 添加这行，确保从顶部导航栏底部开始 */
+    color: var(--sidebar-text);
+    /* 移除 padding-top: 0; 因为不需要 */
+    font-size: 13px;
+    border-right: 1px solid var(--border-color);
+}
+
+.nav-parent {
+    border-bottom: 1px solid var(--border-color);
+}
+
+.nav-parent > .nav-link {
+    padding: 12px 20px;
+    color: var(--sidebar-text);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: all 0.3s;
+    cursor: pointer;
+    font-weight: 500;
+    text-decoration: none;
+    user-select: none;
+}
+
+.nav-parent > .nav-link span {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.nav-parent > .nav-link:hover {
+    color: var(--sidebar-active-text);
+    background: var(--sidebar-hover);
+}
+
+.nav-parent.expanded > .nav-link {
+    color: var(--sidebar-active-text);
+    background: var(--sidebar-hover);
+}
+
+.nav-parent > .nav-link i.arrow {
+    transition: transform 0.3s;
+    font-size: 12px;
+    opacity: 0.7;
+}
+
+.nav-parent.expanded > .nav-link i.arrow {
+    transform: rotate(180deg);
+    opacity: 1;
+}
+
+.nav-children {
+    display: none;
+    background: var(--submenu-bg);
+    overflow: hidden;
+}
+
+.nav-parent.expanded .nav-children {
+    display: block;
+}
+
+.nav-children .nav-link {
+    padding: 10px 20px 10px 40px;
+    color: var(--sidebar-text);
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+    transition: all 0.3s;
+}
+
+.nav-children .nav-link:hover {
+    color: var(--sidebar-active-text);
+    background: var(--sidebar-hover);
+    padding-left: 45px;
+}
+
+.nav-children .nav-link.active {
+    color: var(--sidebar-active-text);
+    background: var(--sidebar-active);
+    padding-left: 45px;
+}
+
+.nav-link i:not(.arrow) {
+    width: 16px;
+    margin-right: 8px;
+    text-align: center;
+}
+
+/* Layout */
+.layout {
+    display: flex;
+    min-height: 100vh;
+    padding-top: 45px;
+}
+
+/* Main Content */
+.main-content {
+    flex: 1;
+    margin-left: 200px;
+    padding: 15px;
+}
+
+/* 相应的CSS */
+/*.header-about-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 12px;
+    border: none;
+    border-radius: 2px;
+    font-size: 12px;
+    cursor: pointer;
+    background-color: var(--sidebar-active);
+    color: white;
+}*/
+
+/* 顶部导航按钮的基础样式 */
+/* 顶部导航按钮的基础样式 */
+.header-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 12px;
+    border: none;
+    border-radius: 2px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+/* 关于按钮样式 */
+.header-about-btn {
+    background-color: #26c998; /* 使用亮绿色 */
+    color: white;
+}
+
+.header-about-btn:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+/* 退出按钮样式 */
+/* 方案4: 使用橙色系 */
+.header-logout-btn {
+    background-color: #ff9800; /* 温暖的橙色 */
+    color: white;
+}
+
+.header-logout-btn:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
