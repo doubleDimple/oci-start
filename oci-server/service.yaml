@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: oci-start
+  namespace: default
+spec:
+  type: NodePort
+  selector:
+    app: oci-start
+  ports:
+    - name: http
+      port: 9856        # K8s 集群内部访问端口
+      targetPort: 9856  # 对应容器内部端口 (SERVER_PORT)
+      nodePort: 30856   # 浏览器访问端口: http://节点IP:30856
