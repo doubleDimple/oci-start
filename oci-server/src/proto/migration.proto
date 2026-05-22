@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+option java_package = "com.google.authenticator.proto";
+option java_outer_classname = "MigrationProtos";
+
+message MigrationPayload {
+  int32 version = 1;
+  repeated OtpParameters otp_parameters = 2;
+  int32 batch_size = 3;
+  int32 batch_index = 4;
+  int32 batch_id = 5;
+}
+
+message OtpParameters {
+  bytes secret = 1;
+  bytes name = 2;
+  bytes issuer = 3;
+  Algorithm algorithm = 4;
+  int32 digits = 5;
+  OtpType type = 6;
+  int64 counter = 7;
+
+  enum Algorithm {
+    ALGORITHM_UNSPECIFIED = 0;
+    SHA1 = 1;
+    SHA256 = 2;
+    SHA512 = 3;
+    MD5 = 4;
+  }
+
+  enum OtpType {
+    OTP_TYPE_UNSPECIFIED = 0;
+    HOTP = 1;
+    TOTP = 2;
+  }
+}

@@ -1,0 +1,249 @@
+/* ============================================================
+   metrics_page2.css — Dark / Light Theme
+   ============================================================ */
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+/* ── Dark defaults ── */
+:root {
+    --bg:             #0f1117;
+    --surface:        #1a1d27;
+    --surface-2:      #1f2233;
+    --card-border:    #2a2d3a;
+    --text-primary:   #e2e8f0;
+    --text-secondary: #8892a4;
+    --accent-blue:    #4d9eff;
+    --accent-green:   #34d399;
+    --accent-red:     #f87171;
+    --accent-yellow:  #fbbf24;
+    --hover-bg:       rgba(255,255,255,0.04);
+    --shadow-color:   rgba(0,0,0,0.4);
+    --progress-track: rgba(255,255,255,0.08);
+}
+
+/* ── Light overrides ── */
+[data-theme="light"] {
+    --bg:             #f4f5f7;
+    --surface:        #ffffff;
+    --surface-2:      #f5f5f5;
+    --card-border:    #e0e0e0;
+    --text-primary:   #333333;
+    --text-secondary: #666666;
+    --accent-blue:    #2196f3;
+    --accent-green:   #1abc9c;
+    --accent-red:     #ff6b6b;
+    --accent-yellow:  #ff9800;
+    --hover-bg:       #f5f5f5;
+    --shadow-color:   rgba(0,0,0,0.1);
+    --progress-track: #f0f0f0;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background-color: var(--bg);
+    color: var(--text-primary);
+    line-height: 1.4;
+    font-size: 12px;
+}
+
+/* ── Layout ── */
+.layout      { display: flex; min-height: 100vh; }
+.main-content { flex: 1; margin-left: 0; padding: 15px; background-color: var(--bg); }
+
+/* ── Page Header ── */
+.page-header {
+    margin-bottom: 15px;
+    display: flex; justify-content: space-between; align-items: center;
+}
+.page-title {
+    font-size: 16px; font-weight: normal;
+    color: var(--text-primary);
+    display: flex; align-items: center; gap: 8px;
+}
+.page-title i { color: var(--accent-green); }
+
+/* ── View Actions ── */
+.view-actions { display: flex; gap: 15px; align-items: center; }
+
+.view-toggle {
+    display: flex; gap: 4px;
+    background: var(--surface-2);
+    padding: 4px; border-radius: 4px;
+    border: 1px solid var(--card-border);
+}
+.view-toggle .btn {
+    background: none; border: none;
+    padding: 4px 8px;
+    color: var(--text-secondary);
+    cursor: pointer; border-radius: 3px;
+    transition: background 0.15s, color 0.15s;
+}
+.view-toggle .btn.active {
+    background: var(--surface);
+    color: var(--accent-green);
+}
+
+/* ── Buttons ── */
+.btn {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 6px 12px;
+    border: none; border-radius: 4px;
+    font-size: 12px; cursor: pointer;
+    text-decoration: none;
+    transition: opacity 0.2s, transform 0.15s;
+}
+.btn:hover      { opacity: 0.88; transform: translateY(-1px); }
+.btn:disabled   { opacity: 0.5; cursor: not-allowed; transform: none; }
+.btn-info       { background: var(--accent-blue);  color: #fff; }
+.btn-danger     { background: var(--accent-red);   color: #fff; }
+
+/* ── Refresh Button ── */
+.refresh-btn {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 6px 12px;
+    background: var(--accent-green);
+    color: #fff;
+    border: none; border-radius: 4px;
+    cursor: pointer; font-size: 12px;
+    transition: opacity 0.2s;
+}
+.refresh-btn:hover { opacity: 0.88; }
+.refresh-btn i.spinning { animation: spin 1s linear infinite; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Table View ── */
+.table-view {
+    background: var(--surface);
+    border-radius: 6px;
+    border: 1px solid var(--card-border);
+    margin-bottom: 15px;
+    overflow-x: auto;
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 800px;
+}
+.table th {
+    background: var(--surface-2);
+    font-weight: normal;
+    text-align: left;
+    padding: 10px 15px;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--card-border);
+}
+.table td {
+    padding: 10px 15px;
+    border-bottom: 1px solid var(--card-border);
+    color: var(--text-primary);
+}
+.table tr:last-child td { border-bottom: none; }
+.table tr:hover { background: var(--hover-bg); }
+.table td .btn { padding: 4px 8px; }
+
+/* ── Grid View ── */
+.grid-view {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 10px;
+}
+
+/* ── Metric Card ── */
+.metric-card {
+    background: var(--surface);
+    border: 1px solid var(--card-border);
+    border-radius: 6px;
+    overflow: hidden;
+    max-width: 240px;
+    margin: 0 auto;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+.metric-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px var(--shadow-color);
+}
+
+.card-header {
+    padding: 12px 15px;
+    background: var(--surface-2);
+    display: flex; align-items: center; gap: 12px;
+    border-bottom: 1px solid var(--card-border);
+}
+
+.instance-icon {
+    width: 36px; height: 36px;
+    background: var(--accent-green);
+    border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff;
+    flex-shrink: 0;
+    font-size: 14px;
+}
+
+.instance-info { flex: 1; min-width: 0; }
+.instance-name { font-size: 13px; font-weight: 500; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.instance-ip   { color: var(--text-secondary); font-size: 11px; }
+
+/* ── Status Tag ── */
+.status-tag {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px;
+    border-radius: 3px; font-size: 11px;
+    flex-shrink: 0;
+}
+.status-tag.online  { background: rgba(52,211,153,0.12); color: var(--accent-green); }
+.status-tag.offline { background: rgba(248,113,113,0.12); color: var(--accent-red); }
+
+/* ── Metric Content ── */
+.metric-content { padding: 10px; }
+
+.metric-item { margin-bottom: 10px; }
+
+.metric-header {
+    display: flex; justify-content: space-between;
+    margin-bottom: 4px; font-size: 12px;
+}
+.metric-name  { color: var(--text-secondary); flex: 1; }
+.metric-value { color: var(--text-primary); width: 60px; text-align: right; font-family: monospace; }
+
+/* ── Progress Bar ── */
+.progress-bar {
+    height: 5px;
+    background: var(--progress-track);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 6px;
+}
+.progress-fill {
+    height: 100%;
+    background: var(--accent-blue);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+.progress-fill.warning { background: var(--accent-yellow); }
+.progress-fill.danger  { background: var(--accent-red); }
+
+/* ── Card Actions ── */
+.card-actions {
+    padding-top: 10px; margin-top: 10px;
+    border-top: 1px solid var(--card-border);
+    display: flex; justify-content: flex-end;
+}
+
+/* ── Last Update ── */
+.last-update {
+    color: var(--text-secondary);
+    font-size: 11px;
+    text-align: right;
+    margin-top: 8px;
+}
+
+/* ── Utilities ── */
+.truncate { max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+@keyframes fadeOut {
+    from { opacity: 1; transform: translateY(0); }
+    to   { opacity: 0; transform: translateY(-10px); }
+}

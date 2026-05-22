@@ -1,0 +1,417 @@
+/* ===== Theme variables ===== */
+:root {
+    --main-bg:      #1a1d21;
+    --surface:      #22262b;
+    --surface-2:    #292d32;
+    --text-primary: #cdd9e5;
+    --text-secondary:#768390;
+    --accent-blue:  #4d9eff;
+    --accent-green: #3fb950;
+    --accent-red:   #ff6b6b;
+    --accent-orange:#f78166;
+    --hover-bg:     #2d3138;
+    --card-border:  #31363d;
+    --shadow-color: rgba(0,0,0,0.4);
+}
+[data-theme="light"] {
+    --main-bg:      #f0f4f8;
+    --surface:      #ffffff;
+    --surface-2:    #f8fafc;
+    --text-primary: #1a202c;
+    --text-secondary:#64748b;
+    --accent-blue:  #2563eb;
+    --accent-green: #16a34a;
+    --accent-red:   #dc2626;
+    --accent-orange:#ea580c;
+    --hover-bg:     #f1f5f9;
+    --card-border:  #dde3ec;
+    --shadow-color: rgba(0,0,0,0.08);
+}
+
+html { background: var(--main-bg); }
+body { background-color: var(--main-bg); color: var(--text-primary); margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+
+/* ===== Layout ===== */
+.layout { padding-top: 0; }
+.main-content { margin-left: 0; padding: 20px 24px; background: var(--main-bg); }
+
+/* ===== Page card ===== */
+.page-card {
+    background: var(--surface);
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    box-shadow: 0 4px 24px var(--shadow-color);
+    padding: 24px;
+}
+
+/* ===== Page header ===== */
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+.page-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+}
+.page-title i { color: var(--accent-green); }
+
+/* ===== Buttons ===== */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.15s;
+    text-decoration: none;
+    white-space: nowrap;
+}
+.btn:hover { opacity: 0.88; transform: translateY(-1px); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; }
+.btn-primary   { background: var(--accent-blue);   color: #fff; }
+.btn-success   { background: var(--accent-green);  color: #fff; }
+.btn-danger    { background: var(--accent-red);    color: #fff; }
+.btn-warning   { background: var(--accent-orange); color: #fff; }
+.btn-secondary { background: var(--hover-bg); color: var(--text-primary); border: 1px solid var(--card-border); }
+.btn-group { display: flex; gap: 8px; flex-wrap: wrap; }
+.view-actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+
+/* ===== Tabs ===== */
+.nginx-tabs {
+    display: flex;
+    background: var(--main-bg);
+    border-radius: 8px;
+    padding: 4px;
+    margin-bottom: 20px;
+    gap: 4px;
+    border: 1px solid var(--card-border);
+}
+.nginx-tab-btn {
+    flex: 1;
+    padding: 10px 16px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-weight: 500;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 13px;
+}
+.nginx-tab-btn:hover:not(.active) {
+    background: var(--hover-bg);
+    color: var(--text-primary);
+}
+.nginx-tab-btn.active {
+    background: var(--accent-green);
+    color: #fff;
+    box-shadow: 0 2px 8px var(--shadow-color);
+}
+
+/* ===== Tab content ===== */
+.nginx-tab-content { display: none; }
+.nginx-tab-content.active { display: block; }
+
+/* ===== OpenResty status bar ===== */
+.openresty-status-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+.openresty-status-bar.error   { background: color-mix(in srgb, var(--accent-red) 12%, var(--surface)); border: 1px solid var(--accent-red); color: var(--accent-red); }
+.openresty-status-bar.warning { background: color-mix(in srgb, var(--accent-orange) 12%, var(--surface)); border: 1px solid var(--accent-orange); color: var(--accent-orange); }
+.openresty-status-bar.success { background: color-mix(in srgb, var(--accent-green) 12%, var(--surface)); border: 1px solid var(--accent-green); color: var(--accent-green); }
+
+/* ===== Action bar ===== */
+.tab-actions {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+/* ===== Table ===== */
+.nginx-table {
+    width: 100%;
+    border-collapse: collapse;
+    border-radius: 8px;
+    overflow: hidden;
+    font-size: 13px;
+}
+.nginx-table th {
+    background: var(--main-bg);
+    padding: 12px 16px;
+    text-align: left;
+    font-weight: 600;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--card-border);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.nginx-table td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--card-border);
+    color: var(--text-primary);
+    vertical-align: middle;
+}
+.nginx-table tr:last-child td { border-bottom: none; }
+.nginx-table tr:hover td { background-color: var(--hover-bg); }
+
+/* ===== Status badges ===== */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+}
+.status-badge.active   { background: color-mix(in srgb, var(--accent-green) 15%, transparent); color: var(--accent-green); }
+.status-badge.pending  { background: color-mix(in srgb, var(--accent-orange) 15%, transparent); color: var(--accent-orange); }
+.status-badge.inactive { background: color-mix(in srgb, var(--accent-red) 15%, transparent); color: var(--accent-red); }
+.status-badge.warning  { background: color-mix(in srgb, var(--accent-orange) 15%, transparent); color: var(--accent-orange); }
+.status-badge.info     { background: color-mix(in srgb, var(--accent-blue) 15%, transparent); color: var(--accent-blue); }
+
+/* ===== Config status bar (Nginx tab) ===== */
+.config-status-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+.config-status-bar.pending { background: color-mix(in srgb, var(--accent-orange) 12%, var(--surface)); border: 1px solid var(--accent-orange); color: var(--accent-orange); }
+.config-status-bar.success { background: color-mix(in srgb, var(--accent-green) 12%, var(--surface)); border: 1px solid var(--accent-green); color: var(--accent-green); }
+.config-status-bar.error   { background: color-mix(in srgb, var(--accent-red) 12%, var(--surface)); border: 1px solid var(--accent-red); color: var(--accent-red); }
+
+/* ===== Form elements ===== */
+.form-group { margin-bottom: 16px; }
+.form-label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 500;
+    color: var(--text-primary);
+    font-size: 13px;
+}
+.form-label .required { color: var(--accent-red); }
+.form-input, .form-select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--card-border);
+    border-radius: 6px;
+    font-size: 13px;
+    background: var(--surface-2);
+    color: var(--text-primary);
+    transition: border-color 0.2s, box-shadow 0.2s;
+    box-sizing: border-box;
+}
+.form-input:focus, .form-select:focus {
+    outline: none;
+    border-color: var(--accent-green);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-green) 20%, transparent);
+}
+.form-input::placeholder { color: var(--text-secondary); }
+.form-hint { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
+
+/* ===== Config diff viewer ===== */
+.diff-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    height: 500px;
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    overflow: hidden;
+}
+.diff-panel {
+    position: relative;
+    border-right: 1px solid var(--card-border);
+    overflow-y: auto;
+    padding-top: 40px;
+}
+.diff-panel:last-child { border-right: none; }
+.diff-panel-header {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    background: var(--main-bg);
+    border-bottom: 1px solid var(--card-border);
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 5;
+}
+.diff-content {
+    padding: 16px;
+    font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-all;
+    color: var(--text-primary);
+    min-height: 100%;
+    background: var(--surface-2);
+}
+.diff-panel:first-child .diff-content { background: var(--surface); }
+.copy-btn {
+    padding: 4px 10px;
+    background: var(--accent-green);
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    transition: opacity 0.2s;
+}
+.copy-btn:hover { opacity: 0.85; }
+.copy-btn.copied { background: var(--text-secondary); }
+
+/* Scrollbar for diff panels */
+.diff-panel::-webkit-scrollbar { width: 6px; }
+.diff-panel::-webkit-scrollbar-track { background: var(--main-bg); }
+.diff-panel::-webkit-scrollbar-thumb { background: var(--card-border); border-radius: 3px; }
+.diff-panel::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
+
+/* ===== Empty state ===== */
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-secondary);
+}
+.empty-state i { font-size: 48px; margin-bottom: 16px; opacity: 0.3; display: block; }
+.empty-state h3 { margin: 0 0 8px; color: var(--text-primary); font-size: 16px; }
+.empty-state p { margin: 0; font-size: 13px; }
+
+/* ===== Toggle switch ===== */
+.toggle-switch { position: relative; display: inline-block; width: 36px; height: 20px; }
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-slider {
+    position: absolute; cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: var(--card-border);
+    border-radius: 20px;
+    transition: 0.3s;
+}
+.toggle-slider:before {
+    position: absolute; content: "";
+    height: 14px; width: 14px; left: 3px; bottom: 3px;
+    background: white; border-radius: 50%;
+    transition: 0.3s;
+}
+.toggle-switch input:checked + .toggle-slider { background: var(--accent-green); }
+.toggle-switch input:checked + .toggle-slider:before { transform: translateX(16px); }
+
+/* ===== Auto-renew toggle label ===== */
+.auto-renew-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    color: var(--text-primary);
+}
+
+/* ===== Domain text ===== */
+.domain-text {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-family: 'Monaco', monospace;
+    font-size: 13px;
+}
+
+/* ===== Info box ===== */
+.info-box {
+    background: color-mix(in srgb, var(--accent-blue) 10%, var(--surface));
+    border: 1px solid color-mix(in srgb, var(--accent-blue) 30%, transparent);
+    border-radius: 6px;
+    padding: 10px 14px;
+    font-size: 12px;
+    color: var(--accent-blue);
+    margin-top: 8px;
+}
+.info-box i { margin-right: 6px; }
+
+/* ===== Swal overrides ===== */
+.swal-wide-popup { font-size: 14px !important; }
+.swal-wide-popup .swal2-html-container { max-height: 70vh; overflow-y: auto; }
+
+/* ===== Responsive ===== */
+@media (max-width: 768px) {
+    .nginx-tabs { flex-direction: column; }
+    .tab-actions { flex-direction: column; }
+    .nginx-table { font-size: 12px; }
+    .nginx-table th, .nginx-table td { padding: 8px; }
+    .diff-container { grid-template-columns: 1fr; height: auto; }
+    .diff-panel { height: 300px; }
+    .main-content { padding: 12px; }
+}
+
+/* ===== OpenResty 安装指南弹框样式(走主题变量) ===== */
+.install-guide { text-align: left; color: var(--text-primary); font-size: 13px; }
+.install-guide .ig-step {
+    margin: 14px 0; padding: 12px 14px;
+    border-left: 3px solid var(--accent-green);
+    background: var(--surface-2); border-radius: 0 6px 6px 0;
+}
+.install-guide .ig-step h4 {
+    margin: 0 0 8px 0; font-size: 14px; font-weight: 600;
+    color: var(--text-primary);
+}
+.install-guide .ig-step p {
+    margin: 0 0 6px 0; color: var(--text-secondary); font-size: 12px;
+}
+.install-guide .ig-cmd {
+    display: block; margin: 6px 0; padding: 10px 12px;
+    background: var(--main-bg); color: var(--text-primary);
+    border: 1px solid var(--card-border); border-radius: 4px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px; white-space: pre-wrap; word-break: break-all;
+}
+.install-guide .ig-notes {
+    margin-top: 18px; padding: 12px 14px;
+    background: rgba(245, 158, 11, 0.08);
+    border: 1px solid rgba(245, 158, 11, 0.4);
+    border-radius: 6px;
+}
+.install-guide .ig-notes-title {
+    font-weight: 600; color: var(--accent-orange); margin-bottom: 6px;
+    display: flex; align-items: center; gap: 6px;
+}
+.install-guide .ig-notes ul {
+    margin: 0; padding-left: 20px; color: var(--text-secondary);
+}
+.install-guide .ig-notes li { margin: 3px 0; line-height: 1.6; }

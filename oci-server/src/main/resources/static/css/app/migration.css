@@ -1,0 +1,461 @@
+/* ============================================================
+   migration.css — Dark / Light Theme
+   ============================================================ */
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+/* ── Dark defaults ── */
+:root {
+    --bg:            #0f1117;
+    --surface:       #1a1d27;
+    --surface-2:     #1f2233;
+    --card-border:   #2a2d3a;
+    --text-primary:  #e2e8f0;
+    --text-secondary:#8892a4;
+    --accent-blue:   #4d9eff;
+    --accent-green:  #34d399;
+    --accent-red:    #f87171;
+    --hover-bg:      rgba(255,255,255,0.04);
+    --shadow-color:  rgba(0,0,0,0.4);
+    --input-bg:      #161820;
+    --input-border:  #2a2d3a;
+    --focus-ring:    rgba(77,158,255,0.20);
+    --file-bg:       rgba(77,158,255,0.06);
+    --file-hover-bg: rgba(77,158,255,0.12);
+    --cloud-bg:      rgba(77,158,255,0.08);
+    --drag-overlay-bg: rgba(15,17,23,0.85);
+}
+
+/* ── Light overrides ── */
+[data-theme="light"] {
+    --bg:            #f3f6fa;
+    --surface:       #ffffff;
+    --surface-2:     #f8f9fa;
+    --card-border:   #e2e8f0;
+    --text-primary:  #222222;
+    --text-secondary:#555555;
+    --accent-blue:   #2196f3;
+    --accent-green:  #1abc9c;
+    --accent-red:    #ff6b6b;
+    --hover-bg:      #f5f5f5;
+    --shadow-color:  rgba(0,0,0,0.06);
+    --input-bg:      #ffffff;
+    --input-border:  #d5d9df;
+    --focus-ring:    rgba(33,150,243,0.15);
+    --file-bg:       #f8fbff;
+    --file-hover-bg: #eef6ff;
+    --cloud-bg:      #f1f8ff;
+    --drag-overlay-bg: rgba(255,255,255,0.85);
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text-primary);
+    line-height: 1.4;
+    font-size: 13px;
+}
+
+/* ── Layout ── */
+.layout       { display: flex; min-height: 100vh; }
+.main-content { flex: 1; margin-left: 0; padding: 20px 24px; background: var(--bg); }
+
+/* ── Page Card ── */
+.page-card {
+    background: var(--surface);
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    box-shadow: 0 4px 20px var(--shadow-color);
+    padding: 24px 28px;
+}
+
+/* ── Page Header ── */
+.page-header {
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--card-border);
+}
+
+.page-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0 0 6px;
+    letter-spacing: -.3px;
+}
+
+.page-title i { color: var(--accent-blue); }
+
+.page-description {
+    color: var(--text-secondary);
+    font-size: 13px;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* ── Migration Grid ── */
+.migration-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: 16px;
+}
+
+/* ── Migration Card ── */
+.migration-card {
+    background: var(--surface-2);
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    box-shadow: 0 1px 4px var(--shadow-color);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.migration-card-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--card-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.export-header { background: rgba(77,158,255,.06); }
+.import-header { background: rgba(52,211,153,.06); }
+
+[data-theme="light"] .export-header { background: rgba(33,150,243,.05); }
+[data-theme="light"] .import-header { background: rgba(26,188,156,.05); }
+
+.migration-card-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+}
+
+.export-header .migration-card-title i { color: var(--accent-blue); }
+.import-header .migration-card-title i { color: var(--accent-green); }
+
+.migration-card-badge {
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.badge-export { background: rgba(77,158,255,.15);  color: var(--accent-blue); }
+.badge-import { background: rgba(52,211,153,.15);  color: var(--accent-green); }
+
+.migration-card-body {
+    padding: 18px;
+    flex: 1;
+}
+
+.migration-card-footer {
+    padding: 12px 18px;
+    border-top: 1px solid var(--card-border);
+    background: var(--hover-bg);
+    display: flex;
+    justify-content: flex-end;
+}
+
+/* ── Info Box ── */
+.migration-info-box {
+    display: flex;
+    gap: 10px;
+    padding: 12px 14px;
+    background: var(--file-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 6px;
+    margin-bottom: 16px;
+    align-items: flex-start;
+}
+
+.migration-info-icon {
+    color: var(--accent-blue);
+    font-size: 15px;
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+.migration-info-text {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    margin: 0;
+}
+
+/* ── Steps ── */
+.migration-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.migration-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.step-num {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    background: var(--accent-blue);
+    color: #fff;
+    border-radius: 50%;
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 1px;
+}
+
+.step-text {
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+/* ── Import Mode ── */
+.import-mode-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.import-mode-option {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+}
+
+.import-mode-label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 13px;
+    color: var(--text-primary);
+}
+
+.import-mode-label i { color: var(--accent-blue); font-size: 12px; }
+
+/* ── File Upload ── */
+.file-input-label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 24px 12px;
+    border: 2px dashed var(--accent-blue);
+    border-radius: 8px;
+    cursor: pointer;
+    background: var(--file-bg);
+    transition: background .2s, border-color .2s;
+    text-align: center;
+}
+
+.file-input-label:hover       { background: var(--file-hover-bg); }
+.file-input-label.drag-active { background: var(--file-hover-bg); border-color: var(--accent-blue); }
+
+.file-upload-icon {
+    font-size: 28px;
+    color: var(--accent-blue);
+    opacity: .75;
+}
+
+.file-upload-text {
+    font-size: 13px;
+    color: var(--accent-blue);
+    font-weight: 500;
+}
+
+.file-upload-hint {
+    font-size: 11px;
+    color: var(--text-secondary);
+    background: var(--hover-bg);
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--card-border);
+}
+
+/* ── Master Key ── */
+.master-key-wrapper {
+    position: relative;
+}
+
+.master-key-prefix-icon {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-secondary);
+    font-size: 12px;
+    pointer-events: none;
+}
+
+.form-control-prefixed { padding-left: 30px; }
+
+/* ── Buttons ── */
+.btn-export {
+    background: var(--accent-blue);
+    color: #fff;
+    padding: 8px 20px;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: filter .2s, transform .15s;
+}
+
+.btn-import {
+    background: var(--accent-green);
+    color: #fff;
+    padding: 8px 20px;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: filter .2s, transform .15s;
+}
+
+.btn-export:hover, .btn-import:hover {
+    filter: brightness(1.1);
+    transform: translateY(-1px);
+}
+
+/* ── Legacy form-card (kept for backward compat) ── */
+.form-card {
+    background: var(--surface);
+    border-radius: 8px; padding: 24px;
+    border: 1px solid var(--card-border);
+    box-shadow: 0 4px 14px var(--shadow-color);
+    margin-bottom: 15px;
+}
+
+.form-title {
+    font-size: 15px; font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 18px;
+    border-bottom: 1px solid var(--card-border);
+    padding-bottom: 8px;
+}
+
+/* ── Form Elements ── */
+.form-group { margin-bottom: 15px; }
+
+.form-label {
+    display: flex; align-items: center; gap: 5px;
+    margin-bottom: 8px;
+    font-size: 12px; font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.form-label i { font-size: 11px; }
+
+.form-control {
+    width: 100%; height: 36px;
+    padding: 0 12px; font-size: 13px;
+    background: var(--input-bg); color: var(--text-primary);
+    border: 1px solid var(--input-border); border-radius: 6px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+.form-control:hover  { border-color: var(--accent-blue); }
+.form-control:focus  { outline: none; border-color: var(--accent-blue); box-shadow: 0 0 0 3px var(--focus-ring); }
+.form-control.error  { border-color: var(--accent-red); background: rgba(248,113,113,0.08); }
+
+.config-textarea {
+    width: 100%; min-height: 140px;
+    padding: 8px 12px; font-family: monospace; font-size: 12px;
+    background: var(--input-bg); color: var(--text-primary);
+    border: 1px solid var(--input-border); border-radius: 6px;
+    resize: vertical; transition: border-color 0.2s, box-shadow 0.2s;
+}
+.config-textarea:hover  { border-color: var(--accent-blue); }
+.config-textarea:focus  { outline: none; border-color: var(--accent-blue); box-shadow: 0 0 0 3px var(--focus-ring); }
+.config-textarea.drag-over { border-color: var(--accent-blue); background: rgba(77,158,255,0.06); }
+
+/* ── Alert ── */
+.alert {
+    padding: 10px; border-radius: 6px;
+    margin-bottom: 15px; font-size: 12px;
+    display: none; align-items: center; gap: 8px;
+}
+.alert-error   { background: rgba(231,76,60,0.10);  border: 1px solid rgba(231,76,60,0.25);  color: var(--accent-red); }
+.alert-success { background: rgba(46,204,113,0.10); border: 1px solid rgba(46,204,113,0.25); color: var(--accent-green); }
+
+/* ── File Input ── */
+.file-input-wrapper { position: relative; }
+
+input[type="file"] { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; z-index: 1; }
+
+/* ── Cloud Provider Indicator ── */
+.cloud-provider-indicator {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 20px; padding: 12px 14px;
+    background: var(--cloud-bg);
+    border-radius: 6px; border-left: 4px solid var(--accent-blue);
+}
+.cloud-provider-indicator img {
+    width: 26px; height: 26px;
+    border-radius: 4px; object-fit: contain;
+    background: var(--surface); border: 1px solid var(--card-border); padding: 2px;
+}
+
+/* ── Drag Overlay ── */
+.config-textarea-wrapper { position: relative; }
+.drag-overlay {
+    display: none; position: absolute; inset: 0;
+    background: var(--drag-overlay-bg);
+    border: 2px dashed var(--accent-blue);
+    border-radius: 8px;
+    justify-content: center; align-items: center;
+    font-size: 14px; font-weight: 600;
+    color: var(--accent-blue); pointer-events: none;
+}
+.drag-overlay i          { margin-right: 8px; }
+.drag-active .drag-overlay { display: flex; }
+
+/* ── Select ── */
+select.form-control {
+    appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg fill='%238892a4' width='16' height='16' viewBox='0 0 24 24'><path d='M7 10l5 5 5-5z'/></svg>");
+    background-repeat: no-repeat; background-position: right 10px center;
+    background-size: 12px; padding-right: 30px;
+    background-color: var(--input-bg);
+}
+
+/* ── Misc ── */
+.export-desc { font-size: 13px; color: var(--text-secondary); margin-bottom: 15px; }
+
+/* ── SweetAlert2 dark theme ── */
+:root .swal2-popup {
+    background: var(--surface); color: var(--text-primary);
+    border: 1px solid var(--card-border);
+}
+:root .swal2-title,
+:root .swal2-html-container { color: var(--text-primary); }
+:root .swal2-confirm { background: var(--accent-blue)  !important; }
+:root .swal2-cancel  { background: var(--accent-red)   !important; }

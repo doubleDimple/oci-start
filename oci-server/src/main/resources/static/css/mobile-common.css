@@ -1,0 +1,998 @@
+/* ===== 增强版移动端通用样式 ===== */
+
+/* CSS变量定义 - 保持统一配色 */
+:root {
+    --cloud-color: #667eea;
+    --cloud-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    /* 云厂商logo颜色仅用于图标显示 */
+    --oracle-icon-color: #f80000;
+    --google-icon-color: #4285f4;
+    --azure-icon-color: #0078d4;
+    --aws-icon-color: #ff9900;
+}
+
+/* ===== 顶部导航栏样式 ===== */
+.enhanced-top-nav {
+    background: var(--cloud-gradient);
+    color: white;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    transition: all 0.3s ease;
+}
+
+.enhanced-top-nav-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 15px;
+    padding-top: calc(10px + env(safe-area-inset-top));
+    min-height: 64px;
+}
+
+.enhanced-nav-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+}
+
+.enhanced-nav-center {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+}
+
+.enhanced-nav-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    justify-content: flex-end;
+}
+
+/* 返回按钮 */
+.enhanced-back-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    border: none;
+    background: rgba(255,255,255,0.2);
+    color: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.enhanced-back-btn:active {
+    background: rgba(255,255,255,0.3);
+    transform: scale(0.95);
+}
+
+/* 云厂商切换器 */
+.enhanced-cloud-switcher {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: 8px;
+}
+
+.enhanced-cloud-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    border: 2px solid rgba(255,255,255,0.3);
+    background: rgba(255,255,255,0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.enhanced-cloud-btn.active {
+    border-color: rgba(255,255,255,0.8);
+    background: rgba(255,255,255,0.25);
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.enhanced-cloud-btn:not(.active):hover {
+    background: rgba(255,255,255,0.15);
+    transform: scale(1.05);
+}
+
+.enhanced-cloud-logo {
+    width: 24px;
+    height: 24px;
+    background: white;
+    border-radius: 4px;
+    padding: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.enhanced-cloud-logo i {
+    font-size: 14px;
+}
+
+/* Oracle图标颜色 */
+.enhanced-cloud-btn[data-type="1"] .enhanced-cloud-logo i {
+    color: var(--oracle-icon-color);
+}
+
+/* Google图标颜色 */
+.enhanced-cloud-btn[data-type="2"] .enhanced-cloud-logo i {
+    color: var(--google-icon-color);
+}
+
+/* Azure图标颜色 */
+.enhanced-cloud-btn[data-type="3"] .enhanced-cloud-logo i {
+    color: var(--azure-icon-color);
+}
+
+/* AWS图标颜色 */
+.enhanced-cloud-btn[data-type="4"] .enhanced-cloud-logo i {
+    color: var(--aws-icon-color);
+}
+
+.enhanced-cloud-logo img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+/* 页面标题 */
+.enhanced-page-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: white;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    text-align: center;
+}
+
+/* 顶部操作按钮 */
+.enhanced-top-action-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    border: none;
+    background: rgba(255,255,255,0.2);
+    color: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.enhanced-top-action-btn:active {
+    background: rgba(255,255,255,0.3);
+    transform: scale(0.95);
+}
+
+.enhanced-top-action-btn i {
+    font-size: 16px;
+}
+
+/* 通知角标 */
+.enhanced-notification-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    background: #dc3545;
+    color: white;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    border: 2px solid white;
+}
+
+/* 用户菜单 */
+.enhanced-user-menu {
+    position: relative;
+}
+
+.enhanced-user-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.2);
+    border: 2px solid rgba(255,255,255,0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.enhanced-user-avatar:hover {
+    background: rgba(255,255,255,0.3);
+    border-color: rgba(255,255,255,0.5);
+    transform: scale(1.05);
+}
+
+.enhanced-user-dropdown {
+    position: absolute;
+    top: 120%;
+    right: 0;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+    padding: 8px 0;
+    min-width: 180px;
+    z-index: 1001;
+    transform: translateY(-10px);
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+}
+
+.enhanced-user-dropdown.show {
+    transform: translateY(0);
+    opacity: 1;
+    visibility: visible;
+}
+
+.enhanced-dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    color: #333;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+    background: none;
+    width: 100%;
+    text-align: left;
+    font-size: 14px;
+}
+
+.enhanced-dropdown-item:hover {
+    background: #f8f9fa;
+}
+
+.enhanced-dropdown-item i {
+    width: 16px;
+    text-align: center;
+    color: #666;
+}
+
+.enhanced-dropdown-divider {
+    height: 1px;
+    background: #e9ecef;
+    margin: 8px 16px;
+}
+
+.enhanced-dropdown-item.danger {
+    color: #dc3545;
+}
+
+.enhanced-dropdown-item.danger:hover {
+    background: #fff5f5;
+}
+
+/* ===== 底部导航栏样式 ===== */
+.enhanced-bottom-nav, .bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: white;
+    border-top: 1px solid #e0e0e0;
+    display: flex;
+    padding: 8px 0;
+    padding-bottom: calc(8px + env(safe-area-inset-bottom));
+    z-index: 1000;
+    box-shadow: 0 -2px 8px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+}
+
+.enhanced-nav-item, .nav-item {
+    flex: 1;
+    text-align: center;
+    padding: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    opacity: 0.6;
+}
+
+.enhanced-nav-item.active, .nav-item.active {
+    opacity: 1;
+    color: var(--cloud-color);
+}
+
+.enhanced-nav-item.active::before, .nav-item.active::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: 60%;
+    height: 3px;
+    background: var(--cloud-gradient);
+    transform: translateX(-50%);
+    border-radius: 0 0 3px 3px;
+}
+
+.enhanced-nav-icon, .nav-icon {
+    font-size: 20px;
+    margin-bottom: 4px;
+    transition: all 0.3s ease;
+}
+
+.enhanced-nav-item.active .enhanced-nav-icon,
+.nav-item.active .nav-icon {
+    transform: scale(1.1);
+}
+
+.enhanced-nav-text, .nav-text {
+    font-size: 12px;
+    font-weight: 500;
+}
+
+/* ===== 主内容区域调整 ===== */
+.enhanced-main-content {
+    padding-top: 74px !important;
+    padding-bottom: 100px !important;
+}
+
+.main-content {
+    padding-top: 74px !important;
+    padding-bottom: 100px !important;
+}
+
+body {
+    padding-top: 0 !important;
+}
+
+.tenant-list,
+.instance-table,
+.table-container,
+.filter-section,
+.stats-container,
+.tenant-info-card,
+.region-table-container,
+.loading-container,
+.empty-state {
+    margin-top: 5px;
+}
+
+.tenant-list:first-child,
+.instance-table:first-child,
+.table-container:first-child,
+.filter-section:first-child,
+.stats-container:first-child,
+.tenant-info-card:first-child,
+.region-table-container:first-child,
+.loading-container:first-child,
+.empty-state:first-child {
+    margin-top: 8px;
+}
+
+/* ===== 移动端分页组件样式 ===== */
+.mobile-pagination {
+    background: white;
+    padding: 15px;
+    border-top: 1px solid #e9ecef;
+    position: sticky;
+    bottom: 0;
+    z-index: 100;
+    margin: 0;
+    box-shadow: 0 -2px 8px rgba(0,0,0,0.1);
+}
+
+.pagination-info {
+    text-align: center;
+    margin-bottom: 15px;
+    color: #666;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.pagination-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 15px;
+}
+
+.pagination-btn {
+    background: var(--cloud-gradient);
+    color: white;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 80px;
+    justify-content: center;
+    user-select: none;
+}
+
+.pagination-btn:disabled {
+    background: #e9ecef;
+    color: #6c757d;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.pagination-btn:not(:disabled):active {
+    transform: scale(0.95);
+}
+
+.page-selector {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    justify-content: center;
+}
+
+.page-input-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #f8f9fa;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+    transition: all 0.2s ease;
+}
+
+.page-input-group:focus-within {
+    border-color: var(--cloud-color);
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+}
+
+.page-input {
+    border: none;
+    background: transparent;
+    width: 40px;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 500;
+    color: #333;
+    outline: none;
+}
+
+.page-input::-webkit-outer-spin-button,
+.page-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.page-input[type=number] {
+    -moz-appearance: textfield;
+}
+
+.page-total {
+    color: #666;
+    font-size: 14px;
+    white-space: nowrap;
+}
+
+.quick-jump-btn {
+    background: #f8f9fa;
+    color: var(--cloud-color);
+    border: 1px solid #e9ecef;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-weight: 500;
+    user-select: none;
+}
+
+.quick-jump-btn:active {
+    background: #e9ecef;
+    transform: scale(0.95);
+}
+
+.quick-jump-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.pagination-loading {
+    display: none;
+    text-align: center;
+    padding: 15px;
+    color: #666;
+    font-size: 14px;
+}
+
+.pagination-loading.show {
+    display: block;
+}
+
+.pagination-loading-spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid var(--cloud-color);
+    border-radius: 50%;
+    animation: paginationSpin 1s linear infinite;
+    margin-right: 8px;
+}
+
+@keyframes paginationSpin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.mobile-pagination.hidden {
+    display: none;
+}
+
+.mobile-pagination.compact {
+    padding: 10px 15px;
+}
+
+.mobile-pagination.compact .pagination-info {
+    margin-bottom: 10px;
+    font-size: 13px;
+}
+
+.mobile-pagination.compact .pagination-btn {
+    padding: 10px 16px;
+    font-size: 13px;
+    min-width: 70px;
+}
+
+/* ===== 操作下拉菜单样式 ===== */
+.action-dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.action-dropdown-btn {
+    background: var(--cloud-gradient);
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 70px;
+    justify-content: center;
+    user-select: none;
+    z-index: 1;
+}
+
+.action-dropdown-btn:active {
+    transform: scale(0.95);
+}
+
+.action-dropdown-btn i {
+    transition: transform 0.3s ease;
+}
+
+.action-dropdown.show .action-dropdown-btn i {
+    transform: rotate(180deg);
+}
+
+.action-dropdown-menu {
+    position: fixed; /* 使用fixed定位，避免被父容器裁剪 */
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+    padding: 6px 0;
+    min-width: 130px;
+    z-index: 9999; /* 使用更高的z-index */
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+    border: 1px solid #e9ecef;
+    transform: scale(0.95);
+    transform-origin: top right; /* 默认从右上角缩放 */
+}
+
+.action-dropdown.show .action-dropdown-menu {
+    opacity: 1;
+    visibility: visible;
+    transform: scale(1);
+}
+
+.action-dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    color: #333;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+    background: none;
+    width: 100%;
+    text-align: left;
+    font-size: 14px;
+    user-select: none;
+}
+
+.action-dropdown-item:hover {
+    background: #f8f9fa;
+}
+
+.action-dropdown-item:active {
+    background: #e9ecef;
+}
+
+.action-dropdown-item i {
+    width: 16px;
+    text-align: center;
+    font-size: 13px;
+}
+
+.action-dropdown-item.sync i {
+    color: var(--cloud-color);
+}
+
+.action-dropdown-item.grab i {
+    color: #28a745;
+}
+
+.action-dropdown-item.view i {
+    color: #17a2b8;
+}
+
+/* ===== 状态标签样式 ===== */
+.status-badge {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 500;
+    display: inline-block;
+}
+
+.status-badge.home {
+    background: #e8f5e8;
+    color: #2e7d32;
+}
+
+.status-badge.not-home {
+    background: #f3e5f5;
+    color: #7b1fa2;
+}
+
+.status-badge.synced {
+    background: #e8f5e8;
+    color: #2e7d32;
+}
+
+.status-badge.not-synced {
+    background: #ffebee;
+    color: #c62828;
+}
+
+.status-badge.active {
+    background: #e8f5e8;
+    color: #2e7d32;
+}
+
+.status-badge.inactive {
+    background: #ffebee;
+    color: #c62828;
+}
+
+.status-badge.running {
+    background: #e3f2fd;
+    color: #1976d2;
+}
+
+.status-badge.stopped {
+    background: #fafafa;
+    color: #757575;
+}
+
+/* ===== 加载和Toast样式 ===== */
+.enhanced-loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255,255,255,0.9);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+    backdrop-filter: blur(4px);
+}
+
+.enhanced-loading-spinner {
+    width: 48px;
+    height: 48px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid var(--cloud-color);
+    border-radius: 50%;
+    animation: enhanced-spin 1s linear infinite;
+}
+
+@keyframes enhanced-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.enhanced-toast, .toast {
+    position: fixed;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #333;
+    color: white;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    z-index: 10001;
+    opacity: 0;
+    transition: all 0.3s ease;
+    max-width: 90%;
+    text-align: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.enhanced-toast.show, .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(10px);
+}
+
+.enhanced-toast.success, .toast.success {
+    background: #28a745;
+}
+
+.enhanced-toast.error, .toast.error {
+    background: #dc3545;
+}
+
+.enhanced-toast.warning, .toast.warning {
+    background: #ffc107;
+    color: #212529;
+}
+
+.enhanced-toast.info, .toast.info {
+    background: #17a2b8;
+}
+
+/* ===== 移动端租户列表特殊样式 ===== */
+.mobile-tenant-info {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 15px;
+}
+
+.mobile-tenant-info .info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.mobile-tenant-info .info-label {
+    font-size: 11px;
+    color: #666;
+    font-weight: 500;
+}
+
+.mobile-tenant-info .info-value {
+    font-size: 13px;
+    color: #333;
+    word-break: break-all;
+}
+
+.mobile-account-type {
+    padding: 3px 6px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 500;
+    display: inline-block;
+}
+
+.mobile-account-type.trial {
+    background: #e3f2fd;
+    color: #1976d2;
+}
+
+.mobile-account-type.upgrade {
+    background: #e8f5e8;
+    color: #2e7d32;
+}
+
+.mobile-account-type.free {
+    background: #f3e5f5;
+    color: #7b1fa2;
+}
+
+/* ===== 解决内容区域间距问题 ===== */
+.no-side-spacing,
+.tenant-list.no-side-spacing,
+.instance-table.no-side-spacing,
+.table-container.no-side-spacing,
+.region-table-container.no-spacing,
+.tenant-info-card.no-spacing {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+}
+
+/* ===== 工具类样式 ===== */
+.fade-in {
+    animation: fadeIn 0.4s ease-out;
+}
+
+.slide-in-up {
+    animation: slideInUp 0.4s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideInUp {
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.cloud-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #f8f9fa;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--cloud-color);
+    margin-bottom: 10px;
+    border: 1px solid rgba(102, 126, 234, 0.2);
+}
+
+.cloud-indicator i {
+    font-size: 16px;
+}
+
+.cloud-switch-animation {
+    animation: cloudSwitch 0.5s ease-in-out;
+}
+
+@keyframes cloudSwitch {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(0.95); opacity: 0.7; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+.pulse {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+/* ===== 响应式调整 ===== */
+@media (max-width: 375px) {
+    .enhanced-cloud-btn, .enhanced-back-btn,
+    .enhanced-top-action-btn, .enhanced-user-avatar {
+        width: 32px;
+        height: 32px;
+    }
+
+    .enhanced-cloud-logo {
+        width: 20px;
+        height: 20px;
+    }
+
+    .enhanced-page-title {
+        font-size: 16px;
+    }
+
+    .enhanced-cloud-switcher {
+        gap: 4px;
+    }
+
+    .enhanced-top-nav-content {
+        padding: 8px 12px;
+        padding-top: calc(8px + env(safe-area-inset-top));
+        min-height: 60px;
+    }
+
+    .enhanced-main-content, .main-content {
+        padding-top: 76px !important;
+    }
+
+    .mobile-tenant-info {
+        grid-template-columns: 1fr;
+        gap: 6px;
+    }
+
+    .mobile-tenant-info .info-label {
+        font-size: 10px;
+    }
+
+    .mobile-tenant-info .info-value {
+        font-size: 12px;
+    }
+
+    .mobile-account-type {
+        padding: 2px 5px;
+        font-size: 9px;
+    }
+
+    /* 下拉菜单在小屏幕上的调整 */
+    .action-dropdown-btn {
+        padding: 6px 8px;
+        font-size: 11px;
+        min-width: 60px;
+    }
+
+    .action-dropdown-menu {
+        min-width: 110px;
+        right: -20px; /* 防止菜单超出屏幕 */
+        z-index: 1200; /* 进一步提高z-index */
+    }
+
+    .action-dropdown-item {
+        padding: 8px 10px;
+        font-size: 12px;
+    }
+
+    /* 分页组件响应式 */
+    .pagination-controls {
+        gap: 10px;
+    }
+
+    .pagination-btn {
+        padding: 10px 15px;
+        font-size: 13px;
+        min-width: 70px;
+    }
+
+    .page-input {
+        width: 35px;
+    }
+
+    .quick-jump-btn {
+        padding: 5px 8px;
+        font-size: 11px;
+    }
+}

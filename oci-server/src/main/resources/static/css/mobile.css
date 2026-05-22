@@ -1,0 +1,243 @@
+/**
+ * mobile.css - 移动端响应式适配层
+ * 原则：只新增，不破坏桌面端任何现有样式
+ * 所有规则均在 @media (max-width: 768px) 内
+ * Author: doubleDimple
+ */
+
+/* ============================================================
+   1. CSS Variables — 深色/浅色主题跟随系统
+   ============================================================ */
+:root {
+    --mob-tab-height: 56px;
+    --mob-header-height: 60px;
+    --mob-sidebar-width: 280px;
+    --mob-tab-bg: #1e2124;
+    --mob-tab-active: #1abc9c;
+    --mob-tab-text: rgba(255, 255, 255, 0.5);
+    --mob-overlay-bg: rgba(0, 0, 0, 0.6);
+    --mob-surface: #242424;
+    --mob-border: rgba(255, 255, 255, 0.1);
+}
+
+/* 浅色系统主题覆盖 tab bar */
+@media (prefers-color-scheme: light) {
+    :root {
+        --mob-tab-bg: #ffffff;
+        --mob-tab-active: #1abc9c;
+        --mob-tab-text: rgba(0, 0, 0, 0.45);
+        --mob-overlay-bg: rgba(0, 0, 0, 0.5);
+        --mob-surface: #f5f5f5;
+        --mob-border: rgba(0, 0, 0, 0.1);
+    }
+}
+
+/* ============================================================
+   2. 底部 Tab 栏 — 桌面端默认隐藏
+   ============================================================ */
+.mobile-tab-bar {
+    display: none;
+}
+
+.mobile-overlay {
+    display: none;
+}
+
+/* ============================================================
+   3. 移动端核心布局 (@media <= 768px)
+   ============================================================ */
+@media (max-width: 768px) {
+
+    /* --- 3.1 整体布局调整 --- */
+    .admin-main {
+        /* 底部为 tab bar 留出空间，覆盖内联 height 样式 */
+        height: calc(100vh - var(--mob-header-height) - var(--mob-tab-height)) !important;
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    /* --- 3.2 Sidebar 变为侧抽屉 --- */
+    .sidebar {
+        /* 默认隐藏到屏幕左侧外 */
+        transform: translateX(-100%);
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        width: var(--mob-sidebar-width) !important;
+        /* 覆盖桌面端 top: 60px，移动端从顶部全高 */
+        top: 0 !important;
+        height: 100vh !important;
+        z-index: 1200;
+        padding-top: calc(var(--mob-header-height) + 8px);
+        box-shadow: 4px 0 16px rgba(0, 0, 0, 0.4);
+    }
+
+    /* 侧抽屉打开状态 */
+    .sidebar.mobile-sidebar-open {
+        transform: translateX(0);
+    }
+
+    /* --- 3.3 主内容区全宽 (sidebar 是 fixed 不占 flex 空间) --- */
+    .admin-main > main {
+        width: 100% !important;
+        margin-left: 0 !important;
+    }
+
+    /* iframe 高度使用父容器全高 */
+    #biz-frame {
+        width: 100% !important;
+        height: 100% !important;
+    }
+
+    /* --- 3.4 遮罩层 --- */
+    .mobile-overlay {
+        display: block;
+        position: fixed;
+        inset: 0;
+        background: var(--mob-overlay-bg);
+        z-index: 1100;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+    }
+
+    .mobile-overlay.active {
+        opacity: 1;
+        pointer-events: all;
+    }
+
+    /* --- 3.5 Header 移动端精简 --- */
+    .top-nav {
+        padding: 0 12px !important;
+    }
+
+    /* 语言切换器在移动端隐藏（功能移到"更多"菜单的用户设置里） */
+    #languageTrigger {
+        display: none !important;
+    }
+
+    /* 更新按钮只保留图标 */
+    #updateBtn span {
+        display: none !important;
+    }
+
+    #updateBtn i {
+        margin-right: 0 !important;
+    }
+
+    /* 用户信息文字区移动端隐藏（空间紧凑） */
+    .user-info-text {
+        display: none !important;
+    }
+
+    .dropdown-arrow {
+        display: none !important;
+    }
+
+    /* --- 3.6 底部 Tab 栏显示 --- */
+    .mobile-tab-bar {
+        display: flex;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: var(--mob-tab-height);
+        background: var(--mob-tab-bg);
+        border-top: 1px solid var(--mob-border);
+        z-index: 1000;
+        /* iPhone 底部安全区 */
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+        box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    .mobile-tab-item {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 3px;
+        cursor: pointer;
+        color: var(--mob-tab-text);
+        font-size: 10px;
+        font-family: inherit;
+        border: none;
+        background: none;
+        padding: 6px 0;
+        position: relative;
+        -webkit-tap-highlight-color: transparent;
+        transition: color 0.2s ease;
+        outline: none;
+    }
+
+    .mobile-tab-item i {
+        font-size: 19px;
+        line-height: 1;
+        transition: transform 0.2s ease;
+    }
+
+    .mobile-tab-item.active {
+        color: var(--mob-tab-active);
+    }
+
+    .mobile-tab-item.active i {
+        transform: translateY(-1px);
+    }
+
+    /* 激活指示线 */
+    .mobile-tab-item.active::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 20%;
+        right: 20%;
+        height: 2px;
+        background: var(--mob-tab-active);
+        border-radius: 0 0 2px 2px;
+    }
+
+    /* 点击水波纹反馈 */
+    .mobile-tab-item:active {
+        opacity: 0.7;
+    }
+
+    /* --- 3.7 消息下拉菜单移动端位置修正 --- */
+    .message-dropdown-menu {
+        right: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        border-radius: 0 !important;
+        top: var(--mob-header-height) !important;
+        max-height: 60vh;
+        overflow-y: auto;
+    }
+
+    #languageDropdown {
+        right: 0 !important;
+        left: auto !important;
+        top: var(--mob-header-height) !important;
+    }
+
+    /* 用户下拉菜单移动端全宽 */
+    .user-dropdown-menu {
+        right: 0 !important;
+        width: 100% !important;
+        border-radius: 0 !important;
+        top: var(--mob-header-height) !important;
+    }
+}
+
+/* ============================================================
+   4. 超小屏适配 (@media <= 480px)
+   ============================================================ */
+@media (max-width: 480px) {
+    .mobile-tab-item {
+        font-size: 9px;
+        gap: 2px;
+    }
+
+    .mobile-tab-item i {
+        font-size: 17px;
+    }
+
+    .top-nav .brand h1 {
+        font-size: 18px !important;
+    }
+}
