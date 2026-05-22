@@ -1,0 +1,293 @@
+/* ============================================================
+   api_token_config.css — 暗色/亮色双主题
+   ============================================================ */
+
+/* ── 页面外框卡片 ── */
+.page-card {
+    background: var(--surface, #22262b);
+    border: 1px solid var(--card-border, #31363d);
+    border-radius: 10px;
+    box-shadow: 0 4px 24px var(--shadow-color, rgba(0,0,0,.4));
+    padding: 24px 28px;
+}
+
+/* ── 页面标题区 ── */
+.page-header {
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--card-border, #31363d);
+}
+
+.page-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary, #cdd9e5);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0 0 6px;
+    letter-spacing: -.3px;
+}
+
+.page-title i { color: var(--accent-blue, #4d9eff); }
+
+.page-description {
+    color: var(--text-secondary, #768390);
+    font-size: 13px;
+    margin: 0;
+}
+
+/* ── 设置卡片网格 ── */
+.settings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 16px;
+}
+
+/* ── 内嵌设置卡片 ── */
+.settings-card {
+    background: var(--main-bg, #1a1d21);
+    border: 1px solid var(--card-border, #31363d);
+    border-radius: 8px;
+    box-shadow: 0 1px 3px var(--shadow-color, rgba(0,0,0,.3));
+}
+
+.settings-card-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--card-border, #31363d);
+    background: var(--hover-bg, #292d32);
+    border-radius: 8px 8px 0 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.settings-card-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary, #cdd9e5);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+}
+
+.settings-card-body { padding: 18px; }
+
+.settings-card-footer {
+    padding: 12px 18px;
+    border-top: 1px solid var(--card-border, #31363d);
+    background: var(--hover-bg, #292d32);
+    border-radius: 0 0 8px 8px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+/* ── Token 状态徽章 ── */
+.token-status-badge {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.status-active   { background: rgba(63,185,80,.15);   color: var(--accent-green, #3fb950); }
+.status-inactive { background: rgba(255,107,107,.15); color: var(--accent-red,   #ff6b6b); }
+
+/* ── Token 信息网格 ── */
+.token-info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-top: 8px;
+}
+
+.token-info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.token-info-item.full-width { grid-column: 1 / -1; }
+
+.token-info-item label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-secondary, #768390);
+    text-transform: uppercase;
+    letter-spacing: .4px;
+}
+
+.token-info-item span {
+    font-size: 13px;
+    color: var(--text-primary, #cdd9e5);
+}
+
+.text-warning { color: #f78166 !important; }
+
+/* ── Token 值显示 ── */
+.token-display-card { }
+
+.token-display {
+    background: var(--hover-bg, #292d32);
+    padding: 16px;
+    border-radius: 8px;
+    border: 1px solid var(--card-border, #31363d);
+}
+
+.token-value-container {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.token-input {
+    flex: 1;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    background: var(--main-bg, #1a1d21);
+    border: 1px solid var(--card-border, #31363d);
+    color: var(--text-primary, #cdd9e5);
+    padding: 8px 12px;
+    border-radius: 6px;
+}
+
+/* ── API 文档链接 ── */
+.api-docs-info {
+    text-align: center;
+    padding: 16px;
+}
+
+.api-docs-description {
+    color: var(--text-secondary, #768390);
+    margin-bottom: 18px;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.api-docs-links {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.api-doc-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 20px;
+    background: var(--accent-blue, #4d9eff);
+    color: #fff;
+    text-decoration: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    transition: filter .2s, transform .15s;
+}
+
+.api-doc-link:hover {
+    filter: brightness(1.12);
+    transform: translateY(-1px);
+    color: #fff;
+    text-decoration: none;
+}
+
+/* ── 使用说明 ── */
+.usage-guide-card { }
+
+.usage-methods { display: grid; gap: 12px; }
+
+.usage-method {
+    background: var(--hover-bg, #292d32);
+    padding: 14px 16px;
+    border-radius: 8px;
+    border: 1px solid var(--card-border, #31363d);
+}
+
+.usage-method h5 {
+    margin: 0 0 10px;
+    color: var(--text-primary, #cdd9e5);
+    font-size: 13px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.usage-method .method-code {
+    background: var(--main-bg, #1a1d21);
+    border: 1px solid var(--card-border, #31363d);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    color: var(--accent-green, #3fb950);
+    margin-bottom: 8px;
+}
+
+.usage-method .method-description {
+    font-size: 12px;
+    color: var(--text-secondary, #768390);
+    margin: 0;
+}
+
+/* ── 复制按钮 ── */
+.copy-code-btn {
+    float: right;
+    margin-top: -2px;
+    padding: 2px 8px;
+    font-size: 11px;
+    border: 1px solid var(--card-border, #31363d);
+    background: var(--surface, #22262b);
+    color: var(--text-secondary, #768390);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all .2s;
+}
+
+.copy-code-btn:hover {
+    background: var(--hover-bg, #292d32);
+    color: var(--text-primary, #cdd9e5);
+}
+
+/* ── 按钮覆盖 ── */
+.btn-outline-primary {
+    color: var(--accent-blue, #4d9eff);
+    border: 1px solid var(--accent-blue, #4d9eff);
+    background: transparent;
+}
+.btn-outline-primary:hover { background: var(--accent-blue, #4d9eff); color: #fff; }
+
+/* ── 表单控件 ── */
+.form-control {
+    background: var(--surface, #22262b);
+    border: 1px solid var(--card-border, #31363d);
+    color: var(--text-primary, #cdd9e5);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 13px;
+    width: 100%;
+    transition: border-color .2s, box-shadow .2s;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: var(--accent-blue, #4d9eff);
+    box-shadow: 0 0 0 3px rgba(77,158,255,.15);
+}
+
+.form-control option {
+    background: var(--surface, #22262b);
+    color: var(--text-primary, #cdd9e5);
+}
+
+.form-tip {
+    font-size: 11px;
+    color: var(--text-secondary, #768390);
+    margin-top: 5px;
+}
