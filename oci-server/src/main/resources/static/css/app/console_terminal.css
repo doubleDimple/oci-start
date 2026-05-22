@@ -1,0 +1,426 @@
+/* ============================================================
+   console_terminal.css — 暗色/亮色双主题
+   ============================================================ */
+
+:root {
+    --bg:        #1a1d21;
+    --surface:   #22262b;
+    --surface-2: #292d32;
+    --border:    #31363d;
+    --text:      #cdd9e5;
+    --muted:     #768390;
+    --accent:    #4d9eff;
+    --accent-g:  #3fb950;
+    --accent-r:  #ff6b6b;
+    --accent-o:  #f78166;
+    --hover:     #2d3138;
+    --shadow:    0 4px 24px rgba(0,0,0,.4);
+    --shadow-sm: 0 2px 8px rgba(0,0,0,.3);
+    --radius:    10px;
+    --radius-sm: 6px;
+    /* Terminal area — always dark */
+    --term-bg:       #0d1117;
+    --term-header:   #161b22;
+    --term-border:   #30363d;
+    --term-muted:    #8b949e;
+    --term-toolbar:  #1c2128;
+}
+
+[data-theme="light"] {
+    --bg:        #f0f4f8;
+    --surface:   #ffffff;
+    --surface-2: #f8fafc;
+    --border:    #dde3ec;
+    --text:      #1a202c;
+    --muted:     #64748b;
+    --accent:    #2563eb;
+    --accent-g:  #16a34a;
+    --accent-r:  #dc2626;
+    --accent-o:  #ea580c;
+    --hover:     #f1f5f9;
+    --shadow:    0 4px 20px rgba(0,0,0,.08);
+    --shadow-sm: 0 2px 8px rgba(0,0,0,.06);
+}
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+html { background: var(--bg); }
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 13px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* ── Layout ── */
+.layout { display: flex; min-height: 100vh; }
+
+.main-content {
+    flex: 1;
+    padding: 8px 12px;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* ── Config Panel ── */
+.console-config-panel {
+    flex-shrink: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-sm);
+    padding: 8px 12px;
+}
+
+.console-config-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: flex-end;
+}
+
+.console-config-item {
+    min-width: 0;
+}
+
+/* IP field: fixed comfortable width; buttons: push to right */
+.console-config-item:first-child { flex: 0 0 220px; }
+.console-config-item:last-child  { flex: 1 1 auto; margin-left: auto; }
+
+.console-config-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 4px;
+    font-weight: 500;
+}
+
+.console-input {
+    width: 100%;
+    height: 32px;
+    padding: 4px 10px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    color: var(--text);
+    outline: none;
+    transition: border-color .2s, box-shadow .2s;
+}
+
+.console-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(77,158,255,.12);
+}
+
+.console-input:read-only {
+    background: var(--hover);
+    color: var(--muted);
+    cursor: default;
+}
+
+/* ── Action Buttons ── */
+.button-container {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+.action-btn {
+    height: 32px;
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 0 14px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all .2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    text-decoration: none;
+    white-space: nowrap;
+    color: #fff;
+}
+
+.action-btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
+.action-btn:active { transform: translateY(0); }
+.action-btn:disabled { opacity: .5; cursor: not-allowed; transform: none; filter: none; }
+
+.action-btn           { background: var(--accent-g); }
+.action-btn.copy      { background: var(--accent); }
+.action-btn.reboot    { background: var(--accent-o); }
+.action-btn.secondary { background: var(--muted); }
+
+/* connection-info is now an invisible stub — kept for JS compat */
+#connectionInfo { display: none !important; }
+
+/* ── VNC Wrapper ── */
+.vnc-wrapper {
+    flex: 1;
+    min-height: 0;
+    background: var(--term-bg);
+    border: 1px solid var(--term-border);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ── VNC Header ── */
+.vnc-header {
+    flex-shrink: 0;
+    padding: 0 14px;
+    background: var(--term-header);
+    border-bottom: 1px solid var(--term-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    height: 42px;
+    gap: 12px;
+}
+
+.vnc-title {
+    color: #e6edf3;
+    font-size: 13px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.connection-type-badge {
+    background: rgba(63,185,80,.2);
+    color: #3fb950;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: .3px;
+}
+
+.vnc-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn-fullscreen, .btn-disconnect {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 0 12px;
+    height: 26px;
+    border: none;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all .2s;
+    white-space: nowrap;
+    color: #fff;
+}
+
+.btn-fullscreen { background: var(--accent); }
+.btn-disconnect { background: var(--accent-r); }
+.btn-fullscreen:hover, .btn-disconnect:hover { filter: brightness(1.1); }
+.btn-fullscreen:disabled, .btn-disconnect:disabled { opacity: .4; cursor: not-allowed; filter: none; }
+
+/* ── Connection Status Badge ── */
+.connection-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 10px;
+    height: 24px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 500;
+    white-space: nowrap;
+    transition: background .3s, color .3s;
+}
+
+.connection-status.disconnected { background: rgba(120,130,140,.2); color: var(--term-muted); }
+.connection-status.connected    { background: rgba(63,185,80,.2);   color: #3fb950; }
+.connection-status.connecting   { background: rgba(247,129,102,.2); color: #f78166; }
+
+.connection-timeout-indicator { font-size: 10px; opacity: .7; }
+
+/* ── VNC Toolbar ── */
+.vnc-toolbar {
+    flex-shrink: 0;
+    padding: 4px 10px;
+    background: var(--term-toolbar);
+    border-bottom: 1px solid var(--term-border);
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    font-size: 11px;
+}
+
+.vnc-toolbar button {
+    background: rgba(255,255,255,.07);
+    border: 1px solid rgba(255,255,255,.1);
+    color: #c9d1d9;
+    padding: 2px 10px;
+    height: 22px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 11px;
+    white-space: nowrap;
+    transition: background .15s;
+}
+
+.vnc-toolbar button:hover { background: rgba(255,255,255,.14); }
+.vnc-toolbar button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+.vnc-toolbar .auto-stop-notice {
+    margin-left: auto;
+    color: #f78166;
+    font-size: 11px;
+}
+
+/* ── VNC Container ── */
+#vnc-container {
+    flex: 1;
+    min-height: 0;
+    background: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+}
+
+#vnc-display {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+/* noVNC inner container */
+#vnc-display .noVNC_container {
+    width: 100% !important;
+    height: 100% !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Crisp pixel rendering — prevents CSS blur when scaling */
+#vnc-display canvas {
+    display: block;
+    border: none;
+    image-rendering: -webkit-optimize-contrast; /* Safari */
+    image-rendering: crisp-edges;               /* Firefox */
+    image-rendering: pixelated;                 /* Chrome/Edge */
+}
+
+/* ── VNC Placeholder ── */
+#vnc-placeholder {
+    color: var(--term-muted);
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+}
+
+#vnc-placeholder p { margin-top: 12px; font-size: 14px; }
+#vnc-placeholder p + p { font-size: 12px; color: #6e7681; margin-top: 6px; }
+
+.computer-icon-wrapper {
+    position: relative;
+    display: inline-block;
+    margin-bottom: 8px;
+}
+
+.computer-icon-wrapper .fa-desktop {
+    display: block;
+    position: relative;
+    z-index: 2;
+    color: #8b949e;
+}
+
+/* Loading ring animations */
+#vnc-placeholder.loading .computer-icon-wrapper::before {
+    content: '';
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 100px; height: 100px;
+    margin: -50px 0 0 -50px;
+    border: 3px solid rgba(139,148,158,.15);
+    border-top-color: var(--accent);
+    border-right-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 1.2s linear infinite;
+    z-index: 1;
+}
+
+#vnc-placeholder.loading .computer-icon-wrapper::after {
+    content: '';
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 80px; height: 80px;
+    margin: -40px 0 0 -40px;
+    border: 2px solid rgba(139,148,158,.1);
+    border-bottom-color: #3fb950;
+    border-left-color: #3fb950;
+    border-radius: 50%;
+    animation: spinReverse 1.8s linear infinite;
+    z-index: 1;
+}
+
+#vnc-placeholder.loading .fa-desktop { animation: iconPulse 2s ease-in-out infinite; }
+
+@keyframes spin        { to { transform: rotate(360deg); } }
+@keyframes spinReverse { to { transform: rotate(-360deg); } }
+@keyframes iconPulse {
+    0%,100% { opacity: .7; transform: scale(1); }
+    50%      { opacity: 1;  transform: scale(1.05); }
+}
+
+/* ── VNC Footer ── */
+.vnc-footer {
+    flex-shrink: 0;
+    padding: 0 14px;
+    height: 30px;
+    background: var(--term-header);
+    border-top: 1px solid var(--term-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: var(--term-muted);
+    font-size: 12px;
+}
+
+/* ── Loading overlay (disabled) ── */
+.loading-overlay { display: none !important; }
+
+/* ── SweetAlert2 ── */
+.swal2-popup {
+    background: var(--surface) !important;
+    color: var(--text) !important;
+    border: 1px solid var(--border) !important;
+    font-size: 13px !important;
+}
+.swal2-title          { color: var(--text) !important; }
+.swal2-html-container { color: var(--muted) !important; }
+.swal2-styled.swal2-confirm { background: var(--accent) !important; }
+.swal2-styled.swal2-cancel  { background: var(--accent-r) !important; }
