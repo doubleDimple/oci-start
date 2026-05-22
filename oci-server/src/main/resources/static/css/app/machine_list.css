@@ -1,0 +1,414 @@
+
+:root {
+    --top-nav-bg: #1f1f1f;
+    --sidebar-bg: #1e2124;
+    --sidebar-hover: #292d30;
+    --sidebar-active: #1abc9c;
+    --sidebar-text: #a9b7c6;
+    --sidebar-active-text: #ffffff;
+    --submenu-bg: #292d30;
+    --border-color: #383c40;
+    --main-bg: #ffffff;
+    --text-primary: #333333;
+    --text-secondary: #666666;
+    --text-light: #ffffff;
+    --accent-blue: #2196f3;
+    --accent-green: #1abc9c;
+    --accent-red: #ff6b6b;
+    --hover-bg: #f5f5f5;
+    --card-border: #e0e0e0;
+    --shadow-color: rgba(0, 0, 0, 0.1);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background-color: var(--main-bg);
+    color: var(--text-primary);
+    line-height: 1.4;
+    font-size: 12px;
+}
+
+/* Top Navigation */
+.top-nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 45px;
+    background-color: var(--top-nav-bg);
+    color: var(--text-light);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 20px;
+    z-index: 1000;
+}
+
+.brand {
+    color: var(--accent-green);
+    font-size: 14px;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.top-nav-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    font-size: 12px;
+}
+
+.top-nav-right span,
+.top-nav-right a {
+    color: var(--text-light);
+    text-decoration: none;
+}
+
+/* Layout */
+.layout {
+    display: flex;
+    min-height: 100vh;
+    padding-top: 45px;
+}
+
+/* Sidebar */
+.sidebar {
+    width: 200px;
+    background: var(--sidebar-bg);
+    position: fixed;
+    height: calc(100vh - 45px);
+    color: var(--sidebar-text);
+    padding-top: 0;
+    font-size: 13px;
+    border-right: 1px solid var(--border-color);
+}
+
+/* 导航菜单样式保持与之前一致 */
+.nav-parent {
+    border-bottom: 1px solid var(--border-color);
+}
+
+.nav-parent > .nav-link {
+    padding: 12px 20px;
+    color: var(--sidebar-text);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: all 0.3s;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.nav-children {
+    display: none;
+    background: var(--submenu-bg);
+}
+
+.nav-parent.expanded .nav-children {
+    display: block;
+}
+
+.nav-children .nav-link {
+    padding: 10px 20px 10px 40px;
+    color: var(--sidebar-text);
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+    transition: all 0.3s;
+}
+
+/* Main Content */
+.main-content {
+    flex: 1;
+    margin-left: 200px;
+    padding: 15px;
+    background-color: var(--main-bg);
+}
+
+.page-header {
+    margin-bottom: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.page-title {
+    font-size: 16px;
+    font-weight: normal;
+    color: var(--text-primary);
+}
+
+/* Table Styles */
+.table-card {
+    background: white;
+    border-radius: 3px;
+    border: 1px solid var(--card-border);
+    margin-bottom: 15px;
+    overflow: auto;
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: auto;
+    min-width: 1200px;
+}
+
+.table th,
+.table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--card-border);
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+/* 表格行样式 */
+.table tr {
+    background-color: white;
+    transition: background-color 0.2s;
+}
+
+.table tr:hover {
+    background-color: var(--hover-bg);
+}
+
+/* 表格头部样式 */
+.table th {
+    background-color: #fafafa;
+    font-weight: normal;
+    color: var(--text-secondary);
+    text-align: left;
+}
+
+/* Status Badge */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 8px;
+    border-radius: 2px;
+    font-size: 11px;
+    font-weight: normal;
+}
+
+.status-offline { background-color: var(--text-secondary); color: white; }
+.status-running { background-color: var(--accent-green); color: white; }
+.status-starting { background-color: var(--accent-blue); color: white; }
+
+/* 按钮样式 */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border: none;
+    border-radius: 2px;
+    font-size: 12px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.2s;
+}
+
+.btn-primary { background-color: var(--accent-blue); color: white; }
+.btn-success { background-color: var(--accent-green); color: white; }
+.btn-danger { background-color: var(--accent-red); color: white; }
+.btn-warning { background-color: var(--warning-color); color: white; }
+
+.btn:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Toast 样式 */
+.toast {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: var(--top-nav-bg);
+    color: var(--text-light);
+    padding: 8px 16px;
+    border-radius: 2px;
+    font-size: 12px;
+    z-index: 1000;
+}
+
+/* 按钮组 */
+.btn-group {
+    display: flex;
+    gap: 6px;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .sidebar {
+        width: 100%;
+        height: auto;
+        position: relative;
+    }
+
+    .main-content {
+        margin-left: 0;
+        padding: 10px;
+    }
+
+    .top-nav-right {
+        display: none;
+    }
+
+    .page-header {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .btn-group {
+        flex-wrap: wrap;
+    }
+}
+/* Modal Styles */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 1050;
+}
+
+.modal-container {
+    background: var(--main-bg);
+    padding: 20px;
+    border-radius: 3px;
+    width: 90%;
+    max-width: 500px;
+    box-shadow: 0 4px 6px var(--shadow-color);
+}
+
+.modal-header {
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--card-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-title {
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.modal-title i {
+    margin-right: 8px;
+    color: var(--accent-blue);
+}
+
+.modal-body {
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text-primary);
+}
+
+.version-content a {
+    color: var(--accent-blue);
+    text-decoration: none;
+}
+
+.version-content a:hover {
+    text-decoration: underline;
+}
+
+.version-info {
+    margin-bottom: 15px;
+}
+
+.version-info-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--card-border);
+}
+
+.version-info-item:last-child {
+    border-bottom: none;
+}
+
+/* Modal animation */
+.modal-overlay .modal-container {
+    animation: modalFadeIn 0.3s ease-out;
+}
+
+@keyframes modalFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.logout-link {
+    background: none;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    padding: 0;
+    font: inherit;
+    text-decoration: none;
+}
+
+.logout-link:hover {
+    text-decoration: underline;
+}
+
+/* ============================================================
+   移动端适配 — 机器列表 (iframe 内无 header/sidebar)
+   Author: doubleDimple
+   ============================================================ */
+@media (max-width: 768px) {
+    /* iframe 内无 header/sidebar，清零占位 */
+    .layout { padding-top: 0; }
+
+    /* 表格容器增强触摸滚动 */
+    .table-card { -webkit-overflow-scrolling: touch; }
+
+    /* 触摸设备禁用 hover 上浮，保证按钮松手后不残留悬浮态 */
+    .btn:hover { transform: none; }
+
+    /* 按钮触控高度补偿 */
+    .btn { min-height: 34px; }
+
+    /* 状态 badge 紧凑 */
+    .status-badge { font-size: 10px; padding: 2px 6px; }
+}
+
+@media (max-width: 480px) {
+    .main-content { padding: 8px; }
+    .page-header { gap: 6px; margin-bottom: 10px; }
+    .page-title { font-size: 14px; }
+    .btn { font-size: 11px; padding: 5px 8px; }
+}

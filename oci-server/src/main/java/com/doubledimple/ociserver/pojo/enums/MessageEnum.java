@@ -1,9 +1,5 @@
-package com.doubledimple.ociserver.enums;
+package com.doubledimple.ociserver.pojo.enums;
 
-import com.oracle.bmc.core.model.Shape;
-
-import static com.oracle.bmc.core.model.Shape.BillingType.AlwaysFree;
-import static com.oracle.bmc.core.model.Shape.BillingType.LimitedFree;
 
 public enum MessageEnum {
 
@@ -11,6 +7,12 @@ public enum MessageEnum {
     TELEGRAM("TELEGRAM"),
 
     DING_DING("DING_DING"),
+
+    BARK("bark"),
+
+    ALL_SMS("ALL_SMS"),
+
+    FEISHU("feishu"),
 
     ;
 

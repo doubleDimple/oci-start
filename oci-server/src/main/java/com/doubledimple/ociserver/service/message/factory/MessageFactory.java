@@ -1,7 +1,7 @@
-package com.doubledimple.ociserver.message.factory;
+package com.doubledimple.ociserver.service.message.factory;
 
-import com.doubledimple.ociserver.enums.MessageEnum;
-import com.doubledimple.ociserver.message.MessageService;
+import com.doubledimple.ociserver.pojo.enums.MessageEnum;
+import com.doubledimple.ociserver.service.message.MessageService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
 
