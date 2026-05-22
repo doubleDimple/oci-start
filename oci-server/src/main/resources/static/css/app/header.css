@@ -1,0 +1,702 @@
+/* ========== 主题变量（外壳） ========== */
+:root {
+    --top-nav-bg:          #1f1f1f;
+    --nav-border:          rgba(255,255,255,0.1);
+    --nav-icon-color:      rgba(255,255,255,0.9);
+    --nav-hover-bg:        rgba(255,255,255,0.1);
+    --nav-text-color:      rgba(255,255,255,0.85);
+    --brand-color:         #FFD700;
+    --update-btn-bg:       rgba(234,5,7,0.15);
+    --update-btn-border:   rgba(234,5,7,0.3);
+    --update-btn-color:    #ffffff;
+    --sidebar-bg:          #1e2124;
+    --sidebar-hover:       #292d30;
+    --sidebar-active:      #1abc9c;
+    --sidebar-text:        #a9b7c6;
+    --sidebar-active-text: #ffffff;
+    --submenu-bg:          #292d30;
+    --border-color:        #383c40;
+}
+
+[data-theme="light"] {
+    --top-nav-bg:          #d0dae6;
+    --nav-border:          #b0bfcf;
+    --nav-icon-color:      #1e2f42;
+    --nav-hover-bg:        rgba(0,0,0,0.08);
+    --nav-text-color:      #1e2f42;
+    --brand-color:         #b45309;
+    --update-btn-bg:       rgba(220,38,38,0.08);
+    --update-btn-border:   rgba(220,38,38,0.35);
+    --update-btn-color:    #dc2626;
+    --sidebar-bg:          #e4eaf2;
+    --sidebar-hover:       #d6dfe9;
+    --sidebar-text:        #374a61;
+    --sidebar-active-text: #1a2a3a;
+    --submenu-bg:          #dde4ef;
+    --border-color:        #b8c8d8;
+}
+
+/* ========== 底部版权栏 ========== */
+.global-footer {
+    height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 28px;
+    background: var(--top-nav-bg);
+    border-top: 1px solid var(--nav-border);
+    flex-shrink: 0;
+}
+
+.global-footer-center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    margin-top: 2px;
+}
+
+.footer-line1 {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--nav-icon-color);
+    letter-spacing: 0.3px;
+}
+
+.footer-line1 strong {
+    color: var(--brand-color);
+    font-size: 16px;
+}
+
+.footer-line2 a {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--nav-icon-color);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    opacity: 0.8;
+    transition: opacity 0.2s;
+}
+
+.footer-line2 a:hover { opacity: 1; }
+.footer-line2 a i { font-size: 15px; }
+
+/* ========== 全局布局 ========== */
+.top-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    background-color: var(--top-nav-bg);
+    border-bottom: 1px solid var(--nav-border);
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    z-index: 1000;
+}
+
+.top-nav * {
+    box-sizing: border-box;
+}
+
+/* 品牌 Logo */
+.top-nav .brand {
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+}
+
+.top-nav .brand h1,
+.brand-title {
+    margin: 0;
+    font-size: 30px;
+    font-weight: 600;
+    color: var(--brand-color);
+    letter-spacing: 1px;
+}
+
+/* 右侧容器 */
+.top-nav-right {
+    display: flex;
+    align-items: center;
+    gap: 15px; /* 按钮之间的间距 */
+    height: 100%;
+}
+
+/* ========== 组件：版本更新按钮 ========== */
+.header-update-btn {
+    padding: 6px 12px;
+    background-color: var(--update-btn-bg) !important;
+    border: 1px solid var(--update-btn-border) !important;
+    color: var(--update-btn-color) !important;
+    border-radius: 16px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: bold;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+}
+
+.header-update-btn:hover {
+    background-color: rgba(234, 5, 7, 0.25) !important;
+    transform: translateY(-1px);
+}
+
+/* ========== 组件：消息铃铛 ========== */
+.nav-icon-wrapper {
+    position: relative;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 50%;
+    transition: background-color 0.3s;
+}
+
+.nav-icon-wrapper:hover {
+    background-color: var(--nav-hover-bg);
+}
+
+.icon-inner {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.nav-icon {
+    font-size: 18px;
+    color: var(--nav-icon-color);
+}
+
+/* 修改前的 .notification-dot 只能显示红点，修改后可以显示数字 */
+.notification-dot {
+    position: absolute;
+    top: -5px;          /*稍微往上提一点，以免挡住铃铛*/
+    right: -5px;
+    min-width: 16px;    /* 最小宽度，保证个位数时是圆的 */
+    height: 16px;
+    line-height: 14px;  /* 垂直居中 */
+    padding: 0 4px;     /* 左右内边距，适应多位数 */
+    background-color: #ff4d4f;
+    border-radius: 10px; /* 变成圆角胶囊状 */
+    border: 1px solid #fff;
+    box-shadow: 0 0 4px rgba(255, 77, 79, 0.5);
+
+    color: #fff;
+    font-size: 10px;
+    font-weight: bold;
+    text-align: center;
+    white-space: nowrap;
+
+    display: none;
+    z-index: 10;
+}
+
+/* ========== 组件：用户头像 & 下拉菜单 ========== */
+.user-profile-widget {
+    position: relative;
+    height: 100%;
+    display: flex;
+    align-items: center;
+}
+
+/* 触发区：包含头像、文字、箭头 */
+.user-trigger {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    padding: 4px 12px 4px 6px;
+    border-radius: 6px;
+    transition: background-color 0.3s;
+}
+
+.user-trigger:hover {
+    background-color: var(--nav-hover-bg);
+}
+
+.user-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--nav-text-color);
+}
+
+/* 文字区域：垂直排列 */
+.user-info-text {
+    display: flex;
+    flex-direction: column;
+    margin: 0 10px;
+    line-height: 1.2;
+    justify-content: center;
+}
+
+.user-name-small {
+    font-size: 11px;
+    color: var(--nav-text-color);
+}
+
+.current-provider-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--nav-icon-color);
+    white-space: nowrap;
+}
+
+.dropdown-arrow {
+    color: var(--nav-text-color);
+    font-size: 12px;
+    transition: transform 0.3s;
+}
+
+/* 下拉菜单本体 */
+.user-dropdown-menu {
+    display: none;
+    position: absolute;
+    top: 60px;
+    right: 0;
+    width: 240px;
+    background-color: #ffffff;
+    border-radius: 0 0 8px 8px;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+    padding: 8px 0;
+    z-index: 2000;
+    animation: fadeInDown 0.2s ease-out;
+}
+
+.user-dropdown-menu.show {
+    display: block;
+}
+
+/* 菜单项样式 */
+.menu-header {
+    padding: 8px 16px;
+}
+.menu-role-text {
+    font-size: 12px;
+    color: #999;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+.menu-divider {
+    height: 1px;
+    background-color: #f0f0f0;
+    margin: 6px 0;
+}
+.menu-label {
+    padding: 8px 16px 4px;
+    font-size: 11px;
+    color: #999;
+    font-weight: bold;
+}
+
+.menu-item {
+    padding: 10px 16px;
+    font-size: 14px;
+    color: #333;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between; /* 图标文字在左，对勾在右 */
+    transition: all 0.2s;
+}
+
+.item-left {
+    display: flex;
+    align-items: center;
+}
+
+.menu-item:hover {
+    background-color: #f5f7fa;
+    color: #1890ff;
+}
+
+.menu-icon {
+    width: 20px;
+    margin-right: 10px;
+    text-align: center;
+    color: #8c8c8c;
+}
+
+.menu-item:hover .menu-icon {
+    color: #1890ff;
+}
+
+/* 选中项的高亮样式 (厂商切换用) */
+.active-provider {
+    background-color: #e6f7ff;
+    color: #1890ff;
+    font-weight: 500;
+}
+
+.active-provider .menu-icon {
+    color: #1890ff;
+}
+
+/* 对勾图标：默认隐藏，只有激活时显示 */
+.check-icon {
+    display: none;
+    font-size: 12px;
+}
+
+.active-provider .check-icon {
+    display: block;
+    color: #1890ff;
+}
+
+/* 语言选中样式 */
+.active-item {
+    color: #1890ff;
+    background-color: #e6f7ff;
+}
+
+/* 退出按钮红色悬浮 */
+.logout-item:hover {
+    background-color: #fff1f0;
+    color: #ff4d4f;
+}
+.logout-item:hover .menu-icon {
+    color: #ff4d4f;
+}
+
+@keyframes fadeInDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+    .top-nav { padding: 0 10px; height: 50px; }
+    .brand h1 { font-size: 18px !important; }
+    .user-name-small { display: none; } /* 空间不够隐藏名字 */
+    .user-dropdown-menu { top: 50px; }
+}
+
+/* ========== 消息下拉菜单样式 ========== */
+.message-dropdown-menu {
+    display: none; /* 默认隐藏 */
+    position: absolute;
+    top: 60px;
+    right: 80px; /* 根据铃铛位置调整 */
+    width: 320px;
+    background-color: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+    z-index: 2001;
+    animation: fadeInDown 0.2s ease-out;
+    border: 1px solid #eee;
+}
+
+.message-dropdown-menu.show {
+    display: block;
+}
+
+/* 头部：标题和全部已读 */
+.msg-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid #f0f0f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 600;
+    color: #333;
+}
+
+.mark-all-btn {
+    font-size: 12px;
+    color: #1890ff;
+    cursor: pointer;
+    font-weight: normal;
+}
+.mark-all-btn:hover {
+    text-decoration: underline;
+}
+
+/* 列表容器 */
+.msg-list {
+    max-height: 350px;
+    overflow-y: auto;
+    min-height: 100px;
+}
+
+/* 单个消息项 */
+.msg-item {
+    padding: 12px 16px;
+    border-bottom: 1px solid #f5f5f5;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    position: relative;
+}
+
+.msg-item:hover {
+    background-color: #f5f7fa;
+}
+
+/* 未读消息样式 */
+.msg-item.unread {
+    background-color: #fffbfb;
+}
+.msg-item.unread .msg-title {
+    font-weight: bold;
+    color: #333;
+}
+.msg-item.unread::before {
+    content: '';
+    position: absolute;
+    left: 6px;
+    top: 18px;
+    width: 6px;
+    height: 6px;
+    background-color: #ff4d4f;
+    border-radius: 50%;
+}
+
+.msg-title {
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+}
+
+.msg-time {
+    font-size: 11px;
+    color: #999;
+}
+
+.msg-empty, .msg-loading {
+    padding: 20px;
+    text-align: center;
+    color: #999;
+    font-size: 13px;
+}
+
+/* 底部翻页 */
+.msg-footer {
+    padding: 8px 16px;
+    border-top: 1px solid #f0f0f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+}
+
+.msg-page-btn {
+    background: none;
+    border: 1px solid #ddd;
+    padding: 2px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+    color: #666;
+}
+.msg-page-btn:disabled {
+    color: #ccc;
+    cursor: not-allowed;
+    border-color: #eee;
+}
+.msg-page-btn:hover:not(:disabled) {
+    border-color: #1890ff;
+    color: #1890ff;
+}
+
+/* SweetAlert 自定义内容优化 */
+.swal2-html-container {
+    margin: 1em 1.6em .3em !important;
+    text-align: left !important;
+}
+
+/* 修改消息项的布局，使其内容和操作按钮可以并排 */
+.msg-item {
+    display: flex; /* 启用 Flex 布局 */
+    justify-content: space-between; /* 内容和操作按钮两端对齐 */
+    align-items: center; /* 垂直居中 */
+    padding-right: 10px; /* 为删除按钮留出空间 */
+}
+
+/* 消息内容包装器，占据主要宽度，并保留点击打开详情的功能 */
+.msg-content-wrapper {
+    flex-grow: 1; /* 占据剩余所有空间 */
+    padding: 10px; /* 原有的内边距 */
+    cursor: pointer; /* 保持可点击状态 */
+}
+
+/* 操作区域 */
+.msg-actions {
+    flex-shrink: 0;
+    margin-left: 10px;
+}
+
+/* 删除按钮样式 */
+.delete-msg-btn {
+    background: none;
+    border: none;
+    color: #999;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 5px;
+    transition: color 0.2s;
+}
+
+.delete-msg-btn:hover {
+    color: var(--accent-red, #f44336);
+}
+
+/* 菜单头部样式 */
+.user-dropdown-menu .menu-header {
+    padding: 15px 20px 10px 20px;
+    border-bottom: 1px solid var(--border-color, #eee);
+}
+
+/* 欢迎文本的样式 */
+.menu-welcome-text {
+    font-size: 16px;
+    font-weight: 600; /* 加粗 */
+    color: var(--primary-color, #1890ff); /* 使用主题色或主色调 */
+    white-space: nowrap; /* 防止换行 */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    /* 让欢迎信息更突出，例如：加一个背景或阴影 */
+    /* text-shadow: 0 1px 1px rgba(0,0,0,0.1); */
+}
+
+#languageDropdown {
+    display: none;
+    position: absolute;
+    top: 60px; /* 根据你导航栏高度调整 */
+    right: 120px; /* 调整此值，确保它对齐在语言图标下方 */
+    background: #fff;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    border-radius: 4px;
+    z-index: 1000;
+}
+
+#languageDropdown.show {
+    display: block;
+}
+
+#languageDropdown .menu-item {
+    padding: 10px 20px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+#languageDropdown .menu-item:hover {
+    background-color: #f5f5f5;
+}
+
+#languageDropdown .active-item {
+    color: #409eff;
+    font-weight: bold;
+}
+
+#aiContentText {
+    white-space: pre-wrap !important;
+    line-height: 2.0;
+    font-family: 'Consolas', monospace;
+}
+/* 基础勋章样式 */
+.lvl-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 10px;
+    font-weight: bold;
+    font-size: 11px;
+    border-radius: 4px;
+    position: relative;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background-color: #2c3e50;
+    color: #fff !important;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    white-space: nowrap;
+}
+
+/* 动态扫光效果 */
+.lvl-badge::after {
+    content: '';
+    position: absolute;
+    top: -50%; left: -150%;
+    width: 60%; height: 200%;
+    background: linear-gradient(to right, transparent, rgba(255,255,255,0.3), transparent);
+    transform: rotate(30deg);
+    animation: badge-shine 4s infinite ease-in-out;
+}
+
+@keyframes badge-shine {
+    0% { left: -150%; }
+    20% { left: 150%; }
+    100% { left: 150%; }
+}
+
+/* 9个段位的配色方案 */
+.lvl-1 { background: #78909c; } /* 初级云玩家 (1-2) */
+.lvl-2 { background: #8d6e63; } /* 中级云达人 (3-4) */
+.lvl-3 { background: #546e7a; } /* 高级架构师 (5-10) */
+.lvl-4 { background: #2e7d32; } /* 资深资源商 (11-25) */
+.lvl-5 { background: #1565c0; } /* 核心合伙人 (26-50) */
+.lvl-6 { background: #6a1b9a; } /* 顶级运营商 (51-80) */
+.lvl-7 { background: #c62828; } /* 巅峰掌控者 (81-120) */
+.lvl-8 { background: #00838f; } /* 至尊领航员 (121-200) */
+.lvl-9 { background: #000; border: 1px solid #ff0000; color: #ff0000 !important; } /* Oracle主宰者 (201+) */
+
+/* ========== 暗色模式适配 ========== */
+[data-theme="dark"] .user-dropdown-menu {
+    background-color: #1f2229;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+[data-theme="dark"] .menu-header { border-bottom-color: #31363d; }
+[data-theme="dark"] .menu-role-text { color: #768390; }
+[data-theme="dark"] .menu-divider { background-color: #31363d; }
+[data-theme="dark"] .menu-label { color: #768390; }
+[data-theme="dark"] .menu-item { color: #cdd9e5; }
+[data-theme="dark"] .menu-item:hover { background-color: #252c36; color: #4d9eff; }
+[data-theme="dark"] .menu-icon { color: #768390; }
+[data-theme="dark"] .menu-item:hover .menu-icon { color: #4d9eff; }
+[data-theme="dark"] .active-provider { background-color: rgba(77,158,255,0.12); color: #4d9eff; }
+[data-theme="dark"] .active-provider .menu-icon { color: #4d9eff; }
+[data-theme="dark"] .active-provider .check-icon { color: #4d9eff; }
+[data-theme="dark"] .active-item { color: #4d9eff; background-color: rgba(77,158,255,0.12); }
+[data-theme="dark"] .logout-item:hover { background-color: rgba(255,77,79,0.12); color: #ff4d4f; }
+[data-theme="dark"] .logout-item:hover .menu-icon { color: #ff4d4f; }
+[data-theme="dark"] .menu-welcome-text { color: #4d9eff; }
+
+[data-theme="dark"] .message-dropdown-menu {
+    background-color: #1f2229;
+    border-color: #31363d;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+[data-theme="dark"] .msg-header { border-bottom-color: #31363d; color: #cdd9e5; }
+[data-theme="dark"] .mark-all-btn { color: #4d9eff; }
+[data-theme="dark"] .msg-item { border-bottom-color: #2a2f38; }
+[data-theme="dark"] .msg-item:hover { background-color: #252c36; }
+[data-theme="dark"] .msg-item.unread { background-color: #1c2128; }
+[data-theme="dark"] .msg-item.unread .msg-title { color: #cdd9e5; }
+[data-theme="dark"] .msg-title { color: #a8b3c0; }
+[data-theme="dark"] .msg-time { color: #768390; }
+[data-theme="dark"] .msg-empty,
+[data-theme="dark"] .msg-loading { color: #768390; }
+[data-theme="dark"] .msg-footer { border-top-color: #31363d; }
+[data-theme="dark"] .msg-page-btn { border-color: #31363d; color: #cdd9e5; background: #252c36; }
+[data-theme="dark"] .msg-page-btn:hover:not(:disabled) { border-color: #4d9eff; color: #4d9eff; }
+[data-theme="dark"] .msg-page-btn:disabled { color: #4a5568; border-color: #2a2f38; }
+[data-theme="dark"] .delete-msg-btn { color: #768390; }
+
+[data-theme="dark"] #languageDropdown {
+    background: #1f2229;
+    border-color: #31363d;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+}
+[data-theme="dark"] #languageDropdown .menu-item:hover { background-color: #252c36; }
+[data-theme="dark"] #languageDropdown .active-item { background-color: rgba(77,158,255,0.12); }
