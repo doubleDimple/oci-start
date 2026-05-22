@@ -1,0 +1,142 @@
+spring:
+  web:
+    resources:
+      cache:
+        cachecontrol:
+          max-age: 2592000
+      chain:
+        enabled: true
+        strategy:
+          content:
+            enabled: true
+            paths: /js/**, /css/**
+  cache:
+    type: caffeine
+    caffeine:
+      # 覆盖common模块中的默认配置
+      spec: initialCapacity=100,maximumSize=1000,expireAfterAccess=30m,expireAfterWrite=1h
+  quartz:
+    web:
+      enabled: true
+      base-path: /quartz-monitor
+      path: /quartz-ui
+    job-store-type: jdbc
+    jdbc:
+      initialize-schema: always
+    properties:
+      org.quartz.jobStore.driverDelegateClass: org.quartz.impl.jdbcjobstore.StdJDBCDelegate
+  main:
+    lazy-initialization: true
+    banner-mode: log
+  jmx:
+    enabled: false
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    serialization:
+      write-dates-as-timestamps: false
+  application:
+    name: oci-start
+  freemarker:
+    template-loader-path: classpath:/templates/
+    content-type: text/html
+    cache: true
+    charset: UTF-8
+    check-template-location: true
+    expose-request-attributes: false
+    expose-session-attributes: false
+    request-context-attribute: req
+    suffix: .ftl
+    settings:
+      api_builtin_enabled: true
+      date_format: yyyy-MM-dd
+      time_format: HH:mm:ss
+      datetime_format: yyyy-MM-dd HH:mm:ss
+  messages:
+    basename: i18n/messages
+    encoding: UTF-8
+    fallback-to-system-locale: false
+    use-code-as-default-message: true
+
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 20MB
+
+  datasource:
+    driverClassName: org.h2.Driver
+    ##数据库的用户名和密码,目前只支持h2
+    url: jdbc:h2:file:./data/vps_db;DB_CLOSE_ON_EXIT=FALSE
+    username: oci-start-sa_admin
+    password: QWWQE^$%#^20240190ghf
+  jpa:
+    hibernate:
+      ddl-auto: update
+    generate-ddl: true
+    database-platform: org.hibernate.dialect.H2Dialect
+    open-in-view: false
+  h2:
+    console:
+      enabled: false
+  profiles:
+    active: release
+server:
+  #forward-headers-strategy: native
+  max-http-header-size: 81920
+  port: 9856
+
+# 日志配置
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{traceId}] %-5level %logger{36} - %msg%n"
+  level:
+    com.doubledimple.ociserver: INFO
+    com.oracle.bmc.core.VirtualNetworkClient: ERROR
+    com.oracle.bmc.http.client.jersey.JerseyHttpClientBuilder: WARN
+    com.oracle.bmc.core.BlockstorageClient: ERROR
+    com.oracle.bmc.core.ComputeClient: ERROR
+    com.oracle.bmc.workrequests.WorkRequestClient: WARN
+    com.oracle.bmc.Region: WARN
+    com.oracle.bmc.identity.IdentityClient: ERROR
+    com.oracle.bmc.objectstorage.ObjectStorageClient: ERROR
+    com.oracle.bmc.Services: ERROR
+    com.oracle.bmc.ClientRuntime: ERROR
+    com.oracle.bmc.logging.LoggingManagementClient: ERROR
+    com.oracle.bmc.http.client.jersey.internal.IdleConnectionMonitor: ERROR
+    com.oracle.bmc.identitydomains.IdentityDomainsClient: ERROR
+    com.oracle.bmc.monitoring.MonitoringClient: ERROR
+    org.springframework.scheduling.quartz.SchedulerFactoryBean: ERROR
+    org.quartz.core.QuartzScheduler: ERROR
+    org.quartz.impl.StdSchedulerFactory: ERROR
+    org.quartz.impl.jdbcjobstore.JobStoreTX: ERROR
+    org.telegram.telegrambots.updatesreceivers.DefaultBotSession:  ERROR
+    org.springframework.security.web.DefaultSecurityFilterChain: ERROR
+    org.springframework.data.repository.config.RepositoryConfigurationDelegate: ERROR
+    com.oracle.bmc.usageapi.UsageapiClient: ERROR
+    com.oracle.bmc.ospgateway.SubscriptionServiceClient: ERROR
+    com.oracle.bmc.mysql.DbSystemClient: ERROR
+    com.oracle.bmc.networkloadbalancer.NetworkLoadBalancerClient: ERROR
+
+#/root/oci-start/upload/
+
+baseFile:
+  filePath: ./data/upload/
+
+cf:
+  worker:
+    domain: https://oci-api-worker.lovele-cn.workers.dev
+
+thirdApi:
+  speedUrl: https://speed.objboy.com/
+
+oci:
+  version: 5.7.69
+  ssh-version: v-5.7.69
+
+ssl:
+  staging: false
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+  packages-to-scan: com.doubledimple.ociserver.third.openApi.controller

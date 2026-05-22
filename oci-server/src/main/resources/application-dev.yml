@@ -1,0 +1,102 @@
+# 本地调试：强制禁用 Turnstile 人机验证（生产环境请勿开启）
+turnstile:
+  local:
+    bypass: true
+
+spring:
+  cache:
+    type: caffeine
+    caffeine:
+      # 覆盖common模块中的默认配置
+      spec: initialCapacity=100,maximumSize=1000,expireAfterAccess=30m,expireAfterWrite=1h
+  quartz:
+    web:
+      enabled: true
+      base-path: /quartz-monitor
+      path: /quartz-ui
+    job-store-type: jdbc
+    jdbc:
+      initialize-schema: always
+    properties:
+      org.quartz.jobStore.driverDelegateClass: org.quartz.impl.jdbcjobstore.StdJDBCDelegate
+  main:
+    lazy-initialization: true
+  jmx:
+    enabled: false
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    serialization:
+      write-dates-as-timestamps: false
+  application:
+    name: oci-server-pro
+  freemarker:
+    template-loader-path: classpath:/templates/
+    content-type: text/html
+    cache: true
+    charset: UTF-8
+    check-template-location: true
+    expose-request-attributes: false
+    expose-session-attributes: false
+    request-context-attribute: req
+    suffix: .ftl
+    settings:
+      api_builtin_enabled: true
+      date_format: yyyy-MM-dd
+      time_format: HH:mm:ss
+      datetime_format: yyyy-MM-dd HH:mm:ss
+  datasource:
+    driverClassName: org.h2.Driver
+    ##数据库的用户名和密码,目前只支持h2
+    url: jdbc:h2:file:/Users/admin/devData/vps_db;DB_CLOSE_ON_EXIT=FALSE
+    username: oci-start-sa_admin
+    password: QWWQE^$%#^20240190ghf
+  jpa:
+    hibernate:
+      ddl-auto: update
+    generate-ddl: true
+    database-platform: org.hibernate.dialect.H2Dialect
+    open-in-view: false
+  h2:
+    console:
+      enabled: false
+server:
+  max-http-header-size: 81920
+  port: 9856
+
+# 日志配置
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{traceId}] %-5level %logger{36} - %msg%n"
+  level:
+    com.doubledimple.ociserver: INFO
+    com.oracle.bmc.core.VirtualNetworkClient: ERROR
+    com.oracle.bmc.http.client.jersey.JerseyHttpClientBuilder: WARN
+    com.oracle.bmc.core.BlockstorageClient: ERROR
+    com.oracle.bmc.core.ComputeClient: ERROR
+    com.oracle.bmc.workrequests.WorkRequestClient: WARN
+    com.oracle.bmc.Region: WARN
+    com.oracle.bmc.identity.IdentityClient: ERROR
+    com.oracle.bmc.objectstorage.ObjectStorageClient: ERROR
+    com.oracle.bmc.Services: ERROR
+    com.oracle.bmc.ClientRuntime: ERROR
+    com.oracle.bmc.logging.LoggingManagementClient: ERROR
+    com.oracle.bmc.http.client.jersey.internal.IdleConnectionMonitor: ERROR
+    org.springframework.scheduling.quartz.SchedulerFactoryBean: ERROR
+    org.quartz.core.QuartzScheduler: ERROR
+    org.quartz.impl.StdSchedulerFactory: ERROR
+    org.quartz.impl.jdbcjobstore.JobStoreTX: ERROR
+baseFile:
+  filePath: /Users/admin/devData/upload
+
+rsa:
+  privateKey: MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCSTFcrnPAld+RZtjwpv2Hgeqp+AHcniAOiB1KZBqRv6qyEXXrWCk0pfX+XGiCPyE9hXyAo0r8D7BEaYBLPH+I2BskDm5FtKcUV2KSgA4K4asOUdNyxFXwh1UEFHrQiX2PFIVS2N4uno32Zc9OGWfirFWIhHQzfjvlyK/9vTeVmW5VZB4Aml2ChRn/JcBWvYt6UFmMutIdf8qxCFAOJkPGhfMXDmS2zdlFL+FkZZdQxmctCwUVNuKrzMwE8OQa1pwlRmihUm6sC1IPhZl6bJQqN06RwUxvLF41O+QtSXpNJOWNcN96u3NaigBTDwfnrOWnjMhPodaAacGFEHwlCAcGXAgMBAAECggEALwzYOBGH9jThvqxqGu8O9lfc/xr9Nzx6FqEOQmKtfcTWaNd7itzTRhWzdBAWCsfcJ6+lMxvcDNHeCkJ9qhlR8hgqi7t7gMUfOlBrWX7nipHjhpoy48zKGENyXsgqHKfa+WonyVaB1o8w9KoYjCvhWnxNC+NA4aEkvkBCLTS7IziyeBfCkMOHhTI6LLeMKzSqoTkbdCtaQE/l7699ESFOXfLrtlgngW8MnnaJtQ/B2Frkm03gh+xcLXo/P4qTRH6fXTBIJhyi4tDa6KqN5kUx7R0mReeG+WASnURPqHJU/jLvZxJjqAYbYmAfkZdBjP7eZtcFPbLGPvBB3rMPuk91MQKBgQDIa6Kbpm1Xcyp0ZQSrPzk0lqEZRtCLXNLDwvBi5wk9OW3Caiwg/EncLXhPTA41EaNqbZ0vlZWZOfx25Q94izCON6W26t1tu5NA2eTlPTfdDln7dS9KyaztKnXB0ITq3nKOaB2aAEUxwEkZBavZKebbW5CiSWRpIEOdhaFETm5F3wKBgQC63m1yjZ7prUfWmDN8L7TMOxcA8Rl7cHkFGvqEN8+zJwBhn3YKG/EZghtrU6V9hx7+p5BCMzzH7T2401g10MEVPFUJHG/TQDzbL/VQsTjhiJJV/9GKkokfx7scXRvfSTfkH6wxY6SDiYTaB2OqeZVd44vGRRPpbcxQ555HYdjLSQKBgQCff+l87cn+2oxi7TH2Bu7Dx0yWDSFSh6DEYpNkYnGb4+RR4KUV6zHso9MnaGO2ID9pJ6r8f5L6yob9J/ZT/JG73NVo6SkndywNZFshhMK8jftWf0APyMhyRmRIxmXBdR697mYAdU6b9Wc3HqhQv2QWFpzYSog6kY6+AecBsVlZCQKBgFz4mP9rUmr0WU98/fCFU7BgnbtMON9fP/a4S3dIxT9e4iOv0GyLJlMIlle5kBZ6CYOtHmqxT0Yw1IqGK9bqe4XzNGOKEGDMDvsGS0jQQ3qCFjxPQJNvAGYdWwxrjphytyn6UBNqfckrvDs1ffKs9xF1Sm9kotl6VTLTab4eAlxxAoGAIEGCZIoIFqcI/RzFo5XL0eigoDXROhJoE+3nw3Rx9ps9sQQydP/3HEc5SMKGwIhPvrLu4zFbW/cBBo6jkw+NooGnAvRYDi61ZEz3aV9nfH2ZKknEmQWpEkw1Zo4ETogQi3W2kwToJa71+Bjo3RpEi8SFdE//6sFh8tY9EyEwSNw=
+
+thirdApi:
+  domain: https://notify.objboy.com/server-support-api/
+  #domain: http://localhost:9966/server-support-api/
+  regionNotify: notify
+  helpNotify: help
+  records: archRecords
+
+oci:
+  version: 5.1.8
