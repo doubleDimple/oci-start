@@ -1,0 +1,629 @@
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+}
+
+:root {
+    --primary-color: #42b983;
+    --secondary-color: #35495e;
+    --error-color: #ff6b6b;
+    --success-color: #42b983;
+    --background-color: #f4f5f7;
+    --text-color: #2c3e50;
+    --border-color: #e4e7ed;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+    color: var(--text-color);
+    background-color: var(--background-color) !important;
+    background-image:
+            radial-gradient(at 0% 0%, rgba(91, 61, 246, 0.12) 0px, transparent 50%),
+            radial-gradient(at 100% 100%, rgba(0, 180, 219, 0.12) 0px, transparent 50%),
+            linear-gradient(180deg, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0) 100%) !important;
+    background-attachment: fixed !important;
+    background-size: cover !important;
+    height: 100vh !important;
+    width: 100vw !important;
+    overflow: hidden !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overscroll-behavior: none !important;
+}
+
+.page-container {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.header {
+    padding: 20px;
+    text-align: center;
+    background: linear-gradient(135deg, #42b983 0%, #35495e 100%);
+    color: white;
+    position: relative;
+}
+
+.wave-container {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    overflow: hidden;
+    line-height: 0;
+    transform: rotate(180deg);
+}
+
+.wave-container svg {
+    position: relative;
+    display: block;
+    width: calc(100% + 1.3px);
+    height: 46px;
+}
+
+.wave-container .shape-fill {
+    fill: var(--background-color);
+}
+
+.header h1 {
+    font-size: 24px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.header .logo-icon {
+    font-size: 28px;
+    animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+}
+
+.main-content {
+    flex: 1;
+    padding: 20px;
+    margin-top: 40px;  /* 增加顶部边距 */
+    display: flex;     /* 添加flex布局 */
+    align-items: center;  /* 垂直居中 */
+    min-height: calc(100vh - 250px);  /* 确保有足够的空间进行居中 */
+}
+
+.login-card {
+    background: white;
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    max-width: 400px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--text-color);
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.input-container {
+    position: relative;
+}
+
+.form-control {
+    width: 100%;
+    height: 48px;
+    padding: 12px 16px;
+    font-size: 16px;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    transition: all 0.3s;
+    background: #f8f9fa;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    background: white;
+    box-shadow: 0 0 0 3px rgba(66, 185, 131, 0.1);
+}
+
+.input-icon {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #999;
+    font-size: 18px;
+}
+
+.btn {
+    width: 100%;
+    height: 48px;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.btn-primary {
+    background: var(--primary-color);
+    color: white;
+}
+
+.btn-github {
+    background: #24292e;
+    color: white;
+    margin-top: 12px;
+}
+
+.btn:active {
+    transform: scale(0.98);
+}
+
+.btn.disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.verification-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr;  /* 将空间平均分成两列 */
+    gap: 8px;
+}
+
+.verification-input {
+    width: 100%;  /* 让输入框占满其列宽 */
+}
+
+.btn-send-code {
+    width: 100%;  /* 让按钮占满其列宽 */
+    background: linear-gradient(135deg, #00b4db 0%, #0083b0 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.3s;
+    height: 42px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 10px rgba(0, 180, 219, 0.2);
+}
+
+.btn-send-code:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0, 180, 219, 0.3);
+    background: linear-gradient(135deg, #00c6db 0%, #0095b0 100%);
+}
+
+.btn-send-code:disabled {
+    background: linear-gradient(135deg, #b0b0b0 0%, #8c8c8c 100%);
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+.tab-group {
+    display: flex;
+    margin-bottom: 20px;
+    background: #f8f9fa;
+    padding: 4px;
+    border-radius: 12px;
+}
+
+.tab {
+    flex: 1;
+    padding: 10px;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-color);
+    cursor: pointer;
+    border-radius: 8px;
+    transition: all 0.3s;
+}
+
+.tab.active {
+    background: var(--primary-color);
+    color: white;
+}
+
+.message {
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+    from { transform: translateY(-10px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+.error-message {
+    background: rgba(255, 107, 107, 0.1);
+    color: var(--error-color);
+}
+
+.success-message {
+    background: rgba(66, 185, 131, 0.1);
+    color: var(--success-color);
+}
+
+.footer {
+    text-align: center;
+    padding: 20px;
+    color: #666;
+    font-size: 12px;
+}
+
+/* 自定义滚动条 */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+/* 适配暗色模式 */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --background-color: #1a1a1a;
+        --text-color: #e0e0e0;
+        --border-color: #333;
+    }
+
+    .login-card {
+        background: #242424;
+    }
+
+    .form-control {
+        background: #333;
+        color: #e0e0e0;
+    }
+
+    .form-control:focus {
+        background: #404040;
+    }
+
+    .tab-group {
+        background: #333;
+    }
+
+    .message {
+        background: rgba(0, 0, 0, 0.2);
+    }
+}
+
+.forgot-password-link {
+    display: block;
+    text-align: center;
+    margin-top: 16px;
+    color: var(--primary-color);
+    text-decoration: none;
+    font-size: 14px;
+    transition: color 0.3s;
+}
+
+.forgot-password-link:hover {
+    color: var(--secondary-color);
+}
+
+/* 模态框样式 */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 20px;
+    animation: fadeIn 0.3s ease;
+}
+
+.modal-overlay.show {
+    display: flex;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.modal {
+    background: white;
+    border-radius: 16px;
+    padding: 24px;
+    max-width: 400px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    position: relative;
+    animation: slideUp 0.3s ease;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(30px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.modal-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-color);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: #999;
+    cursor: pointer;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.3s;
+}
+
+.modal-close:hover {
+    background: #f5f5f5;
+    color: var(--text-color);
+}
+
+.modal-steps {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 24px;
+    position: relative;
+}
+
+.modal-steps::before {
+    content: '';
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    right: 16px;
+    height: 2px;
+    background: var(--border-color);
+    z-index: 1;
+}
+
+.modal-steps .progress-line {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    height: 2px;
+    background: var(--primary-color);
+    z-index: 2;
+    transition: width 0.5s ease;
+    width: 0;
+}
+
+.step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+    position: relative;
+    z-index: 3;
+}
+
+.step-circle {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: white;
+    border: 2px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 600;
+    color: #999;
+    transition: all 0.3s;
+}
+
+.step.active .step-circle {
+    border-color: var(--primary-color);
+    background: var(--primary-color);
+    color: white;
+}
+
+.step.completed .step-circle {
+    border-color: var(--success-color);
+    background: var(--success-color);
+    color: white;
+}
+
+.step-label {
+    font-size: 12px;
+    color: #999;
+    margin-top: 8px;
+    text-align: center;
+}
+
+.step.active .step-label,
+.step.completed .step-label {
+    color: var(--text-color);
+}
+
+.reset-step {
+    display: none;
+}
+
+.reset-step.active {
+    display: block;
+}
+
+.step-description {
+    background: #f8f9fa;
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 16px;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 12px;
+}
+
+.btn-secondary {
+    background: #f5f5f5;
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+}
+
+.btn-modal {
+    height: 44px;
+    border-radius: 8px;
+    font-size: 14px;
+    flex: 1;
+}
+
+html, body {
+    height: 100vh !important;
+    width: 100vw !important;
+    overflow: hidden !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overscroll-behavior: none !important;
+}
+
+.page-container {
+    height: 100vh !important;
+    min-height: auto !important;
+    overflow: hidden !important;
+}
+.main-content {
+    margin-top: 0 !important;
+    height: 100% !important;
+}
+
+.auth-shell {
+    min-height: auto !important;
+    max-height: 96vh;
+    overflow-y: auto;
+}
+
+/* ============================================================
+   移动端补充 — 超小屏适配
+   Author: doubleDimple
+   ============================================================ */
+@media (max-width: 480px) {
+    /* 超小屏手机允许垂直滚动，防止表单被裁切 */
+    html, body {
+        overflow: auto !important;
+        overflow-x: hidden !important;
+    }
+
+    .page-container {
+        overflow: auto !important;
+    }
+
+    /* auth-shell 在超小屏上全高自适应 */
+    .auth-shell {
+        max-height: none !important;
+        border-radius: 0 !important;
+    }
+
+    /* 表单区收窄内边距，留更多输入空间 */
+    .form-panel .login-card {
+        padding: 32px 16px 24px !important;
+    }
+
+    /* 按钮触控区保持 48px */
+    .btn {
+        height: 48px;
+        font-size: 15px;
+    }
+
+    /* lang-selector 小屏缩小 */
+    .lang-selector {
+        padding: 6px 10px !important;
+        gap: 8px !important;
+        font-size: 12px;
+        top: 12px !important;
+        right: 12px !important;
+    }
+
+    /* 品牌区缩小间距 */
+    .brand {
+        margin-bottom: 22px !important;
+    }
+
+    .brand-name {
+        font-size: 19px !important;
+    }
+
+    /* 表单 label 字号 */
+    .form-group label {
+        font-size: 13px !important;
+    }
+}

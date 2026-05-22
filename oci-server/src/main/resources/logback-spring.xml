@@ -1,19 +1,38 @@
 <configuration>
-    <property name="LOG_HOME" value="logs" />
+    <!-- 默认日志路径 -->
+    <springProfile name="!dev">
+        <property name="LOG_HOME" value="logs" />
+    </springProfile>
+
+    <!-- dev 环境专用日志路径 -->
+    <springProfile name="dev">
+        <property name="LOG_HOME" value="/Users/admin/devData/logs" />
+    </springProfile>
+
+
+    <!-- 定义日志格式，包含 traceId -->
+    <property name="LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{traceId:-NONE}] %highlight(%-5level) %logger{36} - %msg%n" />
 
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <pattern>%d{yyyy-MM-dd HH:mm:ss} [%thread] %highlight(%-5level) %logger{36} - %msg%n</pattern>
+            <pattern>${LOG_PATTERN}</pattern>
         </encoder>
     </appender>
+
     <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>${LOG_HOME}/application.log</file>
-        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-            <fileNamePattern>${LOG_HOME}/application-%d{yyyy-MM-dd}.log</fileNamePattern>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <!-- 修改这一行，添加 %i -->
+            <fileNamePattern>${LOG_HOME}/application-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <!-- 保留3天的日志 -->
             <maxHistory>3</maxHistory>
+            <!-- 假设每天最多10个文件（1GB），3天就是3GB -->
+            <totalSizeCap>3GB</totalSizeCap>
+            <cleanHistoryOnStart>true</cleanHistoryOnStart>
+            <maxFileSize>100MB</maxFileSize>
         </rollingPolicy>
         <encoder>
-            <pattern>%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n</pattern>
+            <pattern>${LOG_PATTERN}</pattern>
         </encoder>
     </appender>
 

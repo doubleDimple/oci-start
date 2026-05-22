@@ -1,0 +1,89 @@
+/* ====== 全屏遮罩层（玻璃拟态 + 渐显效果） ====== */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(6px);
+
+    z-index: 99999;
+
+    opacity: 0;
+    animation: fadeIn 0.25s ease-out forwards;
+}
+
+/* ====== 加载容器（进入带缩放） ====== */
+.loading-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+
+    transform: scale(0.85);
+    opacity: 0;
+    animation: zoomIn 0.25s ease-out forwards;
+    animation-delay: 0.05s;
+}
+
+.loading-spinner {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+
+    border: 7px solid rgba(255, 255, 255, 0.2);
+
+    border-top-color: #00AEEF;
+    border-left-color: #20E5FF;
+
+    box-shadow: none;
+
+    animation: spin 0.9s linear infinite;
+}
+
+
+.loading-text {
+    margin-top: 15px;
+    padding: 8px 18px;
+
+    color: #ffffff;
+    font-size: 18px;
+    font-weight: 600;
+
+    background: rgba(0, 0, 0, 0.55);
+    border-radius: 10px;
+
+    text-shadow: none;
+
+    animation: none;
+}
+
+
+/* ====== 旋转动画 ====== */
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* ====== 遮罩渐显 ====== */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* ====== 内容缩放进入 ====== */
+@keyframes zoomIn {
+    from { transform: scale(0.85); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
+
+/* ====== 呼吸动画（用于文字） ====== */
+@keyframes breathing {
+    0%   { opacity: 0.75; }
+    50%  { opacity: 1; }
+    100% { opacity: 0.75; }
+}
