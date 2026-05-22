@@ -350,6 +350,12 @@ Made with ❤️ by [doubleDimple](https://github.com/doubleDimple)
 
 </div>
 
+## Contributors
+
+<a href="https://github.com/doubleDimple/oci-start/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=doubleDimple/oci-start" />
+</a>
+
 # Contributing to OCI-START
 
 感谢你对 `oci-start` 项目的关注与支持 ❤️
