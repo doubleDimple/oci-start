@@ -12,7 +12,7 @@
                         <i class="fas fa-chevron-down page-size-arrow" id="pageSizeArrow"></i>
                     </button>
                     <div class="page-size-panel" id="pageSizePanel" style="display:none;">
-                        <#list [10,20,30] as item>
+                        <#list [10,20,30,50] as item>
                             <button type="button" class="page-size-item <#if size == item>active</#if>"
                                     onclick="selectPageSize(${item}, '${url}', ${page})">${item}</button>
                         </#list>
