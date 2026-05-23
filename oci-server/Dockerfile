@@ -5,13 +5,17 @@ FROM eclipse-temurin:17-jre-jammy
 WORKDIR /oci-start
 
 # 创建必要的目录
-RUN mkdir -p /oci-start/data \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends tzdata \
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /oci-start/data \
     && mkdir -p /oci-start/logs
 
 # 设置环境变量
 ENV SERVER_PORT=9856
 ENV DATA_PATH=/oci-start/data
 ENV LOG_HOME=/oci-start/logs
+ENV TZ=Asia/Shanghai
 
 # 直接复制本地已构建好的 jar
 COPY target/oci-start-release.jar oci-start.jar
@@ -27,6 +31,7 @@ VOLUME ["/oci-start/data", "/oci-start/logs"]
 
 # 启动命令
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS \
+    -Duser.timezone=$TZ \
     -DSERVER_PORT=$SERVER_PORT \
     -DDATA_PATH=$DATA_PATH \
     -DLOG_HOME=$LOG_HOME \

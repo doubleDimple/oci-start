@@ -35,6 +35,7 @@
 
     <!-- SweetAlert2 CSS -->
     <link href="/css/sweetalert2.min.css" rel="stylesheet">
+    <link href="/css/common/sweetalert-overrides.css" rel="stylesheet">
     <!-- SweetAlert2 JS -->
     <script src="/js/sweetalert2.min.js"></script>
     <script src="/js/common/dropdown-menu.js"></script>
@@ -783,7 +784,56 @@
         machine_net: "${msg.get('machine.net')?js_string}",
         machine_deleteRecord: "${msg.get('machine.deleteRecord')?js_string}",
         token_enabled: "${msg.get('token.status.enabled')?js_string}",
-        tenant_no: "${msg.get('tenant.no')?js_string}"
+        tenant_no: "${msg.get('tenant.no')?js_string}",
+        common_success: "${msg.get('common.success')?js_string}",
+        common_error: "${msg.get('common.error')?js_string}",
+        common_delete: "${msg.get('common.delete')?js_string}",
+        request_default_fail: "${msg.get('request.defaultFail')?js_string}",
+        request_network_or_server_error: "${msg.get('request.networkOrServerError')?js_string}",
+        request_fail_title: "${msg.get('request.failTitle')?js_string}",
+        request_http_400_suffix: "${msg.get('request.http400Suffix')?js_string}",
+        request_http_401_suffix: "${msg.get('request.http401Suffix')?js_string}",
+        request_http_403_suffix: "${msg.get('request.http403Suffix')?js_string}",
+        request_http_404_suffix: "${msg.get('request.http404Suffix')?js_string}",
+        request_http_408_suffix: "${msg.get('request.http408Suffix')?js_string}",
+        request_http_409_suffix: "${msg.get('request.http409Suffix')?js_string}",
+        request_http_413_suffix: "${msg.get('request.http413Suffix')?js_string}",
+        request_http_429_suffix: "${msg.get('request.http429Suffix')?js_string}",
+        request_http_5xx_suffix: "${msg.get('request.http5xxSuffix')?js_string}",
+        request_http_generic_suffix: "${msg.get('request.httpGenericSuffix')?js_string}",
+        modal_autoClose3s: "${msg.get('modal.autoClose3s')?js_string}",
+        machine_errorRetrySuffix: "${msg.get('machine.errorRetrySuffix')?js_string}",
+        machine_errorIpChangeFail: "${msg.get('machine.errorIpChangeFail')?js_string}",
+        machine_errorIpChangeNetwork: "${msg.get('machine.errorIpChangeNetwork')?js_string}",
+        machine_errorIpv6EnableFail: "${msg.get('machine.errorIpv6EnableFail')?js_string}",
+        machine_errorIpv6EnableNetwork: "${msg.get('machine.errorIpv6EnableNetwork')?js_string}",
+        machine_errorVerifyCodeSendFail: "${msg.get('machine.errorVerifyCodeSendFail')?js_string}",
+        machine_errorVerifyCodeSendNetwork: "${msg.get('machine.errorVerifyCodeSendNetwork')?js_string}",
+        machine_errorTerminateFail: "${msg.get('machine.errorTerminateFail')?js_string}",
+        machine_errorTerminateNetwork: "${msg.get('machine.errorTerminateNetwork')?js_string}",
+        machine_errorConfigUpdateFail: "${msg.get('machine.errorConfigUpdateFail')?js_string}",
+        machine_errorConfigUpdateNetwork: "${msg.get('machine.errorConfigUpdateNetwork')?js_string}",
+        machine_errorNameUpdateFail: "${msg.get('machine.errorNameUpdateFail')?js_string}",
+        machine_errorNameUpdateNetwork: "${msg.get('machine.errorNameUpdateNetwork')?js_string}",
+        machine_errorBootVolumeUpdateFail: "${msg.get('machine.errorBootVolumeUpdateFail')?js_string}",
+        machine_errorBootVolumeUpdateNetwork: "${msg.get('machine.errorBootVolumeUpdateNetwork')?js_string}",
+        machine_errorRemarkUpdateFail: "${msg.get('machine.errorRemarkUpdateFail')?js_string}",
+        machine_errorRemarkUpdateNetwork: "${msg.get('machine.errorRemarkUpdateNetwork')?js_string}",
+        machine_errorStartFail: "${msg.get('machine.errorStartFail')?js_string}",
+        machine_errorStartNetwork: "${msg.get('machine.errorStartNetwork')?js_string}",
+        machine_errorStopFail: "${msg.get('machine.errorStopFail')?js_string}",
+        machine_errorStopNetwork: "${msg.get('machine.errorStopNetwork')?js_string}",
+        machine_errorLocalDeleteFail: "${msg.get('machine.errorLocalDeleteFail')?js_string}",
+        machine_errorLocalDeleteNetwork: "${msg.get('machine.errorLocalDeleteNetwork')?js_string}",
+        machine_errorVpuUpdateFail: "${msg.get('machine.errorVpuUpdateFail')?js_string}",
+        machine_errorVpuUpdateNetwork: "${msg.get('machine.errorVpuUpdateNetwork')?js_string}",
+        machine_deleteLocalConfirmTitle: "${msg.get('machine.deleteLocalConfirmTitle')?js_string}",
+        machine_deleteLocalConfirmPrefix: "${msg.get('machine.deleteLocalConfirmPrefix')?js_string}",
+        machine_deleteLocalConfirmSuffix: "${msg.get('machine.deleteLocalConfirmSuffix')?js_string}",
+        machine_deleteSuccess: "${msg.get('machine.deleteSuccess')?js_string}",
+        machine_deleteFail: "${msg.get('machine.deleteFail')?js_string}",
+        machine_requestFail: "${msg.get('machine.requestFail')?js_string}",
+        machine_cidrRequired: "${msg.get('machine.cidrRequired')?js_string}"
     }
 
     const i18n = window.I18N;
@@ -812,8 +862,85 @@
         Swal.fire({
             icon: 'error',
             title: title,
-            text: text
+            text: text,
+            timer: 3000,
+            showConfirmButton: false
         });
+    }
+
+    const modalStatusTimers = new Map();
+
+    function clearModalStatusTimer(modal) {
+        const key = modal && modal.id ? modal.id : 'default';
+        if (modalStatusTimers.has(key)) {
+            clearTimeout(modalStatusTimers.get(key));
+            modalStatusTimers.delete(key);
+        }
+    }
+
+    function parseXhrJson(xhr) {
+        if (!xhr.responseText) return {};
+        try {
+            return JSON.parse(xhr.responseText);
+        } catch (e) {
+            return {};
+        }
+    }
+
+    function isPlainErrorMessage(message) {
+        return !message || String(message).trim().toLowerCase() === 'error';
+    }
+
+    function getFriendlyHttpMessage(status, fallback) {
+        const code = Number(status);
+        if (!code) return fallback + i18n.machine_errorRetrySuffix;
+        if (code === 400) return fallback + i18n.request_http_400_suffix;
+        if (code === 401) return fallback + i18n.request_http_401_suffix;
+        if (code === 403) return fallback + i18n.request_http_403_suffix;
+        if (code === 404) return fallback + i18n.request_http_404_suffix;
+        if (code === 408) return fallback + i18n.request_http_408_suffix;
+        if (code === 409) return fallback + i18n.request_http_409_suffix;
+        if (code === 413) return fallback + i18n.request_http_413_suffix;
+        if (code === 429) return fallback + i18n.request_http_429_suffix;
+        if (code >= 500) return fallback + i18n.request_http_5xx_suffix;
+        return fallback + i18n.request_http_generic_suffix;
+    }
+
+    function getXhrFailureMessage(xhr, fallback) {
+        const data = parseXhrJson(xhr);
+        const backendMessage = data.message || data.msg || data.error || data.reason;
+        if (!isPlainErrorMessage(backendMessage)) {
+            return backendMessage;
+        }
+        if (xhr.status && xhr.status !== 200) {
+            return getFriendlyHttpMessage(xhr.status, fallback);
+        }
+        return fallback + i18n.machine_errorRetrySuffix;
+    }
+
+    function getPayloadFailureMessage(data, fallback) {
+        const backendMessage = data && (data.message || data.msg || data.error || data.reason);
+        return !isPlainErrorMessage(backendMessage) ? backendMessage : fallback + i18n.machine_errorRetrySuffix;
+    }
+
+    function showModalStatusError(modal, statusMessage, statusText, message, options = {}) {
+        const closeModal = options.closeModal !== false;
+        const key = modal && modal.id ? modal.id : 'default';
+
+        clearModalStatusTimer(modal);
+        statusMessage.className = 'status-message error';
+        statusMessage.style.display = 'block';
+        statusText.textContent = message + (closeModal ? i18n.modal_autoClose3s : '');
+
+        const timer = setTimeout(() => {
+            if (closeModal && modal) {
+                modal.style.display = 'none';
+            } else {
+                statusMessage.style.display = 'none';
+            }
+            modalStatusTimers.delete(key);
+        }, 3000);
+        modalStatusTimers.set(key, timer);
     }
 
     // 租户名遮罩切换
@@ -923,7 +1050,7 @@
 
         // 验证输入,可以为空
         /*if (cidrRanges.length === 0) {
-            alert('请至少输入一个CIDR范围');
+            alert(i18n.machine_cidrRequired);
             return;
         }*/
 
@@ -943,7 +1070,7 @@
         xhr.onreadystatechange = function() {
             if (xhr.readyState === 4) {
                 if (xhr.status === 200) {
-                    const data = JSON.parse(xhr.responseText);
+                    const data = parseXhrJson(xhr);
 
                     if (data.status === 'success') {
                         statusMessage.className = 'status-message success';
@@ -963,18 +1090,16 @@
                             location.reload();
                         }, 3000);
                     } else {
-                        throw new Error(data.message || 'error');
+                        showModalStatusError(modal, statusMessage, statusText, getPayloadFailureMessage(data, i18n.machine_errorIpChangeFail));
                     }
                 } else {
-                    statusMessage.className = 'status-message error';
-                    statusText.textContent = 'error';
+                    showModalStatusError(modal, statusMessage, statusText, getXhrFailureMessage(xhr, i18n.machine_errorIpChangeFail));
                 }
             }
         };
 
         xhr.onerror = function() {
-            statusMessage.className = 'status-message error';
-            statusText.textContent = 'error';
+            showModalStatusError(modal, statusMessage, statusText, i18n.machine_errorIpChangeNetwork);
         };
 
         // 发送数据
@@ -1082,7 +1207,7 @@
         xhr.onreadystatechange = function() {
             if (xhr.readyState === 4) {
                 if (xhr.status === 200) {
-                    const data = JSON.parse(xhr.responseText);
+                    const data = parseXhrJson(xhr);
 
                     if (data.status === 'success') {
                         statusMessage.className = 'status-message success';
@@ -1101,18 +1226,16 @@
                             location.reload();
                         }, 3000);
                     } else {
-                        throw new Error(data.message || 'error');
+                        showModalStatusError(modal, statusMessage, statusText, getPayloadFailureMessage(data, i18n.machine_errorIpv6EnableFail));
                     }
                 } else {
-                    statusMessage.className = 'status-message error';
-                    statusText.textContent = 'error';
+                    showModalStatusError(modal, statusMessage, statusText, getXhrFailureMessage(xhr, i18n.machine_errorIpv6EnableFail));
                 }
             }
         };
 
         xhr.onerror = function() {
-            statusMessage.className = 'status-message error';
-            statusText.textContent = 'IPv6 error';
+            showModalStatusError(modal, statusMessage, statusText, i18n.machine_errorIpv6EnableNetwork);
         };
 
         xhr.send(JSON.stringify({
@@ -1169,21 +1292,23 @@
         xhr.onreadystatechange = function() {
             if (xhr.readyState === 4) {
                 if (xhr.status === 200) {
-                    const data = JSON.parse(xhr.responseText);
+                    const data = parseXhrJson(xhr);
                     if (data.success) {
                         // 显示验证码输入步骤
                         confirmStep.style.display = 'none';
                         document.getElementById('verifyStep').style.display = 'block';
                         statusMessage.style.display = 'none';
                     } else {
-                        statusMessage.className = 'status-message error';
-                        statusText.textContent = data.message || 'error';
+                        showModalStatusError(modal, statusMessage, statusText, getPayloadFailureMessage(data, i18n.machine_errorVerifyCodeSendFail));
                     }
                 } else {
-                    statusMessage.className = 'status-message error';
-                    statusText.textContent = 'error';
+                    showModalStatusError(modal, statusMessage, statusText, getXhrFailureMessage(xhr, i18n.machine_errorVerifyCodeSendFail));
                 }
             }
+        };
+
+        xhr.onerror = function() {
+            showModalStatusError(modal, statusMessage, statusText, i18n.machine_errorVerifyCodeSendNetwork);
         };
 
         xhr.send(JSON.stringify({
@@ -1200,9 +1325,7 @@
         const statusText = document.getElementById('terminateText');
 
         if (!verificationCode) {
-            statusMessage.className = 'status-message error';
-            statusMessage.style.display = 'block';
-            statusText.textContent = i18n.machine_placeholder;
+            showModalStatusError(modal, statusMessage, statusText, i18n.machine_placeholder, { closeModal: false });
             return;
         }
 
@@ -1222,7 +1345,7 @@
         xhr.onreadystatechange = function() {
             if (xhr.readyState === 4) {
                 if (xhr.status === 200) {
-                    const data = JSON.parse(xhr.responseText);
+                    const data = parseXhrJson(xhr);
                     if (data.success) {
                         statusMessage.className = 'status-message success';
                         statusText.textContent = 'success';
@@ -1233,14 +1356,16 @@
                             location.reload();
                         }, 3000);
                     } else {
-                        statusMessage.className = 'status-message error';
-                        statusText.textContent =  'error';
+                        showModalStatusError(modal, statusMessage, statusText, getPayloadFailureMessage(data, i18n.machine_errorTerminateFail));
                     }
                 } else {
-                    statusMessage.className = 'status-message error';
-                    statusText.textContent = 'error';
+                    showModalStatusError(modal, statusMessage, statusText, getXhrFailureMessage(xhr, i18n.machine_errorTerminateFail));
                 }
             }
+        };
+
+        xhr.onerror = function() {
+            showModalStatusError(modal, statusMessage, statusText, i18n.machine_errorTerminateNetwork);
         };
 
         xhr.send(JSON.stringify({
@@ -1281,9 +1406,7 @@
 
         // 验证输入
         if (!newCpu || !newMemory) {
-            statusMessage.className = 'status-message error';
-            statusMessage.style.display = 'block';
-            statusText.textContent = i18n.notification_plzInputGlobalInfo;
+            showModalStatusError(modal, statusMessage, statusText, i18n.notification_plzInputGlobalInfo, { closeModal: false });
             return;
         }
 
@@ -1303,7 +1426,7 @@
         xhr.onreadystatechange = function() {
             if (xhr.readyState === 4) {
                 if (xhr.status === 200) {
-                    const data = JSON.parse(xhr.responseText);
+                    const data = parseXhrJson(xhr);
                     if (data.success) {
                         statusMessage.className = 'status-message success';
                         statusText.textContent =  'success';
@@ -1314,14 +1437,16 @@
                             location.reload();
                         }, 3000);
                     } else {
-                        statusMessage.className = 'status-message error';
-                        statusText.textContent =  'error';
+                        showModalStatusError(modal, statusMessage, statusText, getPayloadFailureMessage(data, i18n.machine_errorConfigUpdateFail));
                     }
                 } else {
-                    statusMessage.className = 'status-message error';
-                    statusText.textContent = 'error';
+                    showModalStatusError(modal, statusMessage, statusText, getXhrFailureMessage(xhr, i18n.machine_errorConfigUpdateFail));
                 }
             }
+        };
+
+        xhr.onerror = function() {
+            showModalStatusError(modal, statusMessage, statusText, i18n.machine_errorConfigUpdateNetwork);
         };
 
         xhr.send(JSON.stringify({
@@ -1359,9 +1484,7 @@
 
         // 验证输入
         if (!newName) {
-            statusMessage.className = 'status-message error';
-            statusMessage.style.display = 'block';
-            statusText.textContent = i18n.machine_plzInsName;
+            showModalStatusError(modal, statusMessage, statusText, i18n.machine_plzInsName, { closeModal: false });
             return;
         }
 
@@ -1381,7 +1504,7 @@
         xhr.onreadystatechange = function() {
             if (xhr.readyState === 4) {
                 if (xhr.status === 200) {
-                    const data = JSON.parse(xhr.responseText);
+                    const data = parseXhrJson(xhr);
                     if (data.success) {
                         statusMessage.className = 'status-message success';
                         statusText.textContent =  'success';
@@ -1392,14 +1515,16 @@
                             location.reload();
                         }, 3000);
                     } else {
-                        statusMessage.className = 'status-message error';
-                        statusText.textContent =  'error';
+                        showModalStatusError(modal, statusMessage, statusText, getPayloadFailureMessage(data, i18n.machine_errorNameUpdateFail));
                     }
                 } else {
-                    statusMessage.className = 'status-message error';
-                    statusText.textContent = 'error';
+                    showModalStatusError(modal, statusMessage, statusText, getXhrFailureMessage(xhr, i18n.machine_errorNameUpdateFail));
                 }
             }
+        };
+
+        xhr.onerror = function() {
+            showModalStatusError(modal, statusMessage, statusText, i18n.machine_errorNameUpdateNetwork);
         };
 
         xhr.send(JSON.stringify({
@@ -1505,14 +1630,14 @@
         xhr.onreadystatechange = function() {
             if (xhr.readyState === 4) {
                 if (xhr.status === 200) {
-                    const data = JSON.parse(xhr.responseText);
+                    const data = parseXhrJson(xhr);
                     if (data.success) {
                         statusMessage.className = 'status-message success';
                         if (!data.message) {
                             if (isExpand) {
-                                statusText.textContent = "successful";
+                                statusText.textContent = i18n.common_success;
                             } else {
-                                statusText.textContent = "successful";
+                                statusText.textContent = i18n.common_success;
                             }
                         } else {
                             statusText.textContent = data.message;
@@ -1524,22 +1649,16 @@
                             location.reload();
                         }, 3000);
                     } else {
-                        statusMessage.className = 'status-message error';
-                        if (!data.message) {
-                            if (isExpand) {
-                                statusText.textContent = "error";
-                            } else {
-                                statusText.textContent = "error";
-                            }
-                        } else {
-                            statusText.textContent = data.message;
-                        }
+                        showModalStatusError(modal, statusMessage, statusText, getPayloadFailureMessage(data, i18n.machine_errorBootVolumeUpdateFail));
                     }
                 } else {
-                    statusMessage.className = 'status-message error';
-                    statusText.textContent = 'error';
+                    showModalStatusError(modal, statusMessage, statusText, getXhrFailureMessage(xhr, i18n.machine_errorBootVolumeUpdateFail));
                 }
             }
+        };
+
+        xhr.onerror = function() {
+            showModalStatusError(modal, statusMessage, statusText, i18n.machine_errorBootVolumeUpdateNetwork);
         };
 
         xhr.send(JSON.stringify({
@@ -1592,10 +1711,10 @@
         xhr.onreadystatechange = function() {
             if (xhr.readyState === 4) {
                 if (xhr.status === 200) {
-                    const data = JSON.parse(xhr.responseText);
+                    const data = parseXhrJson(xhr);
                     if (data.success) {
                         statusMessage.className = 'status-message success';
-                        statusText.textContent = 'successful';
+                        statusText.textContent = i18n.common_success;
 
                         // 3秒后刷新页面
                         setTimeout(() => {
@@ -1603,14 +1722,16 @@
                             location.reload();
                         }, 3000);
                     } else {
-                        statusMessage.className = 'status-message error';
-                        statusText.textContent = 'error';
+                        showModalStatusError(modal, statusMessage, statusText, getPayloadFailureMessage(data, i18n.machine_errorRemarkUpdateFail));
                     }
                 } else {
-                    statusMessage.className = 'status-message error';
-                    statusText.textContent = 'error';
+                    showModalStatusError(modal, statusMessage, statusText, getXhrFailureMessage(xhr, i18n.machine_errorRemarkUpdateFail));
                 }
             }
+        };
+
+        xhr.onerror = function() {
+            showModalStatusError(modal, statusMessage, statusText, i18n.machine_errorRemarkUpdateNetwork);
         };
 
         xhr.send(JSON.stringify({
@@ -1746,7 +1867,7 @@
         const options = { headers: { 'X-CSRF-TOKEN': csrfToken } };
         fetch('/tenants/listParentTenants', options)
             .then(response => {
-                if (!response.ok) throw new Error('网络请求失败');
+                if (!response.ok) throw new Error(i18n.request_network_or_server_error);
                 return response.json();
             })
             .then(data => {
@@ -1793,7 +1914,7 @@
             headers: { 'X-CSRF-TOKEN': csrfToken }
         })
             .then(response => {
-                if (!response.ok) throw new Error('网络请求失败');
+                if (!response.ok) throw new Error(i18n.request_network_or_server_error);
                 return response.json();
             })
             .then(data => {
@@ -2110,7 +2231,7 @@
         xhr.onreadystatechange = function() {
             if (xhr.readyState === 4) {
                 if (xhr.status === 200) {
-                    const data = JSON.parse(xhr.responseText);
+                    const data = parseXhrJson(xhr);
                     if (data.success) {
                         statusMessage.className = 'status-message success';
                         statusText.textContent = 'success';
@@ -2119,19 +2240,16 @@
                             location.reload();
                         }, 3000);
                     } else {
-                        statusMessage.className = 'status-message error';
-                        statusText.textContent = 'error';
+                        showModalStatusError(modal, statusMessage, statusText, getPayloadFailureMessage(data, i18n.machine_errorStartFail));
                     }
                 } else {
-                    statusMessage.className = 'status-message error';
-                    statusText.textContent = 'error';
+                    showModalStatusError(modal, statusMessage, statusText, getXhrFailureMessage(xhr, i18n.machine_errorStartFail));
                 }
             }
         };
 
         xhr.onerror = function() {
-            statusMessage.className = 'status-message error';
-            statusText.textContent = 'error and try';
+            showModalStatusError(modal, statusMessage, statusText, i18n.machine_errorStartNetwork);
         };
 
         xhr.send(JSON.stringify({
@@ -2173,7 +2291,7 @@
         xhr.onreadystatechange = function() {
             if (xhr.readyState === 4) {
                 if (xhr.status === 200) {
-                    const data = JSON.parse(xhr.responseText);
+                    const data = parseXhrJson(xhr);
                     if (data.success) {
                         statusMessage.className = 'status-message success';
                         statusText.textContent = 'success';
@@ -2184,19 +2302,16 @@
                             location.reload();
                         }, 3000);
                     } else {
-                        statusMessage.className = 'status-message error';
-                        statusText.textContent = 'error';
+                        showModalStatusError(modal, statusMessage, statusText, getPayloadFailureMessage(data, i18n.machine_errorStopFail));
                     }
                 } else {
-                    statusMessage.className = 'status-message error';
-                    statusText.textContent = 'error';
+                    showModalStatusError(modal, statusMessage, statusText, getXhrFailureMessage(xhr, i18n.machine_errorStopFail));
                 }
             }
         };
 
         xhr.onerror = function() {
-            statusMessage.className = 'status-message error';
-            statusText.textContent = 'error';
+            showModalStatusError(modal, statusMessage, statusText, i18n.machine_errorStopNetwork);
         };
 
         xhr.send(JSON.stringify({
@@ -2225,7 +2340,7 @@
             showCopySuccess(element);
             Swal.fire({
                 icon: 'success',
-                title: 'successful',
+                title: i18n.common_success,
                 text: text ,
                 timer: 1500,
                 showConfirmButton: false,
@@ -2239,7 +2354,7 @@
                     showCopySuccess(element);
                     Swal.fire({
                         icon: 'success',
-                        title: 'successful',
+                        title: i18n.common_success,
                         text: text ,
                         timer: 1500,
                         showConfirmButton: false,
@@ -2276,7 +2391,7 @@
     function showCopyError() {
         Swal.fire({
             icon: 'error',
-            title: 'error',
+            title: i18n.common_error,
             timer: 2000,
             showConfirmButton: false,
             toast: true,
@@ -2345,12 +2460,12 @@
     function handleDeleteRecord(instanceId, instanceName) {
         event.preventDefault();
         Swal.fire({
-            title: '${msg.get("machine.deleteRecord")}',
-            html: '<p style="color:var(--text-primary)">确认删除实例 <strong>' + instanceName + '</strong> 的本地记录？<br/><span style="color:var(--accent-red);font-size:13px;">此操作仅删除本地数据，不会操作OCI云端实例。</span></p>',
+            title: i18n.machine_deleteLocalConfirmTitle,
+            html: '<p style="color:var(--text-primary)">' + i18n.machine_deleteLocalConfirmPrefix + ' <strong>' + instanceName + '</strong> ' + i18n.machine_deleteLocalConfirmSuffix + '</p>',
             icon: 'warning',
             showCancelButton: true,
-            confirmButtonText: '${msg.get("common.confirm")}',
-            cancelButtonText: '${msg.get("common.cancel")}',
+            confirmButtonText: i18n.common_confirm,
+            cancelButtonText: i18n.common_cancel,
             confirmButtonColor: '#e74c3c',
             cancelButtonColor: '#95a5a6'
         }).then(function(result) {
@@ -2365,13 +2480,25 @@
                     body: JSON.stringify({ id: instanceId })
                 }).then(function(r) { return r.json(); }).then(function(data) {
                     if (data.code === 200 || data.success) {
-                        Swal.fire({ icon: 'success', title: '删除成功', timer: 1200, showConfirmButton: false })
+                        Swal.fire({ icon: 'success', title: i18n.machine_deleteSuccess, timer: 1200, showConfirmButton: false })
                             .then(function() { location.reload(); });
                     } else {
-                        Swal.fire({ icon: 'error', title: '删除失败', text: data.message || data.msg || '' });
+                        Swal.fire({
+                            icon: 'error',
+                            title: i18n.machine_deleteFail,
+                            text: getPayloadFailureMessage(data, i18n.machine_errorLocalDeleteFail),
+                            timer: 3000,
+                            showConfirmButton: false
+                        });
                     }
                 }).catch(function(e) {
-                    Swal.fire({ icon: 'error', title: '请求失败', text: e.message });
+                    Swal.fire({
+                        icon: 'error',
+                        title: i18n.machine_requestFail,
+                        text: e.message || i18n.machine_errorLocalDeleteNetwork,
+                        timer: 3000,
+                        showConfirmButton: false
+                    });
                 });
             }
         });
@@ -2618,20 +2745,22 @@
             headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
             body: JSON.stringify({ vpusPerGB: vpus, tenantId: tenantId, instanceDetailId: instanceDetailId })
         })
-        .then(r => r.json())
-        .then(data => {
+        .then(r => r.json().catch(() => ({})).then(data => ({ ok: r.ok, status: r.status, statusText: r.statusText, data })))
+        .then(({ ok, status, data }) => {
+            if (!ok) {
+                showModalStatusError(modal, statusMessage, statusText, getFriendlyHttpMessage(status, i18n.machine_errorVpuUpdateFail));
+                return;
+            }
             if (data.success) {
                 statusMessage.className = 'status-message success';
                 statusText.textContent = data.message || 'success';
                 setTimeout(() => { modal.style.display = 'none'; location.reload(); }, 3000);
             } else {
-                statusMessage.className = 'status-message error';
-                statusText.textContent = data.message || 'error';
+                showModalStatusError(modal, statusMessage, statusText, getPayloadFailureMessage(data, i18n.machine_errorVpuUpdateFail));
             }
         })
         .catch(() => {
-            statusMessage.className = 'status-message error';
-            statusText.textContent = 'error';
+            showModalStatusError(modal, statusMessage, statusText, i18n.machine_errorVpuUpdateNetwork);
         });
     }
 

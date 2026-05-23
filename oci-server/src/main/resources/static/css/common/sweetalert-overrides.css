@@ -1,0 +1,152 @@
+/* Global SweetAlert2 sizing and theme guardrails. */
+:root {
+    --swal-app-surface: var(--surface, var(--card-bg, var(--bg-card, #22262b)));
+    --swal-app-surface-2: var(--surface-2, var(--hover-bg, #292d32));
+    --swal-app-border: var(--border, var(--card-border, var(--border-color, #31363d)));
+    --swal-app-text: var(--text, var(--text-primary, #cdd9e5));
+    --swal-app-muted: var(--muted, var(--text-secondary, #768390));
+    --swal-app-primary: var(--accent-blue, var(--accent, #4d9eff));
+    --swal-app-danger: var(--accent-red, var(--accent-r, #ff6b6b));
+    --swal-app-success: var(--accent-green, var(--accent-g, #1abc9c));
+    --swal-app-shadow: var(--shadow, 0 16px 42px rgba(0, 0, 0, .36));
+}
+
+body .swal2-container {
+    padding: 16px !important;
+    overflow-y: auto !important;
+}
+
+body .swal2-container .swal2-popup {
+    width: min(380px, calc(100vw - 32px)) !important;
+    max-width: calc(100vw - 32px) !important;
+    max-height: calc(100vh - 32px) !important;
+    padding: 20px 22px 18px !important;
+    border: 1px solid var(--swal-app-border) !important;
+    border-radius: 10px !important;
+    background: var(--swal-app-surface) !important;
+    color: var(--swal-app-text) !important;
+    box-shadow: var(--swal-app-shadow) !important;
+    font-size: 14px !important;
+    overflow: visible !important;
+}
+
+body .swal2-container .swal2-popup.compact-confirm,
+body .swal2-container .swal2-popup.swal2-icon-warning,
+body .swal2-container .swal2-popup.swal2-icon-question {
+    width: min(360px, calc(100vw - 32px)) !important;
+}
+
+body .swal2-container .swal2-popup.swal-wide,
+body .swal2-container .swal2-popup.swal-wide-popup {
+    width: min(560px, calc(100vw - 32px)) !important;
+}
+
+body .swal2-container .swal2-popup.swal-wide .swal2-html-container,
+body .swal2-container .swal2-popup.swal-wide-popup .swal2-html-container {
+    max-height: min(64vh, 520px) !important;
+    overflow-y: auto !important;
+}
+
+body .swal2-container .swal2-icon {
+    width: 54px !important;
+    height: 54px !important;
+    margin: 4px auto 14px !important;
+    font-size: 12px !important;
+}
+
+body .swal2-container .swal2-title {
+    padding: 0 !important;
+    color: var(--swal-app-text) !important;
+    font-size: 19px !important;
+    line-height: 1.35 !important;
+    font-weight: 700 !important;
+}
+
+body .swal2-container .swal2-html-container {
+    margin: 10px 0 0 !important;
+    padding: 0 !important;
+    color: var(--swal-app-muted) !important;
+    font-size: 13px !important;
+    line-height: 1.6 !important;
+    overflow-wrap: anywhere !important;
+}
+
+body .swal2-container .swal2-actions {
+    display: flex !important;
+    width: 100% !important;
+    gap: 10px !important;
+    align-items: center !important;
+    justify-content: center !important;
+    margin: 18px 0 0 !important;
+    padding: 0 !important;
+}
+
+body .swal2-container .swal2-actions .swal2-styled {
+    min-width: 92px !important;
+    height: 36px !important;
+    margin: 0 !important;
+    padding: 0 16px !important;
+    border-radius: 6px !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    line-height: 36px !important;
+    box-shadow: none !important;
+}
+
+body .swal2-container .swal2-actions .swal2-confirm {
+    background: var(--swal-app-primary);
+    color: #fff;
+}
+
+body .swal2-container .swal2-actions .swal2-cancel {
+    background: var(--swal-app-surface-2);
+    border: 1px solid var(--swal-app-border) !important;
+    color: var(--swal-app-text);
+}
+
+body .swal2-container .swal2-actions .swal2-deny {
+    background: var(--swal-app-danger);
+    color: #fff;
+}
+
+body .swal2-container .swal2-actions .swal2-confirm:focus,
+body .swal2-container .swal2-actions .swal2-cancel:focus,
+body .swal2-container .swal2-actions .swal2-deny:focus {
+    box-shadow: 0 0 0 3px rgba(77, 158, 255, .2) !important;
+}
+
+body .swal2-container .swal2-loader {
+    margin: 4px auto 0 !important;
+}
+
+body .swal2-container .swal2-popup.swal2-toast {
+    width: auto !important;
+    max-width: min(380px, calc(100vw - 32px)) !important;
+    padding: 12px 14px !important;
+    overflow: visible !important;
+}
+
+body .swal2-container .swal2-toast .swal2-title {
+    font-size: 14px !important;
+}
+
+@media (max-width: 480px) {
+    body .swal2-container {
+        padding: 12px !important;
+    }
+
+    body .swal2-container .swal2-popup {
+        width: calc(100vw - 24px) !important;
+        max-width: calc(100vw - 24px) !important;
+        max-height: calc(100vh - 24px) !important;
+        padding: 18px 16px 16px !important;
+    }
+
+    body .swal2-container .swal2-actions {
+        flex-direction: column-reverse !important;
+    }
+
+    body .swal2-container .swal2-actions .swal2-styled {
+        width: 100% !important;
+    }
+}

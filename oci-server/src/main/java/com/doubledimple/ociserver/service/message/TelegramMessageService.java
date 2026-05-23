@@ -19,9 +19,13 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
 import static com.doubledimple.ocicommon.template.MessageTemplate.LEGACY_MESSAGE_TEMPLATE;
@@ -89,7 +93,7 @@ public class TelegramMessageService implements MessageService {
     @Override
     public void sendMessage(OracleInstanceDetail instanceData) {
         log.debug("推送开机成功消息开始...");
-        doSend(formatMessage(instanceData));
+        doSendPlainText(formatMessage(instanceData));
     }
 
     @Override
@@ -178,46 +182,23 @@ public class TelegramMessageService implements MessageService {
     private void doSend(String message){
         doCheckMessage( message);
         TelegramConfig telegramConfig = getTelegramConfig();
-        if (telegramConfig == null){
+        if (!isTelegramAvailable(telegramConfig)){
             log.warn("TG 无法推送消息,消息未配置");
-            return;
-        }
-
-        String chatId = telegramConfig.getChatId();
-        String botToken = telegramConfig.getBotToken();
-        boolean enabled = telegramConfig.isEnabled();
-        if (!enabled){
+        } else if (!telegramConfig.isEnabled()){
             log.debug("TG 无法推送消息,消息推送已被禁用");
+        } else {
+            try {
+                String encodedMessage = URLEncoder.encode(message, "UTF-8");
+                String urlString = String.format(
+                        TG_URL + "&parse_mode=Markdown",
+                        telegramConfig.getBotToken(), telegramConfig.getChatId(), encodedMessage);
+                sendTelegramRequest(urlString, "Markdown");
+            }  catch (Exception e) {
+                log.warn("send message error,reason:{}",e.getMessage());
+            }
         }
 
-
-        try {
-            String encodedMessage = URLEncoder.encode(message, "UTF-8");
-            String urlString = String.format(
-                    TG_URL + "&parse_mode=Markdown",
-                    botToken, chatId, encodedMessage);
-
-            URL url = new URL(urlString);
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-            connection.setRequestMethod("GET");
-            connection.setConnectTimeout(3000);
-            connection.connect();
-            connection.getResponseCode();
-        }  catch (Exception e) {
-            log.warn("send message error,reason:{}",e.getMessage());
-        }
-
-        try {
-            dingDingMessageService.sendMessageTemplate(message);
-        } catch (Exception e) {
-            log.error("钉钉消息发送失败");
-        }
-
-        //fasong bark消息
-        sendBark(message);
-
-        //发送飞书
-        feishuService.sendMessageTemplate(message);
+        sendOtherChannels(message);
     }
 
     /**
@@ -229,46 +210,102 @@ public class TelegramMessageService implements MessageService {
      */
     private void doSendHtml(String message){
         TelegramConfig telegramConfig = getTelegramConfig();
-        if (telegramConfig == null){
+        if (!isTelegramAvailable(telegramConfig)){
             log.warn("TG 无法推送消息,消息未配置");
-            return;
-        }
-
-        String chatId = telegramConfig.getChatId();
-        String botToken = telegramConfig.getBotToken();
-        boolean enabled = telegramConfig.isEnabled();
-        if (!enabled){
+        } else if (!telegramConfig.isEnabled()){
             log.debug("TG 无法推送消息,消息推送已被禁用");
+        } else {
+            try {
+                String encodedMessage = URLEncoder.encode(message, "UTF-8");
+                String urlString = String.format(
+                        TG_URL + "&parse_mode=HTML",
+                        telegramConfig.getBotToken(), telegramConfig.getChatId(), encodedMessage);
+                sendTelegramRequest(urlString, "HTML");
+            }  catch (Exception e) {
+                log.warn("send message error,reason:{}",e.getMessage());
+            }
         }
 
+        sendOtherChannels(message);
+    }
 
-        try {
-            String encodedMessage = URLEncoder.encode(message, "UTF-8");
-            String urlString = String.format(
-                    TG_URL + "&parse_mode=HTML",
-                    botToken, chatId, encodedMessage);
-
-            URL url = new URL(urlString);
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-            connection.setRequestMethod("GET");
-            connection.setConnectTimeout(5000);
-            connection.connect();
-            connection.getResponseCode();
-        }  catch (Exception e) {
-            log.warn("send message error,reason:{}",e.getMessage());
+    /**
+     * 开机成功消息包含 IP、密码等原始文本。密码中的 Markdown 特殊字符会让 Telegram
+     * 拒收整条消息，所以这里不设置 parse_mode，确保机器信息一定能送达。
+     */
+    private void doSendPlainText(String message) {
+        doCheckMessage(message);
+        TelegramConfig telegramConfig = getTelegramConfig();
+        if (!isTelegramAvailable(telegramConfig)){
+            log.warn("TG 无法推送消息,消息未配置");
+        } else if (!telegramConfig.isEnabled()){
+            log.debug("TG 无法推送消息,消息推送已被禁用");
+        } else {
+            try {
+                String encodedMessage = URLEncoder.encode(message, "UTF-8");
+                String urlString = String.format(TG_URL,
+                        telegramConfig.getBotToken(), telegramConfig.getChatId(), encodedMessage);
+                sendTelegramRequest(urlString, "plain text");
+            } catch (Exception e) {
+                log.warn("send message error,reason:{}", e.getMessage());
+            }
         }
 
+        sendOtherChannels(message);
+    }
+
+    private void sendOtherChannels(String message) {
         try {
             dingDingMessageService.sendMessageTemplate(message);
         } catch (Exception e) {
             log.error("钉钉消息发送失败");
         }
 
-        //fasong bark消息
         sendBark(message);
-
-        //发送飞书
         feishuService.sendMessageTemplate(message);
+    }
+
+    private boolean isTelegramAvailable(TelegramConfig telegramConfig) {
+        return telegramConfig != null
+                && StringUtils.isNotBlank(telegramConfig.getBotToken())
+                && StringUtils.isNotBlank(telegramConfig.getChatId());
+    }
+
+    private void sendTelegramRequest(String urlString, String mode) throws Exception {
+        URL url = new URL(urlString);
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        connection.setRequestMethod("GET");
+        connection.setConnectTimeout(5000);
+        connection.setReadTimeout(5000);
+        connection.connect();
+
+        int responseCode = connection.getResponseCode();
+        if (responseCode < 200 || responseCode >= 300) {
+            log.warn("TG 消息发送失败, mode:{}, responseCode:{}, response:{}",
+                    mode, responseCode, readResponseBody(connection));
+        }
+    }
+
+    private String readResponseBody(HttpURLConnection connection) {
+        try {
+            InputStream inputStream = connection.getErrorStream();
+            if (inputStream == null) {
+                inputStream = connection.getInputStream();
+            }
+            if (inputStream == null) {
+                return "";
+            }
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
+                StringBuilder body = new StringBuilder();
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    body.append(line);
+                }
+                return body.toString();
+            }
+        } catch (Exception e) {
+            return "读取 TG 响应失败: " + e.getMessage();
+        }
     }
 
     /**

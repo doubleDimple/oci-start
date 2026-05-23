@@ -5,8 +5,8 @@ const swalConfig = {
     confirmButton: {
         confirmButtonColor: '#2196f3',
         cancelButtonColor: '#ff6b6b',
-        confirmButtonText: '确认',
-        cancelButtonText: '取消'
+        confirmButtonText: i18n.common_confirm,
+        cancelButtonText: i18n.common_cancel
     },
     toast: {
         toast: true,
@@ -22,13 +22,29 @@ const swalConfig = {
 };
 
 // 通用错误处理
-async function handleApiError(error, title = '操作失败') {
+async function handleApiError(error, title = i18n.request_operation_fail) {
+    if (window.OciRequestUtils && typeof window.OciRequestUtils.showApiError === 'function') {
+        await window.OciRequestUtils.showApiError(error, title);
+        return;
+    }
+
     await Swal.fire({
         icon: 'error',
         title: title,
-        text: error.message || error,
+        text: (error && error.message) || error || i18n.request_network_or_server_error,
         confirmButtonColor: '#2196f3'
     });
+}
+
+async function assertResponseOk(response, fallbackMessage = i18n.request_operation_fail) {
+    if (window.OciRequestUtils && typeof window.OciRequestUtils.assertApiResponse === 'function') {
+        return await window.OciRequestUtils.assertApiResponse(response, fallbackMessage);
+    }
+    if (!response.ok) {
+        throw new Error(await response.text() || fallbackMessage);
+    }
+    const text = await response.text();
+    return text ? JSON.parse(text) : null;
 }
 
 // 生成新Token
@@ -73,11 +89,7 @@ async function generateToken() {
                 body: JSON.stringify(config)
             });
 
-            if (!response.ok) {
-                throw new Error(await response.text() || i18n.token_genFail);
-            }
-
-            const tokenResponse = await response.json();
+            const tokenResponse = await assertResponseOk(response, i18n.token_genFail);
 
             // 显示生成的Token
             displayGeneratedToken(tokenResponse);
@@ -92,7 +104,7 @@ async function generateToken() {
             }, 3000);
         }
     } catch (error) {
-        await handleApiError(error, 'Token生成失败');
+        await handleApiError(error, i18n.token_genFail);
     }
 }
 
@@ -102,7 +114,7 @@ function displayGeneratedToken(tokenResponse) {
     const tokenExpirationInfo = document.getElementById('tokenExpirationInfo');
 
     generatedTokenInput.value = tokenResponse.tokenValue;
-    tokenExpirationInfo.textContent = tokenResponse.daysUntilExpiration+`天 (`+tokenResponse.expiresAt +`)`;
+    tokenExpirationInfo.textContent = tokenResponse.daysUntilExpiration + i18n.token_days_suffix + ` (` + tokenResponse.expiresAt + `)`;
 
     tokenDisplayCard.style.display = 'block';
     tokenDisplayCard.scrollIntoView({ behavior: 'smooth' });
@@ -156,9 +168,7 @@ async function revokeToken() {
                 }
             });
 
-            if (!response.ok) {
-                throw new Error(await response.text() || 'Token撤销失败');
-            }
+            await assertResponseOk(response, i18n.token_revokeFail);
 
             const Toast = Swal.mixin(swalConfig.toast);
             Toast.fire({
@@ -172,7 +182,7 @@ async function revokeToken() {
             }, 1500);
         }
     } catch (error) {
-        await handleApiError(error, 'Token撤销失败');
+        await handleApiError(error, i18n.token_revokeFail);
     }
 }
 
@@ -222,7 +232,7 @@ async function copyCurrentToken() {
                 title: i18n.token_alreadyCopy
             });
         } catch (err) {
-            await handleApiError('复制失败，请手动选择复制');
+            await handleApiError(i18n.common_copyFailManual);
         }
     }
 }
@@ -238,7 +248,7 @@ async function copyCode(text) {
             title: i18n.token_codeCopy
         });
     } catch (error) {
-        await handleApiError('复制失败，请手动选择复制');
+        await handleApiError(i18n.common_copyFailManual);
     }
 }
 

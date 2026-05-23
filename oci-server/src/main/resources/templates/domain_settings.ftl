@@ -13,6 +13,7 @@
     <script>(function(){var t=localStorage.getItem('oci_theme')||'dark';if(t==='system')t=window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';document.documentElement.dataset.theme=t;})();</script>
     <link rel="stylesheet" href="/css/all.min.css">
     <link href="/css/sweetalert2.min.css" rel="stylesheet">
+    <link href="/css/common/sweetalert-overrides.css" rel="stylesheet">
     <script src="/js/sweetalert2.min.js"></script>
     <script src="/js/common/jquery.min.js"></script>
     <link rel="stylesheet" href="/css/app/domain_settings.css">
@@ -247,6 +248,42 @@
         common_plzInputGlobalRequired: "${msg.get('common.plzInputGlobalRequired')?js_string}",
         common_saving: "${msg.get('common.saving')?js_string}",
         domain_testing: "${msg.get('domain.testing')?js_string}",
+        common_success: "${msg.get('common.success')?js_string}",
+        common_loading: "${msg.get('common.loading')?js_string}",
+        common_processing: "${msg.get('common.processing')?js_string}",
+        common_submitting: "${msg.get('common.submitting')?js_string}",
+        request_default_fail: "${msg.get('request.defaultFail')?js_string}",
+        request_action_fail: "${msg.get('request.actionFail')?js_string}",
+        request_operation_fail: "${msg.get('request.operationFail')?js_string}",
+        request_network_or_server_error: "${msg.get('request.networkOrServerError')?js_string}",
+        request_invalid_response_title: "${msg.get('request.invalidResponseTitle')?js_string}",
+        request_invalid_response_message: "${msg.get('request.invalidResponseMessage')?js_string}",
+        request_fail_title: "${msg.get('request.failTitle')?js_string}",
+        request_service_error_title: "${msg.get('request.serviceErrorTitle')?js_string}",
+        request_timeout_title: "${msg.get('request.timeoutTitle')?js_string}",
+        request_timeout_message: "${msg.get('request.timeoutMessage')?js_string}",
+        request_offline_title: "${msg.get('request.offlineTitle')?js_string}",
+        request_offline_message: "${msg.get('request.offlineMessage')?js_string}",
+        request_network_title: "${msg.get('request.networkTitle')?js_string}",
+        request_network_message: "${msg.get('request.networkMessage')?js_string}",
+        request_network_message_short: "${msg.get('request.networkMessageShort')?js_string}",
+        request_success_title: "${msg.get('request.successTitle')?js_string}",
+        request_success_message: "${msg.get('request.successMessage')?js_string}",
+        request_http_400_suffix: "${msg.get('request.http400Suffix')?js_string}",
+        request_http_401_suffix: "${msg.get('request.http401Suffix')?js_string}",
+        request_http_403_suffix: "${msg.get('request.http403Suffix')?js_string}",
+        request_http_404_suffix: "${msg.get('request.http404Suffix')?js_string}",
+        request_http_408_suffix: "${msg.get('request.http408Suffix')?js_string}",
+        request_http_409_suffix: "${msg.get('request.http409Suffix')?js_string}",
+        request_http_413_suffix: "${msg.get('request.http413Suffix')?js_string}",
+        request_http_429_suffix: "${msg.get('request.http429Suffix')?js_string}",
+        request_http_5xx_suffix: "${msg.get('request.http5xxSuffix')?js_string}",
+        request_http_generic_suffix: "${msg.get('request.httpGenericSuffix')?js_string}",
+        request_form_missing_with_id: "${msg.get('request.formMissingWithId')?js_string}",
+        domain_cloudflareSaveFail: "${msg.get('domain.cloudflareSaveFail')?js_string}",
+        domain_cloudflareTestFail: "${msg.get('domain.cloudflareTestFail')?js_string}",
+        domain_edgeOneSaveFail: "${msg.get('domain.edgeOneSaveFail')?js_string}",
+        domain_edgeOneTestFail: "${msg.get('domain.edgeOneTestFail')?js_string}",
 
     }
 </script>

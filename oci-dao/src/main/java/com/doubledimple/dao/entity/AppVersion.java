@@ -56,6 +56,38 @@ public class AppVersion {
             log.info("比较版本 - currentVersion: '{}'", currentVersion);
             log.info("比较版本 - latestVersion: '{}'", latestVersion);
         }
-        return !currentVersion.equals(latestVersion);
+        return compareVersion(currentVersion, latestVersion) < 0;
+    }
+
+    private int compareVersion(String left, String right) {
+        String[] leftParts = normalizeVersion(left).split("\\.");
+        String[] rightParts = normalizeVersion(right).split("\\.");
+        int length = Math.max(leftParts.length, rightParts.length);
+        for (int i = 0; i < length; i++) {
+            int leftValue = i < leftParts.length ? parseVersionPart(leftParts[i]) : 0;
+            int rightValue = i < rightParts.length ? parseVersionPart(rightParts[i]) : 0;
+            if (leftValue != rightValue) {
+                return Integer.compare(leftValue, rightValue);
+            }
+        }
+        return 0;
+    }
+
+    private String normalizeVersion(String version) {
+        if (version == null || version.trim().isEmpty()) {
+            return "0";
+        }
+        return version.trim().replaceFirst("^[vV][-_]?", "");
+    }
+
+    private int parseVersionPart(String part) {
+        if (part == null) {
+            return 0;
+        }
+        String digits = part.replaceAll("[^0-9].*$", "");
+        if (digits.isEmpty()) {
+            return 0;
+        }
+        return Integer.parseInt(digits);
     }
 }

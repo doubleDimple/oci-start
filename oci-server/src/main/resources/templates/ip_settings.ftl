@@ -15,6 +15,7 @@
     <link rel="stylesheet" href="/css/common/loading.css">
     <link rel="stylesheet" href="/css/common/custom-select.css">
     <link href="/css/sweetalert2.min.css" rel="stylesheet">
+    <link href="/css/common/sweetalert-overrides.css" rel="stylesheet">
     <script src="/js/sweetalert2.min.js"></script>
     <script src="/js/common/custom-select.js"></script>
 </head>

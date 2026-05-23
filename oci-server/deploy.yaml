@@ -34,6 +34,8 @@ spec:
           env:
             - name: SERVER_PORT
               value: "9856"
+            - name: TZ
+              value: "Asia/Shanghai"
           readinessProbe:
             tcpSocket:
               port: 9856

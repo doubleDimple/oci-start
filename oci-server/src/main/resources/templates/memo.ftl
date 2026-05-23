@@ -12,6 +12,7 @@
     </script>
     <link rel="stylesheet" href="/css/all.min.css">
     <link href="/css/sweetalert2.min.css" rel="stylesheet">
+    <link href="/css/common/sweetalert-overrides.css" rel="stylesheet">
     <link href="/css/quill.snow.css" rel="stylesheet">
     <link rel="stylesheet" href="/css/app/memo.css">
     <link rel="stylesheet" href="/css/common/loading.css">

@@ -22,13 +22,29 @@ const swalConfig = {
 };
 
 // 通用错误处理
-async function handleApiError(error, title = 'error') {
+async function handleApiError(error, title = i18n.request_operation_fail) {
+    if (window.OciRequestUtils && typeof window.OciRequestUtils.showApiError === 'function') {
+        await window.OciRequestUtils.showApiError(error, title);
+        return;
+    }
+
     await Swal.fire({
         icon: 'error',
         title: title,
-        text: error.message || error,
+        text: (error && error.message) || error || i18n.request_network_or_server_error,
         confirmButtonColor: '#2196f3'
     });
+}
+
+async function assertResponseOk(response, fallbackMessage = i18n.request_operation_fail) {
+    if (window.OciRequestUtils && typeof window.OciRequestUtils.assertApiResponse === 'function') {
+        return await window.OciRequestUtils.assertApiResponse(response, fallbackMessage);
+    }
+    if (!response.ok) {
+        throw new Error(await response.text() || fallbackMessage);
+    }
+    const text = await response.text();
+    return text ? JSON.parse(text) : null;
 }
 
 // 更新状态标识
@@ -157,21 +173,19 @@ async function saveCloudflareConfig() {
                 body: JSON.stringify(config)
             });
 
-            if (!response.ok) {
-                throw new Error(await response.text() || 'error');
-            }
+            await assertResponseOk(response, i18n.domain_cloudflareSaveFail);
 
             updateStatus('cloudflare','connected');
 
             const Toast = Swal.mixin(swalConfig.toast);
             Toast.fire({
                 icon: 'success',
-                title: 'Successful'
+                title: i18n.common_success
             });
         }
     } catch (error) {
         updateStatus('cloudflare','disconnected');
-        await handleApiError(error, 'Cloudflare配置保存失败');
+        await handleApiError(error, i18n.domain_cloudflareSaveFail);
     }
 }
 
@@ -198,7 +212,7 @@ async function testCloudflareConnection() {
             didOpen: () => Swal.showLoading()
         });
 
-        updateStatus('cloudflare','pending', 'Test...');
+        updateStatus('cloudflare','pending', i18n.domain_testing);
 
         const response = await fetch('/api/system/testCloudflareConnection', {
             method: 'POST',
@@ -213,27 +227,17 @@ async function testCloudflareConnection() {
             })
         });
 
-        const result = await response.json();
-
-        if (response.ok) {
-            updateStatus('cloudflare','connected');
-            Swal.fire({
-                icon: 'success',
-                title: 'Successful',
-                confirmButtonColor: '#2196f3'
-            });
-        } else {
-            throw new Error(result.message || 'error');
-        }
+        await assertResponseOk(response, i18n.domain_cloudflareTestFail);
+        updateStatus('cloudflare','connected');
+        Swal.fire({
+            icon: 'success',
+            title: i18n.common_success,
+            confirmButtonColor: '#2196f3'
+        });
 
     } catch (error) {
         updateStatus('cloudflare','disconnected');
-        Swal.fire({
-            icon: 'error',
-            title: 'test error',
-            text: error.message,
-            confirmButtonColor: '#2196f3'
-        });
+        await handleApiError(error, i18n.domain_cloudflareTestFail);
     }
 }
 
@@ -289,21 +293,19 @@ async function saveEdgeOneConfig() {
                 body: JSON.stringify(config)
             });
 
-            if (!response.ok) {
-                throw new Error(await response.text() || 'error');
-            }
+            await assertResponseOk(response, i18n.domain_edgeOneSaveFail);
 
             updateStatus('edgeone', 'connected');
 
             const Toast = Swal.mixin(swalConfig.toast);
             Toast.fire({
                 icon: 'success',
-                title: 'Successful'
+                title: i18n.common_success
             });
         }
     } catch (error) {
         updateStatus('edgeone', 'disconnected');
-        await handleApiError(error, '腾讯云EdgeOne配置保存失败');
+        await handleApiError(error, i18n.domain_edgeOneSaveFail);
     }
 }
 
@@ -344,27 +346,17 @@ async function testEdgeOneConnection() {
             })
         });
 
-        const result = await response.json();
-
-        if (response.ok) {
-            updateStatus('edgeone', 'connected');
-            Swal.fire({
-                icon: 'success',
-                title: 'Successful',
-                confirmButtonColor: '#2196f3'
-            });
-        } else {
-            throw new Error(result.message || 'error');
-        }
+        await assertResponseOk(response, i18n.domain_edgeOneTestFail);
+        updateStatus('edgeone', 'connected');
+        Swal.fire({
+            icon: 'success',
+            title: i18n.common_success,
+            confirmButtonColor: '#2196f3'
+        });
 
     } catch (error) {
         updateStatus('edgeone', 'disconnected');
-        Swal.fire({
-            icon: 'error',
-            title: 'error',
-            text: error.message,
-            confirmButtonColor: '#2196f3'
-        });
+        await handleApiError(error, i18n.domain_edgeOneTestFail);
     }
 }
 

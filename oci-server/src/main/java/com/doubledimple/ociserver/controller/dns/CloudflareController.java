@@ -231,9 +231,10 @@ public class CloudflareController  extends BaseController {
      */
     @DeleteMapping("/api/records/{recordId}")
     @ResponseBody
-    public ApiResponse deleteDnsRecord(@PathVariable String recordId) {
+    public ApiResponse deleteDnsRecord(@PathVariable String recordId,
+                                       @RequestParam(required = false) String zoneId) {
         try {
-            boolean success = cloudflareService.deleteDnsRecord(recordId);
+            boolean success = cloudflareService.deleteDnsRecord(recordId, zoneId);
 
             if (success) {
                 return ApiResponse.success("DNS记录删除成功");
@@ -243,7 +244,7 @@ public class CloudflareController  extends BaseController {
 
         } catch (Exception e) {
             log.error("删除DNS记录失败，recordId: {}", recordId, e);
-            return ApiResponse.error("删除DNS记录失败: " + e.getMessage());
+            return ApiResponse.error(e.getMessage());
         }
     }
 
@@ -266,10 +267,11 @@ public class CloudflareController  extends BaseController {
             int syncCount = cloudflareService.syncAllDnsRecords(zoneId, domainName);
 
             Map<String, String> result = new HashMap<>();
+            result.put("syncCount", String.valueOf(syncCount));
             return ApiResponse.builder()
                     .success(true)
                     .message("同步完成，共处理 " + syncCount + " 条记录")
-                    .data(result.put("syncCount", String.valueOf(syncCount)))
+                    .data(result)
                     .build();
 
         } catch (Exception e) {

@@ -300,16 +300,25 @@ public class CloudflareService {
      */
     @Transactional
     public boolean deleteDnsRecord(String recordId) {
+        return deleteDnsRecord(recordId, null);
+    }
+
+    /**
+     * 删除DNS记录
+     */
+    @Transactional
+    public boolean deleteDnsRecord(String recordId, String zoneId) {
         log.info("开始删除DNS记录，recordId: {}", recordId);
 
         try {
             // 从数据库查找记录
             Optional<DnsRecord> optionalRecord = dnsRecordRepository.findByProviderRecordId(recordId);
-            if (!optionalRecord.isPresent()) {
-                throw new IllegalArgumentException("未找到DNS记录: " + recordId);
+            DnsRecord dnsRecord = optionalRecord.orElse(null);
+            String resolvedZoneId = dnsRecord != null ? dnsRecord.getZoneId() : zoneId;
+            if (StringUtils.isBlank(resolvedZoneId)) {
+                throw new IllegalArgumentException("缺少域名区域信息，请刷新页面后重试");
             }
 
-            DnsRecord dnsRecord = optionalRecord.get();
             CloudflareConfig config = systemConfigService.getCloudflareConfig();
 
             if (!config.isEnabled() || StringUtils.isEmpty(config.getApiToken())) {
@@ -317,7 +326,7 @@ public class CloudflareService {
             }
 
             // 调用Cloudflare API删除记录
-            String url = CLOUDFLARE_API_BASE + "/zones/" + dnsRecord.getZoneId() + "/dns_records/" + recordId;
+            String url = CLOUDFLARE_API_BASE + "/zones/" + resolvedZoneId + "/dns_records/" + recordId;
 
             HttpHeaders headers = createHeaders(config.getApiToken());
             HttpEntity<Void> entity = new HttpEntity<>(null, headers);
@@ -330,12 +339,15 @@ public class CloudflareService {
 
             if (jsonNode.get("success").asBoolean()) {
                 // 删除成功，更新数据库记录状态
-                dnsRecord.setStatus(RecordStatus.INACTIVE);
-                dnsRecord.setRemark("已删除");
-                dnsRecord.setUpdateTime(LocalDateTime.now());
-                dnsRecordRepository.save(dnsRecord);
-
-                log.info("删除DNS记录成功: {} -> {}", dnsRecord.getRecordName(), dnsRecord.getRecordValue());
+                if (dnsRecord != null) {
+                    dnsRecord.setStatus(RecordStatus.INACTIVE);
+                    dnsRecord.setRemark("已删除");
+                    dnsRecord.setUpdateTime(LocalDateTime.now());
+                    dnsRecordRepository.save(dnsRecord);
+                    log.info("删除DNS记录成功: {} -> {}", dnsRecord.getRecordName(), dnsRecord.getRecordValue());
+                } else {
+                    log.info("删除Cloudflare DNS记录成功，本地未找到缓存记录，recordId: {}", recordId);
+                }
                 return true;
             } else {
                 handleCloudflareErrors(jsonNode);
@@ -344,11 +356,33 @@ public class CloudflareService {
 
         } catch (HttpClientErrorException e) {
             log.error("删除DNS记录失败: {}", e.getResponseBodyAsString());
-            throw new RuntimeException("删除DNS记录失败: " + e.getMessage());
+            throw new RuntimeException(readableCloudflareDeleteError(e));
         } catch (Exception e) {
             log.error("删除DNS记录失败: {}", e.getMessage(), e);
-            throw new RuntimeException("删除DNS记录失败: " + e.getMessage());
+            throw e instanceof RuntimeException ? (RuntimeException) e : new RuntimeException(e.getMessage());
         }
+    }
+
+    private String readableCloudflareDeleteError(HttpClientErrorException e) {
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode jsonNode = mapper.readTree(e.getResponseBodyAsString());
+            JsonNode errors = jsonNode.get("errors");
+            if (errors != null && errors.isArray() && errors.size() > 0) {
+                List<String> messages = new ArrayList<>();
+                for (JsonNode error : errors) {
+                    if (error.has("message")) {
+                        messages.add(error.get("message").asText());
+                    }
+                }
+                if (!messages.isEmpty()) {
+                    return String.join("；", messages);
+                }
+            }
+        } catch (Exception ignored) {
+            // Fall back to the HTTP exception message below.
+        }
+        return "Cloudflare 删除失败，请刷新列表后重试";
     }
 
     /**

@@ -7,6 +7,7 @@ import com.doubledimple.ociserver.pojo.enums.MessageEnum;
 import com.doubledimple.ociserver.service.message.factory.MessageFactory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.apache.commons.lang3.StringUtils;
 import org.json.JSONObject;
 import org.springframework.http.HttpEntity;
@@ -48,6 +49,12 @@ public class VersionCheckTask {
     private static final String GITHUB_API_URL = "https://api.github.com/repos/doubleDimple/oci-start/releases/latest";
     private static final String DOCKER_HUB_API_URL = "https://hub.docker.com/v2/repositories/lovele/oci-start/tags";
 
+    @Value("${oci.version:2.0.6}")
+    private String dockerVersion;
+
+    @Value("${oci.ssh-version:v-2.0.6}")
+    private String sshVersion;
+
     /**
      * 初始化版本信息
      */
@@ -55,7 +62,7 @@ public class VersionCheckTask {
     public void init() {
         if (!versionRepository.findFirstByOrderByIdAsc().isPresent()) {
             boolean isDocker = isDockerDeploy();
-            String version = isDocker ? "2.0.6" : "v-2.0.6";
+            String version = isDocker ? dockerVersion : sshVersion;
 
             AppVersion appVersion = new AppVersion();
             appVersion.setCurrentVersion(version);
@@ -116,6 +123,12 @@ public class VersionCheckTask {
             } else {
                 // SSH部署只检查GitHub
                 latestVersion = githubVersion;
+            }
+
+            if (latestVersion != null && compareVersion(latestVersion, version.getCurrentVersion()) < 0) {
+                log.info("忽略低于当前运行版本的远程版本 - 当前版本: {}, 远程版本: {}",
+                        version.getCurrentVersion(), latestVersion);
+                return;
             }
 
             if (latestVersion != null && !latestVersion.equals(version.getLatestVersion())) {
@@ -377,6 +390,38 @@ public class VersionCheckTask {
             log.error("获取GitHub Stars失败,原因为:{}", e.getMessage());
             return 0L;
         }
+    }
+
+    private int compareVersion(String left, String right) {
+        String[] leftParts = normalizeVersion(left).split("\\.");
+        String[] rightParts = normalizeVersion(right).split("\\.");
+        int length = Math.max(leftParts.length, rightParts.length);
+        for (int i = 0; i < length; i++) {
+            int leftValue = i < leftParts.length ? parseVersionPart(leftParts[i]) : 0;
+            int rightValue = i < rightParts.length ? parseVersionPart(rightParts[i]) : 0;
+            if (leftValue != rightValue) {
+                return Integer.compare(leftValue, rightValue);
+            }
+        }
+        return 0;
+    }
+
+    private String normalizeVersion(String version) {
+        if (version == null || version.trim().isEmpty()) {
+            return "0";
+        }
+        return version.trim().replaceFirst("^[vV][-_]?", "");
+    }
+
+    private int parseVersionPart(String part) {
+        if (part == null) {
+            return 0;
+        }
+        String digits = part.replaceAll("[^0-9].*$", "");
+        if (digits.isEmpty()) {
+            return 0;
+        }
+        return Integer.parseInt(digits);
     }
 
     private void sendUpdateMessage(String finalLatestVersion, String releaseNotes) {

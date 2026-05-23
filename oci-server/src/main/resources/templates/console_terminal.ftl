@@ -10,6 +10,7 @@
     <script>(function(){var t=localStorage.getItem('oci_theme')||'dark';if(t==='system')t=window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';document.documentElement.dataset.theme=t;})();</script>
     <link rel="stylesheet" href="/css/all.min.css">
     <link rel="stylesheet" href="/css/sweetalert2.min.css">
+    <link href="/css/common/sweetalert-overrides.css" rel="stylesheet">
     <script src="/js/sweetalert2.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.8/clipboard.min.js"></script>
     <script type="module" crossorigin="anonymous">

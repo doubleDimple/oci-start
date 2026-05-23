@@ -16,6 +16,7 @@
     <link rel="stylesheet" href="/css/app/oci_machine_total_list.css">
     <!-- SweetAlert2 CSS -->
     <link href="/css/sweetalert2.min.css" rel="stylesheet">
+    <link href="/css/common/sweetalert-overrides.css" rel="stylesheet">
     <!-- SweetAlert2 JS -->
     <script src="/js/sweetalert2.min.js"></script>
 

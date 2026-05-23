@@ -21,13 +21,29 @@ const swalConfig = {
 };
 
 // 通用错误处理
-async function handleApiError(error, title = '操作失败') {
+async function handleApiError(error, title = i18n.request_operation_fail) {
+    if (window.OciRequestUtils && typeof window.OciRequestUtils.showApiError === 'function') {
+        await window.OciRequestUtils.showApiError(error, title);
+        return;
+    }
+
     await Swal.fire({
         icon: 'error',
         title: title,
-        text: error.message,
+        text: (error && error.message) || error || i18n.request_network_or_server_error,
         confirmButtonColor: '#2196f3'
     });
+}
+
+async function assertResponseOk(response, fallbackMessage = i18n.request_operation_fail) {
+    if (window.OciRequestUtils && typeof window.OciRequestUtils.assertApiResponse === 'function') {
+        return await window.OciRequestUtils.assertApiResponse(response, fallbackMessage);
+    }
+    if (!response.ok) {
+        throw new Error(await response.text() || fallbackMessage);
+    }
+    const text = await response.text();
+    return text ? JSON.parse(text) : null;
 }
 
 async function updateTelegramConfig() {
@@ -68,9 +84,7 @@ async function updateTelegramConfig() {
                 })
             });
 
-            if (!response.ok) {
-                throw new Error(await response.text() || i18n.common_confirmUpdateFail);
-            }
+            await assertResponseOk(response, i18n.common_confirmUpdateFail);
 
             const Toast = Swal.mixin(swalConfig.toast);
             Toast.fire({
@@ -89,8 +103,8 @@ async function updateDingTalkConfig(button) {
     if (!form) {
         await Swal.fire({
             icon: 'error',
-            title: '错误',
-            text: '表单不存在',
+            title: i18n.common_error,
+            text: i18n.request_form_missing,
             confirmButtonColor: '#2196f3'
         });
         return;
@@ -155,9 +169,7 @@ async function updateDingTalkConfig(button) {
                 body: JSON.stringify(config)
             });
 
-            if (!response.ok) {
-                throw new Error(await response.text() || '钉钉配置更新失败');
-            }
+            await assertResponseOk(response, i18n.notification_dingTalkUpdateFail);
 
             const Toast = Swal.mixin(swalConfig.toast);
             Toast.fire({
@@ -183,9 +195,7 @@ async function testDingTalk() {
             }
         });
 
-        if (!response.ok) {
-            throw new Error(await response.text() || i18n.common_sendFail);
-        }
+        await assertResponseOk(response, i18n.common_sendFail);
 
         const Toast = Swal.mixin(swalConfig.toast);
         Toast.fire({
@@ -207,9 +217,7 @@ async function testTgTalk() {
             }
         });
 
-        if (!response.ok) {
-            throw new Error(await response.text() || i18n.common_sendFail);
-        }
+        await assertResponseOk(response, i18n.common_sendFail);
 
         const Toast = Swal.mixin(swalConfig.toast);
         Toast.fire({
@@ -227,8 +235,8 @@ async function updateTaskConfig(button) {
     if (!form) {
         await Swal.fire({
             icon: 'error',
-            title: '错误',
-            text: '表单不存在',
+            title: i18n.common_error,
+            text: i18n.request_form_missing,
             confirmButtonColor: '#2196f3'
         });
         return;
@@ -274,9 +282,7 @@ async function updateTaskConfig(button) {
                 body: JSON.stringify(config)
             });
 
-            if (!response.ok) {
-                throw new Error(await response.text() || '定时任务配置更新失败');
-            }
+            await assertResponseOk(response, i18n.notification_taskUpdateFail);
 
             const Toast = Swal.mixin(swalConfig.toast);
             Toast.fire({
@@ -285,7 +291,7 @@ async function updateTaskConfig(button) {
             });
         }
     } catch (error) {
-        await handleApiError(error, '定时任务配置更新失败');
+        await handleApiError(error, i18n.notification_taskUpdateFail);
     } finally {
         button.innerHTML = '<i class="fas fa-save"></i> ' + i18n.notification_save;
         button.disabled = false;
@@ -298,8 +304,8 @@ async function updateBarkConfig(button) {
     if (!form) {
         await Swal.fire({
             icon: 'error',
-            title: '错误',
-            text: '表单不存在',
+            title: i18n.common_error,
+            text: i18n.request_form_missing,
             confirmButtonColor: '#2196f3'
         });
         return;
@@ -347,9 +353,7 @@ async function updateBarkConfig(button) {
                 body: JSON.stringify(config)
             });
 
-            if (!response.ok) {
-                throw new Error(await response.text() || i18n.common_confirmUpdateFail);
-            }
+            await assertResponseOk(response, i18n.common_confirmUpdateFail);
 
             const Toast = Swal.mixin(swalConfig.toast);
             Toast.fire({
@@ -376,9 +380,7 @@ async function testBark() {
             }
         });
 
-        if (!response.ok) {
-            throw new Error(await response.text() || i18n.common_sendFail);
-        }
+        await assertResponseOk(response, i18n.common_sendFail);
 
         const Toast = Swal.mixin(swalConfig.toast);
         Toast.fire({
@@ -457,8 +459,8 @@ async function updateFeishuConfig(button) {
     if (!form) {
         await Swal.fire({
             icon: 'error',
-            title: '错误',
-            text: '表单不存在',
+            title: i18n.common_error,
+            text: i18n.request_form_missing,
             confirmButtonColor: '#2196f3'
         });
         return;
@@ -505,9 +507,7 @@ async function updateFeishuConfig(button) {
                 body: JSON.stringify(config)
             });
 
-            if (!response.ok) {
-                throw new Error(await response.text() || i18n.common_confirmUpdateFail);
-            }
+            await assertResponseOk(response, i18n.common_confirmUpdateFail);
 
             const Toast = Swal.mixin(swalConfig.toast);
             Toast.fire({
@@ -533,9 +533,7 @@ async function testFeishu() {
             }
         });
 
-        if (!response.ok) {
-            throw new Error(await response.text() || i18n.common_sendFail);
-        }
+        await assertResponseOk(response, i18n.common_sendFail);
 
         const Toast = Swal.mixin(swalConfig.toast);
         Toast.fire({
@@ -589,9 +587,7 @@ async function updateProxyConfig() {
                 body: JSON.stringify(config)
             });
 
-            if (!response.ok) {
-                throw new Error(await response.text() || i18n.common_confirmUpdateFail);
-            }
+            await assertResponseOk(response, i18n.common_confirmUpdateFail);
 
             const Toast = Swal.mixin(swalConfig.toast);
             Toast.fire({
@@ -634,11 +630,7 @@ async function testProxyConnection() {
             body: JSON.stringify(config)
         });
 
-        if (!response.ok) {
-            throw new Error(await response.text() || i18n.common_testFail);
-        }
-
-        const result = await response.json();
+        const result = await assertResponseOk(response, i18n.common_testFail);
         const Toast = Swal.mixin(swalConfig.toast);
 
         if (result.success) {
@@ -679,9 +671,7 @@ async function startTgRobot() {
                 }
             });
 
-            if (!response.ok) {
-                throw new Error(await response.text() || i18n.common_confirmUpdateFail);
-            }
+            await assertResponseOk(response, i18n.common_confirmUpdateFail);
 
             const Toast = Swal.mixin(swalConfig.toast);
             Toast.fire({
@@ -953,4 +943,3 @@ document.addEventListener('keydown', function(event) {
         if (modal && modal.classList.contains('show')) closeAiConfigModal();
     }
 });
-

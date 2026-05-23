@@ -405,6 +405,7 @@ body {
 .status-message.success { background: rgba(52,211,153,0.10); color: var(--accent-green); }
 .status-message.error   { background: rgba(248,113,113,0.10); color: var(--accent-red); }
 .status-message.syncing { background: rgba(77,158,255,0.10);  color: var(--accent-blue); }
+.status-message:not(.syncing) .loading-spinner { display: none; }
 
 /* ── Loading Spinner ── */
 .loading-spinner {

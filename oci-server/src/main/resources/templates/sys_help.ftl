@@ -22,6 +22,7 @@
 
     <!-- 添加 SweetAlert2 -->
     <link href="/css/sweetalert2.min.css" rel="stylesheet">
+    <link href="/css/common/sweetalert-overrides.css" rel="stylesheet">
     <script src="/js/sweetalert2.min.js"></script>
 
     <link rel="stylesheet" href="/css/app/sys_help.css">
