@@ -1,7 +1,18 @@
 (() => {
 let loadingStartTime = 0;
 
-function showLoading(text = '正在加载中...') {
+function t(key, fallback, params) {
+    const dict = window.I18N || window.i18n || {};
+    let value = dict[key] || fallback || key;
+    if (params && typeof value === 'string') {
+        Object.keys(params).forEach(name => {
+            value = value.replace(new RegExp('\\{' + name + '\\}', 'g'), params[name]);
+        });
+    }
+    return value;
+}
+
+function showLoading(text = t('common_loading', 'Loading...')) {
     loadingStartTime = Date.now();
 
     if (document.querySelector('.loading-overlay')) return;
@@ -65,25 +76,25 @@ function escapeHtml(value) {
         .replace(/'/g, '&#39;');
 }
 
-function pickMessage(payload, fallback = '请求失败，请稍后重试') {
+function pickMessage(payload, fallback = t('request_default_fail', 'The request failed. Please try again later.')) {
     if (!payload) return fallback;
     if (typeof payload === 'string') return payload || fallback;
     return payload.message || payload.msg || payload.error || payload.reason || fallback;
 }
 
-function getFriendlyHttpMessage(status, fallback = '请求失败，请稍后重试') {
+function getFriendlyHttpMessage(status, fallback = t('request_default_fail', 'The request failed. Please try again later.')) {
     const code = Number(status);
     if (!code) return fallback;
-    if (code === 400) return fallback + '，提交的内容有误，请检查后再试。';
-    if (code === 401) return fallback + '，登录状态已过期，请重新登录。';
-    if (code === 403) return fallback + '，当前账号没有权限执行此操作。';
-    if (code === 404) return fallback + '，相关资源不存在或已被删除。';
-    if (code === 408) return fallback + '，请求等待时间过长，请稍后重试。';
-    if (code === 409) return fallback + '，当前数据状态已变化，请刷新后再试。';
-    if (code === 413) return fallback + '，提交的内容过大，请减少内容后再试。';
-    if (code === 429) return fallback + '，操作过于频繁，请稍后再试。';
-    if (code >= 500) return fallback + '，服务器处理时出现异常，请稍后重试。';
-    return fallback + '，请求没有成功完成，请稍后重试。';
+    if (code === 400) return fallback + t('request_http_400_suffix', ', please check the submitted content and try again.');
+    if (code === 401) return fallback + t('request_http_401_suffix', ', your login has expired. Please sign in again.');
+    if (code === 403) return fallback + t('request_http_403_suffix', ', this account does not have permission to perform this action.');
+    if (code === 404) return fallback + t('request_http_404_suffix', ', the resource does not exist or has been deleted.');
+    if (code === 408) return fallback + t('request_http_408_suffix', ', the request took too long. Please try again later.');
+    if (code === 409) return fallback + t('request_http_409_suffix', ', the data has changed. Please refresh and try again.');
+    if (code === 413) return fallback + t('request_http_413_suffix', ', the submitted content is too large. Please reduce it and try again.');
+    if (code === 429) return fallback + t('request_http_429_suffix', ', too many operations. Please try again later.');
+    if (code >= 500) return fallback + t('request_http_5xx_suffix', ', the server could not process this request. Please try again later.');
+    return fallback + t('request_http_generic_suffix', ', the request was not completed successfully. Please try again later.');
 }
 
 function isSuccessCode(code) {
@@ -125,21 +136,21 @@ function getPayloadProblem(payload) {
 
     if (Object.prototype.hasOwnProperty.call(payload, 'success') && isFailureSuccessValue(payload.success)) {
         return {
-            reason: pickMessage(payload, '操作没有成功完成，请稍后重试。'),
+            reason: pickMessage(payload, t('request_action_fail', 'The operation was not completed. Please try again later.')),
             meta: ''
         };
     }
 
     if (Object.prototype.hasOwnProperty.call(payload, 'code') && !isSuccessCode(payload.code)) {
         return {
-            reason: pickMessage(payload, '操作没有成功完成，请稍后重试。'),
+            reason: pickMessage(payload, t('request_action_fail', 'The operation was not completed. Please try again later.')),
             meta: ''
         };
     }
 
     if (Object.prototype.hasOwnProperty.call(payload, 'status') && isFailureStatus(payload.status)) {
         return {
-            reason: pickMessage(payload, '操作没有成功完成，请稍后重试。'),
+            reason: pickMessage(payload, t('request_action_fail', 'The operation was not completed. Please try again later.')),
             meta: ''
         };
     }
@@ -160,14 +171,14 @@ async function parseFetchResponse(response) {
     }
 }
 
-async function assertApiResponse(response, fallbackMessage = '请求失败，请稍后重试') {
+async function assertApiResponse(response, fallbackMessage = t('request_default_fail', 'The request failed. Please try again later.')) {
     const parsed = await parseFetchResponse(response);
     const payloadProblem = getPayloadProblem(parsed.json);
 
     if (parsed.text && !parsed.json) {
         throw createApiError({
-            title: '服务响应异常',
-            message: '服务器返回内容异常，请稍后重试。',
+            title: t('request_invalid_response_title', 'Unexpected response'),
+            message: t('request_invalid_response_message', 'The server returned an unexpected response. Please try again later.'),
             detail: '',
             response
         });
@@ -175,7 +186,7 @@ async function assertApiResponse(response, fallbackMessage = '请求失败，请
 
     if (!response.ok || payloadProblem) {
         throw createApiError({
-            title: response.ok ? '请求失败' : '服务异常',
+            title: response.ok ? t('request_fail_title', 'Request failed') : t('request_service_error_title', 'Service unavailable'),
             message: payloadProblem ? payloadProblem.reason : pickMessage(parsed.json, getFriendlyHttpMessage(response.status, fallbackMessage)),
             detail: payloadProblem ? payloadProblem.meta : '',
             response,
@@ -186,7 +197,7 @@ async function assertApiResponse(response, fallbackMessage = '请求失败，请
     return parsed.json;
 }
 
-function normalizeApiError(error, fallbackTitle = '请求失败') {
+function normalizeApiError(error, fallbackTitle = t('request_fail_title', 'Request failed')) {
     if (error && error.__apiError) {
         return error;
     }
@@ -206,35 +217,35 @@ function normalizeApiError(error, fallbackTitle = '请求失败') {
 
     const payloadProblem = getPayloadProblem(parsedPayload);
     const message = (payloadProblem && payloadProblem.reason) ||
-        pickMessage(parsedPayload, rawMessage || '网络异常或服务器无响应，请稍后重试');
-    let title = fallbackTitle || '请求失败';
+        pickMessage(parsedPayload, rawMessage || t('request_network_or_server_error', 'Network error or no server response. Please try again later.'));
+    let title = fallbackTitle || t('request_fail_title', 'Request failed');
     let detail = payloadProblem ? payloadProblem.meta : '';
 
     if (message === 'Request Timeout' || (error && error.name === 'AbortError')) {
-        title = '请求超时';
+        title = t('request_timeout_title', 'Request timed out');
         detail = message;
         return {
             __apiError: true,
             title,
-            message: '服务器响应时间过长，请稍后重试。',
+            message: t('request_timeout_message', 'The server took too long to respond. Please try again later.'),
             detail
         };
     } else if (!navigator.onLine) {
-        title = '网络已断开';
+        title = t('request_offline_title', 'Network disconnected');
         detail = message;
         return {
             __apiError: true,
             title,
-            message: '当前设备看起来已经离线，请检查网络连接。',
+            message: t('request_offline_message', 'This device appears to be offline. Please check your network connection.'),
             detail
         };
     } else if (error instanceof TypeError) {
-        title = '网络错误';
+        title = t('request_network_title', 'Network error');
         detail = message;
         return {
             __apiError: true,
             title,
-            message: '无法连接到服务器，请检查网络、代理或服务是否正常运行。',
+            message: t('request_network_message', 'Unable to connect to the server. Please check your network, proxy, or service status.'),
             detail
         };
     }
@@ -247,7 +258,7 @@ function normalizeApiError(error, fallbackTitle = '请求失败') {
     };
 }
 
-async function showApiError(error, title = '请求失败') {
+async function showApiError(error, title = t('request_fail_title', 'Request failed')) {
     if (typeof Swal === 'undefined') return;
 
     const normalized = normalizeApiError(error, title);
@@ -266,7 +277,7 @@ async function showApiError(error, title = '请求失败') {
     });
 }
 
-function createApiError({ title = '请求失败', message, detail, response, payload }) {
+function createApiError({ title = t('request_fail_title', 'Request failed'), message, detail, response, payload }) {
     const parts = [];
     const responseMessage = response ? getFriendlyHttpMessage(response.status, title) : '';
     if (responseMessage && responseMessage !== message) {
@@ -312,7 +323,7 @@ async function request(options) {
         formId = null,
         headers = {},
         loading = false,
-        loadingText = "正在处理中...",
+        loadingText = t('common_processing', 'Processing...'),
         timeout = REQUEST_TIMEOUT,
         showSuccess = false,
         showError = true,
@@ -347,7 +358,9 @@ async function request(options) {
             if (loading) showLoading(loadingText);
 
             const form = document.getElementById(formId);
-            if (!form) throw new Error(`未找到表单：${formId}`);
+            if (!form) {
+                throw new Error(t('request_form_missing_with_id', 'Form not found: {formId}', { formId }));
+            }
 
             const formData = new FormData(form);
 
@@ -374,8 +387,8 @@ async function request(options) {
                     } catch (e) {
                         if (showError) {
                             showApiError(createApiError({
-                                title: '服务响应异常',
-                                message: '服务器返回内容异常，请稍后重试。',
+                                title: t('request_invalid_response_title', 'Unexpected response'),
+                                message: t('request_invalid_response_message', 'The server returned an unexpected response. Please try again later.'),
                                 detail: ''
                             }));
                         }
@@ -393,7 +406,7 @@ async function request(options) {
                             window.location.href = redirect;
                         } else {
                             if (showSuccess) {
-                                Swal.fire("成功", pickMessage(json, "操作成功"), "success");
+                                Swal.fire(t('request_success_title', 'Success'), pickMessage(json, t('request_success_message', 'Operation completed successfully.')), "success");
                             }
                         }
 
@@ -404,8 +417,8 @@ async function request(options) {
                     // ======= 失败处理 =======
                     if (showError) {
                         showApiError(createApiError({
-                            title: '请求失败',
-                            message: payloadProblem ? payloadProblem.reason : pickMessage(json, '操作失败，请稍后重试'),
+                            title: t('request_fail_title', 'Request failed'),
+                            message: payloadProblem ? payloadProblem.reason : pickMessage(json, t('request_operation_fail', 'Operation failed. Please try again later.')),
                             detail: payloadProblem ? payloadProblem.meta : '',
                             response: { status: xhr.status, statusText: xhr.statusText },
                             payload: json
@@ -418,7 +431,7 @@ async function request(options) {
                 xhr.onerror = function () {
                     if (loading) hideLoading();
                     if (showError) {
-                        showApiError(new TypeError("无法连接到服务器，请检查网络连接后再试"));
+                        showApiError(new TypeError(t('request_network_message_short', 'Unable to connect to the server. Please check your network and try again.')));
                     }
                     resolve(null);
                 };
@@ -461,7 +474,7 @@ async function request(options) {
         let json = null;
 
         try {
-            json = await assertApiResponse(response, errorMessage || "请求失败，请稍后重试");
+            json = await assertApiResponse(response, errorMessage || t('request_default_fail', 'The request failed. Please try again later.'));
         } catch (apiError) {
             if (showError && typeof Swal !== "undefined") {
                 await showApiError(apiError);
@@ -475,9 +488,9 @@ async function request(options) {
         if (showSuccess && finalSuccessMsg && typeof Swal !== "undefined") {
             await Swal.fire({
                 icon: "success",
-                title: "操作成功",
+                title: t('request_success_title', 'Success'),
                 text: finalSuccessMsg,
-                confirmButtonText: "确定"
+                confirmButtonText: t('common_confirm', 'OK')
             });
         }
 
@@ -488,11 +501,11 @@ async function request(options) {
         return json;
 
     } catch (err) {
-        console.error(" 请求异常：", err);
+        console.error("Request exception:", err);
         if (loading) hideLoading();
 
         if (showError && typeof Swal !== "undefined") {
-            await showApiError(errorMessage ? new Error(errorMessage) : err, '网络错误');
+            await showApiError(errorMessage ? new Error(errorMessage) : err, t('request_network_title', 'Network error'));
         }
 
         throw err;
@@ -536,7 +549,7 @@ function bindFormSubmit(formId, config) {
             extraRequiredByCloudType = {},
             scrollToError = true,
             loading = true,
-            loadingText = "正在提交，请稍候...",
+            loadingText = t('common_submitting', 'Submitting, please wait...'),
             redirect,
             showSuccess = true,
             showError = true,
@@ -584,9 +597,9 @@ function bindFormSubmit(formId, config) {
             if (typeof Swal !== "undefined") {
                 Swal.fire({
                     icon: "error",
-                    title: "验证失败",
-                    text: "请填写所有必填字段",
-                    confirmButtonText: "确定"
+                title: t('request_validation_fail_title', 'Validation failed'),
+                text: t('request_required_fields', 'Please fill in all required fields.'),
+                    confirmButtonText: t('common_confirm', 'OK')
                 });
             }
             return;
@@ -668,6 +681,9 @@ function httpDelete(url, data = {}, options = {}) {
         getPayloadProblem,
         normalizeApiError,
         showApiError,
-        assertApiResponse
+        assertApiResponse,
+        getFriendlyHttpMessage,
+        pickMessage,
+        t
     };
 })();

@@ -695,7 +695,7 @@
         // 验证表单
         if (!formData.name || !formData.content) {
             Swal.fire({
-                title: 'error',
+                title: '${msg.get("common.error")?js_string}',
                 text: '${msg.get("common.plzInputGlobalRequired")}',
                 icon: 'error',
                 confirmButtonColor: 'var(--accent-red)'
@@ -705,7 +705,7 @@
 
         // 显示加载状态
         Swal.fire({
-            title: 'loading',
+            title: '${msg.get("common.loading")?js_string}',
             text: '${msg.get("common.loading")}',
             allowOutsideClick: false,
             didOpen: () => {
@@ -725,7 +725,8 @@
             .then(apiResponse => {
                 if (apiResponse.success) {
                     Swal.fire({
-                        title: 'success',
+                        title: '${msg.get("common.success")?js_string}',
+                        text: apiResponse.message || '${msg.get("cf.addDnsSuccess")?js_string}',
                         icon: 'success',
                         confirmButtonColor: 'var(--accent-green)'
                     });
@@ -736,7 +737,8 @@
                     window.location.href = `/dns/cloudflare?zoneId=`+ currentZoneId+`&page=`+ currentPage+`&size=`+ currentSize+``;
                 } else {
                     Swal.fire({
-                        title: 'error',
+                        title: '${msg.get("cf.addDnsFail")?js_string}',
+                        text: apiResponse.message || '${msg.get("common.network.error")}',
                         icon: 'error',
                         confirmButtonColor: 'var(--accent-red)'
                     });
@@ -745,7 +747,7 @@
             .catch(error => {
                 console.error('添加DNS记录失败:', error);
                 Swal.fire({
-                    title: 'error',
+                    title: '${msg.get("common.error")?js_string}',
                     text: '${msg.get("common.network.error")}',
                     icon: 'error',
                     confirmButtonColor: 'var(--accent-red)'
@@ -805,7 +807,7 @@
         // 验证表单
         if (!formData.content) {
             Swal.fire({
-                title: 'error',
+                title: '${msg.get("common.error")?js_string}',
                 text: '${msg.get("common.plzInputGlobalRequired")}',
                 icon: 'error',
                 confirmButtonColor: 'var(--accent-red)'
@@ -815,7 +817,7 @@
 
         // 显示加载状态
         Swal.fire({
-            title: 'loading',
+            title: '${msg.get("common.loading")?js_string}',
             allowOutsideClick: false,
             didOpen: () => {
                 Swal.showLoading();
@@ -840,7 +842,8 @@
                     window.location.href = `/dns/cloudflare?zoneId=`+ currentZoneId+`&page=`+ currentPage+`&size=`+ currentSize+``;+``;
                 } else {
                     Swal.fire({
-                        title: 'error',
+                        title: '${msg.get("cf.updateDnsFail")?js_string}',
+                        text: apiResponse.message || '${msg.get("common.network.error")}',
                         icon: 'error',
                         confirmButtonColor: 'var(--accent-red)'
                     });
@@ -849,7 +852,7 @@
             .catch(error => {
                 console.error('更新DNS记录失败:', error);
                 Swal.fire({
-                    title: 'error',
+                    title: '${msg.get("common.error")?js_string}',
                     text: '${msg.get("common.network.error")}',
                     icon: 'error',
                     confirmButtonColor: 'var(--accent-red)'
@@ -861,7 +864,7 @@
     function deleteDnsRecord(recordId, recordName) {
         Swal.fire({
             title: '${msg.get("mfa.confirm.delete_title")}',
-            html: '确认删除 DNS 记录 <strong style="color:var(--text);word-break:break-all;">' + recordName + '</strong> 吗？<br><span style="color:var(--muted);">删除后将无法恢复。</span>',
+            html: '${msg.get("cf.deleteDnsConfirmPrefix")?js_string} <strong style="color:var(--text);word-break:break-all;">' + recordName + '</strong> ${msg.get("cf.deleteDnsConfirmSuffix")?js_string}<br><span style="color:var(--muted);">${msg.get("cf.deleteDnsConfirmWarning")?js_string}</span>',
             icon: 'warning',
             showCancelButton: true,
             customClass: {
@@ -875,7 +878,7 @@
             if (result.isConfirmed) {
                 // 显示加载状态
                 Swal.fire({
-                    title: 'loading',
+                    title: '${msg.get("common.loading")?js_string}',
                     allowOutsideClick: false,
                     didOpen: () => {
                         Swal.showLoading();
@@ -900,7 +903,7 @@
                             window.location.href = `/dns/cloudflare?zoneId=`+ currentZoneId+`&page=`+ currentPage+`&size=`+ currentSize+``;+``;
                         } else {
                             Swal.fire({
-                                title: '删除失败',
+                                title: '${msg.get("cf.deleteDnsFail")?js_string}',
                                 text: apiResponse.message || '${msg.get("common.network.error")}',
                                 icon: 'error',
                                 confirmButtonColor: 'var(--accent-red)'
@@ -910,7 +913,7 @@
                     .catch(error => {
                         console.error('删除DNS记录失败:', error);
                         Swal.fire({
-                            title: 'error',
+                            title: '${msg.get("common.error")?js_string}',
                             text: '${msg.get("common.network.error")}',
                             icon: 'error',
                             confirmButtonColor: 'var(--accent-red)'
@@ -949,7 +952,7 @@
             if (result.isConfirmed) {
                 // 显示加载状态
                 Swal.fire({
-                    title: 'loading',
+                    title: '${msg.get("common.loading")?js_string}',
                     allowOutsideClick: false,
                     didOpen: () => {
                         Swal.showLoading();
@@ -972,14 +975,16 @@
                         if (apiResponse.success) {
                             const syncCount = apiResponse.data ? apiResponse.data.syncCount : 0;
                             Swal.fire({
-                                title: 'success',
+                                title: '${msg.get("common.success")?js_string}',
+                                text: apiResponse.message || '${msg.get("cf.syncSuccess")?js_string}',
                                 icon: 'success',
                                 confirmButtonColor: 'var(--accent-green)'
                             });
                             loadDnsRecords();
                         } else {
                             Swal.fire({
-                                title: 'error',
+                                title: '${msg.get("cf.syncFail")?js_string}',
+                                text: apiResponse.message || '${msg.get("common.network.error")}',
                                 icon: 'error',
                                 confirmButtonColor: 'var(--accent-red)'
                             });
@@ -988,7 +993,7 @@
                     .catch(error => {
                         console.error('同步DNS记录失败:', error);
                         Swal.fire({
-                            title: 'error',
+                            title: '${msg.get("common.error")?js_string}',
                             text: '${msg.get("common.network.error")}',
                             icon: 'error',
                             confirmButtonColor: 'var(--accent-red)'
@@ -1140,7 +1145,7 @@
         if (formData.enabled) {
             if (!formData.apiToken) {
                 Swal.fire({
-                    title: 'warning',
+                    title: '${msg.get("common.confirmFormatFail")?js_string}',
                     text: '${msg.get("common.plzInputGlobalRequired")}',
                     icon: 'warning',
                     confirmButtonColor: 'var(--accent-blue)'
@@ -1150,7 +1155,7 @@
 
             if (!formData.email) {
                 Swal.fire({
-                    title: 'warning',
+                    title: '${msg.get("common.confirmFormatFail")?js_string}',
                     text: '${msg.get("common.plzInputGlobalRequired")}',
                     icon: 'warning',
                     confirmButtonColor: 'var(--accent-blue)'
@@ -1161,7 +1166,7 @@
 
         // 显示加载状态
         Swal.fire({
-            title: 'loading',
+            title: '${msg.get("common.loading")?js_string}',
             text: '${msg.get("common.saving")}',
             allowOutsideClick: false,
             didOpen: () => Swal.showLoading()
@@ -1196,7 +1201,7 @@
                 return response.text().then(text => {
                     if (text.trim() === '') {
                         // 空响应表示成功
-                        return { success: true, message: 'successful' };
+                        return { success: true, message: '${msg.get("common.success")?js_string}' };
                     } else {
                         try {
                             return JSON.parse(text);
@@ -1210,7 +1215,7 @@
             .then(data => {
                 // 保存成功后直接刷新页面
                 Swal.fire({
-                    title: 'success',
+                    title: '${msg.get("common.success")?js_string}',
                     icon: 'success',
                     confirmButtonColor: 'var(--accent-green)',
                     timer: 1500,  // 1.5秒后自动关闭
@@ -1224,7 +1229,7 @@
                 console.error('保存配置失败:', error);
                 updateConfigStatus('disconnected');
                 Swal.fire({
-                    title: 'error',
+                    title: '${msg.get("common.error")?js_string}',
                     text: '${msg.get("common.network.error")}',
                     icon: 'error',
                     confirmButtonColor: 'var(--accent-red)'
@@ -1261,7 +1266,7 @@
 
         if (!apiToken || !email) {
             Swal.fire({
-                title: 'warning',
+                title: '${msg.get("common.confirmFormatFail")?js_string}',
                 text: '${msg.get("common.plzInputGlobalRequired")}',
                 icon: 'warning',
                 confirmButtonColor: 'var(--accent-blue)'
@@ -1271,7 +1276,7 @@
 
         // 显示加载状态
         Swal.fire({
-            title: 'loading',
+            title: '${msg.get("common.loading")?js_string}',
             allowOutsideClick: false,
             didOpen: () => Swal.showLoading()
         });
@@ -1294,19 +1299,19 @@
                 if (data.success) {
                     updateConfigStatus('connected');
                     Swal.fire({
-                        title: 'success',
-                        text: 'successful',
+                        title: '${msg.get("common.success")?js_string}',
+                        text: data.message || '${msg.get("common.success")?js_string}',
                         icon: 'success',
                         confirmButtonColor: 'var(--accent-green)'
                     });
                 } else {
-                    throw new Error(data.message || '连接失败');
+                    throw new Error(data.message || '${msg.get("cf.connectionFail")?js_string}');
                 }
             })
             .catch(error => {
                 updateConfigStatus('disconnected');
                 Swal.fire({
-                    title: 'error',
+                    title: '${msg.get("common.error")?js_string}',
                     text: error.message,
                     icon: 'error',
                     confirmButtonColor: 'var(--accent-red)'
@@ -1369,7 +1374,7 @@
         try {
             await navigator.clipboard.writeText(value);
             Swal.fire({
-                title: 'success',
+                title: '${msg.get("domain.copySuccess")?js_string}',
                 icon: 'success',
                 timer: 2000,
                 showConfirmButton: false
@@ -1379,7 +1384,7 @@
             input.select();
             document.execCommand('copy');
             Swal.fire({
-                title: 'success',
+                title: '${msg.get("domain.copySuccess")?js_string}',
                 icon: 'success',
                 timer: 2000,
                 showConfirmButton: false

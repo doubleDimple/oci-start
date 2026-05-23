@@ -23,7 +23,7 @@ const swalConfig = {
 };
 
 // 通用错误处理
-async function handleApiError(error, title = 'error') {
+async function handleApiError(error, title = i18n.request_operation_fail) {
     if (window.OciRequestUtils && typeof window.OciRequestUtils.showApiError === 'function') {
         await window.OciRequestUtils.showApiError(error, title);
         return;
@@ -32,9 +32,20 @@ async function handleApiError(error, title = 'error') {
     await Swal.fire({
         icon: 'error',
         title: title,
-        text: (error && error.message) || error || '网络异常或服务器无响应，请稍后重试',
+        text: (error && error.message) || error || i18n.request_network_or_server_error,
         confirmButtonColor: '#2196f3'
     });
+}
+
+async function assertResponseOk(response, fallbackMessage = i18n.request_operation_fail) {
+    if (window.OciRequestUtils && typeof window.OciRequestUtils.assertApiResponse === 'function') {
+        return await window.OciRequestUtils.assertApiResponse(response, fallbackMessage);
+    }
+    if (!response.ok) {
+        throw new Error(await response.text() || fallbackMessage);
+    }
+    const text = await response.text();
+    return text ? JSON.parse(text) : null;
 }
 
 // 更新GitHub配置
@@ -43,8 +54,8 @@ async function updateGithubConfig(button) {
     if (!form) {
         await Swal.fire({
             icon: 'error',
-            title: '错误',
-            text: '表单不存在',
+            title: i18n.common_error,
+            text: i18n.request_form_missing,
             confirmButtonColor: '#2196f3'
         });
         return;
@@ -100,9 +111,7 @@ async function updateGithubConfig(button) {
                 body: JSON.stringify(formData)
             });
 
-            if (!response.ok) {
-                throw new Error(await response.text());
-            }
+            await assertResponseOk(response, i18n.common_confirmUpdateFail);
 
             /*const Toast = Swal.mixin(swalConfig.toast);
             Toast.fire({
@@ -111,7 +120,7 @@ async function updateGithubConfig(button) {
             });*/
         }
     } catch (error) {
-        await handleApiError(error, 'error');
+        await handleApiError(error, i18n.common_confirmUpdateFail);
     } finally {
         button.innerHTML = '<i class="fas fa-save"></i> '+i18n.sys_githubSave;
         button.disabled = false;
@@ -127,7 +136,7 @@ async function fetchGithubId() {
     if (!usernameInput || !idInput || !fetchBtn) {
         await Swal.fire({
             icon: 'error',
-            title: 'error',
+            title: i18n.common_error,
             confirmButtonColor: '#2196f3'
         });
         return;
@@ -152,7 +161,7 @@ async function fetchGithubId() {
         const data = await response.json();
 
         if (!response.ok) {
-            throw new Error(data.message || '获取GitHub ID失败');
+            throw new Error(data.message || i18n.sys_githubIdFail);
         }
 
         idInput.value = data.id;
@@ -300,9 +309,7 @@ async function updateAccount() {
                 })
             });
 
-            if (!response.ok) {
-                throw new Error(await response.text() || '账号信息修改失败');
-            }
+            await assertResponseOk(response, i18n.sys_accountUpdateFail);
 
             if (newPassword) {
                 /*await Swal.fire({
@@ -324,7 +331,7 @@ async function updateAccount() {
             }
         }
     } catch (error) {
-        await handleApiError(error, '账号信息修改失败');
+        await handleApiError(error, i18n.sys_accountUpdateFail);
     }
 }
 
@@ -334,8 +341,8 @@ async function updateMfaConfig(button) {
     if (!form) {
         await Swal.fire({
             icon: 'error',
-            title: '错误',
-            text: '表单不存在',
+            title: i18n.common_error,
+            text: i18n.request_form_missing,
             confirmButtonColor: '#2196f3'
         });
         return;
@@ -369,9 +376,7 @@ async function updateMfaConfig(button) {
                 body: JSON.stringify(formData)
             });
 
-            if (!response.ok) {
-                throw new Error(await response.text() || 'MFA配置更新失败');
-            }
+            await assertResponseOk(response, i18n.sys_mfaUpdateFail);
 
             const Toast = Swal.mixin(swalConfig.toast);
             Toast.fire({
@@ -383,7 +388,7 @@ async function updateMfaConfig(button) {
             setTimeout(() => location.reload(), 1500);
         }
     } catch (error) {
-        await handleApiError(error, 'MFA配置更新失败');
+        await handleApiError(error, i18n.sys_mfaUpdateFail);
     } finally {
         button.innerHTML = '<i class="fas fa-save"></i> '+i18n.common_confirmUpdate;
         button.disabled = false;
@@ -413,13 +418,11 @@ async function regenerateMfaSecret(button) {
                 }
             });
 
-            if (!response.ok) {
-                throw new Error(await response.text() || 'error');
-            }
+            await assertResponseOk(response, i18n.sys_mfaRegenerateFail);
             setTimeout(() => location.reload(), 1500);
         }
     } catch (error) {
-        await handleApiError(error, 'error');
+        await handleApiError(error, i18n.sys_mfaRegenerateFail);
     } finally {
         button.innerHTML = '<i class="fas fa-refresh"></i> '+i18n.sys_mfaSecondSecret;
         button.disabled = false;
@@ -431,8 +434,8 @@ async function verifyMfaCode(button) {
     if (!codeInput) {
         await Swal.fire({
             icon: 'error',
-            title: '错误',
-            text: '验证码输入框不存在',
+            title: i18n.common_error,
+            text: i18n.sys_mfaCodeInputMissing,
             confirmButtonColor: '#2196f3'
         });
         return;
@@ -479,11 +482,7 @@ async function verifyMfaCode(button) {
             })
         });
 
-        const result = await response.json();
-
-        if (!response.ok) {
-            throw new Error(result.message || 'MFA验证请求失败');
-        }
+        const result = await assertResponseOk(response, i18n.sys_mfaVerifyRequestFail);
 
         // 使用ApiResponse格式处理返回结果
         if (result.success) {
@@ -501,7 +500,7 @@ async function verifyMfaCode(button) {
             /*const Toast = Swal.mixin(swalConfig.toast);
             Toast.fire({
                 icon: 'success',
-                title: 'MFA配置验证通过'
+                title: i18n.sys_mfaVerifyPassed
             });*/
         } else {
             // 验证失败
@@ -517,7 +516,7 @@ async function verifyMfaCode(button) {
             codeInput.focus();
         }
     } catch (error) {
-        await handleApiError(error, 'error');
+        await handleApiError(error, i18n.sys_mfaVerifyRequestFail);
         // 验证失败时清空输入框
         codeInput.value = '';
         codeInput.focus();
@@ -615,13 +614,10 @@ async function deleteMfaConfig(button) {
             }
         });
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(errorText || 'error');
-        }
+        await assertResponseOk(response, i18n.sys_mfaDeleteFail);
         location.reload();
     } catch (error) {
-        await handleApiError(error, 'error');
+        await handleApiError(error, i18n.sys_mfaDeleteFail);
     } finally {
         button.innerHTML = '<i class="fas fa-trash"></i> '+i18n.sys_deleteMfa;
         button.disabled = false;
@@ -678,17 +674,15 @@ async function updateGoogleConfig(button) {
                 body: JSON.stringify(formData)
             });
 
-            if (!response.ok) {
-                throw new Error(await response.text());
-            }
+            await assertResponseOk(response, i18n.sys_googleUpdateFail);
             const Toast = Swal.mixin(swalConfig.toast);
             Toast.fire({
                 icon: 'success',
-                title: 'successful'
+                title: i18n.common_success
             });
         }
     } catch (error) {
-        await handleApiError(error, 'Update Failed');
+        await handleApiError(error, i18n.sys_googleUpdateFail);
     } finally {
         button.innerHTML = '<i class="fas fa-save"></i> ' + (i18n.sys_githubSave);
         button.disabled = false;
@@ -730,17 +724,13 @@ async function saveLogoNameOnly(button) {
                 body: new URLSearchParams({ 'logoName': newName })
             });
 
-            const resData = await response.json();
-
-            if (!response.ok || resData.code !== 200) {
-                throw new Error(resData.msg || '更新失败');
-            }
+            const resData = await assertResponseOk(response, i18n.sys_logoUpdateFail);
 
             // 5. 成功反馈
             const Toast = Swal.mixin(swalConfig.toast);
             Toast.fire({
                 icon: 'success',
-                title: 'successful'
+                title: i18n.common_success
             });
             const brandLogo = document.querySelector('.brand h1');
             if (brandLogo) {
@@ -748,7 +738,7 @@ async function saveLogoNameOnly(button) {
             }
         }
     } catch (error) {
-        await handleApiError(error, 'error');
+        await handleApiError(error, i18n.sys_logoUpdateFail);
     } finally {
         button.innerHTML = '<i class="fas fa-check"></i> '+ (i18n.sys_githubSave);
         button.disabled = false;
@@ -795,14 +785,12 @@ async function updateTurnstileConfig(button) {
             body: JSON.stringify({ enabled, siteKey, secretKey })
         });
 
-        if (!response.ok) {
-            throw new Error(await response.text());
-        }
+        await assertResponseOk(response, i18n.sys_turnstileUpdateFail);
 
         const Toast = Swal.mixin(swalConfig.toast);
         Toast.fire({ icon: 'success', title: i18n.common_confirmUpdateSuccess });
     } catch (error) {
-        await handleApiError(error, 'error');
+        await handleApiError(error, i18n.sys_turnstileUpdateFail);
     } finally {
         button.innerHTML = '<i class="fas fa-save"></i> ' + i18n.sys_turnstileSave;
         button.disabled = false;

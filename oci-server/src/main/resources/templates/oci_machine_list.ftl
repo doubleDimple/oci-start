@@ -784,7 +784,56 @@
         machine_net: "${msg.get('machine.net')?js_string}",
         machine_deleteRecord: "${msg.get('machine.deleteRecord')?js_string}",
         token_enabled: "${msg.get('token.status.enabled')?js_string}",
-        tenant_no: "${msg.get('tenant.no')?js_string}"
+        tenant_no: "${msg.get('tenant.no')?js_string}",
+        common_success: "${msg.get('common.success')?js_string}",
+        common_error: "${msg.get('common.error')?js_string}",
+        common_delete: "${msg.get('common.delete')?js_string}",
+        request_default_fail: "${msg.get('request.defaultFail')?js_string}",
+        request_network_or_server_error: "${msg.get('request.networkOrServerError')?js_string}",
+        request_fail_title: "${msg.get('request.failTitle')?js_string}",
+        request_http_400_suffix: "${msg.get('request.http400Suffix')?js_string}",
+        request_http_401_suffix: "${msg.get('request.http401Suffix')?js_string}",
+        request_http_403_suffix: "${msg.get('request.http403Suffix')?js_string}",
+        request_http_404_suffix: "${msg.get('request.http404Suffix')?js_string}",
+        request_http_408_suffix: "${msg.get('request.http408Suffix')?js_string}",
+        request_http_409_suffix: "${msg.get('request.http409Suffix')?js_string}",
+        request_http_413_suffix: "${msg.get('request.http413Suffix')?js_string}",
+        request_http_429_suffix: "${msg.get('request.http429Suffix')?js_string}",
+        request_http_5xx_suffix: "${msg.get('request.http5xxSuffix')?js_string}",
+        request_http_generic_suffix: "${msg.get('request.httpGenericSuffix')?js_string}",
+        modal_autoClose3s: "${msg.get('modal.autoClose3s')?js_string}",
+        machine_errorRetrySuffix: "${msg.get('machine.errorRetrySuffix')?js_string}",
+        machine_errorIpChangeFail: "${msg.get('machine.errorIpChangeFail')?js_string}",
+        machine_errorIpChangeNetwork: "${msg.get('machine.errorIpChangeNetwork')?js_string}",
+        machine_errorIpv6EnableFail: "${msg.get('machine.errorIpv6EnableFail')?js_string}",
+        machine_errorIpv6EnableNetwork: "${msg.get('machine.errorIpv6EnableNetwork')?js_string}",
+        machine_errorVerifyCodeSendFail: "${msg.get('machine.errorVerifyCodeSendFail')?js_string}",
+        machine_errorVerifyCodeSendNetwork: "${msg.get('machine.errorVerifyCodeSendNetwork')?js_string}",
+        machine_errorTerminateFail: "${msg.get('machine.errorTerminateFail')?js_string}",
+        machine_errorTerminateNetwork: "${msg.get('machine.errorTerminateNetwork')?js_string}",
+        machine_errorConfigUpdateFail: "${msg.get('machine.errorConfigUpdateFail')?js_string}",
+        machine_errorConfigUpdateNetwork: "${msg.get('machine.errorConfigUpdateNetwork')?js_string}",
+        machine_errorNameUpdateFail: "${msg.get('machine.errorNameUpdateFail')?js_string}",
+        machine_errorNameUpdateNetwork: "${msg.get('machine.errorNameUpdateNetwork')?js_string}",
+        machine_errorBootVolumeUpdateFail: "${msg.get('machine.errorBootVolumeUpdateFail')?js_string}",
+        machine_errorBootVolumeUpdateNetwork: "${msg.get('machine.errorBootVolumeUpdateNetwork')?js_string}",
+        machine_errorRemarkUpdateFail: "${msg.get('machine.errorRemarkUpdateFail')?js_string}",
+        machine_errorRemarkUpdateNetwork: "${msg.get('machine.errorRemarkUpdateNetwork')?js_string}",
+        machine_errorStartFail: "${msg.get('machine.errorStartFail')?js_string}",
+        machine_errorStartNetwork: "${msg.get('machine.errorStartNetwork')?js_string}",
+        machine_errorStopFail: "${msg.get('machine.errorStopFail')?js_string}",
+        machine_errorStopNetwork: "${msg.get('machine.errorStopNetwork')?js_string}",
+        machine_errorLocalDeleteFail: "${msg.get('machine.errorLocalDeleteFail')?js_string}",
+        machine_errorLocalDeleteNetwork: "${msg.get('machine.errorLocalDeleteNetwork')?js_string}",
+        machine_errorVpuUpdateFail: "${msg.get('machine.errorVpuUpdateFail')?js_string}",
+        machine_errorVpuUpdateNetwork: "${msg.get('machine.errorVpuUpdateNetwork')?js_string}",
+        machine_deleteLocalConfirmTitle: "${msg.get('machine.deleteLocalConfirmTitle')?js_string}",
+        machine_deleteLocalConfirmPrefix: "${msg.get('machine.deleteLocalConfirmPrefix')?js_string}",
+        machine_deleteLocalConfirmSuffix: "${msg.get('machine.deleteLocalConfirmSuffix')?js_string}",
+        machine_deleteSuccess: "${msg.get('machine.deleteSuccess')?js_string}",
+        machine_deleteFail: "${msg.get('machine.deleteFail')?js_string}",
+        machine_requestFail: "${msg.get('machine.requestFail')?js_string}",
+        machine_cidrRequired: "${msg.get('machine.cidrRequired')?js_string}"
     }
 
     const i18n = window.I18N;
@@ -844,17 +893,17 @@
 
     function getFriendlyHttpMessage(status, fallback) {
         const code = Number(status);
-        if (!code) return fallback + '，请稍后重试。';
-        if (code === 400) return fallback + '，提交的内容有误，请检查后再试。';
-        if (code === 401) return fallback + '，登录状态已过期，请重新登录。';
-        if (code === 403) return fallback + '，当前账号没有权限执行此操作。';
-        if (code === 404) return fallback + '，相关资源不存在或已被删除。';
-        if (code === 408) return fallback + '，请求等待时间过长，请稍后重试。';
-        if (code === 409) return fallback + '，当前数据状态已变化，请刷新后再试。';
-        if (code === 413) return fallback + '，提交的内容过大，请减少内容后再试。';
-        if (code === 429) return fallback + '，操作过于频繁，请稍后再试。';
-        if (code >= 500) return fallback + '，服务器处理时出现异常，请稍后重试。';
-        return fallback + '，请求没有成功完成，请稍后重试。';
+        if (!code) return fallback + i18n.machine_errorRetrySuffix;
+        if (code === 400) return fallback + i18n.request_http_400_suffix;
+        if (code === 401) return fallback + i18n.request_http_401_suffix;
+        if (code === 403) return fallback + i18n.request_http_403_suffix;
+        if (code === 404) return fallback + i18n.request_http_404_suffix;
+        if (code === 408) return fallback + i18n.request_http_408_suffix;
+        if (code === 409) return fallback + i18n.request_http_409_suffix;
+        if (code === 413) return fallback + i18n.request_http_413_suffix;
+        if (code === 429) return fallback + i18n.request_http_429_suffix;
+        if (code >= 500) return fallback + i18n.request_http_5xx_suffix;
+        return fallback + i18n.request_http_generic_suffix;
     }
 
     function getXhrFailureMessage(xhr, fallback) {
@@ -866,12 +915,12 @@
         if (xhr.status && xhr.status !== 200) {
             return getFriendlyHttpMessage(xhr.status, fallback);
         }
-        return fallback + '，请稍后重试。';
+        return fallback + i18n.machine_errorRetrySuffix;
     }
 
     function getPayloadFailureMessage(data, fallback) {
         const backendMessage = data && (data.message || data.msg || data.error || data.reason);
-        return !isPlainErrorMessage(backendMessage) ? backendMessage : fallback + '，请稍后重试。';
+        return !isPlainErrorMessage(backendMessage) ? backendMessage : fallback + i18n.machine_errorRetrySuffix;
     }
 
     function showModalStatusError(modal, statusMessage, statusText, message, options = {}) {
@@ -881,7 +930,7 @@
         clearModalStatusTimer(modal);
         statusMessage.className = 'status-message error';
         statusMessage.style.display = 'block';
-        statusText.textContent = message + (closeModal ? ' 弹窗将在3秒后自动关闭。' : '');
+        statusText.textContent = message + (closeModal ? i18n.modal_autoClose3s : '');
 
         const timer = setTimeout(() => {
             if (closeModal && modal) {
@@ -1001,7 +1050,7 @@
 
         // 验证输入,可以为空
         /*if (cidrRanges.length === 0) {
-            alert('请至少输入一个CIDR范围');
+            alert(i18n.machine_cidrRequired);
             return;
         }*/
 
@@ -1041,16 +1090,16 @@
                             location.reload();
                         }, 3000);
                     } else {
-                        showModalStatusError(modal, statusMessage, statusText, getPayloadFailureMessage(data, 'IP切换失败'));
+                        showModalStatusError(modal, statusMessage, statusText, getPayloadFailureMessage(data, i18n.machine_errorIpChangeFail));
                     }
                 } else {
-                    showModalStatusError(modal, statusMessage, statusText, getXhrFailureMessage(xhr, 'IP切换失败'));
+                    showModalStatusError(modal, statusMessage, statusText, getXhrFailureMessage(xhr, i18n.machine_errorIpChangeFail));
                 }
             }
         };
 
         xhr.onerror = function() {
-            showModalStatusError(modal, statusMessage, statusText, '网络异常，IP切换请求未发送成功。');
+            showModalStatusError(modal, statusMessage, statusText, i18n.machine_errorIpChangeNetwork);
         };
 
         // 发送数据
@@ -1177,16 +1226,16 @@
                             location.reload();
                         }, 3000);
                     } else {
-                        showModalStatusError(modal, statusMessage, statusText, getPayloadFailureMessage(data, 'IPv6开启失败'));
+                        showModalStatusError(modal, statusMessage, statusText, getPayloadFailureMessage(data, i18n.machine_errorIpv6EnableFail));
                     }
                 } else {
-                    showModalStatusError(modal, statusMessage, statusText, getXhrFailureMessage(xhr, 'IPv6开启失败'));
+                    showModalStatusError(modal, statusMessage, statusText, getXhrFailureMessage(xhr, i18n.machine_errorIpv6EnableFail));
                 }
             }
         };
 
         xhr.onerror = function() {
-            showModalStatusError(modal, statusMessage, statusText, '网络异常，IPv6开启请求未发送成功。');
+            showModalStatusError(modal, statusMessage, statusText, i18n.machine_errorIpv6EnableNetwork);
         };
 
         xhr.send(JSON.stringify({
@@ -1250,16 +1299,16 @@
                         document.getElementById('verifyStep').style.display = 'block';
                         statusMessage.style.display = 'none';
                     } else {
-                        showModalStatusError(modal, statusMessage, statusText, getPayloadFailureMessage(data, '验证码发送失败'));
+                        showModalStatusError(modal, statusMessage, statusText, getPayloadFailureMessage(data, i18n.machine_errorVerifyCodeSendFail));
                     }
                 } else {
-                    showModalStatusError(modal, statusMessage, statusText, getXhrFailureMessage(xhr, '验证码发送失败'));
+                    showModalStatusError(modal, statusMessage, statusText, getXhrFailureMessage(xhr, i18n.machine_errorVerifyCodeSendFail));
                 }
             }
         };
 
         xhr.onerror = function() {
-            showModalStatusError(modal, statusMessage, statusText, '网络异常，验证码发送请求未发送成功。');
+            showModalStatusError(modal, statusMessage, statusText, i18n.machine_errorVerifyCodeSendNetwork);
         };
 
         xhr.send(JSON.stringify({
@@ -1307,16 +1356,16 @@
                             location.reload();
                         }, 3000);
                     } else {
-                        showModalStatusError(modal, statusMessage, statusText, getPayloadFailureMessage(data, '终止实例失败'));
+                        showModalStatusError(modal, statusMessage, statusText, getPayloadFailureMessage(data, i18n.machine_errorTerminateFail));
                     }
                 } else {
-                    showModalStatusError(modal, statusMessage, statusText, getXhrFailureMessage(xhr, '终止实例失败'));
+                    showModalStatusError(modal, statusMessage, statusText, getXhrFailureMessage(xhr, i18n.machine_errorTerminateFail));
                 }
             }
         };
 
         xhr.onerror = function() {
-            showModalStatusError(modal, statusMessage, statusText, '网络异常，终止实例请求未发送成功。');
+            showModalStatusError(modal, statusMessage, statusText, i18n.machine_errorTerminateNetwork);
         };
 
         xhr.send(JSON.stringify({
@@ -1388,16 +1437,16 @@
                             location.reload();
                         }, 3000);
                     } else {
-                        showModalStatusError(modal, statusMessage, statusText, getPayloadFailureMessage(data, '实例配置更新失败'));
+                        showModalStatusError(modal, statusMessage, statusText, getPayloadFailureMessage(data, i18n.machine_errorConfigUpdateFail));
                     }
                 } else {
-                    showModalStatusError(modal, statusMessage, statusText, getXhrFailureMessage(xhr, '实例配置更新失败'));
+                    showModalStatusError(modal, statusMessage, statusText, getXhrFailureMessage(xhr, i18n.machine_errorConfigUpdateFail));
                 }
             }
         };
 
         xhr.onerror = function() {
-            showModalStatusError(modal, statusMessage, statusText, '网络异常，实例配置更新请求未发送成功。');
+            showModalStatusError(modal, statusMessage, statusText, i18n.machine_errorConfigUpdateNetwork);
         };
 
         xhr.send(JSON.stringify({
@@ -1466,16 +1515,16 @@
                             location.reload();
                         }, 3000);
                     } else {
-                        showModalStatusError(modal, statusMessage, statusText, getPayloadFailureMessage(data, '实例名称更新失败'));
+                        showModalStatusError(modal, statusMessage, statusText, getPayloadFailureMessage(data, i18n.machine_errorNameUpdateFail));
                     }
                 } else {
-                    showModalStatusError(modal, statusMessage, statusText, getXhrFailureMessage(xhr, '实例名称更新失败'));
+                    showModalStatusError(modal, statusMessage, statusText, getXhrFailureMessage(xhr, i18n.machine_errorNameUpdateFail));
                 }
             }
         };
 
         xhr.onerror = function() {
-            showModalStatusError(modal, statusMessage, statusText, '网络异常，实例名称更新请求未发送成功。');
+            showModalStatusError(modal, statusMessage, statusText, i18n.machine_errorNameUpdateNetwork);
         };
 
         xhr.send(JSON.stringify({
@@ -1586,9 +1635,9 @@
                         statusMessage.className = 'status-message success';
                         if (!data.message) {
                             if (isExpand) {
-                                statusText.textContent = "successful";
+                                statusText.textContent = i18n.common_success;
                             } else {
-                                statusText.textContent = "successful";
+                                statusText.textContent = i18n.common_success;
                             }
                         } else {
                             statusText.textContent = data.message;
@@ -1600,16 +1649,16 @@
                             location.reload();
                         }, 3000);
                     } else {
-                        showModalStatusError(modal, statusMessage, statusText, getPayloadFailureMessage(data, '启动盘容量更新失败'));
+                        showModalStatusError(modal, statusMessage, statusText, getPayloadFailureMessage(data, i18n.machine_errorBootVolumeUpdateFail));
                     }
                 } else {
-                    showModalStatusError(modal, statusMessage, statusText, getXhrFailureMessage(xhr, '启动盘容量更新失败'));
+                    showModalStatusError(modal, statusMessage, statusText, getXhrFailureMessage(xhr, i18n.machine_errorBootVolumeUpdateFail));
                 }
             }
         };
 
         xhr.onerror = function() {
-            showModalStatusError(modal, statusMessage, statusText, '网络异常，启动盘容量更新请求未发送成功。');
+            showModalStatusError(modal, statusMessage, statusText, i18n.machine_errorBootVolumeUpdateNetwork);
         };
 
         xhr.send(JSON.stringify({
@@ -1665,7 +1714,7 @@
                     const data = parseXhrJson(xhr);
                     if (data.success) {
                         statusMessage.className = 'status-message success';
-                        statusText.textContent = 'successful';
+                        statusText.textContent = i18n.common_success;
 
                         // 3秒后刷新页面
                         setTimeout(() => {
@@ -1673,16 +1722,16 @@
                             location.reload();
                         }, 3000);
                     } else {
-                        showModalStatusError(modal, statusMessage, statusText, getPayloadFailureMessage(data, '备注更新失败'));
+                        showModalStatusError(modal, statusMessage, statusText, getPayloadFailureMessage(data, i18n.machine_errorRemarkUpdateFail));
                     }
                 } else {
-                    showModalStatusError(modal, statusMessage, statusText, getXhrFailureMessage(xhr, '备注更新失败'));
+                    showModalStatusError(modal, statusMessage, statusText, getXhrFailureMessage(xhr, i18n.machine_errorRemarkUpdateFail));
                 }
             }
         };
 
         xhr.onerror = function() {
-            showModalStatusError(modal, statusMessage, statusText, '网络异常，备注更新请求未发送成功。');
+            showModalStatusError(modal, statusMessage, statusText, i18n.machine_errorRemarkUpdateNetwork);
         };
 
         xhr.send(JSON.stringify({
@@ -1818,7 +1867,7 @@
         const options = { headers: { 'X-CSRF-TOKEN': csrfToken } };
         fetch('/tenants/listParentTenants', options)
             .then(response => {
-                if (!response.ok) throw new Error('网络请求失败');
+                if (!response.ok) throw new Error(i18n.request_network_or_server_error);
                 return response.json();
             })
             .then(data => {
@@ -1865,7 +1914,7 @@
             headers: { 'X-CSRF-TOKEN': csrfToken }
         })
             .then(response => {
-                if (!response.ok) throw new Error('网络请求失败');
+                if (!response.ok) throw new Error(i18n.request_network_or_server_error);
                 return response.json();
             })
             .then(data => {
@@ -2191,16 +2240,16 @@
                             location.reload();
                         }, 3000);
                     } else {
-                        showModalStatusError(modal, statusMessage, statusText, getPayloadFailureMessage(data, '启动实例失败'));
+                        showModalStatusError(modal, statusMessage, statusText, getPayloadFailureMessage(data, i18n.machine_errorStartFail));
                     }
                 } else {
-                    showModalStatusError(modal, statusMessage, statusText, getXhrFailureMessage(xhr, '启动实例失败'));
+                    showModalStatusError(modal, statusMessage, statusText, getXhrFailureMessage(xhr, i18n.machine_errorStartFail));
                 }
             }
         };
 
         xhr.onerror = function() {
-            showModalStatusError(modal, statusMessage, statusText, '网络异常，启动实例请求未发送成功。');
+            showModalStatusError(modal, statusMessage, statusText, i18n.machine_errorStartNetwork);
         };
 
         xhr.send(JSON.stringify({
@@ -2253,16 +2302,16 @@
                             location.reload();
                         }, 3000);
                     } else {
-                        showModalStatusError(modal, statusMessage, statusText, getPayloadFailureMessage(data, '停止实例失败'));
+                        showModalStatusError(modal, statusMessage, statusText, getPayloadFailureMessage(data, i18n.machine_errorStopFail));
                     }
                 } else {
-                    showModalStatusError(modal, statusMessage, statusText, getXhrFailureMessage(xhr, '停止实例失败'));
+                    showModalStatusError(modal, statusMessage, statusText, getXhrFailureMessage(xhr, i18n.machine_errorStopFail));
                 }
             }
         };
 
         xhr.onerror = function() {
-            showModalStatusError(modal, statusMessage, statusText, '网络异常，停止实例请求未发送成功。');
+            showModalStatusError(modal, statusMessage, statusText, i18n.machine_errorStopNetwork);
         };
 
         xhr.send(JSON.stringify({
@@ -2291,7 +2340,7 @@
             showCopySuccess(element);
             Swal.fire({
                 icon: 'success',
-                title: 'successful',
+                title: i18n.common_success,
                 text: text ,
                 timer: 1500,
                 showConfirmButton: false,
@@ -2305,7 +2354,7 @@
                     showCopySuccess(element);
                     Swal.fire({
                         icon: 'success',
-                        title: 'successful',
+                        title: i18n.common_success,
                         text: text ,
                         timer: 1500,
                         showConfirmButton: false,
@@ -2342,7 +2391,7 @@
     function showCopyError() {
         Swal.fire({
             icon: 'error',
-            title: 'error',
+            title: i18n.common_error,
             timer: 2000,
             showConfirmButton: false,
             toast: true,
@@ -2411,12 +2460,12 @@
     function handleDeleteRecord(instanceId, instanceName) {
         event.preventDefault();
         Swal.fire({
-            title: '${msg.get("machine.deleteRecord")}',
-            html: '<p style="color:var(--text-primary)">确认删除实例 <strong>' + instanceName + '</strong> 的本地记录？<br/><span style="color:var(--accent-red);font-size:13px;">此操作仅删除本地数据，不会操作OCI云端实例。</span></p>',
+            title: i18n.machine_deleteLocalConfirmTitle,
+            html: '<p style="color:var(--text-primary)">' + i18n.machine_deleteLocalConfirmPrefix + ' <strong>' + instanceName + '</strong> ' + i18n.machine_deleteLocalConfirmSuffix + '</p>',
             icon: 'warning',
             showCancelButton: true,
-            confirmButtonText: '${msg.get("common.confirm")}',
-            cancelButtonText: '${msg.get("common.cancel")}',
+            confirmButtonText: i18n.common_confirm,
+            cancelButtonText: i18n.common_cancel,
             confirmButtonColor: '#e74c3c',
             cancelButtonColor: '#95a5a6'
         }).then(function(result) {
@@ -2431,13 +2480,13 @@
                     body: JSON.stringify({ id: instanceId })
                 }).then(function(r) { return r.json(); }).then(function(data) {
                     if (data.code === 200 || data.success) {
-                        Swal.fire({ icon: 'success', title: '删除成功', timer: 1200, showConfirmButton: false })
+                        Swal.fire({ icon: 'success', title: i18n.machine_deleteSuccess, timer: 1200, showConfirmButton: false })
                             .then(function() { location.reload(); });
                     } else {
                         Swal.fire({
                             icon: 'error',
-                            title: '删除失败',
-                            text: getPayloadFailureMessage(data, '本地记录删除失败'),
+                            title: i18n.machine_deleteFail,
+                            text: getPayloadFailureMessage(data, i18n.machine_errorLocalDeleteFail),
                             timer: 3000,
                             showConfirmButton: false
                         });
@@ -2445,8 +2494,8 @@
                 }).catch(function(e) {
                     Swal.fire({
                         icon: 'error',
-                        title: '请求失败',
-                        text: e.message || '网络异常，本地记录删除请求未发送成功。',
+                        title: i18n.machine_requestFail,
+                        text: e.message || i18n.machine_errorLocalDeleteNetwork,
                         timer: 3000,
                         showConfirmButton: false
                     });
@@ -2699,7 +2748,7 @@
         .then(r => r.json().catch(() => ({})).then(data => ({ ok: r.ok, status: r.status, statusText: r.statusText, data })))
         .then(({ ok, status, data }) => {
             if (!ok) {
-                showModalStatusError(modal, statusMessage, statusText, getFriendlyHttpMessage(status, 'VPU更新失败'));
+                showModalStatusError(modal, statusMessage, statusText, getFriendlyHttpMessage(status, i18n.machine_errorVpuUpdateFail));
                 return;
             }
             if (data.success) {
@@ -2707,11 +2756,11 @@
                 statusText.textContent = data.message || 'success';
                 setTimeout(() => { modal.style.display = 'none'; location.reload(); }, 3000);
             } else {
-                showModalStatusError(modal, statusMessage, statusText, getPayloadFailureMessage(data, 'VPU更新失败'));
+                showModalStatusError(modal, statusMessage, statusText, getPayloadFailureMessage(data, i18n.machine_errorVpuUpdateFail));
             }
         })
         .catch(() => {
-            showModalStatusError(modal, statusMessage, statusText, '网络异常，VPU更新请求未发送成功。');
+            showModalStatusError(modal, statusMessage, statusText, i18n.machine_errorVpuUpdateNetwork);
         });
     }
 
