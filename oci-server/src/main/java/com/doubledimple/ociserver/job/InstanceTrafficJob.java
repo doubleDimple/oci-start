@@ -1,41 +1,29 @@
 package com.doubledimple.ociserver.job;
 
-import com.doubledimple.ociserver.config.task.InstanceTrafficTask;
+import com.doubledimple.ociserver.config.event.InstanceTrafficCheckEvent;
 import lombok.extern.slf4j.Slf4j;
-import org.quartz.DisallowConcurrentExecution;
 import org.quartz.Job;
 import org.quartz.JobExecutionContext;
-import org.quartz.JobExecutionException;
-import org.slf4j.MDC;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
-import java.util.UUID;
 
 /**
  * 实例流量统计任务Job
+ * 只负责发布事件后立即返回，真正的统计在异步监听器里执行，
+ * 避免长耗时占用 Quartz 工作线程导致触发被挡掉 / misfire（小机器上尤为明显）。
  */
 @Slf4j
 @Component
-@DisallowConcurrentExecution
 public class InstanceTrafficJob implements Job {
 
     @Resource
-    private InstanceTrafficTask instanceTrafficTask;
-
+    private ApplicationEventPublisher eventPublisher;
 
     @Override
-    public void execute(JobExecutionContext context) throws JobExecutionException {
-        String traceId = UUID.randomUUID().toString().replace("-", "");
-        MDC.put("traceId", traceId);
-        log.debug("开始执行流量统计任务.....");
-        try {
-            instanceTrafficTask.updateInstanceTraffic();
-        } catch (Exception e) {
-            log.error("执行流量统计任务失败，原因: {}", e.getMessage(), e);
-            throw new JobExecutionException(e);
-        }finally {
-            MDC.clear();
-        }
+    public void execute(JobExecutionContext context) {
+        log.debug("触发流量统计任务，发布异步事件...");
+        eventPublisher.publishEvent(new InstanceTrafficCheckEvent(this));
     }
 }

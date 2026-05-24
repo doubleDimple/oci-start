@@ -3,6 +3,7 @@ package com.doubledimple.ociserver.utils.oracle;
 import com.doubledimple.dao.entity.Tenant;
 import com.doubledimple.ocicommon.enums.oci.TrafficPeriod;
 import com.doubledimple.ociserver.utils.oracle.vnic.VnicCreationResult;
+import com.oracle.bmc.ClientConfiguration;
 import com.oracle.bmc.auth.SimpleAuthenticationDetailsProvider;
 import com.oracle.bmc.monitoring.MonitoringClient;
 import com.oracle.bmc.monitoring.model.AggregatedDatapoint;
@@ -78,20 +79,29 @@ public class TrafficMetricsUtils {
     }
 
     /**
-     * 查询实例下所有 VNIC 的总流量
+     * 构建带连接/读超时的 MonitoringClient，避免单次调用无限期挂起拖垮整个任务
      */
-    public static double getInstanceTrafficTotal(Tenant tenant,
+    public static MonitoringClient buildClient(SimpleAuthenticationDetailsProvider provider) {
+        ClientConfiguration config = ClientConfiguration.builder()
+                .connectionTimeoutMillis(10_000)
+                .readTimeoutMillis(30_000)
+                .build();
+        return MonitoringClient.builder().configuration(config).build(provider);
+    }
+
+    /**
+     * 查询实例下所有 VNIC 的总流量（复用调用方传入的 MonitoringClient，避免每实例新建客户端）
+     */
+    public static double getInstanceTrafficTotal(MonitoringClient client,
+                                                 String compartmentId,
                                                  List<VnicCreationResult> vnics,
                                                  boolean egress,
                                                  Date startTime,
                                                  Date endTime,
                                                  TrafficPeriod period) {
-        SimpleAuthenticationDetailsProvider provider = OciUtils.getProvider(tenant);
         double total = 0D;
-        try (MonitoringClient client = MonitoringClient.builder().build(provider)) {
-            for (VnicCreationResult vnic : vnics) {
-                total += getVnicTrafficTotal(client, provider.getTenantId(), vnic.getVnicId(), egress, startTime, endTime, period);
-            }
+        for (VnicCreationResult vnic : vnics) {
+            total += getVnicTrafficTotal(client, compartmentId, vnic.getVnicId(), egress, startTime, endTime, period);
         }
         return total;
     }

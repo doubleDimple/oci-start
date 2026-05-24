@@ -9,9 +9,12 @@ import com.doubledimple.ocicommon.enums.oci.TrafficPeriod;
 import com.doubledimple.ociserver.pojo.enums.MessageEnum;
 import com.doubledimple.ociserver.service.message.factory.MessageFactory;
 import com.doubledimple.ociserver.service.oracle.OracleInstanceService;
+import com.doubledimple.ociserver.utils.oracle.OciUtils;
 import com.doubledimple.ociserver.utils.oracle.TrafficMetricsUtils;
 import com.doubledimple.ociserver.utils.oracle.vnic.VnicCreationResult;
 import com.doubledimple.ociserver.utils.oracle.vnic.VnicManagementUtils;
+import com.oracle.bmc.auth.SimpleAuthenticationDetailsProvider;
+import com.oracle.bmc.monitoring.MonitoringClient;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -45,6 +48,9 @@ public class InstanceTrafficTask {
     @Resource
     private MessageFactory messageFactory;
 
+    /** 单轮最长时间预算，超出后提前结束，避免拖到下一轮触发（间隔 30 分钟） */
+    private static final long RUN_BUDGET_MS = 25 * 60 * 1000L;
+
     /**
      * 定时任务入口
      * 每次执行都实时查询 OCI Monitoring
@@ -53,7 +59,12 @@ public class InstanceTrafficTask {
         log.debug("[流量预警] 开始执行实时任务...");
         List<Tenant> tenants = tenantRepository.findAll();
 
+        long deadline = System.currentTimeMillis() + RUN_BUDGET_MS;
         for (Tenant tenant : tenants) {
+            if (System.currentTimeMillis() > deadline) {
+                log.warn("[流量预警] 本轮已超时间预算 {} 分钟，提前结束，剩余租户下轮处理", RUN_BUDGET_MS / 60000);
+                break;
+            }
             Optional<TrafficAlert> alertOpt = trafficAlertRepository.findByTenantId(tenant.getId());
             if (alertOpt.isPresent() && alertOpt.get().getStatisticsEnabled()) {
                 try {
@@ -93,42 +104,47 @@ public class InstanceTrafficTask {
                 .filter(v -> v != null && v.getVnicId() != null && !v.getVnicId().trim().isEmpty())
                 .collect(Collectors.groupingBy(VnicCreationResult::getInstanceId, LinkedHashMap::new, Collectors.toList()));
 
-        // 4. 遍历每个实例的 VNIC，统计出站流量
-        for (Map.Entry<String, List<VnicCreationResult>> entry : vnicsByInstance.entrySet()) {
-            String instanceId = entry.getKey();
-            List<VnicCreationResult> vnics = entry.getValue();
+        // 4. 复用同一个 MonitoringClient（带超时）查询每个实例的出站流量
+        SimpleAuthenticationDetailsProvider provider = OciUtils.getProvider(tenant);
+        String compartmentId = provider.getTenantId();
+        try (MonitoringClient monitoringClient = TrafficMetricsUtils.buildClient(provider)) {
+            for (Map.Entry<String, List<VnicCreationResult>> entry : vnicsByInstance.entrySet()) {
+                String instanceId = entry.getKey();
+                List<VnicCreationResult> vnics = entry.getValue();
 
-            if (vnics.isEmpty()) {
-                log.warn("租户 [{}] 实例 [{}] 未找到有效 VNIC ID", tenant.getTenancy(), instanceId);
-                continue;
+                if (vnics.isEmpty()) {
+                    log.warn("租户 [{}] 实例 [{}] 未找到有效 VNIC ID", tenant.getTenancy(), instanceId);
+                    continue;
+                }
+
+                // 去重（如果有重复 VNIC ID）
+                List<VnicCreationResult> uniqueVnics = vnics.stream()
+                        .collect(Collectors.collectingAndThen(
+                                Collectors.toMap(
+                                        VnicCreationResult::getVnicId,
+                                        v -> v,
+                                        (existing, replacement) -> existing,
+                                        LinkedHashMap::new
+                                ),
+                                map -> new ArrayList<>(map.values())
+                        ));
+
+                double instanceEgress = TrafficMetricsUtils.getInstanceTrafficTotal(
+                        monitoringClient,
+                        compartmentId,
+                        uniqueVnics,
+                        true,
+                        startTime,
+                        endTime,
+                        TrafficPeriod.ONE_DAY
+                );
+
+                String instanceName = uniqueVnics.get(0).getInstanceName();
+                log.debug("租户 [{}] 实例 [{}] VNIC 数:{} 出站流量:{} bytes",
+                        tenant.getTenancy(), instanceName, uniqueVnics.size(), instanceEgress);
+
+                totalTenantEgress += instanceEgress;
             }
-
-            // 去重（如果有重复 VNIC ID）
-            List<VnicCreationResult> uniqueVnics = vnics.stream()
-                    .collect(Collectors.collectingAndThen(
-                            Collectors.toMap(
-                                    VnicCreationResult::getVnicId,
-                                    v -> v,
-                                    (existing, replacement) -> existing,
-                                    LinkedHashMap::new
-                            ),
-                            map -> new ArrayList<>(map.values())
-                    ));
-
-            double instanceEgress = TrafficMetricsUtils.getInstanceTrafficTotal(
-                    tenant,
-                    uniqueVnics,
-                    true,
-                    startTime,
-                    endTime,
-                    TrafficPeriod.ONE_DAY
-            );
-
-            String instanceName = uniqueVnics.get(0).getInstanceName();
-            log.debug("租户 [{}] 实例 [{}] VNIC 数:{} 出站流量:{} bytes",
-                    tenant.getTenancy(), instanceName, uniqueVnics.size(), instanceEgress);
-
-            totalTenantEgress += instanceEgress;
         }
 
         // 5. 判断是否超过阈值
