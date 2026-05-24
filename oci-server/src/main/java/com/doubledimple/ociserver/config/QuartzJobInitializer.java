@@ -133,7 +133,7 @@ public class QuartzJobInitializer implements ApplicationListener<ContextRefreshe
         deleteScheduleJob(scheduler, INSTANCE_SYNC_TASK, INSTANCE_SYNC_TASK);
 
         // 2. 流量统计任务
-        scheduleJob(scheduler, instanceTrafficJob.getClass(), INSTANCE_TRAFFIC_TASK, INSTANCE_TRAFFIC_TASK, "0 0/30 * * * ?"); // 每5分钟
+        scheduleJob(scheduler, instanceTrafficJob.getClass(), INSTANCE_TRAFFIC_TASK, INSTANCE_TRAFFIC_TASK, "0 0/5 * * * ?"); // 每5分钟
         log.debug("流量统计任务加载完成....");
 
         // 3. 区域加载任务
