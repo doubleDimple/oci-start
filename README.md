@@ -216,7 +216,7 @@ location ~ ^/websockify/(\d+)$ {
     <td align="center" width="33%">
       <a href="https://dartnode.com">
         <b>DartNode</b><br>
-        <sub>开源项目免费 VPS</sub>
+        <sub>VPS提供商</sub>
       </a>
     </td>
   </tr>
