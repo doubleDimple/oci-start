@@ -3,16 +3,12 @@ package com.doubledimple.ociserver.utils.oracle;
 import com.oracle.bmc.core.*;
 import com.oracle.bmc.core.model.*;
 import com.oracle.bmc.core.requests.*;
-import com.oracle.bmc.identity.IdentityClient;
-import com.oracle.bmc.identity.model.AvailabilityDomain;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
 import java.util.List;
-
-import static com.doubledimple.ociserver.service.oracle.OracleCloudService.getFirstAvailabilityDomain;
 
 /**
  * Utility class for Oracle Cloud Infrastructure IPv6 operations
@@ -67,10 +63,8 @@ public class OciIpv6Utils {
     /**
      * Ensures that the VCN has IPv6 enabled
      */
-    public static Vcn ensureVcnWithIpv6(VirtualNetworkClient virtualNetworkClient, String compartmentId) {
-        log.debug("Ensuring VCN with IPv6 in compartment: {}", compartmentId);
-
-        Vcn vcn = getOrCreateVcn(virtualNetworkClient, compartmentId);
+    public static Vcn ensureVcnWithIpv6(VirtualNetworkClient virtualNetworkClient, Vcn vcn) {
+        log.debug("Ensuring VCN with IPv6: {}", vcn.getId());
 
         if (vcn.getIpv6CidrBlocks() == null || vcn.getIpv6CidrBlocks().isEmpty()) {
             log.debug("No IPv6 CIDR blocks found for VCN. Adding IPv6 CIDR...");
@@ -94,18 +88,12 @@ public class OciIpv6Utils {
      * Ensures subnet has IPv6 CIDR block
      */
     public static Subnet ensureSubnetWithIpv6(VirtualNetworkClient virtualNetworkClient,
-                                              IdentityClient identityClient,
-                                              String compartmentId,
-                                              String vcnId) {
-        log.debug("Ensuring subnet with IPv6 in VCN: {}", vcnId);
-
-        Subnet subnet = getOrCreateSubnet(virtualNetworkClient, identityClient, compartmentId, vcnId);
+                                              Subnet subnet,
+                                              Vcn vcn) {
+        log.debug("Ensuring subnet with IPv6: {}", subnet.getId());
 
         if (StringUtils.isEmpty(subnet.getIpv6CidrBlock())) {
             log.debug("No IPv6 CIDR block found for subnet. Adding IPv6 CIDR...");
-
-            GetVcnRequest getVcnRequest = GetVcnRequest.builder().vcnId(vcnId).build();
-            Vcn vcn = virtualNetworkClient.getVcn(getVcnRequest).getVcn();
 
             List<String> ipv6CidrBlocks = vcn.getIpv6CidrBlocks();
             if (ipv6CidrBlocks == null || ipv6CidrBlocks.isEmpty()) {
@@ -179,77 +167,6 @@ public class OciIpv6Utils {
     }
 
     // Private helper methods
-
-    private static Vcn getOrCreateVcn(VirtualNetworkClient virtualNetworkClient, String compartmentId) {
-        ListVcnsRequest listRequest = ListVcnsRequest.builder()
-                .compartmentId(compartmentId)
-                .limit(10)
-                .build();
-
-        List<Vcn> vcns = virtualNetworkClient.listVcns(listRequest).getItems();
-
-        if (!vcns.isEmpty()) {
-            log.debug("Using existing VCN: {}", vcns.get(0).getId());
-            return vcns.get(0);
-        }
-
-        log.debug("Creating new VCN in compartment: {}", compartmentId);
-
-        CreateVcnDetails createDetails = CreateVcnDetails.builder()
-                .compartmentId(compartmentId)
-                .cidrBlock("10.0.0.0/16")
-                .displayName("IPv6-VCN-" + System.currentTimeMillis())
-                .isIpv6Enabled(true)
-                .build();
-
-        CreateVcnRequest createRequest = CreateVcnRequest.builder()
-                .createVcnDetails(createDetails)
-                .build();
-
-        Vcn vcn = virtualNetworkClient.createVcn(createRequest).getVcn();
-        log.debug("Created new VCN with ID: {}", vcn.getId());
-
-        return vcn;
-    }
-
-    private static Subnet getOrCreateSubnet(VirtualNetworkClient virtualNetworkClient,
-                                            IdentityClient identityClient,
-                                            String compartmentId,
-                                            String vcnId) {
-        ListSubnetsRequest listRequest = ListSubnetsRequest.builder()
-                .compartmentId(compartmentId)
-                .vcnId(vcnId)
-                .limit(10)
-                .build();
-
-        List<Subnet> subnets = virtualNetworkClient.listSubnets(listRequest).getItems();
-
-        if (!subnets.isEmpty()) {
-            log.debug("Using existing subnet: {}", subnets.get(0).getId());
-            return subnets.get(0);
-        }
-
-        log.debug("Creating new subnet in VCN: {}", vcnId);
-
-        AvailabilityDomain availabilityDomain = getFirstAvailabilityDomain(identityClient, compartmentId);
-
-        CreateSubnetDetails createDetails = CreateSubnetDetails.builder()
-                .compartmentId(compartmentId)
-                .vcnId(vcnId)
-                .availabilityDomain(availabilityDomain.getName())
-                .cidrBlock("10.0.0.0/24")
-                .displayName("IPv6-Subnet-" + System.currentTimeMillis())
-                .build();
-
-        CreateSubnetRequest createRequest = CreateSubnetRequest.builder()
-                .createSubnetDetails(createDetails)
-                .build();
-
-        Subnet subnet = virtualNetworkClient.createSubnet(createRequest).getSubnet();
-        log.debug("Created new subnet with ID: {}", subnet.getId());
-
-        return subnet;
-    }
 
     private static String findOrCreateIpv6Gateway(VirtualNetworkClient virtualNetworkClient,
                                                   String compartmentId,
@@ -453,6 +370,22 @@ public class OciIpv6Utils {
         log.debug("Found VNIC with ID: {}", vnic.getId());
 
         return vnic;
+    }
+
+    /**
+     * Gets a subnet by its OCID
+     */
+    public static Subnet getSubnetById(VirtualNetworkClient virtualNetworkClient, String subnetId) {
+        GetSubnetRequest request = GetSubnetRequest.builder().subnetId(subnetId).build();
+        return virtualNetworkClient.getSubnet(request).getSubnet();
+    }
+
+    /**
+     * Gets a VCN by its OCID
+     */
+    public static Vcn getVcnById(VirtualNetworkClient virtualNetworkClient, String vcnId) {
+        GetVcnRequest request = GetVcnRequest.builder().vcnId(vcnId).build();
+        return virtualNetworkClient.getVcn(request).getVcn();
     }
 
 }
