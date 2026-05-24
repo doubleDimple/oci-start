@@ -170,7 +170,13 @@ public class CreateInstanceTaskV2 {
             log.debug("去重后剩余 {} 个任务", dedupedTasks.size());
 
             for (BootInstance task : dedupedTasks.values()) {
-                taskExecutor.submit(() -> processTask(task));
+                try {
+                    taskExecutor.submit(() -> processTask(task));
+                } catch (Exception e) {
+                    // 提交失败(如线程池已关闭)必须释放已占用的 key，否则该 key 永久泄漏
+                    log.error("提交任务失败，释放占用 - taskId: {}", task.getBootId(), e);
+                    removeTaskKey(task);
+                }
             }
 
             long endTime = System.currentTimeMillis();
@@ -203,14 +209,11 @@ public class CreateInstanceTaskV2 {
                     task.getArchitecture();
 
             if (activeTaskKeyMap.containsKey(key)) {
-                String mainBootId = activeTaskKeyMap.get(key);
-
-                if (task.getBootId().equals(mainBootId)) {
-                    dedupedTasks.put(key, task);
-                    log.debug("Key {} 已被任务 {} 占用，本轮继续执行它", key, mainBootId);
-                } else {
-                    log.debug("Key {} 已被任务 {} 占用，跳过替补任务 {}", key, mainBootId, task.getBootId());
-                }
+                // key 被占用 = 该(账号+区域+架构)已有一个抢机在飞，本轮一律跳过。
+                // 包括 holder 自己也要跳过：否则会对同一任务并发发起抢机，并在其中一个完成时
+                // 提前释放 key，破坏单飞。等在飞任务结束释放 key 后，下一轮再重新调度。
+                log.debug("Key {} 已被任务 {} 占用，本轮跳过任务 {}",
+                        key, activeTaskKeyMap.get(key), task.getBootId());
                 continue;
             }
 
@@ -555,21 +558,17 @@ public class CreateInstanceTaskV2 {
      */
     public void removeTaskKey(BootInstance task) {
         try {
-            if (task == null) return;
+            if (task == null || task.getBootId() == null) return;
 
-            Tenant tenant = tenantRepository.findById(task.getTenantId()).orElse(null);
-            if (tenant == null) return;
-            String key = tenant.getTenancy() + "_" +
-                    tenant.getRegion() + "_" +
-                    task.getArchitecture();
-            String existBootId = activeTaskKeyMap.get(key);
-            if (existBootId != null && existBootId.equals(task.getBootId())) {
-                activeTaskKeyMap.remove(key);
-                log.debug("释放占用: Key={} -> TaskId={}", key, task.getBootId());
-            } else {
-                log.debug("Key {} 当前未被任务 {} 占用，无需释放", key, task.getBootId());
+            // 按持有者 bootId 释放，不再重新查询租户重建 key：
+            // 1) 租户被删/查询失败时也能正常释放，避免 key 永久泄漏导致该(账号+区域+架构)永远被跳过；
+            // 2) 省去每次释放都要做的一次 DB 查询。
+            // 一个 bootId 至多持有一个 key，只移除“值 == 该 bootId”的条目，不会误删别的任务占用的 key。
+            boolean removed = activeTaskKeyMap.entrySet()
+                    .removeIf(e -> task.getBootId().equals(e.getValue()));
+            if (removed) {
+                log.debug("释放占用 - TaskId={}", task.getBootId());
             }
-
         } catch (Exception e) {
             log.error("释放 key 失败", e);
         }
