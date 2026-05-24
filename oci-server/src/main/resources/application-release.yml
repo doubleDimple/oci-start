@@ -3,8 +3,8 @@ server:
 
 telegram:
   bot:
-    id: 6822503512
-    token: 7994955517:AAFec4Jtpau_2-Roo4zt6_LbQge6U8bkTe4
+    id: 682200000
+    token: 799491231237:AASADFAASDFXXXXX
     username: 哈哈哈
   #http 127.0.0.1:10809
   #sock 127.0.0.1:10808
