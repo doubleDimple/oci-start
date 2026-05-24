@@ -90,6 +90,26 @@ public interface BootInstanceRepository extends JpaRepository<BootInstance, Long
             @Param("currentTime") Timestamp currentTime,
             @Param("limit") int limit);
 
+    /**
+     * 查询到期任务，并按 (tenant_id, architecture) 去重：每组只取最早到期的一条。
+     * 避免"同一账号+架构有大量重复任务时挤占 LIMIT 名额、饿死其它账号"的问题。
+     * （同组若 next_execution_time 完全相同出现并列，由调用方的内存去重再兜一层）
+     */
+    @Query(value = "SELECT * FROM BOOT_INSTANCE b " +
+            "WHERE b.status = 1 AND b.next_execution_time <= :currentTime " +
+            "AND b.next_execution_time = (" +
+            "    SELECT MIN(b2.next_execution_time) FROM BOOT_INSTANCE b2 " +
+            "    WHERE b2.status = 1 " +
+            "      AND b2.tenant_id = b.tenant_id " +
+            "      AND COALESCE(b2.architecture, '') = COALESCE(b.architecture, '') " +
+            "      AND b2.next_execution_time <= :currentTime) " +
+            "ORDER BY b.next_execution_time ASC " +
+            "LIMIT :limit",
+            nativeQuery = true)
+    List<BootInstance> findDistinctTasksToExecute(
+            @Param("currentTime") Timestamp currentTime,
+            @Param("limit") int limit);
+
 
     /**
     * @Description: 查询状态为1的

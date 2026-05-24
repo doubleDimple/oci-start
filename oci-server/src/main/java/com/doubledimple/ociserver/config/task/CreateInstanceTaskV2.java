@@ -145,7 +145,8 @@ public class CreateInstanceTaskV2 {
             long startTime = System.currentTimeMillis();
             Timestamp currentTime = new Timestamp(startTime);
 
-            List<BootInstance> expiredTasks = instanceRepository.findTasksToExecute(
+            // 按 (tenant_id, architecture) 去重后再取 BATCH_SIZE，避免同账号大量重复任务挤占名额、饿死其它账号
+            List<BootInstance> expiredTasks = instanceRepository.findDistinctTasksToExecute(
                     currentTime,
                     BATCH_SIZE
             );
