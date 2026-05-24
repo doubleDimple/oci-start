@@ -159,6 +159,24 @@ public class ThreadPoolConfig {
     }
 
     /**
+     * 短间隔定时任务的异步执行线程池（配合 AsyncJobRunner）。
+     * 单飞由 AsyncJobRunner 的守卫保证；这里用 DiscardPolicy，线程占满时直接丢弃本次触发，
+     * 绝不回灌到 Quartz 调度线程（不要用 CallerRunsPolicy）。
+     */
+    @Bean(name = "jobExecutor")
+    public ThreadPoolTaskExecutor jobExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(3);
+        executor.setMaxPoolSize(3);
+        executor.setQueueCapacity(2);
+        executor.setThreadNamePrefix("job-async-");
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.DiscardPolicy());
+        executor.setWaitForTasksToCompleteOnShutdown(false);
+        executor.initialize();
+        return executor;
+    }
+
+    /**
      * AI聊天专用线程池
      */
     @Bean(name = "aiChatExecutor")

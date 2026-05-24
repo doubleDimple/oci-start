@@ -1,43 +1,31 @@
 package com.doubledimple.ociserver.job;
 
 import com.doubledimple.ocimonitor.service.MonitorCoreService;
-import lombok.extern.slf4j.Slf4j;
 import org.quartz.DisallowConcurrentExecution;
 import org.quartz.Job;
 import org.quartz.JobExecutionContext;
-import org.quartz.JobExecutionException;
-import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import java.util.UUID;
-
 /**
- * 抢机调度器Job
+ * 探针离线检查Job
+ * 派发到异步线程池执行，不阻塞 Quartz 线程；上一轮未结束则跳过本轮。
  */
-@Slf4j
 @Component
 @DisallowConcurrentExecution
 public class CheckOfflineInstanceJob implements Job {
 
     private final MonitorCoreService monitorCoreService;
+    private final AsyncJobRunner asyncJobRunner;
 
     @Autowired
-    public CheckOfflineInstanceJob(MonitorCoreService monitorCoreService) {
+    public CheckOfflineInstanceJob(MonitorCoreService monitorCoreService, AsyncJobRunner asyncJobRunner) {
         this.monitorCoreService = monitorCoreService;
+        this.asyncJobRunner = asyncJobRunner;
     }
 
     @Override
-    public void execute(JobExecutionContext context) throws JobExecutionException {
-        String traceId = UUID.randomUUID().toString().replace("-", "");
-        MDC.put("traceId", traceId);
-        try {
-            log.debug("Start executing monitor check offLine....");
-            monitorCoreService.checkOfflineInstances();
-        } catch (Exception e) {
-            log.error("Start executing monitor check offLine error: {}", e.getMessage(), e);
-        } finally {
-            MDC.clear();
-        }
+    public void execute(JobExecutionContext context) {
+        asyncJobRunner.runOnce("monitor-offline-check", monitorCoreService::checkOfflineInstances);
     }
 }
