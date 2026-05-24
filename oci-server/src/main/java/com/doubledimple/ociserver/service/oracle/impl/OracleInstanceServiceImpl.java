@@ -489,18 +489,20 @@ public class OracleInstanceServiceImpl implements OracleInstanceService {
         String compartmentId = provider.getTenantId();
 
         try (VirtualNetworkClient virtualNetworkClient = VirtualNetworkClient.builder().build(provider);
-             IdentityClient identityClient = IdentityClient.builder().build(provider);
              ComputeClient computeClient = ComputeClient.builder().build(provider)) {
 
             // Get VNIC associated with instance
             Vnic vnic = OciIpv6Utils.getVnic(computeClient, virtualNetworkClient, instanceId, compartmentId);
 
+            // 必须使用实例 VNIC 真实所在的子网/VCN，否则会把 IPv6 段加到别的子网，导致 "ipv6 not enabled in this subnet"
+            Subnet subnet = OciIpv6Utils.getSubnetById(virtualNetworkClient, vnic.getSubnetId());
+            Vcn vcn = OciIpv6Utils.getVcnById(virtualNetworkClient, subnet.getVcnId());
+
             // Ensure VCN has IPv6 enabled
-            Vcn vcn = OciIpv6Utils.ensureVcnWithIpv6(virtualNetworkClient, compartmentId);
+            vcn = OciIpv6Utils.ensureVcnWithIpv6(virtualNetworkClient, vcn);
 
             // Ensure subnet has IPv6 CIDR block
-            Subnet subnet = OciIpv6Utils.ensureSubnetWithIpv6(
-                    virtualNetworkClient, identityClient, compartmentId, vcn.getId());
+            OciIpv6Utils.ensureSubnetWithIpv6(virtualNetworkClient, subnet, vcn);
 
             // Ensure IPv6 internet gateway exists
             OciIpv6Utils.ensureIpv6InternetGateway(virtualNetworkClient, compartmentId, vcn.getId());
