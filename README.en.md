@@ -1,84 +1,67 @@
-<p align="right">
-   <a href="./README.md">中文</a> | <strong>English</strong>
-</p>
-
-# 🚀 OCI-Start
-
 <div align="center">
 
-**A powerful system for creating and managing Oracle Cloud instances using API integration**
+# OCI-Start
 
-[![GitHub stars](https://img.shields.io/github/stars/doubleDimple/oci-start?style=flat-square&logo=github)](https://github.com/doubleDimple/oci-start)
-[![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
-[![Java](https://img.shields.io/badge/Java-8+-orange?style=flat-square&logo=java)](https://www.java.com)
-[![Docker](https://img.shields.io/badge/Docker-Ready-blue?style=flat-square&logo=docker)](https://www.docker.com)
+**A powerful system for creating and managing Oracle Cloud instances via API integration**
 
-[![Deploy to EdgeOne](https://img.shields.io/badge/Deploy%20to-EdgeOne-1976d2?style=for-the-badge&logo=tencent-cloud&logoColor=white)](https://console.cloud.tencent.com/edgeone/pages/project?github=https://github.com/doubleDimple/oci-start)
+[![Stars](https://img.shields.io/github/stars/doubleDimple/oci-start?style=flat-square&logo=github&color=yellow)](https://github.com/doubleDimple/oci-start/stargazers)
+[![License](https://img.shields.io/github/license/doubleDimple/oci-start?style=flat-square&color=blue)](LICENSE)
+[![Issues](https://img.shields.io/github/issues/doubleDimple/oci-start?style=flat-square&color=orange)](https://github.com/doubleDimple/oci-start/issues)
+[![Java](https://img.shields.io/badge/Java-8+-ED8B00?style=flat-square&logo=java&logoColor=white)](https://www.java.com)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=flat-square&logo=docker&logoColor=white)](https://www.docker.com)
+
+[简体中文](./README.md) · [Quick Start](#quick-start) · [Deployment](#deployment) · [Configuration](#configuration) · [Screenshots](#screenshots)
 
 </div>
 
 ---
 
-## 📋 Table of Contents
-
-- [Features](#-features)
-- [Quick Start](#-quick-start)
-- [Deployment Methods](#-deployment-methods)
-- [Configuration](#️-configuration)
-- [Usage Guide](#-usage-guide)
-- [Screenshots](#-screenshots)
-- [Sponsorship](#-sponsorship)
-- [Disclaimer](#️-disclaimer)
+> ⚠️ **Important Notice**
+> This project is fully open source. Please respect basic developer ethics — **do not** fork this repository to modify its functionality and trick others into deploying it for the purpose of stealing their account credentials. Do no harm, however small.
 
 ---
 
-## ✨ Features
+## Features
 
-<div align="center">
+OCI-Start provides end-to-end lifecycle management for Oracle Cloud instances, covering creation, configuration, monitoring, and termination.
 
-| 🎯 Feature | 📝 Description |
-|---------|---------|
-| **Multi-Instance Launch** | Support multiple APIs and instances launching simultaneously |
-| **Instance Management** | Instance stop, start, and synchronization functionality |
-| **Boot Volume Management** | Modify instance names and boot volume VPU |
-| **Network Configuration** | One-click creation of secondary VNICs |
-| **System Rescue** | One-click system rescue functionality |
-| **Region Management** | Region subscription features |
-| **Security Rules** | Comprehensive security rule management system |
-| **User Management** | Query and add admin user functionality |
-| **IPv6 Support** | One-click IPv4 to IPv6 switching |
-| **Instance Termination** | Safe instance termination operations |
-| **Traffic Monitoring** | Real-time instance traffic monitoring |
-| **IP Quality Detection** | Automatic detection and switching to high-quality IPs |
+### Instance Management
+- Concurrent boot across multiple APIs and instances
+- Start / stop / sync / terminate operations
+- Real-time traffic monitoring
+- One-click rescue mode
 
-</div>
+### Network & Storage
+- Create secondary VNICs with a single click
+- Boot volume rename and VPU adjustment
+- Toggle between IPv4 and IPv6
+- Automatic IP quality detection and switching
 
-### 🔥 Key Highlights
+### Account & Security
+- Multi-tenant API management
+- Region subscription and switching
+- Visual security rule management
+- Admin user lookup and creation
 
-- 🌟 **Multi-tenant Support** - Complete instance creation using APIs with multi-tenant management
-- 🎛️ **Visual Dashboard** - Intuitive web interface for managing multiple APIs
-- 🔒 **Data Security** - API private keys stored in local H2 database
-- 🤖 **Smart Bot** - Used only for grabbing machine notifications, no data storage
-- 🛠️ **Instance Management** - Complete lifecycle management including start, stop, sync
-- 🌐 **Network Enhancement** - One-click secondary VNIC creation with flexible network configuration
-- 🚑 **System Rescue** - Quick system rescue to resolve instance failures
-- 📍 **Region Subscription** - Intelligent region management for optimized resource allocation
+### System
+- API private keys stored locally in H2 database — **never uploaded**
+- Telegram bot used only for snatch notifications; no account data retained
+- Clean web-based dashboard for all operations
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
-### 📋 System Requirements
+### Requirements
 
-<div align="center">
+| Component | Version |
+|-----------|---------|
+| Java | 8 or higher |
+| OS | Linux (Debian / Ubuntu recommended) |
+| Docker | Optional, for containerized deployment |
 
-![Java](https://img.shields.io/badge/Java-8+-ED8B00?style=for-the-badge&logo=java&logoColor=white)
-![Linux](https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)
-![Docker](https://img.shields.io/badge/Docker-2CA5E0?style=for-the-badge&logo=docker&logoColor=white)
+Install JDK on Debian / Ubuntu:
 
-</div>
-
-#### 🐧 Debian/Ubuntu Environment Setup
 ```bash
 sudo apt update
 sudo apt install default-jdk
@@ -86,82 +69,79 @@ sudo apt install default-jdk
 
 ---
 
-## 🛠️ Deployment Methods
+## Deployment
 
-### Method 1: 📜 Script Deployment (Recommended)
+Two deployment methods are available — pick whichever suits your environment.
 
-> ⚠️ **Note**: The new version will detect and install Redis, which may affect previous Redis installations
+### Option 1: Script Installation (Recommended)
+
+> The new version auto-detects and installs Redis. If you already run Redis on this host, review for conflicts before proceeding.
 
 ```bash
-# 1. 🗂️ Switch to root user and create folder
+# Create working directory
 mkdir -p oci-start && cd oci-start
 
-# 2. 📥 Download execution script
-wget -O oci-start.sh https://raw.githubusercontent.com/doubleDimple/shell-tools/master/oci-start.sh && chmod +x oci-start.sh
+# Download installer
+wget -O oci-start.sh https://raw.githubusercontent.com/doubleDimple/shell-tools/master/oci-start.sh
+chmod +x oci-start.sh
 
-# 3. 🎯 Run script directly for automatic installation and deployment
+# Install
 ./oci-start.sh install
 ```
 
-#### 🎮 Script Commands
+Common commands:
 
 ```bash
-# 🚀 Start application
-./oci-start.sh start
-
-# ⏹️ Stop application
-./oci-start.sh stop
-
-# 🔄 Restart application
-./oci-start.sh restart    
-
-# ⬆️ Update to latest version
-./oci-start.sh update
-
-# 🗑️ Complete uninstall
-./oci-start.sh uninstall
+./oci-start.sh start       # Start
+./oci-start.sh stop        # Stop
+./oci-start.sh restart     # Restart
+./oci-start.sh status      # Check status
+./oci-start.sh update      # Upgrade
+./oci-start.sh uninstall   # Uninstall
 ```
 
-### Method 2: 🐳 Docker Deployment
+### Option 2: Docker
 
 ```bash
-# 📁 Create working directory
 mkdir -p oci-start-docker && cd oci-start-docker
 
-# 📥 Download Docker script
-wget -O docker.sh https://raw.githubusercontent.com/doubleDimple/shell-tools/master/docker.sh && chmod +x docker.sh
+wget -O docker.sh https://raw.githubusercontent.com/doubleDimple/shell-tools/master/docker.sh
+chmod +x docker.sh
 
-# 🔧 Execute script
-./docker.sh install    # Install application
-./docker.sh uninstall  # Uninstall application
+./docker.sh install        # Install
+./docker.sh uninstall      # Uninstall
 ```
 
-#### 🐋 Docker Management Commands
+Container operations:
 
 ```bash
-# 📊 View container status
-docker ps -a
-
-# 📜 View container logs
-docker logs oci-start
+docker ps -a               # Container status
+docker logs oci-start      # View logs
+docker logs -f oci-start   # Follow logs
 ```
+
+Once deployed, open `http://your-ip:9856` in your browser and sign in with your configured credentials.
 
 ---
 
-## ⚙️ Configuration
+## Configuration
 
-> 💡 **Upgrade Note**: For users with existing deployments, all configurations remain unchanged except security settings which need to be completely removed
+### Basic
 
-### 📝 Basic Configuration
+The default port is `9856`. To change it:
 
 ```yaml
-# 🌐 Port configuration (default port is 9856)
 server:
   port: 9856
+```
 
-# 🔗 Domain access configuration (requires nginx configuration)
+### Nginx Reverse Proxy
+
+To expose the dashboard via a domain, Nginx must forward WebSocket traffic (used by the VNC console):
+
+```nginx
 location ~ ^/websockify/(\d+)$ {
-    proxy_pass http://yourIp:$1;
+    proxy_pass http://your-backend-ip:$1;
     proxy_http_version 1.1;
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection "upgrade";
@@ -172,146 +152,125 @@ location ~ ^/websockify/(\d+)$ {
 }
 ```
 
----
-
-## 📖 Usage Guide
-
-### 🎯 Basic Operations
-
-```bash
-# 🔑 Add execution permissions
-chmod 777 oci-start.sh
-
-# 🚀 Start program
-./oci-start.sh start
-
-# 📊 Check startup status
-./oci-start.sh status
-
-# ⏹️ Stop program
-./oci-start.sh stop
-```
-
-### 🌐 Access Method
-
-Access through browser: `http://your-ip:port`
-
-Enter your configured username and password to start using!
+> When upgrading from older versions, remove the `security` block entirely. All other configuration entries can be kept as-is.
 
 ---
 
-## 📸 Screenshots
+## Screenshots
 
 <div align="center">
 
-### 🏠 Main Interface
-<img width="1423" alt="Main Interface" src="https://github.com/user-attachments/assets/23b9ab72-6212-42c3-a02c-3efa795ca9ea" />
+### Dashboard
+<img width="900" alt="Dashboard" src="https://github.com/user-attachments/assets/23b9ab72-6212-42c3-a02c-3efa795ca9ea" />
 
-### 📊 Instance Management
-<img width="1420" alt="Instance Management" src="https://github.com/user-attachments/assets/af1ef632-84b9-4f08-a7d3-39480d518384" />
+### Instance Management
+<img width="900" alt="Instance Management" src="https://github.com/user-attachments/assets/af1ef632-84b9-4f08-a7d3-39480d518384" />
 
-### ⚙️ System Configuration
-<img width="1211" alt="System Configuration" src="https://github.com/user-attachments/assets/306f307b-61b7-4e7c-b786-3d9e39471c91" />
-
-### 🔧 Advanced Settings
-<img width="1432" alt="Advanced Settings" src="https://github.com/user-attachments/assets/15994398-0bc9-4bef-aa81-7b44c75021fb" />
-
-</div>
+### System Configuration
+<img width="900" alt="System Configuration" src="https://github.com/user-attachments/assets/306f307b-61b7-4e7c-b786-3d9e39471c91" />
 
 <details>
-<summary>📱 More Screenshots</summary>
+<summary><b>More screenshots</b></summary>
 
-<img width="1420" alt="Features Page" src="https://github.com/user-attachments/assets/bf98973a-d3f6-4f2a-836f-3698647b8f3f" />
+<br>
 
-<img width="1427" alt="Monitor Interface" src="https://github.com/user-attachments/assets/3e8c0ce8-6077-4748-bc39-fc1fa70da08e" />
-
-<img width="1430" alt="Data Statistics" src="https://github.com/user-attachments/assets/0794298d-702f-4af7-ad5b-6cb5c206fa54" />
+<img width="900" alt="Advanced Settings" src="https://github.com/user-attachments/assets/15994398-0bc9-4bef-aa81-7b44c75021fb" />
+<img width="900" alt="Feature Page" src="https://github.com/user-attachments/assets/bf98973a-d3f6-4f2a-836f-3698647b8f3f" />
+<img width="900" alt="Monitoring" src="https://github.com/user-attachments/assets/3e8c0ce8-6077-4748-bc39-fc1fa70da08e" />
+<img width="900" alt="Analytics" src="https://github.com/user-attachments/assets/0794298d-702f-4af7-ad5b-6cb5c206fa54" />
 
 </details>
 
----
-
-## 💖 Sponsorship
-
-<div align="center">
-
-**Thank you very much to all donors supporting this project! Your generous support is crucial to us.**
-
 </div>
 
-### 🎉 Donation Records
+---
 
-Thanks to the following users for their generous support (in chronological order):
+## Contributing
 
-| 👤 Donor | 💰 Amount/Item | 📅 Date |
-|:----------:|:------------:|:--------:|
-| Conan | GCP Account | 2025-07-15 |
-| Riva Milne | GCP Account | 2025-07-15 |
+Issues and pull requests are welcome. Please read [CONTRIBUTING.md](./CONTRIBUTING.md) for development workflow, branch naming, and commit conventions before submitting.
+
+<a href="https://github.com/doubleDimple/oci-start/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=doubleDimple/oci-start" />
+</a>
+
+---
+
+## Sponsors
+
+Special thanks to the following organizations for their ongoing support:
+
+<table>
+  <tr>
+    <td align="center" width="33%">
+      <a href="https://yxvm.com/aff.php?aff=762">
+        <b>YxVM</b><br>
+        <sub>Server resources</sub>
+      </a>
+    </td>
+    <td align="center" width="33%">
+      <a href="https://github.com/NodeSeekDev/NodeSupport">
+        <b>NodeSeek</b><br>
+        <sub>Community & infrastructure</sub>
+      </a>
+    </td>
+    <td align="center" width="33%">
+      <a href="https://dartnode.com">
+        <b>DartNode</b><br>
+        <sub>Free VPS for open source</sub>
+      </a>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" colspan="3">
+      <a href="https://edgeone.ai/?from=github">
+        <img src="https://edgeone.ai/media/34fe3a45-492d-4ea4-ae5d-ea1087ca7b4b.png" width="280" alt="Tencent EdgeOne"/>
+      </a>
+      <br>
+      <sub>CDN acceleration and security provided by <b>Tencent EdgeOne</b></sub>
+    </td>
+  </tr>
+</table>
+
+---
+
+## Donations
+
+Thanks to everyone who has supported this project. The donation QR code is available in the **About** page inside the app. If you'd like your name added to the list below, reach out to the maintainer after donating.
+
+<details>
+<summary><b>Donation history (click to expand)</b></summary>
+
+<br>
+
+| Donor | Amount / Item | Date |
+|:------|:--------------|:-----|
+| 柯南 | GCP account | 2025-07-15 |
+| Riva Milne | GCP account | 2025-07-15 |
 | Ja3pez | ¥30 | 2025-07-15 |
 | Anonymous | ¥50 | 2025-07-15 |
 | Anonymous | ¥215 | 2025-07-14 |
-| Anonymous | Cloud Account | 2025-04-13 |
-| Anonymous | Cloud Account | 2025-04-13 |
+| Anonymous | Cloud account | 2025-04-13 |
+| Anonymous | Cloud account | 2025-04-13 |
 | xdfaka | ¥68 | 2025-04-13 |
-
-<details>
-<summary>📜 View More Donation Records</summary>
-
-| 👤 Donor | 💰 Amount/Item | 📅 Date |
-|:----------:|:------------:|:--------:|
-| Anonymous | Cloud Account | 2025-04-07 |
+| Anonymous | Cloud account | 2025-04-07 |
 | Anonymous | ¥50 | 2025-04-06 |
 | Anonymous | ¥9.9 | 2025-04-01 |
 | Anonymous | ¥10 | 2025-04-01 |
-| Anonymous | Cloud Account | 2025-03-25 |
-| Conan | Cloud Account | 2025-03-15 |
-| Anonymous | Cloud Account (Upgrade) | 2025-03-08 |
+| Anonymous | Cloud account | 2025-03-25 |
+| 柯南 | Cloud account | 2025-03-15 |
+| Anonymous | Cloud account (upgrade) | 2025-03-08 |
 | Anonymous | ¥9.9 | 2025-03-06 |
-| Conan | ¥100 | 2025-03-01 |
+| 柯南 | ¥100 | 2025-03-01 |
 | Anonymous | ¥200 | 2025-02-15 |
 | Anonymous | ¥50 | 2024-11-05 |
 
 </details>
 
-### 💝 How to Donate
-
-If you would like to support our project, you can find the donation QR code on the About page of oci-start.
-
-> 💌 If you want your name added to the donor list, please contact the project maintainer after donating.
-
 ---
 
-## 🤝 Sponsors
+## Star History
 
 <div align="center">
-
-**This project greatly appreciates the support provided by the following sponsors!**
-
-### 🏆 Main Sponsors
-
-[![YxVM](https://img.shields.io/badge/YxVM-Server%20Resources-blue?style=for-the-badge&logo=server&logoColor=white)](https://yxvm.com/aff.php?aff=762)
-
-[![NodeSeek](https://img.shields.io/badge/NodeSeek-Community%20Support-green?style=for-the-badge&logo=discourse&logoColor=white)](https://github.com/NodeSeekDev/NodeSupport)
-
-[![DartNode](https://dartnode.com/branding/DN-Open-Source-sm.png)](https://dartnode.com "Powered by DartNode - Free VPS for Open Source")
-
-### 🚀 CDN Acceleration Sponsors
-
-<a href="https://edgeone.ai/zh?from=github" target="_blank">
-  <img src="https://edgeone.ai/media/34fe3a45-492d-4ea4-ae5d-ea1087ca7b4b.png" alt="EdgeOne Logo" width="400"/>
-</a>
-
-**This project's CDN acceleration and security protection sponsored by [Tencent EdgeOne](https://edgeone.ai/zh?from=github)**
-
-</div>
-
----
-
-## 📊 Project Statistics
-
-<div align="center">
-
-### ⭐ Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=doubleDimple/oci-start&type=Date)](https://star-history.com/#doubleDimple/oci-start&Date)
 
@@ -319,31 +278,23 @@ If you would like to support our project, you can find the donation QR code on t
 
 ---
 
-## ⚖️ Disclaimer
+## Disclaimer
 
-<div align="center">
-
-> ⚠️ **Important Notice: Please do not use if you have any objections**
-
-</div>
-
-### 📜 Disclaimer Terms
-
-- 🔬 Any scripts involved in the projects released in this repository are **for testing and learning research only**, and commercial use is prohibited
-- ⚖️ Cannot guarantee their legality, accuracy, completeness and effectiveness, please judge according to the situation
-- 📋 All users need to comply with laws and regulations when using any part of the project. You are responsible for any consequences caused by improper use
-- 🛡️ We are not responsible for any script issues, including but not limited to any loss or damage caused by any script errors
-- 📄 If any unit or individual believes that the project may infringe their rights, they should notify promptly and provide identity proof and ownership proof, and we will delete relevant files after receiving the certification documents
-- 👀 Anyone who views this project in any way or directly or indirectly uses any script of the project should read this statement carefully
-- 🔄 I reserve the right to change or supplement this disclaimer at any time. Once you use and copy any related scripts or rules of this project, you are deemed to have accepted this disclaimer
-- ⏰ You must completely delete the above content from your computer or phone within 24 hours after downloading
+- This project and all related scripts are intended **strictly for testing, learning, and research**. Commercial use is prohibited.
+- No guarantee is made regarding the legality, accuracy, completeness, or effectiveness of any content. Use at your own discretion.
+- Users must comply with the laws and regulations of their jurisdiction. All consequences arising from use are the sole responsibility of the user.
+- The maintainer is **not liable** for any issues caused by the scripts, including but not limited to data loss or damage.
+- If any party believes this project infringes on their rights, please provide proof of identity and ownership. Relevant content will be removed upon verification.
+- Viewing this project, in any way, or using any of its scripts — directly or indirectly — constitutes acceptance of this disclaimer.
+- The maintainer reserves the right to modify or supplement this disclaimer at any time.
+- You must completely delete the contents within **24 hours** of downloading.
 
 ---
 
 <div align="center">
 
-**🎉 Thank you for using and supporting!**
+**Made with care by [@doubleDimple](https://github.com/doubleDimple)**
 
-Made with ❤️ by [doubleDimple](https://github.com/doubleDimple)
+If this project helps you, consider giving it a Star ⭐
 
 </div>
