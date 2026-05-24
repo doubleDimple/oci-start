@@ -1187,6 +1187,12 @@ textarea::placeholder { color: var(--text-secondary); }
     vertical-align: middle;
 }
 
+/* 单元格内的行内元素（徽标/胶囊/按钮/链接）默认按基线对齐，会与纯文本错位，
+   这里统一改为按中线对齐，保证同一行内容在一条水平线上 */
+.table td > * {
+    vertical-align: middle;
+}
+
 /* 小按钮样式 */
 .btn-sm {
     padding: 2px 6px;
