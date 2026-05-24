@@ -210,7 +210,7 @@ location ~ ^/websockify/(\d+)$ {
     <td align="center" width="33%">
       <a href="https://github.com/NodeSeekDev/NodeSupport">
         <b>NodeSeek</b><br>
-        <sub>社区与基础设施</sub>
+        <sub>社区论坛</sub>
       </a>
     </td>
     <td align="center" width="33%">
