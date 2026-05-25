@@ -4,7 +4,8 @@ on:
     types: [opened, closed, reopened]
   watch:
     types: [started]
-  
+  fork:
+
 jobs:
   notify:
     runs-on: ubuntu-latest
@@ -18,6 +19,7 @@ jobs:
           disable_web_page_preview: false
           message: |
             ${{ github.event_name == 'watch' && '🌟 *恭喜！获得新的Star*' || 
+                github.event_name == 'fork' && '🍴 *项目被Fork了*' ||
                 github.event_name == 'issues' && github.event.action == 'opened' && '🐛 *收到新Issue*' ||
                 github.event_name == 'issues' && github.event.action == 'closed' && '✅ *Issue已解决*' ||
                 github.event_name == 'issues' && github.event.action == 'reopened' && '🔄 *Issue被重新打开*' }}
@@ -27,7 +29,8 @@ jobs:
             👤 *操作者：* [${{ github.actor }}](https://github.com/${{ github.actor }})
             ${{ github.event.issue.title && format('📋 *标题：* {0}', github.event.issue.title) || '' }}
             ${{ github.event_name == 'watch' && format('⭐ 项目现在有 *{0}* 个Star了！', github.event.repository.stargazers_count) || '' }}
+            ${{ github.event_name == 'fork' && format('🍴 项目现在有 *{0}* 个Fork了！Fork仓库：[{1}]({2})', github.event.repository.forks_count, github.event.forkee.full_name, github.event.forkee.html_url) || '' }}
             
             🔗 [${{ github.event_name == 'watch' && '查看项目' || 
-                   github.event_name == 'issues' && '查看Issue' }}](${{ github.event.issue.html_url || format('{0}/{1}', github.server_url, github.repository) }})
-            
+                   github.event_name == 'fork' && '查看Fork' ||
+                   github.event_name == 'issues' && '查看Issue' }}](${{ github.event.forkee.html_url || github.event.issue.html_url || format('{0}/{1}', github.server_url, github.repository) }})
