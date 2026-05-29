@@ -31,7 +31,7 @@
         <security.version>2.3.12.RELEASE</security.version>
         <netflix-eureka-server.version>2.2.9.RELEASE</netflix-eureka-server.version>
         <circuitbreaker-reactor-resilience4j.version>1.0.6.RELEASE</circuitbreaker-reactor-resilience4j.version>
-        <oci-java-sdk.version>3.82.0</oci-java-sdk.version>
+        <oci-java-sdk.version>3.88.0</oci-java-sdk.version>
         <caffeine.version>2.9.2</caffeine.version>
         <disruptor.version>3.4.4</disruptor.version>
         <openapi.version>1.7.0</openapi.version>

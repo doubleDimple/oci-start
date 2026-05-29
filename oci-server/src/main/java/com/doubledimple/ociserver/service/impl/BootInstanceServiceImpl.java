@@ -114,8 +114,8 @@ public class BootInstanceServiceImpl implements BootInstanceService {
         }
         List<OciComputerDto.AvailabilityDomainName> availabilityDomainNameList = ociComputerDto.getAvailabilityDomainNameList();
         if (CollectionUtils.isEmpty(availabilityDomainNameList)){
-            log.warn("当前租户:{}未获取到可用域信息,此区域可能不支持开机",tenant.getTenancyName());
-            return;
+            log.error("当前租户:{}未获取到可用域信息,此区域可能不支持开机",tenant.getTenancyName());
+            throw new RuntimeException("当前租户未获取到可用域信息,请检查你的API或者确认该账号状态");
         }
         for ( int i = 0;i<instanceCount;i++){
             BootInstance bootInstanceAdd = new BootInstance();

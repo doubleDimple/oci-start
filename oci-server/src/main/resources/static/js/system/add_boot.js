@@ -185,7 +185,7 @@ function initFormValidation() {
                 if (data.success) {
                     window.location.href = `/tenants/bootList?tenantId=${document.querySelector('input[name="tenantId"]').value}`;
                 } else {
-                    showError();
+                    Swal.fire({ title: 'error', text: data.message, icon: 'error', confirmButtonColor: '#ff6b6b' });
                 }
             })
             .catch(err => {
