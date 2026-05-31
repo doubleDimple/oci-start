@@ -7,6 +7,7 @@ import com.doubledimple.dao.repository.TrafficAlertRepository;
 import com.doubledimple.ocicommon.enums.RegionEnum;
 import com.doubledimple.ocicommon.enums.oci.TrafficPeriod;
 import com.doubledimple.ociserver.pojo.enums.MessageEnum;
+import com.doubledimple.ociserver.pojo.response.TenantTrafficStats;
 import com.doubledimple.ociserver.service.message.factory.MessageFactory;
 import com.doubledimple.ociserver.service.oracle.OracleInstanceService;
 import com.doubledimple.ociserver.utils.oracle.OciUtils;
@@ -16,9 +17,11 @@ import com.doubledimple.ociserver.utils.oracle.vnic.VnicManagementUtils;
 import com.oracle.bmc.auth.SimpleAuthenticationDetailsProvider;
 import com.oracle.bmc.monitoring.MonitoringClient;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
+import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -51,6 +54,8 @@ public class InstanceTrafficTask {
     /** 单轮最长时间预算，超出后提前结束，避免拖到下一轮触发（间隔 30 分钟） */
     private static final long RUN_BUDGET_MS = 25 * 60 * 1000L;
 
+    private static final double BYTES_PER_GB = 1024.0 * 1024.0 * 1024.0;
+
     /**
      * 定时任务入口
      * 每次执行都实时查询 OCI Monitoring
@@ -77,89 +82,118 @@ public class InstanceTrafficTask {
     }
 
     /**
+     * 查询单个租户本月流量统计（不触发告警，仅返回数据）
+     * 供外部调用，例如 TG 菜单查询
+     */
+    public TenantTrafficStats queryTenantTraffic(Tenant tenant) {
+        TenantTrafficStats stats = new TenantTrafficStats();
+        stats.setTenantId(tenant.getId());
+        stats.setTenancy(tenant.getTenancy());
+        stats.setTenancyName(tenant.getTenancyName());
+        stats.setDisplayName(resolveDisplayName(tenant));
+        stats.setRegion(tenant.getRegion());
+
+        Optional<TrafficAlert> alertOpt = trafficAlertRepository.findByTenantId(tenant.getId());
+        alertOpt.ifPresent(alert -> {
+            stats.setThresholdGB(alert.getThreshold());
+            stats.setStatisticsEnabled(alert.getStatisticsEnabled());
+            stats.setAutoShutdown(alert.getAutoShutdown());
+        });
+
+        try {
+            ZonedDateTime startUtc = ZonedDateTime.now(ZoneOffset.UTC)
+                    .withDayOfMonth(1)
+                    .toLocalDate()
+                    .atStartOfDay(ZoneOffset.UTC);
+            ZonedDateTime endUtc = ZonedDateTime.now(ZoneOffset.UTC);
+            stats.setStartTime(startUtc.toLocalDateTime());
+            stats.setEndTime(endUtc.toLocalDateTime());
+
+            Date startTime = Date.from(startUtc.toInstant());
+            Date endTime = Date.from(endUtc.toInstant());
+
+            List<VnicCreationResult> allVnics = VnicManagementUtils.listAllVnicsForTenant(tenant);
+            if (allVnics == null || allVnics.isEmpty()) {
+                stats.setMessage("该区域暂无 VNIC，无流量可统计");
+                return stats;
+            }
+
+            Map<String, List<VnicCreationResult>> vnicsByInstance = allVnics.stream()
+                    .filter(v -> v != null && v.getVnicId() != null && !v.getVnicId().trim().isEmpty())
+                    .collect(Collectors.groupingBy(
+                            VnicCreationResult::getInstanceId,
+                            LinkedHashMap::new,
+                            Collectors.toList()));
+
+            SimpleAuthenticationDetailsProvider provider = OciUtils.getProvider(tenant);
+            String compartmentId = provider.getTenantId();
+
+            double totalTenantEgress = 0D;
+            try (MonitoringClient monitoringClient = TrafficMetricsUtils.buildClient(provider)) {
+                for (Map.Entry<String, List<VnicCreationResult>> entry : vnicsByInstance.entrySet()) {
+                    String instanceId = entry.getKey();
+                    List<VnicCreationResult> uniqueVnics = entry.getValue().stream()
+                            .collect(Collectors.collectingAndThen(
+                                    Collectors.toMap(
+                                            VnicCreationResult::getVnicId,
+                                            v -> v,
+                                            (existing, replacement) -> existing,
+                                            LinkedHashMap::new),
+                                    map -> new ArrayList<>(map.values())));
+
+                    if (uniqueVnics.isEmpty()) {
+                        continue;
+                    }
+
+                    double instanceEgressBytes = TrafficMetricsUtils.getInstanceTrafficTotal(
+                            monitoringClient,
+                            compartmentId,
+                            uniqueVnics,
+                            true,
+                            startTime,
+                            endTime,
+                            TrafficPeriod.ONE_DAY);
+
+                    TenantTrafficStats.InstanceTraffic info = new TenantTrafficStats.InstanceTraffic();
+                    info.setInstanceId(instanceId);
+                    info.setInstanceName(uniqueVnics.get(0).getInstanceName());
+                    info.setPublicIp(uniqueVnics.get(0).getPublicIp());
+                    info.setVnicCount(uniqueVnics.size());
+                    info.setEgressGB(instanceEgressBytes / BYTES_PER_GB);
+                    stats.getInstances().add(info);
+
+                    totalTenantEgress += instanceEgressBytes;
+                }
+            }
+
+            stats.setTotalEgressGB(totalTenantEgress / BYTES_PER_GB);
+        } catch (Exception e) {
+            log.error("查询租户 [{}] 流量失败: {}", tenant.getTenancy(), e.getMessage(), e);
+            stats.setSuccess(false);
+            stats.setMessage(e.getMessage());
+        }
+        return stats;
+    }
+
+    /**
      * 检查单个租户流量情况
      */
     private void checkTrafficForTenant(Tenant tenant, TrafficAlert alert) {
-        // 1. 获取本月 UTC 起止时间
-        ZonedDateTime startUtc = ZonedDateTime.now(ZoneOffset.UTC)
-                .withDayOfMonth(1)
-                .toLocalDate()
-                .atStartOfDay(ZoneOffset.UTC);
-        ZonedDateTime endUtc = ZonedDateTime.now(ZoneOffset.UTC);
-        Date startTime = Date.from(startUtc.toInstant());
-        Date endTime = Date.from(endUtc.toInstant());
-
-        double totalTenantEgress = 0D;
-
-        // 2. 直接查询所有 VNIC（已包含实例信息）
-        List<VnicCreationResult> allVnics = VnicManagementUtils.listAllVnicsForTenant(tenant);
-
-        if (allVnics.isEmpty()) {
-            log.warn("租户 [{}] 未找到任何 VNIC，跳过流量统计", tenant.getTenancy());
+        TenantTrafficStats stats = queryTenantTraffic(tenant);
+        if (!stats.isSuccess() || stats.getInstances().isEmpty()) {
             return;
         }
 
-        // 3. 根据 instanceId 分组统计
-        Map<String, List<VnicCreationResult>> vnicsByInstance = allVnics.stream()
-                .filter(v -> v != null && v.getVnicId() != null && !v.getVnicId().trim().isEmpty())
-                .collect(Collectors.groupingBy(VnicCreationResult::getInstanceId, LinkedHashMap::new, Collectors.toList()));
-
-        // 4. 复用同一个 MonitoringClient（带超时）查询每个实例的出站流量
-        SimpleAuthenticationDetailsProvider provider = OciUtils.getProvider(tenant);
-        String compartmentId = provider.getTenantId();
-        try (MonitoringClient monitoringClient = TrafficMetricsUtils.buildClient(provider)) {
-            for (Map.Entry<String, List<VnicCreationResult>> entry : vnicsByInstance.entrySet()) {
-                String instanceId = entry.getKey();
-                List<VnicCreationResult> vnics = entry.getValue();
-
-                if (vnics.isEmpty()) {
-                    log.warn("租户 [{}] 实例 [{}] 未找到有效 VNIC ID", tenant.getTenancy(), instanceId);
-                    continue;
-                }
-
-                // 去重（如果有重复 VNIC ID）
-                List<VnicCreationResult> uniqueVnics = vnics.stream()
-                        .collect(Collectors.collectingAndThen(
-                                Collectors.toMap(
-                                        VnicCreationResult::getVnicId,
-                                        v -> v,
-                                        (existing, replacement) -> existing,
-                                        LinkedHashMap::new
-                                ),
-                                map -> new ArrayList<>(map.values())
-                        ));
-
-                double instanceEgress = TrafficMetricsUtils.getInstanceTrafficTotal(
-                        monitoringClient,
-                        compartmentId,
-                        uniqueVnics,
-                        true,
-                        startTime,
-                        endTime,
-                        TrafficPeriod.ONE_DAY
-                );
-
-                String instanceName = uniqueVnics.get(0).getInstanceName();
-                log.debug("租户 [{}] 实例 [{}] VNIC 数:{} 出站流量:{} bytes",
-                        tenant.getTenancy(), instanceName, uniqueVnics.size(), instanceEgress);
-
-                totalTenantEgress += instanceEgress;
-            }
-        }
-
-        // 5. 判断是否超过阈值
-        double totalGB = totalTenantEgress / (1024.0 * 1024.0 * 1024.0);
+        double totalGB = stats.getTotalEgressGB();
         double threshold = alert.getThreshold() != null ? alert.getThreshold() : Double.MAX_VALUE;
 
         if (totalGB > threshold) {
             log.warn("租户 [{}] 本月出站流量超限：{} GB / 阈值 {} GB",
                     tenant.getTenancy(), totalGB, threshold);
 
-            // 6. 取第一个 VNIC 的实例信息
-            VnicCreationResult first = allVnics.get(0);
+            TenantTrafficStats.InstanceTraffic first = stats.getInstances().get(0);
             String publicIp = first.getPublicIp();
 
-            // 7. 是否自动关机
             boolean shutdown = alert.getAutoShutdown();
             if (shutdown) {
                 oracleInstanceService.stopInstance(first.getInstanceId(), tenant.getTenancy());
@@ -167,12 +201,17 @@ public class InstanceTrafficTask {
                         tenant.getTenancy(), first.getInstanceName(), threshold);
             }
 
-            // 8. 发送告警
             sendAlert(tenant, publicIp, totalGB, threshold, totalGB - threshold, shutdown);
         }
     }
 
-
+    private String resolveDisplayName(Tenant tenant) {
+        String defName = tenant.getDefName();
+        if (StringUtils.isBlank(defName) || "未设置".equals(defName)) {
+            return tenant.getTenancyName();
+        }
+        return defName;
+    }
 
     /**
      * 发送流量告警消息
