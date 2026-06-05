@@ -384,14 +384,22 @@ public class ThreadPoolConfig {
 
     @Bean(name = "ociApiExecutor")
     public ThreadPoolExecutor ociApiExecutor() {
-        int cpu = Runtime.getRuntime().availableProcessors();
+        long maxMemoryMB = Runtime.getRuntime().maxMemory() / 1024 / 1024;
+
+        // 1+1机器: core=2, max=4, queue=30 (匹配BATCH_SIZE)
+        // 大机器:  core=4, max=16, queue=200
+        boolean small = maxMemoryMB < 1536;
+        int core = small ? 2 : 4;
+        int max  = small ? 4 : 16;
+        int queue = small ? 30 : 200;
+
         return new MdcThreadPoolExecutor(
-                Math.max(2, cpu * 4),
-                Math.max(8, cpu * 8),
+                core,
+                max,
                 60L, TimeUnit.SECONDS,
-                new LinkedBlockingQueue<>(200),
+                new LinkedBlockingQueue<>(queue),  // 保留有界队列，匹配 BATCH_SIZE
                 new ThreadFactoryBuilder().setNameFormat("oci-api-%d").setDaemon(true).build(),
-                new ThreadPoolExecutor.AbortPolicy()
+                new ThreadPoolExecutor.AbortPolicy()  // 保留 AbortPolicy，上层已有 catch + removeTaskKey
         );
     }
 

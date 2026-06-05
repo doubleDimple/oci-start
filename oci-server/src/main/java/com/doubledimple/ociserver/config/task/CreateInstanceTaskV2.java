@@ -309,7 +309,7 @@ public class CreateInstanceTaskV2 {
                 updateTaskFailCount(task, e.getMessage());
                 return null;
             }
-        }, ociApiExecutor);  // ★ 关键：子任务走独立池子
+        }, ociApiExecutor);
 
         // 非阻塞超时：到点强制 completeExceptionally，不占用任何线程
         ScheduledFuture<?> timeoutFuture = delayedTaskExecutor.schedule(() -> {
