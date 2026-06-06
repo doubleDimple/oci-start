@@ -59,7 +59,6 @@ public class OciLogBuilder {
                     (error.getMessage().contains(CAPACITY.getErrorType()) || error.getMessage().contains(CAPACITY_HOST.getErrorType()))) {
 
                 //log.debug("[TaskId={}] 用户:{}当前区域容量不足 {} 换另一个可用性区域继续执行", user.getBootId(), user.getUserName(),CAPACITY.getMessage());
-                size--;
                 if (size <= 0) {
                     //log.debug("[TaskId={}] 用户:[{}]的区域:[{}]的架构:[{}]未完成开机,具体原因为:[{}]", user.getBootId(), user.getUserName(),user.getRegion(),user.getArchitecture(),e.getMessage());
                     log.info("[TaskId={}] 用户:[{}]的区域:[{}]的架构:[{}]未完成开机,已执行抢机次数为:[{}],原因为:{},将在:[{}]秒后重试...", user.getBootId(), user.getUserName(),user.getRegion(),user.getArchitecture(),count,CAPACITY.getMessage(),user.getInterval());

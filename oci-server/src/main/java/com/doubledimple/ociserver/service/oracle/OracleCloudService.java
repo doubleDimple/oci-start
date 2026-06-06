@@ -203,11 +203,10 @@ public class OracleCloudService {
                 try {
                     List<Shape> shapes = getShape(computeClient, compartmentId, availablityDomain, user);
                     if (shapes.size() == 0) {
-                        size --;
                         log.warn("用户:[{}] 的当前可用性域:{} 没有符合的Shape,切换后再次执行", user.getUserName(),availablityDomain.getName());
                         continue;
                     }
-
+                    size --;
                     for (Shape shape : shapes) {
                         Shape.BillingType billingType = shape.getBillingType();
                         Image image = getImage(computeClient, compartmentId, shape, user);
@@ -244,7 +243,12 @@ public class OracleCloudService {
                                 shape, imageId,
                                 subnet, networkSecurityGroup,
                                 cloudInitScript, user);
-                        instance = createInstance(computeClient,user,computeWaiters, launchInstanceDetails);
+                        try {
+                            instance = createInstance(computeClient,user,computeWaiters, launchInstanceDetails);
+                        } catch (Exception e) {
+                            ociLogBuilder.buildOpenBootException(count,availablityDomain.getName(),size,user,instanceCreated,e,oracleInstanceDetail);
+                            continue;
+                        }
                         instanceCreated = true;
                         printInstance(user,computeClient, virtualNetworkClient, instance, oracleInstanceDetail,billingType,authenticationDetailsProvider);
                     }
@@ -282,8 +286,15 @@ public class OracleCloudService {
              size = dbInstanceDetails.size();
              ComputeWaiters computeWaiters = computeClient.newWaiters(workRequestClient);
              for (LaunchInstanceDetails launchInstanceDetails : dbInstanceDetails) {
+                 size --;
                  availabilityDomain = launchInstanceDetails.getAvailabilityDomain();
-                 Instance instance = createInstance(computeClient,user,computeWaiters, launchInstanceDetails);
+                 Instance instance = null;
+                 try {
+                     instance = createInstance(computeClient,user,computeWaiters, launchInstanceDetails);
+                 } catch (Exception e) {
+                     ociLogBuilder.buildOpenBootException(count,availabilityDomain,size,user,instanceCreated,e,oracleInstanceDetail);
+                     continue;
+                 }
                  instanceCreated = true;
                  printInstance(user,computeClient, virtualNetworkClient, instance, oracleInstanceDetail,billingType,provider);
              }
@@ -772,6 +783,7 @@ public class OracleCloudService {
                         && bmcEx.getMessage().contains("Retry token collision")) {
                     log.warn("检测到 Token 冲突，尝试找回任务[{}]可能已创建的实例...", taskId);
                 }
+                //todo 这里需要打印日志输出...
             }
             log.debug("任务[{}]执行异常，回滚删除锁，允许下次重试", taskId, e);
             try {
