@@ -162,11 +162,18 @@ function renderPagination(currentPageNum, total) {
     paginationDiv.innerHTML = html;
 }
 
+function refreshProxyModalSelects() {
+    if (typeof CustomSelect === 'undefined') return;
+    CustomSelect.refresh(document.getElementById('proxyType'));
+    CustomSelect.refresh(document.getElementById('availableStatus'));
+}
+
 function openAddModal() {
     const modal = document.getElementById('proxyModal');
     document.getElementById('proxyForm').reset();
     document.getElementById('proxyId').value = '';
     document.getElementById('modalTitle').textContent = '新增代理';
+    refreshProxyModalSelects();
     modal.style.display = 'flex';
     setTimeout(() => { modal.style.opacity = '1'; }, 50);
 }
@@ -181,6 +188,7 @@ function openEditModal(id, proxyType, proxyHost, proxyPort, proxyUsername, proxy
     document.getElementById('proxyPassword').value = proxyPassword || '';
     document.getElementById('availableStatus').value = availableStatus;
     document.getElementById('modalTitle').textContent = i18n.vpn_edit;
+    refreshProxyModalSelects();
     modal.style.display = 'flex';
     setTimeout(() => { modal.style.opacity = '1'; }, 50);
 }

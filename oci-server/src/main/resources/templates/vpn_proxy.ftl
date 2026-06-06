@@ -18,6 +18,7 @@
     <link rel="stylesheet" href="/css/app/vpn_proxy.css">
     <link rel="stylesheet" href="/css/common/dropdown-menu.css">
     <link rel="stylesheet" href="/css/common/loading.css">
+    <link rel="stylesheet" href="/css/common/custom-select.css">
 </head>
 <body>
 <!-- 引入顶部导航栏 -->
@@ -98,7 +99,8 @@
 
                 <div class="form-group">
                     <label for="proxyType">${msg.get("vpn.type")}:</label>
-                    <select id="proxyType" name="proxyType" class="form-input" required>
+                    <select id="proxyType" name="proxyType" class="form-input" required
+                            data-custom-select data-placeholder="${msg.get('vpn.selectType')}">
                         <option value="">${msg.get("vpn.selectType")}</option>
                         <option value="HTTP">HTTP</option>
                         <option value="HTTPS">HTTPS</option>
@@ -129,7 +131,8 @@
 
                 <div class="form-group">
                     <label for="availableStatus">${msg.get("vpn.status")}:</label>
-                    <select id="availableStatus" name="availableStatus" class="form-input" required>
+                    <select id="availableStatus" name="availableStatus" class="form-input" required
+                            data-custom-select>
                         <option value="1">${msg.get("common.start")}</option>
                         <option value="0">${msg.get("common.stop")}</option>
                     </select>
@@ -169,6 +172,7 @@
 </script>
 <script src="/js/common/request.js"></script>
 <script src="/js/common/loading.js"></script>
+<script src="/js/common/custom-select.js"></script>
 <script src="/js/system/vpn_proxy.js"></script>
 <script src="/js/common/dropdown-menu.js"></script>
 </body>

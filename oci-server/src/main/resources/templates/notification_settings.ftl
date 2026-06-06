@@ -253,7 +253,7 @@
 
                                 <div class="form-row">
                                     <label class="form-label">${msg.get("notification.tg.proxyType")}</label>
-                                    <select class="form-control" name="proxyType">
+                                    <select class="form-control" name="proxyType" data-custom-select>
                                         <option value="HTTP" <#if proxyConfig.type=="HTTP">selected</#if>>HTTP</option>
                                         <option value="HTTPS" <#if proxyConfig.type=="HTTPS">selected</#if>>HTTPS</option>
                                         <option value="SOCKS5" <#if proxyConfig.type=="SOCKS5">selected</#if>>SOCKS5</option>
