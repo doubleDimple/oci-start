@@ -2,7 +2,8 @@
     position: fixed;
     left: 0;
     top: 60px;
-    bottom: 0;
+    /* 不延伸到 footer 之下,让 sidebar 底边与 footer 顶边对齐 */
+    bottom: var(--global-footer-h, 42px);
     width: 180px;
     z-index: 999;
     overflow: hidden;
