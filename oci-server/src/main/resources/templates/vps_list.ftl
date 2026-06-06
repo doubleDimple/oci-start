@@ -46,12 +46,16 @@
 
                 <div class="control-right">
                     <div class="search-wrapper">
-                        <input type="text" id="server-search" placeholder="搜索 IP、地区..." onkeyup="filterServers()">
+                        <input type="text" id="server-search" placeholder="搜索 IP、地区、租户..." onkeyup="filterServers()">
                         <i class="fas fa-search"></i>
                     </div>
 
                     <button class="btn-tool" onclick="toggleGlobalIpVisibility()" id="btn-toggle-ip" title="切换 IP 显示状态">
                         <i class="fas fa-eye"></i> <span>显示 IP</span>
+                    </button>
+
+                    <button class="btn-tool" onclick="toggleGlobalTenantVisibility()" id="btn-toggle-tenant" title="切换租户名显示状态">
+                        <i class="fas fa-eye"></i> <span>显示租户</span>
                     </button>
 
                     <button class="btn-tool" id="btn-latency-test" onclick="pingAllServers()" title="测试当前浏览器到各实例的延迟">
@@ -114,6 +118,36 @@
                                                  onerror="this.src='/images/flags/xx.svg'">
 
                                             <div class="tag"><i class="fas fa-map-marker-alt"></i> ${instance.regionName!""}</div>
+
+                                            <#-- 架构 tag(根据 architecture 着色) -->
+                                            <#assign archUpper = (instance.architecture!"")?upper_case>
+                                            <#assign archClass = "tag-arch-other">
+                                            <#if archUpper?contains("ARM")>
+                                                <#assign archClass = "tag-arch-arm">
+                                            <#elseif archUpper?contains("AMD") || archUpper?contains("X86")>
+                                                <#assign archClass = "tag-arch-amd">
+                                            </#if>
+                                            <div class="tag tag-arch ${archClass}">${(instance.architecture!"NONE")}</div>
+
+                                            <#-- 配置 tag:CPU / MEM / 磁盘 -->
+                                            <div class="tag tag-spec">${(instance.ocpus!0)}C${(instance.memoryInGBs!0)}G · ${(instance.bootVolumeSizeInGBs!0)}GB</div>
+
+                                            <#-- 租户 tag:打码(首1 *** 末1),点击切换 -->
+                                            <#assign realTenant = instance.tenancyName!"">
+                                            <#if realTenant?length lte 2>
+                                                <#assign tenantMasked = realTenant>
+                                            <#else>
+                                                <#assign tenantMasked = realTenant?substring(0, 1) + "***" + realTenant?substring(realTenant?length - 1)>
+                                            </#if>
+                                            <#if realTenant?has_content>
+                                                <div class="tag tag-tenant masked"
+                                                     data-real-tenant="${realTenant}"
+                                                     data-masked-tenant="${tenantMasked}"
+                                                     onclick="toggleCardTenant(this)"
+                                                     title="点击切换租户名显示">
+                                                    <i class="fas fa-user"></i> <span class="tenant-txt">${tenantMasked}</span>
+                                                </div>
+                                            </#if>
 
                                             <div class="tag tag-uptime" style="display:none"><i class="fas fa-clock"></i> <span class="uptime-txt">--</span></div>
                                             <div class="tag tag-load" style="display:none"><i class="fas fa-tachometer-alt"></i> <span class="load-txt">--</span></div>
@@ -229,6 +263,45 @@
         ipDiv.toggleClass('masked');
     }
 
+    // === 租户名 显示/隐藏逻辑(跟 IP 平行,独立开关) ===
+    let isGlobalTenantVisible = false;
+    function toggleGlobalTenantVisibility() {
+        isGlobalTenantVisible = !isGlobalTenantVisible;
+        const btn = $('#btn-toggle-tenant');
+
+        if (isGlobalTenantVisible) {
+            btn.addClass('active');
+            btn.find('i').attr('class', 'fas fa-eye-slash');
+            btn.find('span').text('隐藏租户');
+            $('.tag-tenant').each(function () {
+                const $el = $(this);
+                $el.removeClass('masked');
+                $el.find('.tenant-txt').text($el.attr('data-real-tenant'));
+            });
+        } else {
+            btn.removeClass('active');
+            btn.find('i').attr('class', 'fas fa-eye');
+            btn.find('span').text('显示租户');
+            $('.tag-tenant').each(function () {
+                const $el = $(this);
+                $el.addClass('masked');
+                $el.find('.tenant-txt').text($el.attr('data-masked-tenant'));
+            });
+        }
+    }
+
+    function toggleCardTenant(el) {
+        const $el = $(el);
+        const isMasked = $el.hasClass('masked');
+        if (isMasked) {
+            $el.removeClass('masked');
+            $el.find('.tenant-txt').text($el.attr('data-real-tenant'));
+        } else {
+            $el.addClass('masked');
+            $el.find('.tenant-txt').text($el.attr('data-masked-tenant'));
+        }
+    }
+
     // === 搜索逻辑 ===
     function filterServers() {
         const input = $('#server-search').val().toLowerCase().trim();
@@ -236,12 +309,16 @@
 
         $('.server-card').each(function() {
             const card = $(this);
-            // 搜索真实 IP (data-real-ip)
+            // 搜索真实 IP (data-real-ip) + 真实租户名(打码时也能搜到)
             const realIp = card.find('.server-ip').attr('data-real-ip') || '';
+            const realTenant = card.find('.tag-tenant').attr('data-real-tenant') || '';
             const tags = card.find('.server-tags').text().toLowerCase();
             const isOffline = card.hasClass('ping-offline');
 
-            const matchesSearch = realIp.toLowerCase().includes(input) || tags.includes(input);
+            const matchesSearch =
+                realIp.toLowerCase().includes(input)
+                || realTenant.toLowerCase().includes(input)
+                || tags.includes(input);
             const matchesStatus = isFilterActive ? isOffline : true;
 
             if (matchesSearch && matchesStatus) {
