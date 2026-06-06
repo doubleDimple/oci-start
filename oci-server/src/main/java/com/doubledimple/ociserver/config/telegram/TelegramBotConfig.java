@@ -8,6 +8,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.UsernamePasswordCredentials;
 import org.apache.http.client.config.RequestConfig;
+import org.apache.http.client.protocol.HttpClientContext;
 import org.apache.http.impl.client.BasicCredentialsProvider;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.ApplicationContext;
@@ -121,12 +122,16 @@ public class TelegramBotConfig {
                 // 可选认证:用户名/密码任一为空则视为无认证(透明代理)
                 if (StringUtils.isNotEmpty(proxyConfig.getUsername())
                         && StringUtils.isNotEmpty(proxyConfig.getPassword())) {
+                    // telegrambots 6.8.0 的 DefaultBotOptions 没有 setCredentialsProvider,
+                    // 走 setHttpContext —— Apache HttpClient 执行请求时会从 context 里取凭证
                     BasicCredentialsProvider credsProvider = new BasicCredentialsProvider();
                     credsProvider.setCredentials(
                             new AuthScope(proxyConfig.getHost(), proxyConfig.getPort()),
                             new UsernamePasswordCredentials(proxyConfig.getUsername(), proxyConfig.getPassword())
                     );
-                    options.setCredentialsProvider(credsProvider);
+                    HttpClientContext httpContext = HttpClientContext.create();
+                    httpContext.setCredentialsProvider(credsProvider);
+                    options.setHttpContext(httpContext);
                     log.debug("已启用Telegram代理(带认证): {} {}:{} user={}",
                             proxyConfig.getType(), proxyConfig.getHost(), proxyConfig.getPort(), proxyConfig.getUsername());
                 } else {
