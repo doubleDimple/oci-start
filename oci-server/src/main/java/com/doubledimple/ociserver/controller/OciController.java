@@ -3,7 +3,10 @@ package com.doubledimple.ociserver.controller;
 import cn.hutool.json.JSONUtil;
 import com.doubledimple.dao.entity.CloudSshConn;
 import com.doubledimple.dao.entity.InstanceDetails;
+import com.doubledimple.dao.entity.Tenant;
 import com.doubledimple.dao.repository.CloudSshConnRepository;
+import com.doubledimple.dao.repository.OracleInstanceDetailRepository;
+import com.doubledimple.dao.repository.TenantRepository;
 import com.doubledimple.ociserver.pojo.request.DDRequest;
 import com.doubledimple.ociserver.pojo.request.SysImageBackupRequest;
 import com.doubledimple.ociserver.service.QuickDdService;
@@ -22,6 +25,8 @@ import com.oracle.bmc.core.ComputeClient;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.data.domain.Page;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -31,6 +36,8 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
 import java.util.*;
 
 import static com.doubledimple.ociserver.utils.DesktopUtils.isMobileRequest;
@@ -60,6 +67,12 @@ public class OciController  extends BaseController{
 
     @Resource
     QuickDdService quickDdService;
+
+    @Resource
+    OracleInstanceDetailRepository oracleInstanceDetailRepository;
+
+    @Resource
+    TenantRepository tenantRepository;
 
     @GetMapping("/list")
     public String listUsers(@RequestParam(defaultValue = "10") int size,
@@ -100,6 +113,97 @@ public class OciController  extends BaseController{
         result.put("totalElements", userPage.getTotalElements());
         result.put("size", size);
         return ResponseEntity.ok(result);
+    }
+
+    /**
+     * 一键导出所有租户所有实例(含明文 Root 密码),按租户分组的纯文本文件。
+     * 调用方需在前端给出强警告确认。
+     */
+    @GetMapping("/export")
+    @ResponseBody
+    public ResponseEntity<byte[]> exportInstances() {
+        Map<Long, Tenant> tenantMap = new HashMap<>();
+        for (Tenant t : tenantRepository.findAll()) {
+            tenantMap.put(t.getId(), t);
+        }
+
+        List<InstanceDetails> instances = oracleInstanceDetailRepository.findAll();
+
+        Map<Long, List<InstanceDetails>> grouped = new LinkedHashMap<>();
+        for (InstanceDetails ins : instances) {
+            grouped.computeIfAbsent(ins.getTenantId(), k -> new ArrayList<InstanceDetails>()).add(ins);
+        }
+
+        SimpleDateFormat ts = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        SimpleDateFormat fts = new SimpleDateFormat("yyyyMMdd-HHmmss");
+        Date now = new Date();
+
+        StringBuilder sb = new StringBuilder(8192);
+        sb.append("# OCI 实例导出\n");
+        sb.append("# 导出时间: ").append(ts.format(now)).append("\n");
+        sb.append("# 实例总数: ").append(instances.size()).append("\n");
+        sb.append("# 租户总数: ").append(grouped.size()).append("\n");
+        sb.append("# 提示: 文件含明文 Root 密码,请妥善保管,使用后建议删除\n");
+        sb.append("\n");
+
+        int tIdx = 1;
+        for (Map.Entry<Long, List<InstanceDetails>> e : grouped.entrySet()) {
+            Tenant t = tenantMap.get(e.getKey());
+            String tenancyName = (t != null && StringUtils.isNotBlank(t.getTenancyName())) ? t.getTenancyName() : "(unknown)";
+            String userName = (t != null) ? t.getUserName() : null;
+            String region = (t != null) ? t.getRegion() : null;
+
+            sb.append("================================================================\n");
+            sb.append("租户 #").append(tIdx++).append(": ").append(tenancyName);
+            if (StringUtils.isNotBlank(userName)) {
+                sb.append(" / 用户: ").append(userName);
+            }
+            if (StringUtils.isNotBlank(region)) {
+                sb.append(" / 区域: ").append(region);
+            }
+            sb.append(" (共 ").append(e.getValue().size()).append(" 台)\n");
+            sb.append("================================================================\n");
+
+            int iIdx = 1;
+            for (InstanceDetails ins : e.getValue()) {
+                sb.append("\n[").append(iIdx++).append("] ").append(dash(ins.getDisplayName())).append("\n");
+                if (StringUtils.isNotBlank(ins.getRemark())) {
+                    sb.append("  备注:      ").append(ins.getRemark()).append("\n");
+                }
+                sb.append("  状态:      ").append(dash(ins.getState())).append("\n");
+                sb.append("  架构:      ").append(dash(ins.getArchitecture())).append("\n");
+                sb.append("  CPU/MEM:   ").append(ins.getOcpus() != null ? ins.getOcpus() : "-").append("C")
+                        .append(ins.getMemoryInGBs() != null ? ins.getMemoryInGBs() : "-").append("G\n");
+                sb.append("  磁盘/VPU:  ").append(ins.getBootVolumeSizeInGBs() != null ? ins.getBootVolumeSizeInGBs() : "-")
+                        .append("GB / ").append(dash(ins.getVpusPerGB())).append("\n");
+                sb.append("  IPv4:      ").append(dash(ins.getPublicIps())).append("\n");
+                sb.append("  Private:   ").append(dash(ins.getPrivateIps())).append("\n");
+                if (StringUtils.isNotBlank(ins.getIpv6Addresses())) {
+                    sb.append("  IPv6:      ").append(ins.getIpv6Addresses()).append("\n");
+                }
+                sb.append("  AD:        ").append(dash(ins.getAvailabilityDomain())).append("\n");
+                sb.append("  SSH 用户:  ").append(StringUtils.isNotBlank(ins.getUsername()) ? ins.getUsername() : "root").append("\n");
+                sb.append("  SSH 端口:  ").append(ins.getPort() != null ? ins.getPort() : 22).append("\n");
+                sb.append("  Root 密码: ").append(StringUtils.isNotBlank(ins.getPassword()) ? ins.getPassword() : "(未设置)").append("\n");
+                if (ins.getCreateTime() != null) {
+                    sb.append("  创建时间:  ").append(ts.format(ins.getCreateTime())).append("\n");
+                }
+            }
+            sb.append("\n");
+        }
+
+        byte[] body = sb.toString().getBytes(StandardCharsets.UTF_8);
+        String filename = "oci-instances-" + fts.format(now) + ".txt";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType("text/plain; charset=utf-8"));
+        headers.setContentDispositionFormData("attachment", filename);
+        headers.setContentLength(body.length);
+        return new ResponseEntity<>(body, headers, 200);
+    }
+
+    private static String dash(String s) {
+        return StringUtils.isBlank(s) ? "-" : s;
     }
 
     /**

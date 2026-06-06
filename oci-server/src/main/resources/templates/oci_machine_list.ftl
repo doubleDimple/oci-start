@@ -94,6 +94,9 @@
                                 <i class="fas fa-times"></i> ${msg.get("common.reset")}
                             </button>
                             <div>
+                                <button class="btn btn-warning" onclick="confirmExportInstances()">
+                                    <i class="fas fa-download"></i> ${msg.get("machine.export")}
+                                </button>
                                 <button class="btn btn-secondary" onclick="history.back()">
                                     <i class="fas fa-arrow-left"></i> ${msg.get("common.rollback")}
                                 </button>
@@ -2788,6 +2791,33 @@
         var label = document.getElementById('pageSizeBtnLabel');
         if (label) label.textContent = newSize;
         loadPage(0, newSize, _currentTenantId);
+    }
+
+    function confirmExportInstances() {
+        Swal.fire({
+            title: '⚠ 警告:即将导出明文密码',
+            html: '<div style="text-align:left;line-height:1.7;font-size:13px;">' +
+                '即将下载包含 <strong>所有租户所有机器</strong> 的:<br>' +
+                '· 公网/私网 IP 地址<br>' +
+                '· <strong style="color:#dc2626">Root 密码(明文)</strong><br>' +
+                '· 配置信息(CPU/MEM/磁盘/架构)<br><br>' +
+                '请确保:<br>' +
+                '1. 你的设备本身是安全的<br>' +
+                '2. 文件下载后会妥善保管<br>' +
+                '3. 使用完成后及时删除<br>' +
+                '</div>',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: '我已了解,确认下载',
+            cancelButtonText: '取消',
+            confirmButtonColor: '#dc2626',
+            cancelButtonColor: '#6c757d',
+            reverseButtons: true
+        }).then(function (result) {
+            if (result.isConfirmed) {
+                window.location.href = '/oci/export';
+            }
+        });
     }
 
 </script>

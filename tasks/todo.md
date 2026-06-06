@@ -434,5 +434,109 @@ createInstanceData (OracleCloudService:105)
   3. 对应任务的"开机日志"抽屉里看到这条
   4. "OCI 开机日志(全局)"页面没有出现成片的 `<======>` 分隔符
 
+---
+
+# OCI 实例列表一键导出(2026-06-06)
+
+## 需求
+
+OCI 实例列表页面加"一键导出"按钮,导出所有租户所有机器的:
+- 配置(架构 ARM/AMD、CPU/MEM、磁盘/VPU)
+- 公网 IP / 私网 IP / IPv6
+- **Root 密码(明文)**
+- 按租户分组
+
+用户痛点:逐条点开复制密码太慢。
+
+## 安全提示(用户已确认接受)
+
+- 密码是**完全明文**存储 + **完全明文**导出
+- 文件下载到本地后浏览器目录无加密
+- 操作前**强警告弹窗确认**,用户责任自负
+
+## 范围(全 A 方案)
+
+| 维度 | 选择 |
+|------|------|
+| 格式 | TXT(按租户分块,纯文本可读) |
+| 数据 | 全量(忽略页面筛选) |
+| 文件 | 单文件 |
+| 安全 | 强警告弹窗确认,无加密保护 |
+
+## 改动文件清单
+
+| 文件 | 改动 |
+|------|------|
+| `OciController.java` | 注入 2 个已有 Repository,新增 `GET /oci/export` |
+| `oci_machine_list.ftl` | 标题栏 view-actions 加按钮 + 弹窗 JS |
+| `i18n/messages.properties` | `machine.export=Export` |
+| `i18n/messages_zh_CN.properties` | `machine.export=一键导出` |
+| `i18n/messages_zh_TW.properties` | `machine.export=一鍵匯出` |
+
+## 步骤
+
+- [x] 1. 3 个 properties 文件加 `machine.export` key
+- [x] 2. `OciController.java`:加 import、注入 `OracleInstanceDetailRepository` + `TenantRepository`,
+     新增 `exportInstances()` 返回 `ResponseEntity<byte[]>`,TXT 格式按租户分块
+- [x] 3. `oci_machine_list.ftl`:`history.back()` 按钮旁加"一键导出"按钮(`btn-warning` 颜色 + `fa-download` 图标);
+     模板末尾追加 `confirmExportInstances()` 函数(SweetAlert2 强警告)
+- [x] 4. FTL 标签平衡通过(`<#if>:0 <#list>:0`)
+- [ ] 5. 提交 push
+- [ ] 6. 用户重启 oci-server 实测
+
+## 关键决策
+
+1. **Controller 直接注入 Repository**:有先例(`CloudSshConnRepository` 在 line 59 已经这么用),
+   避免在 Service 加一个只为导出的方法
+2. **`InstanceDetails` 内置字段已足够**:不去 join "区域中文名"(瓦尔帕莱索/东京 是前端 i18n,
+   后端没有),`availabilityDomain` 字段已足够识别物理位置
+3. **租户头部信息从 `Tenant` 取**:`tenancyName` 作为分组主标识,`userName` 和 `region`
+   作为辅助显示
+4. **按钮颜色 `btn-warning`**:不像 primary 那么"无害感",提示这是个特殊操作
+5. **弹窗 HTML 富文本**:用 `Swal.fire({ html: ... })`,把"明文密码"这一项加红字提示
+
+## Review
+
+### 改动文件(5 个 + todo)
+
+| 文件 | 增 / 减 | 说明 |
+|------|--------|------|
+| `OciController.java` | +104 / -0 | 加 import 6 个 + 注入 2 Repository + 新端点 `exportInstances` 方法 + 私有 `dash` |
+| `oci_machine_list.ftl` | +30 / -0 | 一键导出按钮(`btn-warning` + `fa-download`)+ 弹窗确认函数 |
+| `i18n/messages.properties` | +1 / -0 | `machine.export=Export` |
+| `i18n/messages_zh_CN.properties` | +1 / -0 | `machine.export=一键导出` |
+| `i18n/messages_zh_TW.properties` | +1 / -0 | `machine.export=一鍵匯出` |
+
+### 关键实现细节
+
+1. **`LinkedHashMap` 保序分组**:按数据库返回顺序自然分组,不重排
+2. **`MediaType.parseMediaType("text/plain; charset=utf-8")`**:确保浏览器正确识别 UTF-8 中文
+3. **`headers.setContentDispositionFormData("attachment", filename)`**:走 Spring 标准 API,
+   自动处理文件名编码(避免 RFC 5987 折腾)
+4. **`dash(s)`**:空字符串 / null 显示为 `-`,日志更清爽
+5. **`ins.getOcpus() != null ? ins.getOcpus() : "-"`**:`Integer` 字段可能为 null,
+   不能直接 `+ "C"` 否则 NPE
+6. **`ins.getPort() != null ? ins.getPort() : 22`**:Entity 字段虽默认 22,但旧数据可能 null
+7. **空字段不输出整行**:`备注` / `IPv6` / `创建时间` 字段没值就跳过,避免空数据噪音
+
+### 安全相关
+
+- 端点 `/oci/export` 走和现有 `/oci/list` 同一套 Controller,默认继承
+  `BaseController` 的认证拦截(全站登录拦截器已在)
+- 前端按钮**强警告弹窗**:红色确认按钮 + 反向按钮顺序(取消在右,默认聚焦取消)
+- 文件名为 `oci-instances-yyyyMMdd-HHmmss.txt`(不含 "password" 字样,避免抓眼球)
+- 用户已确认接受"明文密码导出"的全部安全风险
+
+### 未验证项
+
+- **浏览器实测**:本环境无法启动 oci-server,需要用户验证:
+  1. OCI 实例列表页面标题栏看到黄色"一键导出"按钮
+  2. 点击 → 弹出红字警告,默认聚焦"取消"
+  3. 确认下载 → 浏览器下载 `oci-instances-...txt` 文件
+  4. 文件内容按租户分块,字段对齐,UTF-8 中文显示正常
+  5. 多租户多实例场景下文件结构清晰
+- **Maven 编译**:本环境 JDK 21 + Lombok 1.18.24 不兼容,无法跑。
+  Controller 改动是新增方法,手动核对 import 与签名,语法 / 类型无歧义
+
 
 
