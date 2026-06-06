@@ -555,7 +555,9 @@ async function updateProxyConfig() {
         enabled: enabled,
         type: formData.get('proxyType'),
         host: formData.get('proxyHost'),
-        port: parseInt(formData.get('proxyPort')) || 7890
+        port: parseInt(formData.get('proxyPort')) || 7890,
+        username: (formData.get('proxyUsername') || '').trim(),
+        password: formData.get('proxyPassword') || ''
     };
 
     if (enabled && (!config.host || !config.host.trim())) {
@@ -607,7 +609,9 @@ async function testProxyConnection() {
     const config = {
         type: formData.get('proxyType'),
         host: formData.get('proxyHost'),
-        port: parseInt(formData.get('proxyPort')) || 7890
+        port: parseInt(formData.get('proxyPort')) || 7890,
+        username: (formData.get('proxyUsername') || '').trim(),
+        password: formData.get('proxyPassword') || ''
     };
 
     if (!config.host || !config.host.trim()) {

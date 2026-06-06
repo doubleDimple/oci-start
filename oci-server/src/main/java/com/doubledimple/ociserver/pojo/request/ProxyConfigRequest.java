@@ -8,4 +8,6 @@ public class ProxyConfigRequest {
     private String type;
     private String host;
     private int port;
+    private String username;
+    private String password;
 }

@@ -686,12 +686,16 @@ public class SystemConfigService {
         Optional<SystemConfig> type = systemConfigRepository.findByKey("proxy.type");
         Optional<SystemConfig> host = systemConfigRepository.findByKey("proxy.host");
         Optional<SystemConfig> port = systemConfigRepository.findByKey("proxy.port");
+        Optional<SystemConfig> username = systemConfigRepository.findByKey("proxy.username");
+        Optional<SystemConfig> password = systemConfigRepository.findByKey("proxy.password");
 
         config.setEnabled(enabled.map(SystemConfig::isEnabled).orElse(false));
         config.setType(type.map(SystemConfig::getValue).orElse("HTTP"));
         config.setHost(host.map(SystemConfig::getValue).orElse("127.0.0.1"));
         config.setPort(port.map(SystemConfig::getValue)
                 .map(Integer::parseInt).orElse(7890));
+        config.setUsername(username.map(SystemConfig::getValue).orElse(""));
+        config.setPassword(password.map(SystemConfig::getValue).orElse(""));
 
         return config;
     }
@@ -727,9 +731,13 @@ public class SystemConfigService {
         saveOrUpdateConfig("proxy.type", request.getType());
         saveOrUpdateConfig("proxy.host", request.getHost());
         saveOrUpdateConfig("proxy.port", String.valueOf(request.getPort()));
+        // username / password 可选,留空也存(代表清除认证)
+        saveOrUpdateConfig("proxy.username", request.getUsername() == null ? "" : request.getUsername());
+        saveOrUpdateConfig("proxy.password", request.getPassword() == null ? "" : request.getPassword());
 
-        log.info("代理配置已更新: enabled={}, type={}, host={}, port={}",
-                request.isEnabled(), request.getType(), request.getHost(), request.getPort());
+        log.info("代理配置已更新: enabled={}, type={}, host={}, port={}, hasAuth={}",
+                request.isEnabled(), request.getType(), request.getHost(), request.getPort(),
+                StringUtils.isNotEmpty(request.getUsername()));
     }
 
     /**
