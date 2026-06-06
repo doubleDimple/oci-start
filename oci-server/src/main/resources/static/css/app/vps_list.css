@@ -237,6 +237,35 @@ body {
     display: flex; align-items: center; gap: 4px; white-space: nowrap;
 }
 
+/* 架构 tag(ARM 绿 / AMD 蓝 / 其它灰) */
+.tag-arch { font-weight: 600; letter-spacing: 0.3px; }
+.tag-arch-arm { background: rgba(34, 197, 94, 0.15); color: #16a34a; }
+.tag-arch-amd { background: rgba(59, 130, 246, 0.15); color: #2563eb; }
+.tag-arch-other { background: rgba(107, 114, 128, 0.15); color: #6b7280; }
+
+/* 配置 tag(CPU/MEM/磁盘) */
+.tag-spec {
+    background: rgba(168, 85, 247, 0.1);
+    color: #9333ea;
+    font-weight: 500;
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
+}
+
+/* 租户 tag(可点击 toggle 切换打码 / 完整) */
+.tag-tenant {
+    cursor: pointer;
+    background: rgba(245, 158, 11, 0.12);
+    color: #b45309;
+    font-weight: 500;
+    transition: background 0.15s, transform 0.1s;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.tag-tenant:hover { background: rgba(245, 158, 11, 0.22); }
+.tag-tenant:active { transform: scale(0.96); }
+.tag-tenant.masked .tenant-txt { font-family: 'SF Mono', Menlo, Consolas, monospace; letter-spacing: 1px; }
+
 .tag-latency { font-weight: 600; transition: background 0.3s, color 0.3s; cursor: default; }
 .tag-latency.lat-fast    { background: rgba(16,185,129,0.12); color: #10b981; }
 .tag-latency.lat-mid     { background: rgba(245,158,11,0.12);  color: #f59e0b; }
