@@ -177,3 +177,20 @@
 <script src="/js/common/request.js"></script>
 <script src="/js/common/loading.js"></script>
 <script src="/js/system/header.js"></script>
+
+<!-- 消息详情 modal(无遮罩浮窗,参照"关于"modal 风格但不带 backdrop) -->
+<div id="messageDetailModal" class="msg-detail-modal">
+    <div class="msg-detail-modal-content">
+        <button class="msg-detail-modal-close" onclick="closeMessageDetailModal()" title="关闭">
+            <i class="fas fa-times"></i>
+        </button>
+        <div class="msg-detail-modal-header">
+            <h2 id="messageDetailTitle">消息详情</h2>
+            <div class="msg-detail-modal-meta" id="messageDetailMeta"></div>
+        </div>
+        <div class="msg-detail-modal-body" id="messageDetailBody"></div>
+        <div class="msg-detail-modal-footer">
+            <button class="msg-detail-modal-btn" onclick="closeMessageDetailModal()">关闭</button>
+        </div>
+    </div>
+</div>

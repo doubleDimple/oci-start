@@ -278,11 +278,13 @@ function changeMsgPage(delta) {
 
 function openMessageDetail(businessId) {
     const csrf = getCsrfConfig();
-    Swal.fire({
-        title: '正在读取...',
-        allowOutsideClick: false,
-        didOpen: () => { Swal.showLoading(); }
-    });
+
+    // 显示加载状态(自定义 modal,无遮罩浮窗)
+    showMessageDetailModal(
+        '加载中...',
+        '',
+        '<div style="text-align:center;padding:40px 0;color:#94a3b8;"><i class="fas fa-spinner fa-spin" style="font-size:24px;"></i><div style="margin-top:10px;">正在读取消息...</div></div>'
+    );
 
     fetch('/sysMessage/get', {
         method: 'POST',
@@ -304,55 +306,58 @@ function openMessageDetail(businessId) {
                 const firstLineIndex = rawContent.indexOf('\n');
 
                 if (firstLineIndex !== -1) {
-                    // 提取第一行并居中
                     const firstLine = rawContent.substring(0, firstLineIndex);
-                    // 提取剩余内容
                     const otherContent = rawContent.substring(firstLineIndex + 1);
-
-                    contentHtml = `
-                    <div style="text-align: center; font-size: 16px; font-weight: bold; color: #1a1a1a; margin-bottom: 15px; line-height: 1.4;">
-                        ${firstLine}
-                    </div>
-                    <div style="text-align: left; font-size: 14px; line-height: 1.8; color: #333; white-space: pre-wrap; word-break: break-all; border-top: 1px dashed #eee; padding-top: 15px;">${otherContent}</div>
-                `;
+                    contentHtml =
+                        '<div style="text-align:center;font-size:16px;font-weight:bold;margin-bottom:16px;line-height:1.4;">' +
+                        firstLine +
+                        '</div>' +
+                        '<div style="text-align:left;font-size:14px;line-height:1.8;white-space:pre-wrap;word-break:break-all;border-top:1px dashed currentColor;opacity:0.9;padding-top:14px;">' +
+                        otherContent +
+                        '</div>';
                 } else {
-                    // 如果没有换行符，则全量居中或按原样显示
-                    contentHtml = `<div style="text-align: center; font-size: 14px; white-space: pre-wrap;">${rawContent}</div>`;
+                    contentHtml =
+                        '<div style="text-align:center;font-size:14px;white-space:pre-wrap;">' +
+                        rawContent +
+                        '</div>';
                 }
 
-                Swal.fire({
-                    title: msg.subject,
-                    html: `
-                <div style="text-align: left; padding: 0 5px;">
-                    <div style="color: #999; font-size: 12px; margin-bottom: 12px; border-bottom: 1px solid #eee; padding-bottom: 8px;">
-                        <i class="far fa-clock"></i> ${timeStr}
-                        <span style="float: right; color: #1890ff; font-weight:bold;">${msg.messageType || '系统消息'}</span>
-                    </div>
-                    <div style="background: #ffffff; padding: 5px; border-radius: 4px;">
-                        ${contentHtml}
-                    </div>
-                </div>
-            `,
-                    width: 600,
-                    showCloseButton: true,
-                    confirmButtonText: '关闭',
-                    confirmButtonColor: '#3085d6',
-                    didClose: () => {
-                        const menu = document.getElementById('messageDropdown');
-                        if(menu && menu.classList.contains('show')){
-                            loadMessageList();
-                        }
-                        checkUnreadMessages();
-                    }
-                });
+                // 元信息:时间 + 类型 badge
+                const metaHtml =
+                    '<span><i class="far fa-clock"></i> ' + timeStr + '</span>' +
+                    '<span class="msg-type-badge">' + (msg.messageType || '系统消息') + '</span>';
+
+                showMessageDetailModal(msg.subject || '消息详情', metaHtml, contentHtml);
             } else {
+                closeMessageDetailModal();
                 Swal.fire('读取失败', res.message, 'error');
             }
         })
         .catch(e => {
             console.error('Message detail error:', e);
+            closeMessageDetailModal();
             Swal.fire('网络错误', '无法获取消息详情', 'error');
         });
+}
+
+function showMessageDetailModal(title, metaHtml, bodyHtml) {
+    document.getElementById('messageDetailTitle').textContent = title || '';
+    document.getElementById('messageDetailMeta').innerHTML = metaHtml || '';
+    document.getElementById('messageDetailBody').innerHTML = bodyHtml || '';
+    document.getElementById('messageDetailModal').classList.add('open');
+}
+
+function closeMessageDetailModal() {
+    const modal = document.getElementById('messageDetailModal');
+    if (!modal) return;
+    modal.classList.remove('open');
+
+    // 关闭后:刷新消息列表 + 检查未读(原 didClose 逻辑)
+    const menu = document.getElementById('messageDropdown');
+    if (menu && menu.classList.contains('show')) {
+        if (typeof loadMessageList === 'function') loadMessageList();
+    }
+    if (typeof checkUnreadMessages === 'function') checkUnreadMessages();
 }
 
 function markAllAsRead(event) {
