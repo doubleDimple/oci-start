@@ -70,7 +70,6 @@ HTTP/HTTPS/SOCKS5、Java 生态无成熟 HY2/VLESS 客户端),本期**放弃** H
 ---
 
 # 侧边栏菜单手风琴 + 点击一级自动加载第一个二级(2026-06-06)
-
 ## 背景
 
 侧边栏目前点击一级菜单只是切换自身展开/收起,可同时展开多个一级菜单;点击一级菜单也不会
@@ -124,4 +123,128 @@ HTTP/HTTPS/SOCKS5、Java 生态无成熟 HY2/VLESS 客户端),本期**放弃** H
   2. 点击一级菜单(已展开)→ 仅收起当前,不切 iframe
   3. 页面刷新后,URL 对应的二级菜单仍被自动 active 高亮,父菜单自动展开
   4. 切换云供应商后,隐藏的二级菜单不会被作为"第一个可见"误触发
+
+---
+
+# 开机详情菜单新增"开机日志"抽屉(2026-06-06)
+
+## 背景
+
+OCI 开机管理 → 预开列表 → 点击"..."→"开机详情"打开模态框,该模态框内表格的"操作"列
+下拉菜单当前有 4 项(开机停止/开机启动/配置修改/记录删除)。用户希望加第 5 项**"开机日志"**,
+点击后从屏幕右侧滑出抽屉,实时展示**当前这条 BootInstance 任务**相关的日志。
+
+## 调研发现(影响方案的关键事实)
+
+- `task.getBootId()` 是 `String`,值等于 `BootInstance.id.toString()` —— 前端可以用它做匹配键
+- 现有 SSE 流 `/system/streamLogs?isBootLog=true` 是全局的,**不区分** taskId
+- `CreateInstanceTaskV2` 里 5/6 处日志都带了 `TaskId: {bootId}`(格式驼峰带空格)
+- **`OracleCloudService:924` 的"开机成功完整详情"(含 IP/密码/登录信息)没带 taskId** ——
+  纯前端方案下这条最关键的日志会被漏掉,**已与用户确认接受这个代价**
+- `buildOpenBootException` 内部多条 log.warn 也都不带 taskId —— 异常归因日志也会漏
+
+## 方案
+
+**方案 A(纯前端过滤,接受漏数据)**:
+- 复用现有 `/system/streamLogs?isBootLog=true` SSE
+- 前端用正则 `/[Tt]ask[Ii]d\s*[:：]\s*{bootId}(?![0-9])/` 过滤每行
+- 抽屉只展示实时流(不主动拉历史)
+- 不动任何后端 Java 代码
+- 不动现有"OCI 开机日志(全局)"页面
+
+## 范围
+
+只改这 6 个文件:
+
+| 文件 | 改动类型 |
+|------|--------|
+| `i18n/messages.properties` | + `openBoot.log=Boot Log` |
+| `i18n/messages_zh_CN.properties` | + `openBoot.log=开机日志` |
+| `i18n/messages_zh_TW.properties` | + `openBoot.log=開機日誌` |
+| `templates/full_machine_list.ftl` | 引入新 CSS、`</body>` 前加抽屉 HTML、i18n 注入区加 `openBoot_log` |
+| `static/js/system/full_machine_list.js` | 详情菜单(行 373-388)插一项"开机日志"、新增 `openBootLogDrawer/closeBootLogDrawer/connectBootLogSSE/disconnectBootLogSSE/appendBootLogLine` |
+| `static/css/app/boot_log_drawer.css`(新建) | 抽屉遮罩 + 滑入动画 + 终端样式 |
+
+不动:任何 Java 文件、现有 `open_boot_log.ftl` / `open_boot_log.js` / `sys_log.css`、
+后端 `LogController` / `LogServiceImpl` / `OciLogBuilder` / `CreateInstanceTaskV2` / `OracleCloudService`。
+
+## 步骤
+
+- [x] 1. 3 个 properties 文件加 `openBoot.log` key(中/英/繁)
+- [x] 2. `full_machine_list.ftl`:头部引 `boot_log_drawer.css`,i18n script 块加 `openBoot_log`,
+     `</body>` 前加抽屉 HTML(标题/状态/自动滚动/关闭/日志容器/空态)
+- [x] 3. 新建 `boot_log_drawer.css`:遮罩、抽屉容器、滑入动画、终端配色、状态点、空态文字
+- [x] 4. `full_machine_list.js`:
+     - 菜单加项放在"启动开机"后(`fa-file-alt` 图标)
+     - 新增函数:`openBootLogDrawer / closeBootLogDrawer / connectBootLogSSE /
+       disconnectBootLogSSE / setBootLogStatus / appendBootLogLine`
+- [x] 5. `node --check` 通过 + FTL 标签平衡(`<#if>:0 <#list>:0`)
+- [ ] 6. 提交 push
+- [ ] 7. 用户浏览器实测
+
+## 关键决策
+
+1. **菜单走 i18n,抽屉内部小文案硬编码中文**:菜单项必须与同行其它项风格一致(都走 i18n);
+   抽屉内"自动滚动"/"已连接"/"暂无日志" 等少量文字硬编码,避免 i18n 文件膨胀,保持"简单点"
+2. **z-index 高于 modal-overlay**:抽屉叠在详情弹窗之上,关闭抽屉返回详情弹窗,关闭详情弹窗返回列表
+3. **关抽屉时断 SSE**:避免泄漏长连接
+4. **正则同时认 `TaskId`/`taskId`/中英文冒号/有无空格**,末尾 `(?![0-9])` 防 `123` 匹配 `1234`
+5. **每打开一次抽屉清空一次内容**:避免上次任务日志残留
+
+## 已知限制(与用户达成共识)
+
+- `OracleCloudService:924` 的开机成功完整详情(含 Public IP / Private IP / Root 密码)
+  **不会出现在抽屉里**(后端那条日志没带 taskId)
+- `buildOpenBootException` 各异常分支的归因日志同样**不会出现**
+
+如果后续要补这块,需要走方案 A'(改后端 6-7 处日志补 taskId 占位符)。
+
+## Review
+
+### 改动文件(共 6 个,1 新建)
+
+| 文件 | 增 / 减 | 内容 |
+|------|--------|------|
+| `i18n/messages.properties` | +1 / -0 | `openBoot.log=Log` |
+| `i18n/messages_zh_CN.properties` | +1 / -0 | `openBoot.log=开机日志` |
+| `i18n/messages_zh_TW.properties` | +1 / -0 | `openBoot.log=開機日誌` |
+| `templates/full_machine_list.ftl` | +35 / -0 | 引入 CSS、i18n key、抽屉 HTML(33 行) |
+| `static/js/system/full_machine_list.js` | +109 / -0 | 菜单项 3 行 + 抽屉控制函数 106 行 |
+| `static/css/app/boot_log_drawer.css` 🆕 | 新建 | 滑入动画 + 终端配色 + 状态点动画 |
+
+### 关键决策
+
+1. **正则 `[Tt]ask[Ii]d\s*[:：]\s*{bootId}(?![0-9])`**:大小写不敏感,中/英文冒号兼容,
+   末尾 `(?![0-9])` 防止 `123` 误匹配 `1234`
+2. **z-index 2000**(`.modal-overlay` 是 1050):抽屉叠在详情弹窗之上
+3. **每次打开抽屉清空 DOM + 计数**:防止上一条任务的日志残留
+4. **最多保留 1000 行**:与 `open_boot_log.js` 一致,避免内存膨胀
+5. **关抽屉时 `close()` SSE**:防止泄漏长连接
+6. **使用 `data-state` 切换状态点颜色**(灰/黄/绿/红):比类切换更紧凑
+
+### 静态校验
+
+- `node --check full_machine_list.js` → PASS
+- FTL `<#if>` / `<#list>` 标签平衡 → 0 / 0
+
+### 已知限制(用户已确认接受)
+
+- 后端 `OracleCloudService:924` 的"开机成功完整详情"(含 IP / Root 密码)未带 taskId →
+  **不会出现在抽屉里**
+- `buildOpenBootException` 各异常分支日志未带 taskId → **不会出现**
+- `CreateInstanceTaskV2:305`(网络连接暂时不可达)未带 taskId → **不会出现**
+- 抽屉**不加载历史**,只展示打开后的实时流(若 SSE 连上时该任务正好没在抢机,可能长时间空白)
+
+### 未验证项
+
+- **浏览器实测**:本环境无浏览器,无法启动 oci-server。需要用户验证:
+  1. 进入 OCI 开机管理 → 打开"开机详情" → 操作栏菜单出现"开机日志"
+  2. 点击 → 抽屉从右侧滑入,顶部显示 `#bootId`,状态点变绿(已连接)
+  3. 抢机正在运行时,匹配 `TaskId: {当前 id}` 的行实时出现在抽屉里
+  4. 关闭抽屉 → 滑出 + SSE 断开(可在 DevTools Network 看到 EventSource 关闭)
+  5. 多次开关无残留日志、无重复连接
+  6. 详情弹窗与抽屉的 z-index 关系正确
+- **Maven 编译**:本环境无法跑(JDK 21 与 Lombok 1.18.24 不兼容,与本次改动无关)
+  本次仅静态资源 + properties,不会影响 Java 字节码
+
 

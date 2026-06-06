@@ -16,6 +16,7 @@
     <link rel="stylesheet" href="/css/common/dropdown-menu.css">
     <link rel="stylesheet" href="/css/common/loading.css">
     <link rel="stylesheet" href="/css/common/custom-select.css">
+    <link rel="stylesheet" href="/css/app/boot_log_drawer.css">
     <script src="/js/common/dropdown-menu.js"></script>
     <style>
         .layout { padding-top: 0; }
@@ -345,6 +346,7 @@
         openBoot_startOpen: "${msg.get('openBoot.startOpen')?js_string}",
         openBoot_updateConfig: "${msg.get('openBoot.updateConfig')?js_string}",
         openBoot_delete: "${msg.get('openBoot.delete')?js_string}",
+        openBoot_log: "${msg.get('openBoot.log')?js_string}",
         openBoot_nDetailData: "${msg.get('openBoot.nDetailData')?js_string}",
         openBoot_loadingFail: "${msg.get('openBoot.loadingFail')?js_string}",
         openBoot_noDetail: "${msg.get('openBoot.noDetail')?js_string}",
@@ -369,6 +371,39 @@
 
     }
 </script>
+<!-- 开机日志抽屉 -->
+<div id="bootLogDrawer" class="boot-log-drawer" aria-hidden="true">
+    <div class="boot-log-drawer__mask" onclick="closeBootLogDrawer()"></div>
+    <aside class="boot-log-drawer__panel" role="dialog" aria-labelledby="bootLogDrawerTitle">
+        <header class="boot-log-drawer__header">
+            <div class="boot-log-drawer__title">
+                <i class="fas fa-rocket"></i>
+                <span id="bootLogDrawerTitle">开机日志</span>
+                <span class="boot-log-drawer__bootid" id="bootLogDrawerBootId"></span>
+            </div>
+            <div class="boot-log-drawer__actions">
+                <span class="boot-log-drawer__status" id="bootLogDrawerStatus">
+                    <span class="boot-log-drawer__status-dot"></span>
+                    <span class="boot-log-drawer__status-text">未连接</span>
+                </span>
+                <label class="boot-log-drawer__autoscroll">
+                    <input type="checkbox" id="bootLogAutoScroll" checked>
+                    <span>自动滚动</span>
+                </label>
+                <button class="boot-log-drawer__close" onclick="closeBootLogDrawer()" title="关闭">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </header>
+        <div class="boot-log-drawer__body" id="bootLogDrawerBody">
+            <div class="boot-log-drawer__empty" id="bootLogDrawerEmpty">
+                <i class="fas fa-hourglass-half"></i>
+                <span>暂无日志,等待新日志推送...</span>
+            </div>
+        </div>
+    </aside>
+</div>
+
 <script src="/js/common/request.js"></script>
 <script src="/js/common/loading.js"></script>
 <script src="/js/common/custom-select.js"></script>

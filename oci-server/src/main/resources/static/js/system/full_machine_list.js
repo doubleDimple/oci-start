@@ -377,6 +377,9 @@ async function loadBootDetail(bootId) {
                     '<button class="dropdown-item" title="启动开机" onclick="toggleBootStatus(\'' + item.id + '\', 1)">' +
                     '<i class="fas fa-play"></i><span>'+i18n.openBoot_startOpen+'</span>' +
                     '</button>' +
+                    '<button class="dropdown-item" title="开机日志" onclick="openBootLogDrawer(\'' + item.id + '\')">' +
+                    '<i class="fas fa-file-alt"></i><span>'+i18n.openBoot_log+'</span>' +
+                    '</button>' +
                     '<button class="dropdown-item" title="修改" onclick="openEditDetailModal(\'' + item.id + '\', ' +
                     (item.ocpu || 0) + ', ' + (item.memory || 0) + ', ' + (item.disk || 0) + ', ' +
                     (item.loopTime || 0) + ', \'' + (item.rootPassword || '') + '\', \'' + (item.dayGap || '') + '\')">' +
@@ -1114,4 +1117,110 @@ function showError(){
         timer: 1500,
         showConfirmButton: false
     });
+}
+
+// =================== 开机日志抽屉 ===================
+let bootLogEventSource = null;
+let bootLogTaskIdRegex = null;
+let bootLogCount = 0;
+const BOOT_LOG_MAX_LINES = 1000;
+
+function openBootLogDrawer(bootId) {
+    if (!bootId) return;
+    const drawer = document.getElementById('bootLogDrawer');
+    const bodyEl = document.getElementById('bootLogDrawerBody');
+    const emptyEl = document.getElementById('bootLogDrawerEmpty');
+    const idLabel = document.getElementById('bootLogDrawerBootId');
+
+    bodyEl.querySelectorAll('.boot-log-line').forEach(function (el) { el.remove(); });
+    bootLogCount = 0;
+    if (emptyEl) emptyEl.style.display = '';
+
+    idLabel.textContent = '#' + bootId;
+    const escaped = String(bootId).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    bootLogTaskIdRegex = new RegExp('[Tt]ask[Ii]d\\s*[:：]\\s*' + escaped + '(?![0-9])');
+
+    drawer.classList.add('open');
+    drawer.setAttribute('aria-hidden', 'false');
+
+    connectBootLogSSE();
+}
+
+function closeBootLogDrawer() {
+    const drawer = document.getElementById('bootLogDrawer');
+    drawer.classList.remove('open');
+    drawer.setAttribute('aria-hidden', 'true');
+
+    disconnectBootLogSSE();
+    bootLogTaskIdRegex = null;
+}
+
+function connectBootLogSSE() {
+    disconnectBootLogSSE();
+    setBootLogStatus('connecting');
+
+    try {
+        const es = new EventSource('/system/streamLogs?isBootLog=true');
+        bootLogEventSource = es;
+
+        es.onopen = function () { setBootLogStatus('connected'); };
+        es.onmessage = function (event) {
+            const text = event.data;
+            if (!text) return;
+            if (bootLogTaskIdRegex && bootLogTaskIdRegex.test(text)) {
+                appendBootLogLine(text);
+            }
+        };
+        es.onerror = function () { setBootLogStatus('disconnected'); };
+    } catch (e) {
+        setBootLogStatus('disconnected');
+    }
+}
+
+function disconnectBootLogSSE() {
+    if (bootLogEventSource) {
+        try { bootLogEventSource.close(); } catch (e) {}
+        bootLogEventSource = null;
+    }
+}
+
+function setBootLogStatus(state) {
+    const statusEl = document.getElementById('bootLogDrawerStatus');
+    if (!statusEl) return;
+    statusEl.setAttribute('data-state', state);
+    const textEl = statusEl.querySelector('.boot-log-drawer__status-text');
+    if (textEl) {
+        if (state === 'connected') textEl.textContent = '已连接';
+        else if (state === 'connecting') textEl.textContent = '连接中';
+        else textEl.textContent = '已断开';
+    }
+}
+
+function appendBootLogLine(rawText) {
+    const bodyEl = document.getElementById('bootLogDrawerBody');
+    const emptyEl = document.getElementById('bootLogDrawerEmpty');
+    if (emptyEl && emptyEl.style.display !== 'none') emptyEl.style.display = 'none';
+
+    let cls = 'boot-log-line';
+    let text = rawText;
+    if (/\[success]/i.test(text)) { cls += ' boot-log-line--success'; text = text.replace(/\[success]/ig, ''); }
+    else if (/\[warn]/i.test(text)) { cls += ' boot-log-line--warn'; text = text.replace(/\[warn]/ig, ''); }
+    else if (/\[error]/i.test(text)) { cls += ' boot-log-line--error'; text = text.replace(/\[error]/ig, ''); }
+
+    const div = document.createElement('div');
+    div.className = cls;
+    div.textContent = text;
+    bodyEl.appendChild(div);
+    bootLogCount++;
+
+    if (bootLogCount > BOOT_LOG_MAX_LINES) {
+        const first = bodyEl.querySelector('.boot-log-line');
+        if (first) first.remove();
+        bootLogCount--;
+    }
+
+    const autoEl = document.getElementById('bootLogAutoScroll');
+    if (autoEl && autoEl.checked) {
+        bodyEl.scrollTop = bodyEl.scrollHeight;
+    }
 }
