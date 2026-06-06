@@ -38,22 +38,27 @@ public class LoginController  extends BaseController{
     @RequestMapping(value = "/login", method = RequestMethod.GET)
     public String login(Model model, HttpServletRequest request) {
         HttpSession session = request.getSession();
-        String existingPrivateKey = (String) session.getAttribute(RSA_PRIVATE_KEY);
-        String publicKey;
-        if (existingPrivateKey == null) {
-            try {
+        String publicKey = null;
+        try {
+            String existingPrivateKey = (String) session.getAttribute(RSA_PRIVATE_KEY);
+            if (existingPrivateKey == null) {
                 KeyPair keyPair = RsaUtils.generateKeyPair();
                 publicKey = RsaUtils.getPublicKeyString(keyPair);
                 String privateKey = RsaUtils.getPrivateKeyString(keyPair);
-                model.addAttribute("publicKey", publicKey);
                 session.setAttribute(RSA_PRIVATE_KEY, privateKey);
                 session.setAttribute(RSA_PUBLIC_KEY, publicKey);
-            } catch (Exception e) {
-                log.error("生成RSA密钥对失败", e);
+            } else {
+                publicKey = (String) session.getAttribute(RSA_PUBLIC_KEY);
             }
-        } else {
-            publicKey = (String) session.getAttribute(RSA_PUBLIC_KEY);
             model.addAttribute("publicKey", publicKey);
+        } catch (IllegalStateException e) {
+            // Spring Security 登录成功时会换 sessionId 并 invalidate 旧 session;
+            // 如果此刻同一浏览器有并发 GET /login(双击/prefetch/iframe/多 tab),
+            // 旧 session 引用上 setAttribute 会抛此异常 —— 这是预期并发场景,
+            // 用户已登录成功不受影响,降级到 debug 避免噪音
+            log.debug("login session 已失效,RSA 写入跳过(用户大概率已登录成功): {}", e.getMessage());
+        } catch (Exception e) {
+            log.error("生成RSA密钥对失败", e);
         }
         model.addAttribute("allowRegister", !loginUserService.existsAnyUser());
         model.addAttribute("githubEnabled", systemConfigService.getGithubConfig().isEnabled());
