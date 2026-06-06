@@ -5,67 +5,65 @@
     bottom: 0;
     width: 180px;
     z-index: 999;
-    overflow-y: auto;
-    overflow-x: hidden;
+    overflow: hidden;
     box-sizing: border-box;
     background-color: var(--sidebar-bg);
     box-shadow: 2px 0 8px rgba(0, 0, 0, 0.15);
     transition: width 0.3s ease;
     will-change: width;
+    display: flex;
+    flex-direction: column;
+}
+.sidebar > nav {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
-/* 折叠状态:body.sidebar-collapsed 由 toggleSidebar() 切换;
-   html.preload-sidebar-collapsed 在 head inline script 预设,避免首次加载闪烁 */
+/* 折叠状态 */
 body.sidebar-collapsed .sidebar,
-html.preload-sidebar-collapsed .sidebar {
-    width: 60px;
-}
+html.preload-sidebar-collapsed .sidebar { width: 60px; }
 html.preload-sidebar-collapsed .admin-main > main {
     margin-left: 60px !important;
     transition: none !important;
 }
 
-/* ── 顶部:搜索框 + 折叠按钮 ────────────────────── */
+/* ── 顶部:搜索框 ─────────────────────────────── */
 .sidebar-top {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 10px 8px 8px;
-    position: sticky;
-    top: 0;
-    background-color: var(--sidebar-bg);
-    z-index: 2;
+    flex-shrink: 0;
+    padding: 12px 10px 8px;
 }
 .sidebar-search {
-    flex: 1;
-    position: relative;
     display: flex;
     align-items: center;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 6px;
-    height: 30px;
-    padding: 0 6px;
-    transition: opacity 0.2s ease, width 0.2s ease;
+    height: 34px;
+    padding: 0 10px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
     min-width: 0;
 }
 .sidebar-search:focus-within {
-    background: rgba(255, 255, 255, 0.10);
-    border-color: rgba(77, 158, 255, 0.5);
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(77, 158, 255, 0.4);
+    box-shadow: 0 0 0 3px rgba(77, 158, 255, 0.12);
 }
 [data-theme="light"] .sidebar-search {
-    background: rgba(0, 0, 0, 0.05);
-    border-color: rgba(0, 0, 0, 0.08);
+    background: #ffffff;
+    border-color: #e2e8f0;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
 }
 [data-theme="light"] .sidebar-search:focus-within {
-    background: #fff;
     border-color: #4d9eff;
+    box-shadow: 0 0 0 3px rgba(77, 158, 255, 0.15);
 }
 .sidebar-search-icon {
-    font-size: 11px;
+    font-size: 12px;
     color: var(--sidebar-text);
-    opacity: 0.6;
-    margin: 0 4px 0 2px;
+    opacity: 0.55;
+    margin-right: 8px;
     pointer-events: none;
 }
 .sidebar-search-input {
@@ -75,13 +73,13 @@ html.preload-sidebar-collapsed .admin-main > main {
     border: none;
     outline: none;
     color: var(--sidebar-text);
-    font-size: 12px;
+    font-size: 13px;
     padding: 0;
-    line-height: 28px;
+    line-height: 32px;
 }
 .sidebar-search-input::placeholder {
     color: var(--sidebar-text);
-    opacity: 0.45;
+    opacity: 0.4;
 }
 .sidebar-search-clear {
     background: transparent;
@@ -90,57 +88,96 @@ html.preload-sidebar-collapsed .admin-main > main {
     opacity: 0.5;
     cursor: pointer;
     font-size: 11px;
-    padding: 2px 4px;
+    padding: 2px 5px;
     display: none;
     border-radius: 4px;
+    margin-left: 4px;
+    transition: opacity 0.15s ease, background 0.15s ease;
 }
-.sidebar-search-clear:hover { opacity: 1; background: rgba(255, 255, 255, 0.1); }
+.sidebar-search-clear:hover {
+    opacity: 1;
+    background: rgba(127, 127, 127, 0.15);
+}
 .sidebar-search.has-value .sidebar-search-clear { display: inline-block; }
 
-.sidebar-collapse-btn {
+/* ── 中部:无匹配提示 ─────────────────────────── */
+.sidebar-empty-hint {
+    padding: 16px 12px;
+    font-size: 12px;
+    color: var(--sidebar-text);
+    opacity: 0.5;
+    text-align: center;
     flex-shrink: 0;
-    width: 28px;
-    height: 28px;
-    border-radius: 6px;
-    background: transparent;
+}
+
+/* ── 底部:折叠按钮 ───────────────────────────── */
+.sidebar-bottom {
+    flex-shrink: 0;
+    padding: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    display: flex;
+    justify-content: flex-end;
+    transition: justify-content 0.2s ease;
+}
+[data-theme="light"] .sidebar-bottom {
+    border-top-color: rgba(0, 0, 0, 0.06);
+}
+.sidebar-collapse-btn {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.05);
     border: none;
     color: var(--sidebar-text);
-    opacity: 0.65;
+    opacity: 0.7;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     font-size: 11px;
-    transition: opacity 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
+    transition: opacity 0.2s ease, background-color 0.2s ease, transform 0.15s ease;
 }
 .sidebar-collapse-btn:hover {
     opacity: 1;
-    background-color: rgba(255, 255, 255, 0.08);
+    background-color: rgba(127, 127, 127, 0.18);
 }
-[data-theme="light"] .sidebar-collapse-btn:hover { background-color: rgba(0, 0, 0, 0.06); }
+.sidebar-collapse-btn:active { transform: scale(0.92); }
+[data-theme="light"] .sidebar-collapse-btn {
+    background: rgba(0, 0, 0, 0.04);
+}
 .sidebar-collapse-btn i { transition: transform 0.3s ease; }
 body.sidebar-collapsed .sidebar-collapse-btn i { transform: rotate(180deg); }
 
-.sidebar-empty-hint {
-    padding: 16px 12px;
-    font-size: 12px;
-    color: var(--sidebar-text);
-    opacity: 0.6;
-    text-align: center;
-}
-
-/* ── 折叠态(60px):隐藏文字 / 子菜单 / 搜索框 ────────── */
-body.sidebar-collapsed .sidebar-search,
-html.preload-sidebar-collapsed .sidebar-search { display: none; }
+/* ── 折叠态(60px) ───────────────────────────────
+   - 搜索框隐藏(60px 装不下)
+   - 一级菜单的 <span> 内只让"文字"消失,保留 i 图标
+     做法:span 字号设 0,内部 i 显式重置字号
+   - 底部折叠按钮居中
+   ──────────────────────────────────────────────── */
+body.sidebar-collapsed .sidebar-top,
+html.preload-sidebar-collapsed .sidebar-top { display: none; }
 body.sidebar-collapsed .sidebar-empty-hint,
 html.preload-sidebar-collapsed .sidebar-empty-hint { display: none !important; }
-body.sidebar-collapsed .sidebar-top,
-html.preload-sidebar-collapsed .sidebar-top {
+body.sidebar-collapsed .sidebar-bottom,
+html.preload-sidebar-collapsed .sidebar-bottom {
     justify-content: center;
-    padding: 10px 0;
 }
+
+/* 关键修复:span 内 i 图标必须保留 */
 body.sidebar-collapsed .sidebar .nav-link > span,
-html.preload-sidebar-collapsed .sidebar .nav-link > span,
+html.preload-sidebar-collapsed .sidebar .nav-link > span {
+    font-size: 0;
+    line-height: 0;
+    overflow: hidden;
+    white-space: nowrap;
+}
+body.sidebar-collapsed .sidebar .nav-link > span > i,
+html.preload-sidebar-collapsed .sidebar .nav-link > span > i {
+    font-size: 17px;
+    line-height: 1;
+    margin: 0 !important;
+}
+
 body.sidebar-collapsed .sidebar .nav-link .arrow,
 html.preload-sidebar-collapsed .sidebar .nav-link .arrow {
     display: none !important;
@@ -156,19 +193,10 @@ html.preload-sidebar-collapsed .sidebar .nav-link {
     padding-right: 0;
 }
 
-/* ── 搜索时:被搜索过滤掉的节点 ─────────────────── */
+/* ── 搜索时:被过滤掉的节点 ─────────────────────── */
 .sidebar .nav-parent.sidebar-hidden,
 .sidebar .nav-children > .nav-link.sidebar-hidden {
     display: none !important;
-}
-.sidebar .nav-parent.sidebar-search-match {
-    /* 命中的一级菜单:展开二级 */
-}
-.sidebar .nav-link mark.sidebar-search-highlight {
-    background: rgba(77, 158, 255, 0.35);
-    color: inherit;
-    padding: 0 2px;
-    border-radius: 2px;
 }
 
 body > main,
