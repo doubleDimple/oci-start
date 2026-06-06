@@ -142,10 +142,33 @@ function toggleMenu(navLink, navChildren) {
 }
 
 function expandMenu(navLink, navChildren) {
+    document.querySelectorAll('.nav-parent').forEach(function (other) {
+        const oc = other.querySelector('.nav-children');
+        const ol = other.querySelector('.nav-link');
+        if (oc && oc !== navChildren && ol && ol.getAttribute('aria-expanded') === 'true') {
+            collapseMenu(ol, oc);
+        }
+    });
+
     navLink.setAttribute('aria-expanded', 'true');
     navChildren.setAttribute('aria-hidden', 'false');
     navChildren.style.display = 'block';
     navLink.closest('.nav-parent').classList.add('nav-expanded');
+
+    const firstChild = findFirstVisibleChildLink(navChildren);
+    if (firstChild) firstChild.click();
+}
+
+function findFirstVisibleChildLink(navChildren) {
+    const links = navChildren.querySelectorAll('.nav-link[href]');
+    for (let i = 0; i < links.length; i++) {
+        const el = links[i];
+        const href = el.getAttribute('href');
+        if (!href || href === '#' || href.indexOf('javascript:') === 0) continue;
+        if (el.offsetParent === null) continue;
+        return el;
+    }
+    return null;
 }
 
 function collapseMenu(navLink, navChildren) {

@@ -67,3 +67,61 @@ HTTP/HTTPS/SOCKS5、Java 生态无成熟 HY2/VLESS 客户端),本期**放弃** H
 - i18n 资源未碰
 - `vpn_proxy.js` 既有逻辑未重构
 
+---
+
+# 侧边栏菜单手风琴 + 点击一级自动加载第一个二级(2026-06-06)
+
+## 背景
+
+侧边栏目前点击一级菜单只是切换自身展开/收起,可同时展开多个一级菜单;点击一级菜单也不会
+自动进入任何二级页面,需要用户再点二级才能跳转。用户希望:
+1. 点击一级菜单展开时,自动收起其它已展开的一级菜单(手风琴)
+2. 一级菜单从未展开变为展开时,自动加载第一个可见的二级菜单
+
+## 范围
+
+- 只动 `oci-server/src/main/resources/static/js/system/sidebar.js`
+- 只动 `expandMenu()` 入口(用户主动点击展开时才触发)
+- **不动** `expandMenusWithActiveChildren()`(页面首次加载基于 active child 的展开,保持原行为)
+- **不动** `collapseMenu()` / `toggleMenu()`(收起场景无新行为)
+- 不动 HTML / CSS / 后端
+
+## 步骤
+
+- [x] 1. `expandMenu` 开头加手风琴:遍历所有 `.nav-parent`,对非当前且已展开的调用 `collapseMenu`
+- [x] 2. `expandMenu` 结尾新增"找第一个可见有效二级菜单链接并 `.click()`"
+- [x] 3. 新增辅助函数 `findFirstVisibleChildLink`,用 `offsetParent !== null` 过滤被
+     `cloud-menu` 隐藏的项,跳过 `#` / `javascript:` 链接
+- [x] 4. `node --check` 通过
+- [ ] 5. 提交并 push 到 `claude/pensive-edison-mpksh`
+- [ ] 6. 用户在本地浏览器实测交互(本环境无浏览器)
+
+## 关键决策
+
+- **触发方式选 `.click()` 而非手动 `iframe.src = href`**:子菜单的 `<a target="biz-frame">` 由浏览器原生处理 iframe 加载,`.click()` 同时会触发现有的"active 高亮切换"事件监听(`sidebar.js:99-110`),无需重复实现高亮逻辑
+- **手风琴只影响用户主动点击场景**:`expandMenusWithActiveChildren()` 不走 `expandMenu`,
+  直接操作 DOM —— 这是页面初始状态恢复(根据 URL 命中哪个 active child),
+  与"用户主动切换"语义不同,保持隔离
+- **`offsetParent === null` 跳过隐藏项**:针对 `.cloud-menu[data-cloud-types]` 按云供应商
+  动态 `display:none` 的场景,确保不会"加载用户当前云类型下根本看不到的页面"
+- **不引入手风琴的负面后果**:用户已在某二级页面时点击该一级,行为是"收起",
+  原本就走 `collapseMenu`,不会触发新的"自动加载第一个二级",符合直觉
+- **切换一级 = 切换页面上下文**:用户已确认:点击新一级菜单会切走当前 iframe 工作上下文,
+  这是接受的代价
+
+## Review
+
+### 改动文件(1 个)
+
+| 文件 | 增 / 减 | 内容 |
+|------|--------|------|
+| `oci-server/src/main/resources/static/js/system/sidebar.js` | +23 / -0 | `expandMenu` 加手风琴 + 自动加载第一个二级;新增 `findFirstVisibleChildLink` |
+
+### 未验证项
+
+- 浏览器实测(无环境无法跑),需要用户在本地确认:
+  1. 点击一级菜单(从未展开)→ 其它一级收起,当前展开,iframe 跳到第一个二级
+  2. 点击一级菜单(已展开)→ 仅收起当前,不切 iframe
+  3. 页面刷新后,URL 对应的二级菜单仍被自动 active 高亮,父菜单自动展开
+  4. 切换云供应商后,隐藏的二级菜单不会被作为"第一个可见"误触发
+
