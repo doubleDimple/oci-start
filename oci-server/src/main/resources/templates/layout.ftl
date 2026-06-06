@@ -21,7 +21,7 @@
             transition: margin-left 0.3s ease;
         }
         [data-theme="light"] .admin-main > main { background-color: #f0f4f8; }
-        body.sidebar-collapsed .admin-main > main { margin-left: 0; }
+        body.sidebar-collapsed .admin-main > main { margin-left: 60px; }
         @media (max-width: 768px) { .admin-main > main { margin-left: 150px !important; } }
     </style>
     <script>

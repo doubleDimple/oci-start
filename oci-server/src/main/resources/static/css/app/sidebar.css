@@ -6,22 +6,169 @@
     width: 180px;
     z-index: 999;
     overflow-y: auto;
+    overflow-x: hidden;
     box-sizing: border-box;
     background-color: var(--sidebar-bg);
     box-shadow: 2px 0 8px rgba(0, 0, 0, 0.15);
-    transition: transform 0.3s ease;
-    will-change: transform;
+    transition: width 0.3s ease;
+    will-change: width;
 }
 
 /* 折叠状态:body.sidebar-collapsed 由 toggleSidebar() 切换;
    html.preload-sidebar-collapsed 在 head inline script 预设,避免首次加载闪烁 */
 body.sidebar-collapsed .sidebar,
 html.preload-sidebar-collapsed .sidebar {
-    transform: translateX(-100%);
+    width: 60px;
 }
 html.preload-sidebar-collapsed .admin-main > main {
-    margin-left: 0 !important;
+    margin-left: 60px !important;
     transition: none !important;
+}
+
+/* ── 顶部:搜索框 + 折叠按钮 ────────────────────── */
+.sidebar-top {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 8px 8px;
+    position: sticky;
+    top: 0;
+    background-color: var(--sidebar-bg);
+    z-index: 2;
+}
+.sidebar-search {
+    flex: 1;
+    position: relative;
+    display: flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    height: 30px;
+    padding: 0 6px;
+    transition: opacity 0.2s ease, width 0.2s ease;
+    min-width: 0;
+}
+.sidebar-search:focus-within {
+    background: rgba(255, 255, 255, 0.10);
+    border-color: rgba(77, 158, 255, 0.5);
+}
+[data-theme="light"] .sidebar-search {
+    background: rgba(0, 0, 0, 0.05);
+    border-color: rgba(0, 0, 0, 0.08);
+}
+[data-theme="light"] .sidebar-search:focus-within {
+    background: #fff;
+    border-color: #4d9eff;
+}
+.sidebar-search-icon {
+    font-size: 11px;
+    color: var(--sidebar-text);
+    opacity: 0.6;
+    margin: 0 4px 0 2px;
+    pointer-events: none;
+}
+.sidebar-search-input {
+    flex: 1;
+    min-width: 0;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--sidebar-text);
+    font-size: 12px;
+    padding: 0;
+    line-height: 28px;
+}
+.sidebar-search-input::placeholder {
+    color: var(--sidebar-text);
+    opacity: 0.45;
+}
+.sidebar-search-clear {
+    background: transparent;
+    border: none;
+    color: var(--sidebar-text);
+    opacity: 0.5;
+    cursor: pointer;
+    font-size: 11px;
+    padding: 2px 4px;
+    display: none;
+    border-radius: 4px;
+}
+.sidebar-search-clear:hover { opacity: 1; background: rgba(255, 255, 255, 0.1); }
+.sidebar-search.has-value .sidebar-search-clear { display: inline-block; }
+
+.sidebar-collapse-btn {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    background: transparent;
+    border: none;
+    color: var(--sidebar-text);
+    opacity: 0.65;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    transition: opacity 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
+}
+.sidebar-collapse-btn:hover {
+    opacity: 1;
+    background-color: rgba(255, 255, 255, 0.08);
+}
+[data-theme="light"] .sidebar-collapse-btn:hover { background-color: rgba(0, 0, 0, 0.06); }
+.sidebar-collapse-btn i { transition: transform 0.3s ease; }
+body.sidebar-collapsed .sidebar-collapse-btn i { transform: rotate(180deg); }
+
+.sidebar-empty-hint {
+    padding: 16px 12px;
+    font-size: 12px;
+    color: var(--sidebar-text);
+    opacity: 0.6;
+    text-align: center;
+}
+
+/* ── 折叠态(60px):隐藏文字 / 子菜单 / 搜索框 ────────── */
+body.sidebar-collapsed .sidebar-search,
+html.preload-sidebar-collapsed .sidebar-search { display: none; }
+body.sidebar-collapsed .sidebar-empty-hint,
+html.preload-sidebar-collapsed .sidebar-empty-hint { display: none !important; }
+body.sidebar-collapsed .sidebar-top,
+html.preload-sidebar-collapsed .sidebar-top {
+    justify-content: center;
+    padding: 10px 0;
+}
+body.sidebar-collapsed .sidebar .nav-link > span,
+html.preload-sidebar-collapsed .sidebar .nav-link > span,
+body.sidebar-collapsed .sidebar .nav-link .arrow,
+html.preload-sidebar-collapsed .sidebar .nav-link .arrow {
+    display: none !important;
+}
+body.sidebar-collapsed .sidebar .nav-children,
+html.preload-sidebar-collapsed .sidebar .nav-children {
+    display: none !important;
+}
+body.sidebar-collapsed .sidebar .nav-link,
+html.preload-sidebar-collapsed .sidebar .nav-link {
+    justify-content: center;
+    padding-left: 0;
+    padding-right: 0;
+}
+
+/* ── 搜索时:被搜索过滤掉的节点 ─────────────────── */
+.sidebar .nav-parent.sidebar-hidden,
+.sidebar .nav-children > .nav-link.sidebar-hidden {
+    display: none !important;
+}
+.sidebar .nav-parent.sidebar-search-match {
+    /* 命中的一级菜单:展开二级 */
+}
+.sidebar .nav-link mark.sidebar-search-highlight {
+    background: rgba(77, 158, 255, 0.35);
+    color: inherit;
+    padding: 0 2px;
+    border-radius: 2px;
 }
 
 body > main,

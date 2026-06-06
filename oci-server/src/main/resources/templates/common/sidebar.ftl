@@ -1,4 +1,22 @@
 <aside class="sidebar">
+    <!-- 顶部:搜索框 + 折叠按钮 -->
+    <div class="sidebar-top">
+        <div class="sidebar-search">
+            <i class="fas fa-search sidebar-search-icon"></i>
+            <input type="text" id="sidebarSearchInput" class="sidebar-search-input"
+                   placeholder="搜索菜单..." autocomplete="off" spellcheck="false">
+            <button type="button" id="sidebarSearchClear" class="sidebar-search-clear" title="清空" aria-label="清空">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <button type="button" id="sidebarToggleBtn" class="sidebar-collapse-btn"
+                aria-label="切换菜单" title="收起/展开">
+            <i class="fas fa-chevron-left" id="sidebarToggleIcon"></i>
+        </button>
+    </div>
+    <div class="sidebar-empty-hint" id="sidebarSearchEmpty" style="display:none;">
+        无匹配菜单
+    </div>
     <nav>
         <!-- 服务管理菜单 -->
         <div class="nav-parent <#if activePage == 'api-records'>expanded</#if>">
