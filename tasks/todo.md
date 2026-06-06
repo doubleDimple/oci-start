@@ -345,5 +345,94 @@ A 方案上线后实测发现:抢机失败重试日志(用户最高频反馈,如
 - **Maven 编译**:本环境 JDK 21 + Lombok 1.18.24 不兼容,无法跑。但本次 Java 改动仅
   字符串字面量与方法调用,语法/类型无歧义,编译风险极低
 
+---
+
+# 修复"任务计数在涨但日志全无"(2026-06-06)
+
+## 用户反馈
+
+任务很多时,当天抢机次数(`currentAttemptCount`)在累加,但**完全没有该任务的抢机日志**。
+
+## 根因诊断
+
+完整调用链:
+
+```
+createInstanceData (OracleCloudService:105)
+  ↓ 第一行就 inc(user) → 数据库 currentAttemptCount += 1 ← 用户看到的"今日次数"
+  ↓ 后续 OCI API 调用 → BmcException(容量不足,最高频)
+  ↓ catch → buildOpenBootException
+      ↓ 进入"容量不足"分支(OciLogBuilder:60-71)
+         if (log.isDebugEnabled()) { ... }   ← 反模式!Logback 默认 root=info
+           ↳ 5 行 log.info 被吞
+           ↳ 1 行 log.warn 被吞
+         if (size <= 0) { log.info(...重试...) }   ← 只在最后一个 AD 才打
+  ↓ 多 AD 场景下,size > 0 时函数静默返回
+```
+
+`isDebugEnabled()` 只能守卫 `log.debug(...)`,守卫 `log.info/warn` 等于**强制让 info/warn 永远不输出**。
+这是经典反模式。
+
+## 范围
+
+只改 `OciLogBuilder.java` 容量不足分支:
+- 去掉 2 个 `if (log.isDebugEnabled())` 守卫
+- 顺手删 2 个 `log.info("")` 空字符串 + 2 个 `log.info("<====>")` 纯分隔符
+  (用户确认走 A:保持"OCI 开机日志(全局)"页面输出干净)
+- 保留 3 条有信息量的日志(容量不足提示 / 未完成开机 / 重试)
+
+## 不做的事(深入分析后排除)
+
+- **`createFromDbCreateComputer:291` 返回值丢失**:看似 bug,但实测 `buildOpenBootException`
+  方法体内**根本不修改入参 `oracleInstanceDetail`**,引用语义下"丢返回值"与"接返回值"功能等价。
+  纯代码气味,不直接对应用户报告的问题,**按精准修改原则跳过**
+- **全项目其它 9 处 `isDebugEnabled() 守卫 info/warn`**:同型号反模式,但分散在
+  `OracleCloudService` 和 `OciCliUtils` 的多个独立场景,需要逐一判断"作者本意 debug 还是 info"
+  才能选 "去守卫" 还是 "改成 log.debug",超出本次范围
+
+## 步骤
+
+- [x] 1. `OciLogBuilder.java:60-71` 删 2 处 `isDebugEnabled` 守卫,删 4 行无信息量日志
+- [x] 2. `git diff` 确认改动精准(-10 行 / 解放出 2 条原本被吞的 log)
+- [ ] 3. 提交 push
+- [ ] 4. 用户重启 oci-server 实测
+
+## 关键决策
+
+- **不修 Bug 3 是经过深入代码分析后的诚实结论**,不是偷懒。`buildOpenBootException`
+  全方法体逐行核对,确认它不修改 `oracleInstanceDetail`(只 return 它),所以丢返回值
+  在引用传递下零影响
+- **删纯分隔符与空行**:它们原本就靠 `isDebugEnabled` 隐藏,一旦解放守卫,涌进全局日志
+  页面会是垃圾信息。用户已确认走 A 删干净
+- **保留 `log.info` 不改 `log.debug`**:这条容量不足日志对用户有价值(抢机进度可见),
+  作者本意应是 info 级别,守卫的写法是 bug 而非 debug 抑制
+
+## Review
+
+### 改动文件(1 个)
+
+| 文件 | 增 / 减 | 内容 |
+|------|--------|------|
+| `OciLogBuilder.java` | +2 / -10 | 删 2 个 `if (isDebugEnabled())` 守卫 + 4 行无信息量日志,保留 3 条有意义日志 |
+
+### 效果
+
+修复后,**容量不足场景的每次失败都会输出一行日志**:
+```
+[TaskId=N] 用户:东京当前区域容量不足 Out of host capacity 换另一个可用性区域继续执行
+```
+
+多 AD 场景下,3 个 AD 都失败后还会额外打 `未完成开机` 和 `将在 60 秒后重试`。
+
+抽屉里能完整看到失败链路。
+
+### 未验证项
+
+- **浏览器+服务端实测**:本环境无法启动 oci-server,需用户重启后:
+  1. 触发一次抢机失败(任意场景)
+  2. 控制台/日志文件看到 `[TaskId=N] ... 当前区域容量不足 ...` 输出
+  3. 对应任务的"开机日志"抽屉里看到这条
+  4. "OCI 开机日志(全局)"页面没有出现成片的 `<======>` 分隔符
+
 
 
