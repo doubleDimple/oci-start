@@ -43,10 +43,15 @@
     align-items: center;
     justify-content: center;
     padding: 0 28px;
-    background: var(--top-nav-bg);
-    border-top: 1px solid var(--nav-border);
+    background: var(--sidebar-bg);
+    border-top: 1px solid var(--border-color);
     flex-shrink: 0;
+    color: var(--sidebar-text);
 }
+.global-footer .footer-line1,
+.global-footer .footer-line2 { color: var(--sidebar-text); opacity: 0.85; }
+.global-footer a { color: var(--sidebar-text); opacity: 0.85; transition: opacity 0.15s ease; }
+.global-footer a:hover { opacity: 1; }
 
 .global-footer-center {
     display: flex;

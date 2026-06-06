@@ -114,36 +114,44 @@ html.preload-sidebar-collapsed .admin-main > main {
 .sidebar-bottom {
     flex-shrink: 0;
     padding: 10px;
-    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
     display: flex;
-    justify-content: flex-end;
-    transition: justify-content 0.2s ease;
+    justify-content: center;
 }
 [data-theme="light"] .sidebar-bottom {
-    border-top-color: rgba(0, 0, 0, 0.06);
+    border-top-color: rgba(0, 0, 0, 0.08);
 }
 .sidebar-collapse-btn {
-    width: 30px;
-    height: 30px;
+    width: 34px;
+    height: 34px;
     border-radius: 8px;
-    background: rgba(255, 255, 255, 0.05);
-    border: none;
+    background: rgba(255, 255, 255, 0.10);
+    border: 1px solid rgba(255, 255, 255, 0.14);
     color: var(--sidebar-text);
-    opacity: 0.7;
+    opacity: 1;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 11px;
-    transition: opacity 0.2s ease, background-color 0.2s ease, transform 0.15s ease;
+    font-size: 12px;
+    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.15s ease;
 }
 .sidebar-collapse-btn:hover {
-    opacity: 1;
-    background-color: rgba(127, 127, 127, 0.18);
+    background-color: var(--sidebar-active, #4d9eff);
+    border-color: var(--sidebar-active, #4d9eff);
+    color: #ffffff;
 }
 .sidebar-collapse-btn:active { transform: scale(0.92); }
 [data-theme="light"] .sidebar-collapse-btn {
-    background: rgba(0, 0, 0, 0.04);
+    background: #ffffff;
+    border-color: #b8c8d8;
+    color: #1e2f42;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+[data-theme="light"] .sidebar-collapse-btn:hover {
+    background: #4d9eff;
+    border-color: #4d9eff;
+    color: #ffffff;
 }
 .sidebar-collapse-btn i { transition: transform 0.3s ease; }
 body.sidebar-collapsed .sidebar-collapse-btn i { transform: rotate(180deg); }
