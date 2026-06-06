@@ -276,6 +276,21 @@
                                     </div>
                                 </div>
 
+                                <div class="form-row-group">
+                                    <div class="form-row">
+                                        <label class="form-label">用户名(可选)</label>
+                                        <input type="text" class="form-control" name="proxyUsername"
+                                               value="${proxyConfig.username!''}" autocomplete="off">
+                                        <div class="form-tip">代理需认证时填写,留空表示无认证</div>
+                                    </div>
+
+                                    <div class="form-row">
+                                        <label class="form-label">密码(可选)</label>
+                                        <input type="password" class="form-control" name="proxyPassword"
+                                               value="${proxyConfig.password!''}" autocomplete="new-password">
+                                    </div>
+                                </div>
+
                             </form>
                         </div>
 

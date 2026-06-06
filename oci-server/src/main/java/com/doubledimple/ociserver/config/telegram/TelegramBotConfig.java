@@ -5,7 +5,10 @@ import com.doubledimple.ociserver.pojo.request.TelegramConfig;
 import com.doubledimple.ociserver.service.impl.system.SystemConfigService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.http.auth.AuthScope;
+import org.apache.http.auth.UsernamePasswordCredentials;
 import org.apache.http.client.config.RequestConfig;
+import org.apache.http.impl.client.BasicCredentialsProvider;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
@@ -114,7 +117,22 @@ public class TelegramBotConfig {
                 options.setProxyType(type);
                 options.setProxyHost(proxyConfig.getHost());
                 options.setProxyPort(proxyConfig.getPort());
-                log.debug("已启用Telegram代理: {} {}:{}", proxyConfig.getType(), proxyConfig.getHost(), proxyConfig.getPort());
+
+                // 可选认证:用户名/密码任一为空则视为无认证(透明代理)
+                if (StringUtils.isNotEmpty(proxyConfig.getUsername())
+                        && StringUtils.isNotEmpty(proxyConfig.getPassword())) {
+                    BasicCredentialsProvider credsProvider = new BasicCredentialsProvider();
+                    credsProvider.setCredentials(
+                            new AuthScope(proxyConfig.getHost(), proxyConfig.getPort()),
+                            new UsernamePasswordCredentials(proxyConfig.getUsername(), proxyConfig.getPassword())
+                    );
+                    options.setCredentialsProvider(credsProvider);
+                    log.debug("已启用Telegram代理(带认证): {} {}:{} user={}",
+                            proxyConfig.getType(), proxyConfig.getHost(), proxyConfig.getPort(), proxyConfig.getUsername());
+                } else {
+                    log.debug("已启用Telegram代理(无认证): {} {}:{}",
+                            proxyConfig.getType(), proxyConfig.getHost(), proxyConfig.getPort());
+                }
             } else {
                 // 不使用代理
                 options.setProxyType(DefaultBotOptions.ProxyType.NO_PROXY);
