@@ -912,15 +912,16 @@ public class OracleCloudService {
                 GetVnicRequest.builder().vnicId(vnicAttachment.getVnicId()).build();
         GetVnicResponse getVnicResponse = virtualNetworkClient.getVnic(getVnicRequest);
         Vnic vnic = getVnicResponse.getVnic();
+        String taskTag = "[TaskId=" + user.getBootId() + "] ";
         StringBuilder openSuccessLog = new StringBuilder();
-        openSuccessLog.append("<=======================================>\n")
-                .append("Instance create success detail: ").append(instance.getId()).append("\n")
-                .append("Public IP : ").append(vnic.getPublicIp()).append("\n")
-                .append("region : ").append(user.getRegion()).append("\n")
-                .append("Private IP : ").append(vnic.getPrivateIp()).append("\n")
-                .append("login root: root\n")
-                .append("login passWord: ").append(user.getRootPassword()).append("\n")
-                .append("<=======================================>");
+        openSuccessLog.append(taskTag).append("<=======================================>\n")
+                .append(taskTag).append("Instance create success detail: ").append(instance.getId()).append("\n")
+                .append(taskTag).append("Public IP : ").append(vnic.getPublicIp()).append("\n")
+                .append(taskTag).append("region : ").append(user.getRegion()).append("\n")
+                .append(taskTag).append("Private IP : ").append(vnic.getPrivateIp()).append("\n")
+                .append(taskTag).append("login root: root\n")
+                .append(taskTag).append("login passWord: ").append(user.getRootPassword()).append("\n")
+                .append(taskTag).append("<=======================================>");
         ociLogBuilder.buildOpenBootSuccess(openSuccessLog.toString());
 
         oracleInstanceDetail.setPublicIp(vnic.getPublicIp());

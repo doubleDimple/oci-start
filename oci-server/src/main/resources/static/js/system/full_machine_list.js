@@ -1138,7 +1138,7 @@ function openBootLogDrawer(bootId) {
 
     idLabel.textContent = '#' + bootId;
     const escaped = String(bootId).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    bootLogTaskIdRegex = new RegExp('[Tt]ask[Ii]d\\s*[:：]\\s*' + escaped + '(?![0-9])');
+    bootLogTaskIdRegex = new RegExp('[Tt]ask[Ii]d\\s*[=:：]\\s*' + escaped + '(?![0-9])');
 
     drawer.classList.add('open');
     drawer.setAttribute('aria-hidden', 'false');

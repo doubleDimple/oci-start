@@ -302,7 +302,7 @@ public class CreateInstanceTaskV2 {
                 return oracleCloudService.createInstanceData(user);
             } catch (Exception e) {
                 if (isNetworkTemporaryError(e)) {
-                    ociLogBuilder.buildOpenNoThrow("网络连接暂时不可达(DNS/UnknownHost)，跳过本次失败计次: {}", e.getMessage());
+                    ociLogBuilder.buildOpenNoThrow("[TaskId={}] 网络连接暂时不可达(DNS/UnknownHost)，跳过本次失败计次: {}", taskId, e.getMessage());
                     return null;
                 }
                 ociLogBuilder.buildOpenNoThrow("execute openBoot error: taskId:{} reason:{}", taskId, e.getMessage());
