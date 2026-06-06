@@ -763,11 +763,16 @@ function toggleLanguagePanel(event) {
 function showAssetAnalysis() {
     closeUserMenu();
     const cloudType = typeof currentProviderType !== 'undefined' ? currentProviderType : '';
-    Swal.fire({
-        title: 'loading',
-        allowOutsideClick: false,
-        didOpen: () => { Swal.showLoading(); }
-    });
+
+    // 立即显示 loading 状态(用自定义 modal)
+    document.getElementById('assetAnalysisTitle').textContent = window.I18N.header_report || '云资产报告';
+    document.getElementById('assetAnalysisMeta').innerHTML = '';
+    document.getElementById('assetAnalysisBody').innerHTML =
+        '<div style="text-align:center;padding:60px 0;color:#94a3b8;"><i class="fas fa-spinner fa-spin" style="font-size:28px;"></i><div style="margin-top:12px;">loading...</div></div>';
+    document.getElementById('assetAnalysisFooter').innerHTML =
+        '<button class="app-modal-btn" onclick="closeAssetAnalysisModal()">' + (window.I18N.header_closeReport || '关闭报告') + '</button>';
+    document.getElementById('assetAnalysisModal').classList.add('open');
+
     fetch('/tenants/asset/analysis?cloudType='+cloudType)
         .then(r => r.json())
         .then(res => {
@@ -777,6 +782,7 @@ function showAssetAnalysis() {
                 updateHeaderLevelBadge(computedLevel, data.levelTitle);
                 renderAssetModal(data);
             } else {
+                closeAssetAnalysisModal();
                 Swal.fire('error', res.message, 'error');
             }
         })
@@ -791,6 +797,11 @@ function showAssetAnalysis() {
             };
             renderAssetModal(mockData);
         });
+}
+
+function closeAssetAnalysisModal() {
+    const m = document.getElementById('assetAnalysisModal');
+    if (m) m.classList.remove('open');
 }
 
 function updateHeaderLevelBadge(level, title) {
@@ -836,81 +847,58 @@ function renderAssetModal(data) {
 
     const config = rankConfigs[lvl];
 
-    Swal.fire({
-        title: '<div style="text-align: left; font-size: 18px; font-weight: 600; color: #1a1a1a; border-left: 4px solid #1abc9c; padding-left: 12px; margin-left: 5px; white-space: nowrap;">'+window.I18N.header_report+'</div>',
-        width: '900px',
-        padding: '1.5rem',
-        showConfirmButton: true,
-        confirmButtonText: window.I18N.header_closeReport,
-        confirmButtonColor: '#1e2124',
-        html: `
-            <div style="padding: 10px 5px; font-family: -apple-system, sans-serif;">
-                <div style="display: flex; align-items: stretch; border: 1px solid #e0e0e0; border-radius: 4px; overflow: hidden; background: #fff;">
-                     <div style="flex: 0 0 200px; background: #f8f9fa; padding: 25px 15px; text-align: center; border-right: 1px solid #eee; display: flex; flex-direction: column; justify-content: center; align-items: center;">
-                        <div style="font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 12px; white-space: nowrap;">Account Level</div>
-                        
-                        <div class="lvl-badge lvl-${lvl}" style="font-size: 14px; padding: 6px 16px; margin-bottom: 8px; transform: scale(1.2);">
-                             <span style="margin-right:5px;">${config.icon}</span> ${config.name}
-                        </div>
-                        
-                        <div style="margin-top: 10px; font-size: 12px; color: #999; font-weight: 600;">
-                            Scale: Lvl.${lvl}
-                        </div>
-                    </div>
+    // 标题 + meta(时间)
+    document.getElementById('assetAnalysisTitle').textContent = window.I18N.header_report || '云资产报告';
+    document.getElementById('assetAnalysisMeta').innerHTML =
+        '<span><i class="far fa-clock"></i> ' + new Date().toLocaleString() + '</span>';
 
-                    <div style="flex: 1; display: flex; align-items: center; justify-content: space-around; padding: 20px 10px;">
-                        <div style="flex: 1; border-right: 1px solid #f0f0f0; padding: 0 10px; text-align: center;">
-                            <div style="font-size: 12px; color: #666;">${window.I18N.header_accetTotal}</div>
-                            <div style="font-size: 24px; font-weight: 600;">${data.totalCount}</div>
-                        </div>
-                        <div style="flex: 1; border-right: 1px solid #f0f0f0; padding: 0 10px; text-align: center;">
-                            <div style="font-size: 12px; color: #666;">${window.I18N.header_upgreadeTotal}</div>
-                            <div style="font-size: 24px; font-weight: 600; color: #2196f3;">${data.upgradeCount}</div>
-                        </div>
-                        <div style="flex: 1; border-right: 1px solid #f0f0f0; padding: 0 10px; text-align: center;">
-                            <div style="font-size: 12px; color: #666;">${window.I18N.header_freeTotal}</div>
-                            <div style="font-size: 24px; font-weight: 600;">${data.freeCount}</div>
-                        </div>
-                        <div style="flex: 1; padding: 0 10px; text-align: center;">
-                            <div style="font-size: 12px; color: #666;">${window.I18N.header_accountCost}</div>
-                            <div style="font-size: 24px; font-weight: 600; color: #1abc9c;">${data.totalCost}</div>
-                        </div>
-                    </div>
-                </div>
+    // body:Account Level 卡片 + 4 项统计 + AI 分析结果区
+    const bodyHtml =
+        '<div style="font-family:-apple-system,sans-serif;">' +
+            '<div style="display:flex;align-items:stretch;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;background:#fff;">' +
+                '<div style="flex:0 0 200px;background:#f8f9fa;padding:25px 15px;text-align:center;border-right:1px solid #eee;display:flex;flex-direction:column;justify-content:center;align-items:center;">' +
+                    '<div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px;white-space:nowrap;">Account Level</div>' +
+                    '<div class="lvl-badge lvl-' + lvl + '" style="font-size:14px;padding:6px 16px;margin-bottom:8px;transform:scale(1.2);">' +
+                        '<span style="margin-right:5px;">' + config.icon + '</span> ' + config.name +
+                    '</div>' +
+                    '<div style="margin-top:10px;font-size:12px;color:#999;font-weight:600;">Scale: Lvl.' + lvl + '</div>' +
+                '</div>' +
+                '<div style="flex:1;display:flex;align-items:center;justify-content:space-around;padding:20px 10px;">' +
+                    '<div style="flex:1;border-right:1px solid #f0f0f0;padding:0 10px;text-align:center;">' +
+                        '<div style="font-size:12px;color:#666;">' + window.I18N.header_accetTotal + '</div>' +
+                        '<div style="font-size:24px;font-weight:600;">' + data.totalCount + '</div>' +
+                    '</div>' +
+                    '<div style="flex:1;border-right:1px solid #f0f0f0;padding:0 10px;text-align:center;">' +
+                        '<div style="font-size:12px;color:#666;">' + window.I18N.header_upgreadeTotal + '</div>' +
+                        '<div style="font-size:24px;font-weight:600;color:#2196f3;">' + data.upgradeCount + '</div>' +
+                    '</div>' +
+                    '<div style="flex:1;border-right:1px solid #f0f0f0;padding:0 10px;text-align:center;">' +
+                        '<div style="font-size:12px;color:#666;">' + window.I18N.header_freeTotal + '</div>' +
+                        '<div style="font-size:24px;font-weight:600;">' + data.freeCount + '</div>' +
+                    '</div>' +
+                    '<div style="flex:1;padding:0 10px;text-align:center;">' +
+                        '<div style="font-size:12px;color:#666;">' + window.I18N.header_accountCost + '</div>' +
+                        '<div style="font-size:24px;font-weight:600;color:#1abc9c;">' + data.totalCost + '</div>' +
+                    '</div>' +
+                '</div>' +
+            '</div>' +
+            '<div id="aiAnalysisResult" style="margin-top:20px;border-top:1px dashed #e2e8f0;padding-top:15px;text-align:left;display:none;">' +
+                '<div style="margin-bottom:10px;font-weight:bold;color:#6c5ce7;font-size:14px;">' +
+                    '<i class="fas fa-robot"></i> ' + window.I18N.ai_analyzeRes + ':' +
+                '</div>' +
+                '<div id="aiContentText" style="background:#f9f9f9;padding:15px;border-radius:6px;font-size:13px;line-height:1.8;color:#2d3436;white-space:pre-wrap;word-break:break-all;font-family:Monaco,Menlo,Consolas,monospace;border:1px solid #f0f0f0;max-height:400px;overflow-y:auto;"></div>' +
+            '</div>' +
+        '</div>';
+    document.getElementById('assetAnalysisBody').innerHTML = bodyHtml;
 
-                <div id="aiAnalysisResult" style="margin-top: 20px; border-top: 1px dashed #eee; padding-top: 15px; text-align: left; display: none;">
-                    <div style="margin-bottom: 10px; font-weight: bold; color: #6c5ce7; font-size: 14px;">
-                        <i class="fas fa-robot"></i> ${window.I18N.ai_analyzeRes}：
-                    </div>
-                    <div id="aiContentText" style="
-                        background: #f9f9f9; 
-                        padding: 15px; 
-                        border-radius: 6px; 
-                        font-size: 13px; 
-                        line-height: 1.8; 
-                        color: #2d3436; 
-                        white-space: pre-wrap; 
-                        word-break: break-all;
-                        font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
-                        border: 1px solid #f0f0f0;
-                        max-height: 400px;
-                        overflow-y: auto;
-                    "></div>
-                </div>
+    // footer:AI 分析 + 关闭
+    document.getElementById('assetAnalysisFooter').innerHTML =
+        '<button id="aiAnalyzeBtn" onclick="executeAiAuditStream()" style="background:#6c5ce7;color:#fff;border:none;padding:8px 22px;border-radius:6px;cursor:pointer;font-size:13px;margin-right:10px;">' +
+            '<i class="fas fa-magic"></i> ' + window.I18N.ai_analyze +
+        '</button>' +
+        '<button class="app-modal-btn" onclick="closeAssetAnalysisModal()">' + (window.I18N.header_closeReport || '关闭报告') + '</button>';
 
-                <div style="margin-top: 20px; display: flex; justify-content: space-between; align-items: center;">
-                    <div style="font-size: 11px; color: #999;">
-                        <i class="fas fa-clock"></i> ${new Date().toLocaleString()}
-                    </div>
-                    <button id="aiAnalyzeBtn" onclick="executeAiAuditStream()" style="
-                        background: #6c5ce7; color: white; border: none; padding: 8px 20px; border-radius: 4px; cursor: pointer; font-size: 13px;
-                    ">
-                        <i class="fas fa-magic"></i> ${window.I18N.ai_analyze}
-                    </button>
-                </div>
-            </div>
-        `
-    });
+    document.getElementById('assetAnalysisModal').classList.add('open');
 }
 
 
@@ -944,10 +932,10 @@ async function executeAiAuditStream() {
                     let content = line.substring(line.indexOf(':') + 1);
                     fullText += content.trim() + "\n";
                     contentBox.innerText = fullText;
-                    const swalContainer = document.querySelector('.swal2-html-container');
-                    if (swalContainer) {
-                        swalContainer.scrollTop = swalContainer.scrollHeight;
-                    }
+                    // 滚动 AI 内容区(原 swal2-html-container 已替换为 app-modal-body)
+                    contentBox.scrollTop = contentBox.scrollHeight;
+                    const modalBody = document.getElementById('assetAnalysisBody');
+                    if (modalBody) modalBody.scrollTop = modalBody.scrollHeight;
                 }
             }
         }
