@@ -17,9 +17,12 @@ body .swal2-container {
 }
 
 body .swal2-container .swal2-popup {
-    width: min(380px, calc(100vw - 32px)) !important;
+    width: min(520px, calc(100vw - 32px)) !important;
     max-width: calc(100vw - 32px) !important;
     max-height: calc(100vh - 32px) !important;
+    height: auto !important;
+    align-self: center !important;
+    justify-self: center !important;
     padding: 20px 22px 18px !important;
     border: 1px solid var(--swal-app-border) !important;
     border-radius: 10px !important;
@@ -38,7 +41,7 @@ body .swal2-container .swal2-popup.swal2-icon-question {
 
 body .swal2-container .swal2-popup.swal-wide,
 body .swal2-container .swal2-popup.swal-wide-popup {
-    width: min(560px, calc(100vw - 32px)) !important;
+    width: min(720px, calc(100vw - 32px)) !important;
 }
 
 body .swal2-container .swal2-popup.swal-wide .swal2-html-container,
