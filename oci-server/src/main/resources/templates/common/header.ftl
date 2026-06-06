@@ -2,6 +2,9 @@
 <meta name="_csrf_header" content="${_csrf.headerName}">
 
 <div class="top-nav">
+    <button id="sidebarToggleBtn" class="sidebar-toggle-btn" onclick="toggleSidebar(event)" aria-label="切换菜单" title="收起/展开菜单">
+        <i class="fas fa-bars"></i>
+    </button>
     <a href="/index" class="brand">
         <h1 class="brand-title">${siteLogoName!'OCI-START'}</h1>
     </a>

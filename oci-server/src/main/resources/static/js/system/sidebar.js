@@ -3,12 +3,37 @@ document.addEventListener('DOMContentLoaded', function() {
     expandMenusWithActiveChildren();
 
     initializeMenuVisibility();
+    initializeSidebarCollapse();
 
     document.addEventListener('cloudProviderChanged', function(event) {
         const cloudType = event.detail.type;
         updateMenuVisibility(cloudType);
     });
 });
+
+/**
+ * 把 head 预设的 preload-sidebar-collapsed 转移到 body.sidebar-collapsed,
+ * 这样 transition 才会作用于后续 toggle 动画(preload 阶段刻意不带动画,防闪烁)。
+ */
+function initializeSidebarCollapse() {
+    var preload = document.documentElement.classList.contains('preload-sidebar-collapsed');
+    if (preload) {
+        document.body.classList.add('sidebar-collapsed');
+        // 下一帧再移除 preload class,确保浏览器已应用初始状态
+        requestAnimationFrame(function () {
+            document.documentElement.classList.remove('preload-sidebar-collapsed');
+        });
+    }
+}
+
+/**
+ * 切换侧边栏折叠状态,持久化到 localStorage
+ */
+function toggleSidebar(e) {
+    if (e && e.stopPropagation) e.stopPropagation();
+    var collapsed = document.body.classList.toggle('sidebar-collapsed');
+    try { localStorage.setItem('sidebar_collapsed', collapsed ? '1' : '0'); } catch (_) {}
+}
 
 function getSidebarCloudType() {
     const urlParams = new URLSearchParams(window.location.search);

@@ -15,16 +15,24 @@
         html, body { margin: 0; padding: 0; overflow: hidden; background: #1a1d21; }
         [data-theme="light"] html, [data-theme="light"] body { background: #f0f4f8; }
         body { display: flex; flex-direction: column; height: 100vh; padding-top: 60px; box-sizing: border-box; }
-        .admin-main > main { background-color: #1a1d21; }
+        .admin-main > main {
+            background-color: #1a1d21;
+            margin-left: 180px;
+            transition: margin-left 0.3s ease;
+        }
         [data-theme="light"] .admin-main > main { background-color: #f0f4f8; }
+        body.sidebar-collapsed .admin-main > main { margin-left: 0; }
         @media (max-width: 768px) { .admin-main > main { margin-left: 150px !important; } }
     </style>
     <script>
-        /* 防闪烁：CSS 加载前立即设置外壳主题 */
+        /* 防闪烁：CSS 加载前立即设置外壳主题 + sidebar 折叠状态 */
         (function () {
             var t = localStorage.getItem('oci_theme') || 'dark';
             if (t === 'system') t = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
             document.documentElement.dataset.theme = t;
+            if (localStorage.getItem('sidebar_collapsed') === '1') {
+                document.documentElement.classList.add('preload-sidebar-collapsed');
+            }
         })();
     </script>
     <!-- 移动端响应式适配层（放在已有样式之后，确保覆盖优先级正确） -->
@@ -40,7 +48,7 @@
 <div class="admin-main" style="display: flex; flex: 1; min-height: 0;">
     <#include "common/sidebar.ftl">
 
-    <main style="flex: 1; position: relative; margin-left: 180px;">
+    <main style="flex: 1; position: relative;">
         <iframe id="biz-frame" name="biz-frame" src="${initialPath!''}" frameborder="0" style="width: 100%; height: 100%;"></iframe>
     </main>
 </div>

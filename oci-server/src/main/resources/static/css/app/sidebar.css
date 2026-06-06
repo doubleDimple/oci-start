@@ -9,6 +9,19 @@
     box-sizing: border-box;
     background-color: var(--sidebar-bg);
     box-shadow: 2px 0 8px rgba(0, 0, 0, 0.15);
+    transition: transform 0.3s ease;
+    will-change: transform;
+}
+
+/* 折叠状态:body.sidebar-collapsed 由 toggleSidebar() 切换;
+   html.preload-sidebar-collapsed 在 head inline script 预设,避免首次加载闪烁 */
+body.sidebar-collapsed .sidebar,
+html.preload-sidebar-collapsed .sidebar {
+    transform: translateX(-100%);
+}
+html.preload-sidebar-collapsed .admin-main > main {
+    margin-left: 0 !important;
+    transition: none !important;
 }
 
 body > main,
