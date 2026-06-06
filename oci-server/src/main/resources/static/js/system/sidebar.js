@@ -267,8 +267,18 @@ function expandMenusWithActiveChildren() {
 }
 
 function toggleMenu(navLink, navChildren) {
-    const isExpanded = navLink.getAttribute('aria-expanded') === 'true';
+    // 折叠态下点击一级菜单:先展开 sidebar,然后强制 expand 当前 menu
+    // (而不是 toggle —— 折叠状态下子菜单不可见,toggle 语义无意义)
+    if (document.body.classList.contains('sidebar-collapsed')) {
+        toggleSidebar();
+        // 等下一帧再 expand,确保 CSS 已切换、navChildren 不再被 display:none 强制隐藏
+        requestAnimationFrame(function () {
+            expandMenu(navLink, navChildren);
+        });
+        return;
+    }
 
+    const isExpanded = navLink.getAttribute('aria-expanded') === 'true';
     if (isExpanded) {
         collapseMenu(navLink, navChildren);
     } else {
