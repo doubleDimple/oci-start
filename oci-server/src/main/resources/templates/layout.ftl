@@ -13,8 +13,10 @@
     <link rel="stylesheet" href="/css/app/sidebar.css">
     <style>
         html, body { margin: 0; padding: 0; overflow: hidden; background: #1a1d21; }
-        [data-theme="light"] body { background: #f0f4f8; }
+        [data-theme="light"] html, [data-theme="light"] body { background: #f0f4f8; }
         body { display: flex; flex-direction: column; height: 100vh; padding-top: 60px; box-sizing: border-box; }
+        .admin-main > main { background-color: #1a1d21; }
+        [data-theme="light"] .admin-main > main { background-color: #f0f4f8; }
         @media (max-width: 768px) { .admin-main > main { margin-left: 150px !important; } }
     </style>
     <script>

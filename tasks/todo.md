@@ -538,5 +538,69 @@ OCI 实例列表页面加"一键导出"按钮,导出所有租户所有机器的:
 - **Maven 编译**:本环境 JDK 21 + Lombok 1.18.24 不兼容,无法跑。
   Controller 改动是新增方法,手动核对 import 与签名,语法 / 类型无歧义
 
+---
+
+# 修复模态框下方区域变黑(2026-06-06)
+
+## 用户反馈
+
+打开任意 modal(消息中心→账号状态提醒、资产分析→云资产报告、账号批量检测→账号检测中等)时,
+modal 之外的区域**下半部分变成纯黑**,而非半透明灰色。
+
+## 根因诊断
+
+`layout.ftl` 第 15-16 行(改前):
+```css
+html, body { ... background: #1a1d21; }
+[data-theme="light"] body { background: #f0f4f8; }
+```
+
+3 个独立问题叠加:
+
+1. **light theme 没覆盖 html**:只覆盖 `body`,`html` 仍是 `#1a1d21`
+2. **`<main>` 元素没有 background-color**(line 41 inline style 只有 flex 布局)
+3. **iframe 元素默认透明**(浏览器默认)
+
+链路:iframe 加载的页面 `<body>` 高度撑不满 viewport 时(page-card 内容少时),
+透过 iframe → 透过透明 main → 露出 `html` 的 `#1a1d21` 深色。
+modal-overlay 是 `rgba(0,0,0,0.5)` 半透明黑:
+- page-card 白 + 50% 黑 = 浅灰 ✅
+- `#1a1d21` 深色 + 50% 黑 = 几乎纯黑 ❌(用户感知"黑屏")
+
+## 修复方案 B(用户选)
+
+`layout.ftl` 第 14-19 行 `<style>` 块改动:
+1. line 16 把 `[data-theme="light"] body` 扩成 `[data-theme="light"] html, [data-theme="light"] body`
+2. 新增 `<main>` 的 dark default + light override 兜底(无论 iframe / iframe body 是否透明,
+   `<main>` 始终有底色)
+
+## 步骤
+
+- [x] 1. `layout.ftl:14-19` 加 2 行 + 改 1 行(共 +2 行 / -0)
+- [ ] 2. 提交 push
+- [ ] 3. 用户实测各 modal 不再黑屏
+
+## 关键决策
+
+- **不动业务页面**:从 layout 层兜底,而不是逐页检查 body 是否设置 background。
+  各业务页 modal 行为不变,只是后方背景变正常
+- **保持 dark 为默认**:与 layout.ftl line 23 inline script(`localStorage || 'dark'`)
+  默认 dark 行为一致
+- **不动 modal-overlay 通用 CSS**:`rgba(0,0,0,0.5)` 是标准模态遮罩,无问题
+
+## Review
+
+| 文件 | 增 / 减 | 内容 |
+|------|--------|------|
+| `layout.ftl` | +2 / -0 (line 16 修改 + 2 行新增) | light theme 同时覆盖 html;`<main>` 加跟随主题的 background |
+
+### 未验证项
+
+需要用户实测:
+1. 任意 modal 打开,后方区域为浅灰(light theme)/深灰(dark theme),**不再纯黑**
+2. dark / light 主题切换正常,modal 后方颜色随之切换
+3. 移动端(<768px)布局未受影响
+
+
 
 
