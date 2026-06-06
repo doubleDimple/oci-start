@@ -177,3 +177,35 @@
 <script src="/js/common/request.js"></script>
 <script src="/js/common/loading.js"></script>
 <script src="/js/system/header.js"></script>
+
+<!-- 消息详情 modal(无遮罩浮窗) -->
+<div id="messageDetailModal" class="app-modal">
+    <div class="app-modal-content">
+        <button class="app-modal-close" onclick="closeMessageDetailModal()" title="关闭">
+            <i class="fas fa-times"></i>
+        </button>
+        <div class="app-modal-header">
+            <h2 id="messageDetailTitle">消息详情</h2>
+            <div class="app-modal-meta" id="messageDetailMeta"></div>
+        </div>
+        <div class="app-modal-body" id="messageDetailBody"></div>
+        <div class="app-modal-footer">
+            <button class="app-modal-btn" onclick="closeMessageDetailModal()">关闭</button>
+        </div>
+    </div>
+</div>
+
+<!-- 资产分析 modal(无遮罩浮窗,wide 900px) -->
+<div id="assetAnalysisModal" class="app-modal">
+    <div class="app-modal-content app-modal-wide">
+        <button class="app-modal-close" onclick="closeAssetAnalysisModal()" title="关闭">
+            <i class="fas fa-times"></i>
+        </button>
+        <div class="app-modal-header">
+            <h2 id="assetAnalysisTitle">云资产报告</h2>
+            <div class="app-modal-meta" id="assetAnalysisMeta"></div>
+        </div>
+        <div class="app-modal-body" id="assetAnalysisBody"></div>
+        <div class="app-modal-footer" id="assetAnalysisFooter"></div>
+    </div>
+</div>

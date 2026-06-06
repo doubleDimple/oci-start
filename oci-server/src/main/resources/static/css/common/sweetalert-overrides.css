@@ -17,17 +17,39 @@ body .swal2-container {
 }
 
 body .swal2-container .swal2-popup {
-    width: min(380px, calc(100vw - 32px)) !important;
+    width: min(600px, calc(100vw - 32px)) !important;
     max-width: calc(100vw - 32px) !important;
     max-height: calc(100vh - 32px) !important;
-    padding: 20px 22px 18px !important;
+    height: auto !important;
+    align-self: center !important;
+    justify-self: center !important;
+    padding: 24px 28px 20px !important;
     border: 1px solid var(--swal-app-border) !important;
-    border-radius: 10px !important;
+    border-radius: 12px !important;
     background: var(--swal-app-surface) !important;
     color: var(--swal-app-text) !important;
     box-shadow: var(--swal-app-shadow) !important;
     font-size: 14px !important;
     overflow: visible !important;
+}
+
+/* light theme:popup 用浅色,与"关于"modal 风格一致 */
+[data-theme="light"] body .swal2-container .swal2-popup {
+    background: #ffffff !important;
+    color: #1a202c !important;
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: 0 20px 50px -12px rgba(0, 0, 0, 0.25) !important;
+}
+[data-theme="light"] body .swal2-container .swal2-title {
+    color: #1a202c !important;
+}
+[data-theme="light"] body .swal2-container .swal2-html-container {
+    color: #475569 !important;
+}
+[data-theme="light"] body .swal2-container .swal2-actions .swal2-cancel {
+    background: #f1f5f9 !important;
+    border: 1px solid #e2e8f0 !important;
+    color: #475569 !important;
 }
 
 body .swal2-container .swal2-popup.compact-confirm,
@@ -38,7 +60,7 @@ body .swal2-container .swal2-popup.swal2-icon-question {
 
 body .swal2-container .swal2-popup.swal-wide,
 body .swal2-container .swal2-popup.swal-wide-popup {
-    width: min(560px, calc(100vw - 32px)) !important;
+    width: min(720px, calc(100vw - 32px)) !important;
 }
 
 body .swal2-container .swal2-popup.swal-wide .swal2-html-container,

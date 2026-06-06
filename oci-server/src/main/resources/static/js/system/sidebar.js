@@ -3,12 +3,147 @@ document.addEventListener('DOMContentLoaded', function() {
     expandMenusWithActiveChildren();
 
     initializeMenuVisibility();
+    initializeSidebarCollapse();
 
     document.addEventListener('cloudProviderChanged', function(event) {
         const cloudType = event.detail.type;
         updateMenuVisibility(cloudType);
     });
 });
+
+/**
+ * 把 head 预设的 preload-sidebar-collapsed 转移到 body.sidebar-collapsed,
+ * 这样 transition 才会作用于后续 toggle 动画(preload 阶段刻意不带动画,防闪烁)。
+ * 同时给折叠按钮 / 搜索框绑定事件。
+ */
+function initializeSidebarCollapse() {
+    var preload = document.documentElement.classList.contains('preload-sidebar-collapsed');
+    if (preload) {
+        document.body.classList.add('sidebar-collapsed');
+        requestAnimationFrame(function () {
+            document.documentElement.classList.remove('preload-sidebar-collapsed');
+        });
+    }
+
+    var btn = document.getElementById('sidebarToggleBtn');
+    if (btn && !btn._sidebarBound) {
+        btn._sidebarBound = true;
+        btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            toggleSidebar();
+        });
+    }
+
+    initializeSidebarSearch();
+}
+
+/**
+ * 切换侧边栏折叠状态,持久化到 localStorage
+ * 折叠时如果有搜索关键词,清空搜索(否则收起后看不到效果)
+ */
+function toggleSidebar() {
+    var collapsed = document.body.classList.toggle('sidebar-collapsed');
+    try { localStorage.setItem('sidebar_collapsed', collapsed ? '1' : '0'); } catch (_) {}
+    if (collapsed) {
+        var input = document.getElementById('sidebarSearchInput');
+        if (input && input.value) {
+            input.value = '';
+            applySidebarSearch('');
+        }
+    }
+}
+
+/* ============================================================
+   侧边栏搜索:支持一级菜单(.nav-parent > .nav-link)和
+   二级菜单(.nav-children > .nav-link)模糊匹配
+   ============================================================ */
+function initializeSidebarSearch() {
+    var input = document.getElementById('sidebarSearchInput');
+    var clearBtn = document.getElementById('sidebarSearchClear');
+    if (!input || input._sidebarBound) return;
+    input._sidebarBound = true;
+
+    var wrapper = input.closest('.sidebar-search');
+
+    input.addEventListener('input', function () {
+        var kw = input.value.trim().toLowerCase();
+        if (wrapper) wrapper.classList.toggle('has-value', kw.length > 0);
+        applySidebarSearch(kw);
+    });
+
+    input.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+            input.value = '';
+            if (wrapper) wrapper.classList.remove('has-value');
+            applySidebarSearch('');
+            input.blur();
+        }
+    });
+
+    if (clearBtn) {
+        clearBtn.addEventListener('click', function () {
+            input.value = '';
+            if (wrapper) wrapper.classList.remove('has-value');
+            applySidebarSearch('');
+            input.focus();
+        });
+    }
+}
+
+/**
+ * 根据关键词过滤侧边栏菜单
+ * @param {string} kw 关键词(已 lowercase + trim)
+ */
+function applySidebarSearch(kw) {
+    var navParents = document.querySelectorAll('.sidebar .nav-parent');
+    var emptyHint = document.getElementById('sidebarSearchEmpty');
+    var anyVisible = false;
+
+    navParents.forEach(function (parent) {
+        var parentLink = parent.querySelector(':scope > .nav-link');
+        var parentTextEl = parentLink ? parentLink.querySelector('span') : null;
+        var parentText = parentTextEl ? parentTextEl.textContent.toLowerCase() : '';
+
+        var children = parent.querySelectorAll('.nav-children > .nav-link');
+        var anyChildMatch = false;
+
+        if (!kw) {
+            // 清空搜索:全部恢复
+            parent.classList.remove('sidebar-hidden');
+            children.forEach(function (c) { c.classList.remove('sidebar-hidden'); });
+            anyVisible = true;
+            return;
+        }
+
+        var parentMatch = parentText.indexOf(kw) !== -1;
+
+        children.forEach(function (child) {
+            var childSpan = child.querySelector('span');
+            var childText = childSpan ? childSpan.textContent.toLowerCase() : '';
+            var match = childText.indexOf(kw) !== -1;
+            child.classList.toggle('sidebar-hidden', !match && !parentMatch);
+            if (match) anyChildMatch = true;
+        });
+
+        if (parentMatch || anyChildMatch) {
+            parent.classList.remove('sidebar-hidden');
+            anyVisible = true;
+            // 自动展开,让命中的二级菜单可见
+            var navLink = parent.querySelector(':scope > .nav-link');
+            var navChildren = parent.querySelector(':scope > .nav-children');
+            if (navLink && navChildren && navLink.getAttribute('aria-expanded') !== 'true') {
+                navLink.setAttribute('aria-expanded', 'true');
+                navChildren.setAttribute('aria-hidden', 'false');
+                navChildren.style.display = 'block';
+                parent.classList.add('nav-expanded');
+            }
+        } else {
+            parent.classList.add('sidebar-hidden');
+        }
+    });
+
+    if (emptyHint) emptyHint.style.display = (kw && !anyVisible) ? 'block' : 'none';
+}
 
 function getSidebarCloudType() {
     const urlParams = new URLSearchParams(window.location.search);
@@ -132,8 +267,18 @@ function expandMenusWithActiveChildren() {
 }
 
 function toggleMenu(navLink, navChildren) {
-    const isExpanded = navLink.getAttribute('aria-expanded') === 'true';
+    // 折叠态下点击一级菜单:先展开 sidebar,然后强制 expand 当前 menu
+    // (而不是 toggle —— 折叠状态下子菜单不可见,toggle 语义无意义)
+    if (document.body.classList.contains('sidebar-collapsed')) {
+        toggleSidebar();
+        // 等下一帧再 expand,确保 CSS 已切换、navChildren 不再被 display:none 强制隐藏
+        requestAnimationFrame(function () {
+            expandMenu(navLink, navChildren);
+        });
+        return;
+    }
 
+    const isExpanded = navLink.getAttribute('aria-expanded') === 'true';
     if (isExpanded) {
         collapseMenu(navLink, navChildren);
     } else {
