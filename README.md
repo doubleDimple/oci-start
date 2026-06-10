@@ -201,25 +201,25 @@ location ~ ^/websockify/(\d+)$ {
 
 <table>
   <tr>
-    <td align="center" width="33%">
+    <td align="center" width="25%">
       <a href="https://sponsorship.forztn.com/github/doubleDimple/oci-start ">
         <b>ForZTN</b><br>
-        <sub>感谢赞助商-ForZTN</sub>
+        <sub>赞助商-ForZTN</sub>
       </a>
     </td>
-    <td align="center" width="33%">
+    <td align="center" width="25%">
       <a href="https://yxvm.com/aff.php?aff=762">
         <b>YxVM</b><br>
         <sub>服务器资源</sub>
       </a>
     </td>
-    <td align="center" width="33%">
+    <td align="center" width="25%">
       <a href="https://github.com/NodeSeekDev/NodeSupport">
         <b>NodeSeek</b><br>
         <sub>社区论坛</sub>
       </a>
     </td>
-    <td align="center" width="33%">
+    <td align="center" width="25%">
       <a href="https://dartnode.com">
         <b>DartNode</b><br>
         <sub>VPS提供商</sub>
@@ -227,7 +227,7 @@ location ~ ^/websockify/(\d+)$ {
     </td>
   </tr>
   <tr>
-    <td align="center" colspan="3">
+    <td align="center" colspan="4">
       <a href="https://edgeone.ai/zh?from=github">
         <img src="https://edgeone.ai/media/34fe3a45-492d-4ea4-ae5d-ea1087ca7b4b.png" width="280" alt="Tencent EdgeOne"/>
       </a>
