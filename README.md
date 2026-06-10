@@ -202,6 +202,12 @@ location ~ ^/websockify/(\d+)$ {
 <table>
   <tr>
     <td align="center" width="33%">
+      <a href="https://sponsorship.forztn.com/github/doubleDimple/oci-start ">
+        <b>ForZTN</b><br>
+        <sub>感谢赞助商-ForZTN</sub>
+      </a>
+    </td>
+    <td align="center" width="33%">
       <a href="https://yxvm.com/aff.php?aff=762">
         <b>YxVM</b><br>
         <sub>服务器资源</sub>
@@ -217,14 +223,6 @@ location ~ ^/websockify/(\d+)$ {
       <a href="https://dartnode.com">
         <b>DartNode</b><br>
         <sub>VPS提供商</sub>
-      </a>
-    </td>
-  </tr>
-  <tr>
-    <td align="center" width="33%">
-      <a href="https://sponsorship.forztn.com/github/doubleDimple/oci-start ">
-        <b>DartNode</b><br>
-        <sub>感谢赞助商 - ForZTN</sub>
       </a>
     </td>
   </tr>
