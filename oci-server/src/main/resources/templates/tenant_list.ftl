@@ -306,9 +306,9 @@
                                         <button class="dropdown-item" onclick="showSocialLoginModal('${tenant.id?c}', '${tenant.cloudType!1}')" title="${msg.get('tenant.socialLogin')!'社媒配置'}">
                                             <i class="fas fa-share-alt"></i><span>${msg.get('tenant.socialLogin')}</span>
                                         </button>
-                                            <#--<button class="dropdown-item" onclick="showTransferModal('${tenant.id?c}')">
-                                                <i class="fas fa-exchange-alt"></i><span>${msg.get("tenant.transfer")}</span>
-                                            </button>-->
+                                        <button class="dropdown-item" onclick="showQuotaModal('${tenant.id?c}')" title="查看配额">
+                                            <i class="fas fa-chart-bar" style="color:#2563eb;"></i><span>查看配额</span>
+                                        </button>
                                         <#else>
                                         <#-- 已转移：显示“转移详情”按钮 -->
                                             <#--<button class="dropdown-item" onclick="showTransferDetail('${tenant.id?c}', '${tenant.transferAmount!'0'}')" title="转移详情">
@@ -1045,6 +1045,54 @@
 </div>
 
 
+<!-- 配额查看模态框 -->
+<div id="quotaModal" class="modal-overlay" onclick="if(event.target===this)closeModal('quotaModal')">
+    <div style="background:var(--surface);border:1px solid var(--card-border);border-radius:16px;box-shadow:0 24px 64px rgba(0,0,0,0.28);width:min(860px,96vw);max-height:90vh;display:flex;flex-direction:column;overflow:hidden;">
+
+        <!-- Header -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid var(--card-border);background:var(--surface-2,var(--surface));flex-shrink:0;">
+            <div style="display:flex;align-items:center;gap:10px;">
+                <div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#2563eb,#60a5fa);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <i class="fas fa-chart-bar" style="color:#fff;font-size:15px;"></i>
+                </div>
+                <div>
+                    <div style="font-size:15px;font-weight:700;color:var(--text-primary);">账号配额</div>
+                    <div style="font-size:11px;color:var(--text-secondary);margin-top:2px;" id="quotaModalSubtitle">选择租户和服务后点击查询</div>
+                </div>
+            </div>
+            <button onclick="closeModal('quotaModal')" style="background:none;border:none;cursor:pointer;width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--text-secondary);font-size:20px;line-height:1;" onmouseover="this.style.background='var(--hover-bg)'" onmouseout="this.style.background='none'">&times;</button>
+        </div>
+
+        <!-- Filter bar -->
+        <div style="display:flex;align-items:flex-end;gap:12px;padding:16px 24px;border-bottom:1px solid var(--card-border);background:var(--surface-2,var(--surface));flex-shrink:0;flex-wrap:wrap;">
+            <div style="flex:1;min-width:180px;">
+                <div style="font-size:11px;font-weight:600;color:var(--text-secondary);margin-bottom:6px;letter-spacing:.4px;">租户</div>
+                <select id="quotaTenantSelect" class="form-control" data-custom-select data-placeholder="选择租户...">
+                </select>
+            </div>
+            <div style="flex:1;min-width:160px;">
+                <div style="font-size:11px;font-weight:600;color:var(--text-secondary);margin-bottom:6px;letter-spacing:.4px;">服务类型</div>
+                <select id="quotaServiceSelect" class="form-control" data-custom-select>
+                    <option value="compute">计算 (Compute)</option>
+                    <option value="block-storage">块存储 (Block Storage)</option>
+                    <option value="object-storage">对象存储 (Object Storage)</option>
+                </select>
+            </div>
+            <button onclick="doQuotaQuery()" id="quotaQueryBtn" class="btn btn-primary" style="height:38px;padding:0 20px;white-space:nowrap;flex-shrink:0;">
+                <i class="fas fa-search"></i> 查询
+            </button>
+        </div>
+
+        <!-- Results -->
+        <div id="quotaContent" style="flex:1;overflow-y:auto;padding:20px 24px;">
+            <div style="text-align:center;padding:60px 0;color:var(--text-secondary);">
+                <i class="fas fa-chart-bar" style="font-size:36px;display:block;margin-bottom:12px;opacity:0.25;"></i>
+                <div style="font-size:13px;">选择租户和服务类型，点击查询</div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- 在body结束前引入版本信息模块 -->
 <#--<#include "common/version_info.ftl">-->
 <script>
@@ -1298,6 +1346,7 @@
                     dropdownItems += '<button class="dropdown-item" onclick="exportDataByTenant(\'' + id + '\')" title="' + tlEsc(i18n.tenant_export) + '"><i class="fas fa-download"></i> ' + tlEsc(i18n.tenant_export) + '</button>';
                     dropdownItems += '<button class="dropdown-item" onclick="handleEmailServiceAction(\'' + id + '\',' + emailEnable + ')" title="' + tlEsc(i18n.tenant_emailServer) + '"><i class="fas fa-envelope"></i><span>' + tlEsc(i18n.tenant_emailServer) + '</span></button>';
                     dropdownItems += '<button class="dropdown-item" onclick="showSocialLoginModal(\'' + id + '\',\'' + cloudType + '\')" title="' + tlEsc(i18n.tenant_socialLogin) + '"><i class="fas fa-share-alt"></i><span>' + tlEsc(i18n.tenant_socialLogin) + '</span></button>';
+                    dropdownItems += '<button class="dropdown-item" onclick="showQuotaModal(\'' + id + '\')" title="查看配额"><i class="fas fa-chart-bar" style="color:#2563eb;"></i><span>查看配额</span></button>';
                 }
                 dropdownItems += '<button class="dropdown-item" onclick="handleDelete(\'' + id + '\')" title="' + tlEsc(i18n.tenant_deleteTenant) + '"><i class="fas fa-trash"></i><span>' + tlEsc(i18n.tenant_deleteTenant) + '</span></button>';
             } else if (cloudType === 2) {
