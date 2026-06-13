@@ -20,7 +20,12 @@ import com.oracle.bmc.limits.LimitsClient;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import static com.doubledimple.ociserver.utils.oracle.OciUtils.getProvider;
 
@@ -282,6 +287,209 @@ public class OciLimitsUtils {
         }
 
         return validAds;
+    }
+
+    /**
+     * 获取租户在当前区域的全量配额信息（所有服务）。
+     * <p>
+     * 流程：
+     * 1. 列出所有支持限额的服务
+     * 2. 逐服务分页查询 LimitValues，只保留 value > 0 的限额
+     * 3. 对每个非零限额，通过 GetResourceAvailability 获取已用/可用量
+     *    - 区域级限额（availabilityDomain = null）：直接查询
+     *    - AD 级限额：逐 AD 查询后求和
+     *
+     * @return Map&lt;serviceName, List&lt;{name, total, used, available}&gt;&gt;，按服务分组
+     */
+    public static Map<String, List<Map<String, Object>>> getAllServiceQuotas(Tenant tenant) {
+        return getAllServiceQuotas(tenant, java.util.Arrays.asList("compute", "block-storage", "object-storage"));
+    }
+
+    public static Map<String, List<Map<String, Object>>> getAllServiceQuotas(Tenant tenant, List<String> targetServices) {
+        SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
+        Map<String, List<Map<String, Object>>> result = new LinkedHashMap<>();
+
+        try (LimitsClient limitsClient = LimitsClient.builder().build(provider);
+             IdentityClient identityClient = IdentityClient.builder().build(provider)) {
+
+            String compartmentId = provider.getTenantId();
+
+            // 获取所有 AD（供 AD 级别的限额聚合使用）
+            List<AvailabilityDomain> ads = identityClient.listAvailabilityDomains(
+                    ListAvailabilityDomainsRequest.builder()
+                            .compartmentId(compartmentId)
+                            .build()).getItems();
+
+            for (String svcName : targetServices) {
+
+                // [0]=total, [1]=used, [2]=available
+                Map<String, long[]> adLimits = new LinkedHashMap<>();      // AD 级限额（跨 AD 累加）
+                Map<String, long[]> regionalLimits = new LinkedHashMap<>(); // 区域级限额
+
+                // ── Pass 1：逐 AD 查询限额值 + 可用性，合并在同一 AD 循环 ──
+                for (AvailabilityDomain ad : ads) {
+                    Set<String> adLimitNames = new LinkedHashSet<>();
+                    String nextPage = null;
+                    do {
+                        ListLimitValuesResponse lvResp = limitsClient.listLimitValues(
+                                ListLimitValuesRequest.builder()
+                                        .compartmentId(compartmentId)
+                                        .serviceName(svcName)
+                                        .availabilityDomain(ad.getName())
+                                        .page(nextPage)
+                                        .build());
+                        for (LimitValueSummary lv : lvResp.getItems()) {
+                            if (lv.getValue() == null || lv.getValue() <= 0) continue;
+                            adLimits.computeIfAbsent(lv.getName(), k -> new long[3]);
+                            adLimits.get(lv.getName())[0] += lv.getValue();
+                            adLimitNames.add(lv.getName());
+                        }
+                        nextPage = lvResp.getOpcNextPage();
+                    } while (nextPage != null);
+
+                    // 同一 AD 循环内获取可用性，避免二次遍历 AD
+                    for (String limitName : adLimitNames) {
+                        try {
+                            ResourceAvailability ra = limitsClient.getResourceAvailability(
+                                    GetResourceAvailabilityRequest.builder()
+                                            .compartmentId(compartmentId)
+                                            .serviceName(svcName)
+                                            .limitName(limitName)
+                                            .availabilityDomain(ad.getName())
+                                            .build()).getResourceAvailability();
+                            if (ra.getUsed() != null)      adLimits.get(limitName)[1] += ra.getUsed();
+                            if (ra.getAvailable() != null) adLimits.get(limitName)[2] += ra.getAvailable();
+                        } catch (Exception ignored) {
+                        }
+                    }
+                }
+
+                // ── Pass 2：查询区域级限额（不带 AD 过滤，跳过 AD 级条目）──
+                String nextPage = null;
+                do {
+                    ListLimitValuesResponse lvResp = limitsClient.listLimitValues(
+                            ListLimitValuesRequest.builder()
+                                    .compartmentId(compartmentId)
+                                    .serviceName(svcName)
+                                    .page(nextPage)
+                                    .build());
+                    for (LimitValueSummary lv : lvResp.getItems()) {
+                        if (lv.getValue() == null || lv.getValue() <= 0) continue;
+                        if (lv.getAvailabilityDomain() != null) continue; // AD 级已在 Pass1 处理
+                        regionalLimits.put(lv.getName(), new long[]{lv.getValue(), 0L, lv.getValue()});
+                    }
+                    nextPage = lvResp.getOpcNextPage();
+                } while (nextPage != null);
+
+                for (String limitName : regionalLimits.keySet()) {
+                    try {
+                        ResourceAvailability ra = limitsClient.getResourceAvailability(
+                                GetResourceAvailabilityRequest.builder()
+                                        .compartmentId(compartmentId)
+                                        .serviceName(svcName)
+                                        .limitName(limitName)
+                                        .build()).getResourceAvailability();
+                        if (ra.getUsed() != null)      regionalLimits.get(limitName)[1] = ra.getUsed();
+                        if (ra.getAvailable() != null) regionalLimits.get(limitName)[2] = ra.getAvailable();
+                    } catch (Exception e) {
+                        log.debug("获取区域级 {}/{} 可用性失败: {}", svcName, limitName, e.getMessage());
+                    }
+                }
+
+                // ── 合并结果 ──
+                List<Map<String, Object>> quotaItems = new ArrayList<>();
+                adLimits.forEach((name, d) -> {
+                    if (d[0] <= 0) return;
+                    Map<String, Object> item = new LinkedHashMap<>();
+                    item.put("name", name);
+                    item.put("total", d[0]);
+                    item.put("used", d[1]);
+                    item.put("available", d[2] > 0 ? d[2] : Math.max(0L, d[0] - d[1]));
+                    quotaItems.add(item);
+                });
+                regionalLimits.forEach((name, d) -> {
+                    Map<String, Object> item = new LinkedHashMap<>();
+                    item.put("name", name);
+                    item.put("total", d[0]);
+                    item.put("used", d[1]);
+                    item.put("available", d[2]);
+                    quotaItems.add(item);
+                });
+
+                // 将 *-bytes 限额转换为 GB（÷ 1073741824），并重命名为 *-gb
+                for (Map<String, Object> item : quotaItems) {
+                    String n = (String) item.get("name");
+                    if (n != null && n.endsWith("-bytes")) {
+                        item.put("name", n.replace("-bytes", "-gb"));
+                        item.put("total",     ((Long) item.get("total"))     / 1073741824L);
+                        item.put("used",      ((Long) item.get("used"))      / 1073741824L);
+                        item.put("available", ((Long) item.get("available")) / 1073741824L);
+                    }
+                }
+
+                if (!quotaItems.isEmpty()) {
+                    result.put(svcName, quotaItems);
+                }
+            }
+        } catch (Exception e) {
+            log.error("获取全量配额失败: {}", e.getMessage(), e);
+        }
+        return result;
+    }
+
+    /**
+     * 查询单个服务的配额，供前端按需按服务查询（避免一次性查三个服务太慢）。
+     *
+     * @param serviceName 服务名，如 "compute"、"block-storage"、"object-storage"
+     * @return List&lt;{name, total, used, available}&gt;
+     */
+    public static List<Map<String, Object>> getSingleServiceQuotas(Tenant tenant, String serviceName) {
+        Map<String, List<Map<String, Object>>> all = getAllServiceQuotas(tenant,
+                java.util.Collections.singletonList(serviceName));
+        return all.getOrDefault(serviceName, new ArrayList<>());
+    }
+
+    /**
+     * 针对 AD 级别的配额（如 AMD free tier），跨所有 AD 汇总 total/used/available。
+     * 某些限额（例如 vm-standard-e2-1-micro-count）在不传 availabilityDomain 时 OCI 返回 400，
+     * 必须逐 AD 查询后累加。
+     *
+     * @return Map 包含 "total"、"used"、"available"，若全部失败则三项均为 0
+     */
+    public static Map<String, Long> getAggregatedAvailability(Tenant tenant, String serviceName, String limitName) {
+        SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
+        long totalUsed = 0L, totalAvailable = 0L;
+        try (IdentityClient identityClient = IdentityClient.builder().build(provider);
+             LimitsClient limitsClient = LimitsClient.builder().build(provider)) {
+
+            List<AvailabilityDomain> ads = identityClient.listAvailabilityDomains(
+                    ListAvailabilityDomainsRequest.builder()
+                            .compartmentId(provider.getTenantId())
+                            .build()).getItems();
+
+            for (AvailabilityDomain ad : ads) {
+                try {
+                    GetResourceAvailabilityRequest req = GetResourceAvailabilityRequest.builder()
+                            .compartmentId(provider.getTenantId())
+                            .serviceName(serviceName)
+                            .limitName(limitName)
+                            .availabilityDomain(ad.getName())
+                            .build();
+                    ResourceAvailability avail = limitsClient.getResourceAvailability(req).getResourceAvailability();
+                    if (avail.getUsed() != null) totalUsed += avail.getUsed();
+                    if (avail.getAvailable() != null) totalAvailable += avail.getAvailable();
+                } catch (Exception e) {
+                    log.warn("查询 AD [{}] 资源 [{}] 可用性失败: {}", ad.getName(), limitName, e.getMessage());
+                }
+            }
+        } catch (Exception e) {
+            log.error("聚合查询资源 [{}] 可用性失败: {}", limitName, e.getMessage());
+        }
+        Map<String, Long> result = new HashMap<>();
+        result.put("total", totalUsed + totalAvailable);
+        result.put("used", totalUsed);
+        result.put("available", totalAvailable);
+        return result;
     }
 
     /**
