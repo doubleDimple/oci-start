@@ -4229,3 +4229,146 @@ function closeModal(modalId) {
         modal.style.display = 'none';
     }
 }
+
+function showQuotaModal(tenantId) {
+    var modal = document.getElementById('quotaModal');
+    var content = document.getElementById('quotaContent');
+    modal.style.display = 'flex';
+    // Reset content
+    content.innerHTML = '<div style="text-align:center;padding:60px 0;color:var(--text-secondary);">'
+        + '<i class="fas fa-chart-bar" style="font-size:36px;display:block;margin-bottom:12px;opacity:0.25;"></i>'
+        + '<div style="font-size:13px;">选择租户和服务类型，点击查询</div></div>';
+    document.getElementById('quotaModalSubtitle').textContent = '选择租户和服务后点击查询';
+
+    // Fetch tenant list (clicked tenant + children if parent)
+    var tenantSel = document.getElementById('quotaTenantSelect');
+    tenantSel.innerHTML = '<option value="">加载中...</option>';
+    if (window.CustomSelect) CustomSelect.refresh(tenantSel);
+
+    var csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+    fetch('/tenants/listRegions?parentId=' + tenantId, { headers: { 'X-CSRF-TOKEN': csrfToken } })
+    .then(function(r) { return r.json(); })
+    .then(function(list) {
+        tenantSel.innerHTML = '';
+        if (!list || list.length === 0) {
+            // No children — this IS the leaf tenant, add it directly
+            tenantSel.innerHTML = '<option value="' + tenantId + '">当前租户</option>';
+        } else {
+            list.forEach(function(t) {
+                var label = t.tenancyName || t.userName || t.tenantId || t.id;
+                if (t.region) label += ' (' + t.region + ')';
+                var opt = document.createElement('option');
+                opt.value = t.id;
+                opt.textContent = label;
+                tenantSel.appendChild(opt);
+            });
+        }
+        if (window.CustomSelect) CustomSelect.refresh(tenantSel);
+    })
+    .catch(function() {
+        tenantSel.innerHTML = '<option value="' + tenantId + '">当前租户</option>';
+        if (window.CustomSelect) CustomSelect.refresh(tenantSel);
+    });
+
+    // Reset service select to compute
+    var svcSel = document.getElementById('quotaServiceSelect');
+    svcSel.value = 'compute';
+    if (window.CustomSelect) CustomSelect.refresh(svcSel);
+}
+
+function doQuotaQuery() {
+    var tenantSel  = document.getElementById('quotaTenantSelect');
+    var svcSel     = document.getElementById('quotaServiceSelect');
+    var tenantId   = tenantSel.value;
+    var svc        = svcSel.value || 'compute';
+    var svcLabels  = {'compute':'计算 (Compute)','block-storage':'块存储 (Block Storage)','object-storage':'对象存储 (Object Storage)'};
+
+    if (!tenantId) {
+        alert('请先选择租户');
+        return;
+    }
+
+    var content = document.getElementById('quotaContent');
+    var btn     = document.getElementById('quotaQueryBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 查询中...';
+
+    content.innerHTML = '<div style="text-align:center;padding:60px 0;color:var(--text-secondary);">'
+        + '<i class="fas fa-spinner fa-spin" style="font-size:28px;display:block;margin-bottom:12px;"></i>'
+        + '<div style="font-size:13px;">正在查询 ' + (svcLabels[svc]||svc) + ' 配额...</div></div>';
+
+    var csrfToken = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+    fetch('/tenants/quota?tenantId=' + tenantId + '&serviceName=' + encodeURIComponent(svc), {
+        headers: { 'X-CSRF-TOKEN': csrfToken }
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-search"></i> 查询';
+        if (data.error) {
+            content.innerHTML = '<div style="color:var(--accent-red);padding:40px;text-align:center;">'
+                + '<i class="fas fa-exclamation-circle" style="font-size:28px;display:block;margin-bottom:10px;"></i>'
+                + data.error + '</div>';
+            return;
+        }
+        var itemCount = (data.items || []).length;
+        document.getElementById('quotaModalSubtitle').textContent
+            = (data.region || '') + ' · ' + (svcLabels[svc]||svc) + ' · 共 ' + itemCount + ' 项';
+        content.innerHTML = renderQuotaContent(data);
+    })
+    .catch(function() {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-search"></i> 查询';
+        content.innerHTML = '<div style="color:var(--accent-red);padding:40px;text-align:center;">获取配额失败，请稍后重试</div>';
+    });
+}
+
+function renderQuotaContent(data) {
+    var items = data.items || [];
+    if (items.length === 0) {
+        return '<div style="padding:40px;text-align:center;color:var(--text-secondary);">'
+            + '<i class="fas fa-inbox" style="font-size:32px;display:block;margin-bottom:10px;opacity:0.35;"></i>'
+            + '<div style="font-size:13px;">该服务暂无配额数据</div></div>';
+    }
+
+    function bar(pct) {
+        var c = pct >= 90 ? '#dc2626' : pct >= 60 ? '#d97706' : '#16a34a';
+        return '<div style="height:6px;border-radius:3px;background:var(--hover-bg);border:1px solid var(--card-border);overflow:hidden;">'
+            + '<div style="height:100%;width:' + pct + '%;background:' + c + ';border-radius:3px;transition:width 0.4s;"></div></div>';
+    }
+
+    function dot(pct) {
+        var c = pct >= 90 ? '#dc2626' : pct >= 60 ? '#d97706' : '#16a34a';
+        return '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:' + c + ';margin-right:6px;flex-shrink:0;vertical-align:middle;"></span>';
+    }
+
+    var rows = items.map(function(it) {
+        var total = it.total || 0, used = it.used || 0, avail = it.available || 0;
+        var pct   = total > 0 ? Math.min(100, Math.round(used / total * 100)) : 0;
+        var ac    = avail <= 0 ? '#dc2626' : avail < total * 0.2 ? '#d97706' : '#16a34a';
+        var pc    = pct >= 90 ? '#dc2626' : pct >= 60 ? '#d97706' : 'var(--text-secondary)';
+        return '<tr style="border-bottom:1px solid var(--card-border);transition:background 0.1s;"'
+            + ' onmouseover="this.style.background=\'var(--hover-bg)\'" onmouseout="this.style.background=\'transparent\'">'
+            + '<td style="padding:9px 16px;font-size:11px;color:var(--text-primary);word-break:break-all;">'
+            + dot(pct) + it.name + '</td>'
+            + '<td style="padding:9px 12px;font-size:12px;text-align:center;color:var(--text-secondary);">' + total + '</td>'
+            + '<td style="padding:9px 12px;font-size:12px;text-align:center;color:var(--text-secondary);">' + used + '</td>'
+            + '<td style="padding:9px 12px;font-size:12px;text-align:center;font-weight:700;color:' + ac + ';">' + avail + '</td>'
+            + '<td style="padding:9px 16px;min-width:120px;">' + bar(pct) + '</td>'
+            + '<td style="padding:9px 12px;font-size:12px;text-align:center;font-weight:600;color:' + pc + ';white-space:nowrap;">' + pct + '%</td>'
+            + '</tr>';
+    }).join('');
+
+    return '<div style="border:1px solid var(--card-border);border-radius:10px;overflow:hidden;">'
+        + '<table style="width:100%;border-collapse:collapse;">'
+        + '<thead><tr style="background:var(--surface-2,var(--hover-bg));border-bottom:1px solid var(--card-border);">'
+        + '<th style="padding:9px 16px;font-size:10px;font-weight:700;color:var(--text-secondary);text-align:left;letter-spacing:.6px;text-transform:uppercase;">限额名称</th>'
+        + '<th style="padding:9px 12px;font-size:10px;font-weight:700;color:var(--text-secondary);text-align:center;width:64px;letter-spacing:.6px;text-transform:uppercase;">总量</th>'
+        + '<th style="padding:9px 12px;font-size:10px;font-weight:700;color:var(--text-secondary);text-align:center;width:64px;letter-spacing:.6px;text-transform:uppercase;">已用</th>'
+        + '<th style="padding:9px 12px;font-size:10px;font-weight:700;color:var(--text-secondary);text-align:center;width:64px;letter-spacing:.6px;text-transform:uppercase;">可用</th>'
+        + '<th style="padding:9px 16px;font-size:10px;font-weight:700;color:var(--text-secondary);width:130px;letter-spacing:.6px;text-transform:uppercase;">进度条</th>'
+        + '<th style="padding:9px 12px;font-size:10px;font-weight:700;color:var(--text-secondary);text-align:center;width:60px;letter-spacing:.6px;text-transform:uppercase;">占比</th>'
+        + '</tr></thead>'
+        + '<tbody>' + rows + '</tbody>'
+        + '</table></div>';
+}
