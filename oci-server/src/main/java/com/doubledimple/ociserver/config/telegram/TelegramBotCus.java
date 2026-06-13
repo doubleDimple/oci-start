@@ -44,6 +44,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static com.doubledimple.ocicommon.tg.TgUtils.getMaskedDisplayName;
 import static com.doubledimple.ocicommon.utils.DateTimeUtils.daysBetweenCurrent;
@@ -73,6 +75,9 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
 
     private static final int PAGE_SIZE_TENANT = 10;
     private static final int PAGE_SIZE_BOOT_LOG = 5;
+    private static final int QUOTA_TG_PAGE_SIZE = 5;
+
+    private final Map<String, List<Map<String, Object>>> quotaCache = new ConcurrentHashMap<>();
 
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
@@ -483,6 +488,16 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
                         Long tenantId = Long.valueOf(payload.substring(0, sep));
                         String svc = payload.substring(sep + 1);
                         queryAndShowQuota(chatId, messageId, tenantId, svc, true);
+                    }
+                    else if (callbackData.startsWith("quota_page_")) {
+                        String payload = callbackData.substring("quota_page_".length());
+                        int lastSep = payload.lastIndexOf('_');
+                        int page = Integer.parseInt(payload.substring(lastSep + 1));
+                        String rest = payload.substring(0, lastSep);
+                        int firstSep = rest.indexOf('_');
+                        Long tenantId = Long.valueOf(rest.substring(0, firstSep));
+                        String svc = rest.substring(firstSep + 1);
+                        showQuotaPage(chatId, messageId, tenantId, svc, page);
                     }
 
                     /*else {
@@ -1184,44 +1199,87 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
                 (isRefresh ? "正在重新查询..." : "正在查询配额，请稍候...");
         sendOrEdit(chatId, messageId, loadingText, null);
 
+        String cacheKey = tenantId + "_" + serviceName;
+        if (isRefresh) {
+            quotaCache.remove(cacheKey);
+        }
+
         final Tenant finalTenant = tenant;
         new Thread(() -> {
-            List<java.util.Map<String, Object>> items;
+            List<Map<String, Object>> items;
             try {
                 items = OciLimitsUtils.getSingleServiceQuotas(finalTenant, serviceName);
             } catch (Exception e) {
                 log.error("查询配额失败 tenantId={} service={}: {}", tenantId, serviceName, e.getMessage(), e);
                 sendOrEdit(chatId, messageId,
                         "<b>查询失败</b>\n" + DIVIDER + "\n\n" + safe(e.getMessage()),
-                        quotaResultMarkup(tenantId, serviceName));
+                        quotaResultMarkup(tenantId, serviceName, 0, 1));
                 return;
             }
-            String text = renderQuotaResult(items, regionName, svcLabel, serviceName);
-            sendOrEdit(chatId, messageId, text, quotaResultMarkup(tenantId, serviceName));
+            quotaCache.put(cacheKey, items);
+            showQuotaPage(chatId, messageId, tenantId, serviceName, 0);
         }, "tg-quota-" + tenantId).start();
     }
 
-    private String renderQuotaResult(List<java.util.Map<String, Object>> items, String regionName, String svcLabel, String serviceName) {
+    private void showQuotaPage(Long chatId, Integer messageId, Long tenantId, String serviceName, int page) {
+        String cacheKey = tenantId + "_" + serviceName;
+        List<Map<String, Object>> allItems = quotaCache.get(cacheKey);
+        if (allItems == null) {
+            sendOrEdit(chatId, messageId, "配额数据已过期，请重新查询", quotaResultMarkup(tenantId, serviceName, 0, 1));
+            return;
+        }
+        Tenant tenant;
+        try {
+            tenant = getTenantService().getById(tenantId);
+        } catch (Exception e) {
+            sendOrEdit(chatId, messageId, "获取区域信息失败", onlyBackToMainMarkup());
+            return;
+        }
+        String regionName = tenant != null && tenant.getRegion() != null ? tenant.getRegion() : "未知区域";
+        String svcLabel = quotaServiceLabel(serviceName);
+
+        List<Map<String, Object>> filteredItems = new ArrayList<>();
+        for (Map<String, Object> item : allItems) {
+            if (toLong(item.get("total")) != 0 || toLong(item.get("used")) != 0) {
+                filteredItems.add(item);
+            }
+        }
+
+        int total = filteredItems.size();
+        int totalPages = Math.max(1, (int) Math.ceil((double) total / QUOTA_TG_PAGE_SIZE));
+        page = Math.max(0, Math.min(page, totalPages - 1));
+
+        int from = page * QUOTA_TG_PAGE_SIZE;
+        int to = Math.min(from + QUOTA_TG_PAGE_SIZE, total);
+        List<Map<String, Object>> pageItems = filteredItems.subList(from, to);
+
+        String text = renderQuotaResult(pageItems, regionName, svcLabel, page, totalPages, total);
+        sendOrEdit(chatId, messageId, text, quotaResultMarkup(tenantId, serviceName, page, totalPages));
+    }
+
+    private String renderQuotaResult(List<Map<String, Object>> items, String regionName, String svcLabel,
+                                     int page, int totalPages, int totalItems) {
         StringBuilder sb = new StringBuilder();
         sb.append("<b>配额查询结果</b>\n").append(DIVIDER).append("\n");
         sb.append("区域：").append(escape(regionName)).append("\n");
-        sb.append("服务：").append(svcLabel).append("\n\n");
+        sb.append("服务：").append(svcLabel);
+        if (totalPages > 1) {
+            sb.append("  <i>第 ").append(page + 1).append("/").append(totalPages)
+              .append(" 页，共 ").append(totalItems).append(" 项</i>");
+        }
+        sb.append("\n\n");
 
         if (items == null || items.isEmpty()) {
             sb.append("暂无配额数据。\n");
         } else {
-            for (java.util.Map<String, Object> item : items) {
+            for (Map<String, Object> item : items) {
                 String name = String.valueOf(item.getOrDefault("name", ""));
                 long total = toLong(item.get("total"));
                 long used = toLong(item.get("used"));
                 long available = toLong(item.get("available"));
-
-                if (total == 0 && used == 0) continue;
-
                 String pct = total > 0
                         ? String.format("%.0f%%", (double) used / total * 100)
                         : "—";
-
                 sb.append("<code>").append(escape(name)).append("</code>\n");
                 sb.append("  总量: ").append(total)
                         .append(" | 已用: ").append(used)
@@ -1250,13 +1308,25 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
         }
     }
 
-    private InlineKeyboardMarkup quotaResultMarkup(Long regionId, String serviceName) {
+    private InlineKeyboardMarkup quotaResultMarkup(Long regionId, String serviceName, int page, int totalPages) {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> kb = new ArrayList<>();
         kb.add(row(
                 button(BTN_REFRESH, "quota_refresh_" + regionId + "_" + serviceName),
                 button("返回区域", "region_info_" + regionId)
         ));
+        if (totalPages > 1) {
+            List<InlineKeyboardButton> pageRow = new ArrayList<>();
+            if (page > 0) {
+                pageRow.add(button(BTN_LAST_PAGE, "quota_page_" + regionId + "_" + serviceName + "_" + (page - 1)));
+            }
+            if (page < totalPages - 1) {
+                pageRow.add(button(BTN_NEXT_PAGE, "quota_page_" + regionId + "_" + serviceName + "_" + (page + 1)));
+            }
+            if (!pageRow.isEmpty()) {
+                kb.add(pageRow);
+            }
+        }
         kb.add(Collections.singletonList(button(BTN_BACK_MAIN, "back_to_main")));
         markup.setKeyboard(kb);
         return markup;
