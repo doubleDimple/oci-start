@@ -85,12 +85,6 @@ async function updateTelegramConfig() {
             });
 
             await assertResponseOk(response, i18n.common_confirmUpdateFail);
-
-            const Toast = Swal.mixin(swalConfig.toast);
-            Toast.fire({
-                icon: 'success',
-                title: i18n.common_confirmUpdateSuccess
-            });
         }
     } catch (error) {
         await handleApiError(error, i18n.common_confirmUpdateFail);
@@ -170,12 +164,6 @@ async function updateDingTalkConfig(button) {
             });
 
             await assertResponseOk(response, i18n.notification_dingTalkUpdateFail);
-
-            const Toast = Swal.mixin(swalConfig.toast);
-            Toast.fire({
-                icon: 'success',
-                title: i18n.common_confirmUpdate
-            });
         }
     } catch (error) {
         await handleApiError(error, i18n.common_confirmUpdateFail);
@@ -283,12 +271,6 @@ async function updateTaskConfig(button) {
             });
 
             await assertResponseOk(response, i18n.notification_taskUpdateFail);
-
-            const Toast = Swal.mixin(swalConfig.toast);
-            Toast.fire({
-                icon: 'success',
-                title: i18n.common_confirmUpdateSuccess
-            });
         }
     } catch (error) {
         await handleApiError(error, i18n.notification_taskUpdateFail);
@@ -354,12 +336,6 @@ async function updateBarkConfig(button) {
             });
 
             await assertResponseOk(response, i18n.common_confirmUpdateFail);
-
-            const Toast = Swal.mixin(swalConfig.toast);
-            Toast.fire({
-                icon: 'success',
-                title: i18n.common_confirmUpdateSuccess
-            });
         }
     } catch (error) {
         await handleApiError(error, i18n.common_confirmUpdateFail);
@@ -508,12 +484,6 @@ async function updateFeishuConfig(button) {
             });
 
             await assertResponseOk(response, i18n.common_confirmUpdateFail);
-
-            const Toast = Swal.mixin(swalConfig.toast);
-            Toast.fire({
-                icon: 'success',
-                title: i18n.common_confirmUpdateSuccess
-            });
         }
     } catch (error) {
         await handleApiError(error, i18n.common_confirmUpdateFail);
@@ -590,12 +560,6 @@ async function updateProxyConfig() {
             });
 
             await assertResponseOk(response, i18n.common_confirmUpdateFail);
-
-            const Toast = Swal.mixin(swalConfig.toast);
-            Toast.fire({
-                icon: 'success',
-                title: i18n.common_confirmUpdateSuccess
-            });
         }
     } catch (error) {
         await handleApiError(error, i18n.common_confirmUpdateFail);
@@ -676,12 +640,6 @@ async function startTgRobot() {
             });
 
             await assertResponseOk(response, i18n.common_confirmUpdateFail);
-
-            const Toast = Swal.mixin(swalConfig.toast);
-            Toast.fire({
-                icon: 'success',
-                title: i18n.common_confirmUpdateSuccess
-            });
         }
     } catch (error) {
         await handleApiError(error, i18n.common_confirmUpdateFail);
