@@ -19,6 +19,7 @@ import com.doubledimple.ociserver.service.BanService;
 import com.doubledimple.ociserver.service.TenantService;
 import com.doubledimple.ociserver.service.impl.system.SystemConfigService;
 import com.doubledimple.ociserver.service.oracle.OracleInstanceService;
+import com.doubledimple.ociserver.utils.oracle.OciLimitsUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.InitializingBean;
@@ -464,6 +465,26 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
                         showTrafficRegionMenu(chatId, messageId, parentId);
                     }
 
+                    // 配额相关回调
+                    else if (callbackData.startsWith("quota_region_")) {
+                        Long regionId = Long.valueOf(callbackData.substring("quota_region_".length()));
+                        showQuotaServiceMenu(chatId, messageId, regionId);
+                    }
+                    else if (callbackData.startsWith("quota_svc_")) {
+                        String payload = callbackData.substring("quota_svc_".length());
+                        int sep = payload.indexOf('_');
+                        Long tenantId = Long.valueOf(payload.substring(0, sep));
+                        String svc = payload.substring(sep + 1);
+                        queryAndShowQuota(chatId, messageId, tenantId, svc, false);
+                    }
+                    else if (callbackData.startsWith("quota_refresh_")) {
+                        String payload = callbackData.substring("quota_refresh_".length());
+                        int sep = payload.indexOf('_');
+                        Long tenantId = Long.valueOf(payload.substring(0, sep));
+                        String svc = payload.substring(sep + 1);
+                        queryAndShowQuota(chatId, messageId, tenantId, svc, true);
+                    }
+
                     /*else {
                         sendTextMessage(chatId, "未知操作: " + callbackData);
                     }*/
@@ -797,13 +818,14 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
                 }
             }
 
-            // 2. 构建底部操作行：返回 + 更新实例
+            // 2. 构建底部操作行：查询配额 + 更新实例 + 返回
             Long parenId = region.getParenId();
             if (parenId == 0L) parenId = region.getId();
             keyboard.add(row(
-                    button("返回", "tenant_detail_" + parenId),
+                    button("查询配额", "quota_region_" + region.getId()),
                     button("更新实例", "update_instances_" + region.getId())
             ));
+            keyboard.add(Collections.singletonList(button("返回", "tenant_detail_" + parenId)));
             keyboard.add(Collections.singletonList(button(BTN_BACK_MAIN, "back_to_main")));
 
             markup.setKeyboard(keyboard);
@@ -1110,6 +1132,134 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
 
     private String formatGB(double gb) {
         return String.format("%.2f", gb);
+    }
+
+    // ============== 配额查询功能 ==============
+
+    private void showQuotaServiceMenu(Long chatId, Integer messageId, Long regionId) {
+        try {
+            Tenant region = getTenantService().getById(regionId);
+            if (region == null) {
+                sendOrEdit(chatId, messageId, "未找到该区域信息", onlyBackToMainMarkup());
+                return;
+            }
+            String regionName = region.getRegion() != null ? region.getRegion() : "未知区域";
+
+            InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+            List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
+            keyboard.add(Collections.singletonList(button("计算 (Compute)", "quota_svc_" + regionId + "_compute")));
+            keyboard.add(Collections.singletonList(button("块存储 (Block Storage)", "quota_svc_" + regionId + "_block-storage")));
+            keyboard.add(Collections.singletonList(button("对象存储 (Object Storage)", "quota_svc_" + regionId + "_object-storage")));
+            keyboard.add(row(
+                    button("返回区域", "region_info_" + regionId),
+                    button(BTN_BACK_MAIN, "back_to_main")
+            ));
+            markup.setKeyboard(keyboard);
+
+            String text = "<b>配额查询 - " + escape(regionName) + "</b>\n" + DIVIDER + "\n\n请选择服务类型：";
+            sendOrEdit(chatId, messageId, text, markup);
+        } catch (Exception e) {
+            log.error("加载配额服务菜单失败: {}", e.getMessage(), e);
+            sendOrEdit(chatId, messageId, "加载失败：" + safe(e.getMessage()), onlyBackToMainMarkup());
+        }
+    }
+
+    private void queryAndShowQuota(Long chatId, Integer messageId, Long tenantId, String serviceName, boolean isRefresh) {
+        Tenant tenant;
+        try {
+            tenant = getTenantService().getById(tenantId);
+        } catch (Exception e) {
+            sendOrEdit(chatId, messageId, "获取区域信息失败：" + safe(e.getMessage()), onlyBackToMainMarkup());
+            return;
+        }
+        if (tenant == null) {
+            sendOrEdit(chatId, messageId, "未找到该区域信息", onlyBackToMainMarkup());
+            return;
+        }
+
+        String regionName = tenant.getRegion() != null ? tenant.getRegion() : "未知区域";
+        String svcLabel = quotaServiceLabel(serviceName);
+        String loadingText = "<b>配额查询 - " + escape(regionName) + "</b>\n" + DIVIDER + "\n\n" +
+                "服务：" + svcLabel + "\n" +
+                (isRefresh ? "正在重新查询..." : "正在查询配额，请稍候...");
+        sendOrEdit(chatId, messageId, loadingText, null);
+
+        final Tenant finalTenant = tenant;
+        new Thread(() -> {
+            List<java.util.Map<String, Object>> items;
+            try {
+                items = OciLimitsUtils.getSingleServiceQuotas(finalTenant, serviceName);
+            } catch (Exception e) {
+                log.error("查询配额失败 tenantId={} service={}: {}", tenantId, serviceName, e.getMessage(), e);
+                sendOrEdit(chatId, messageId,
+                        "<b>查询失败</b>\n" + DIVIDER + "\n\n" + safe(e.getMessage()),
+                        quotaResultMarkup(tenantId, serviceName));
+                return;
+            }
+            String text = renderQuotaResult(items, regionName, svcLabel, serviceName);
+            sendOrEdit(chatId, messageId, text, quotaResultMarkup(tenantId, serviceName));
+        }, "tg-quota-" + tenantId).start();
+    }
+
+    private String renderQuotaResult(List<java.util.Map<String, Object>> items, String regionName, String svcLabel, String serviceName) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("<b>配额查询结果</b>\n").append(DIVIDER).append("\n");
+        sb.append("区域：").append(escape(regionName)).append("\n");
+        sb.append("服务：").append(svcLabel).append("\n\n");
+
+        if (items == null || items.isEmpty()) {
+            sb.append("暂无配额数据。\n");
+        } else {
+            for (java.util.Map<String, Object> item : items) {
+                String name = String.valueOf(item.getOrDefault("name", ""));
+                long total = toLong(item.get("total"));
+                long used = toLong(item.get("used"));
+                long available = toLong(item.get("available"));
+
+                if (total == 0 && used == 0) continue;
+
+                String pct = total > 0
+                        ? String.format("%.0f%%", (double) used / total * 100)
+                        : "—";
+
+                sb.append("<code>").append(escape(name)).append("</code>\n");
+                sb.append("  总量: ").append(total)
+                        .append(" | 已用: ").append(used)
+                        .append(" | 可用: ").append(available)
+                        .append(" | 占比: ").append(pct)
+                        .append("\n");
+            }
+        }
+
+        sb.append("\n<i>更新时间：").append(LocalDateTime.now().format(TIME_FMT)).append("</i>");
+        return sb.toString();
+    }
+
+    private long toLong(Object obj) {
+        if (obj == null) return 0L;
+        if (obj instanceof Number) return ((Number) obj).longValue();
+        try { return Long.parseLong(String.valueOf(obj)); } catch (Exception e) { return 0L; }
+    }
+
+    private String quotaServiceLabel(String serviceName) {
+        switch (serviceName) {
+            case "compute": return "计算 (Compute)";
+            case "block-storage": return "块存储 (Block Storage)";
+            case "object-storage": return "对象存储 (Object Storage)";
+            default: return escape(serviceName);
+        }
+    }
+
+    private InlineKeyboardMarkup quotaResultMarkup(Long regionId, String serviceName) {
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> kb = new ArrayList<>();
+        kb.add(row(
+                button(BTN_REFRESH, "quota_refresh_" + regionId + "_" + serviceName),
+                button("返回区域", "region_info_" + regionId)
+        ));
+        kb.add(Collections.singletonList(button(BTN_BACK_MAIN, "back_to_main")));
+        markup.setKeyboard(kb);
+        return markup;
     }
 
     // ============== 通用工具 ==============
