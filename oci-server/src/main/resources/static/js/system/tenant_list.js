@@ -4230,11 +4230,20 @@ function closeModal(modalId) {
     }
 }
 
+// ============== 配额分页状态 ==============
+var quotaAllItems = [];
+var quotaCurrentPage = 0;
+var quotaPageSize = 10;
+var quotaCurrentData = null;
+
 function showQuotaModal(tenantId) {
     var modal = document.getElementById('quotaModal');
     var content = document.getElementById('quotaContent');
     modal.style.display = 'flex';
-    // Reset content
+    // Reset content & pagination state
+    quotaAllItems = [];
+    quotaCurrentPage = 0;
+    quotaCurrentData = null;
     content.innerHTML = '<div style="text-align:center;padding:60px 0;color:var(--text-secondary);">'
         + '<i class="fas fa-chart-bar" style="font-size:36px;display:block;margin-bottom:12px;opacity:0.25;"></i>'
         + '<div style="font-size:13px;">选择租户和服务类型，点击查询</div></div>';
@@ -4311,10 +4320,10 @@ function doQuotaQuery() {
                 + data.error + '</div>';
             return;
         }
-        var itemCount = (data.items || []).length;
-        document.getElementById('quotaModalSubtitle').textContent
-            = (data.region || '') + ' · ' + (svcLabels[svc]||svc) + ' · 共 ' + itemCount + ' 项';
-        content.innerHTML = renderQuotaContent(data);
+        quotaAllItems = data.items || [];
+        quotaCurrentData = data;
+        quotaCurrentPage = 0;
+        renderQuotaPage(0);
     })
     .catch(function() {
         btn.disabled = false;
@@ -4323,8 +4332,61 @@ function doQuotaQuery() {
     });
 }
 
-function renderQuotaContent(data) {
-    var items = data.items || [];
+function renderQuotaPage(page) {
+    var total = quotaAllItems.length;
+    var totalPages = Math.max(1, Math.ceil(total / quotaPageSize));
+    var validPage = Math.max(0, Math.min(page, totalPages - 1));
+    quotaCurrentPage = validPage;
+
+    var start = validPage * quotaPageSize;
+    var end = Math.min(start + quotaPageSize, total);
+    var pageItems = quotaAllItems.slice(start, end);
+
+    var svcLabels = {'compute':'计算 (Compute)','block-storage':'块存储 (Block Storage)','object-storage':'对象存储 (Object Storage)'};
+    if (quotaCurrentData) {
+        var svc = quotaCurrentData.service || '';
+        document.getElementById('quotaModalSubtitle').textContent
+            = (quotaCurrentData.region || '') + ' · ' + (svcLabels[svc]||svc) + ' · 共 ' + total + ' 项';
+    }
+
+    var content = document.getElementById('quotaContent');
+    content.innerHTML = renderQuotaContent(pageItems) + renderQuotaPagination(validPage, totalPages, total);
+}
+
+function renderQuotaPagination(page, totalPages, total) {
+    if (totalPages <= 1) return '';
+    var pageSizes = [5, 10, 20];
+    var sizeOpts = pageSizes.map(function(n) {
+        return '<option value="' + n + '"' + (n === quotaPageSize ? ' selected' : '') + '>' + n + '</option>';
+    }).join('');
+    var prevDisabled = page <= 0;
+    var nextDisabled = page >= totalPages - 1;
+    var baseBtn = 'padding:6px 14px;border:1px solid var(--card-border);border-radius:6px;background:var(--surface);color:var(--text-primary);font-size:12px;';
+    var activeBtn = baseBtn + 'cursor:pointer;';
+    var disabledBtn = baseBtn + 'opacity:0.4;cursor:not-allowed;';
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 4px;margin-top:10px;flex-wrap:wrap;gap:8px;">'
+        + '<button onclick="renderQuotaPage(' + (page - 1) + ')" '
+        + (prevDisabled ? 'disabled style="' + disabledBtn + '"' : 'style="' + activeBtn + '"')
+        + '><i class="fas fa-chevron-left"></i> 上一页</button>'
+        + '<div style="display:flex;align-items:center;gap:10px;font-size:12px;color:var(--text-secondary);">'
+        + '<span>第 <strong>' + (page + 1) + '</strong> / <strong>' + totalPages + '</strong> 页</span>'
+        + '<span style="color:var(--card-border);">|</span>'
+        + '<span>共 <strong>' + total + '</strong> 项</span>'
+        + '<span style="color:var(--card-border);">|</span>'
+        + '<span>每页 <select onchange="quotaChangePageSize(this.value)" style="padding:3px 6px;border:1px solid var(--card-border);border-radius:4px;background:var(--surface);color:var(--text-primary);font-size:12px;">' + sizeOpts + '</select> 条</span>'
+        + '</div>'
+        + '<button onclick="renderQuotaPage(' + (page + 1) + ')" '
+        + (nextDisabled ? 'disabled style="' + disabledBtn + '"' : 'style="' + activeBtn + '"')
+        + '>下一页 <i class="fas fa-chevron-right"></i></button>'
+        + '</div>';
+}
+
+function quotaChangePageSize(newSize) {
+    quotaPageSize = parseInt(newSize) || 10;
+    renderQuotaPage(0);
+}
+
+function renderQuotaContent(items) {
     if (items.length === 0) {
         return '<div style="padding:40px;text-align:center;color:var(--text-secondary);">'
             + '<i class="fas fa-inbox" style="font-size:32px;display:block;margin-bottom:10px;opacity:0.35;"></i>'
