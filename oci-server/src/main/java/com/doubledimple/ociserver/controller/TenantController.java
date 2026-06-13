@@ -1384,7 +1384,9 @@ public class TenantController extends BaseController{
     @ResponseBody
     public ResponseEntity<Map<String, Object>> getTenantQuota(
             @RequestParam Long tenantId,
-            @RequestParam(defaultValue = "compute") String serviceName) {
+            @RequestParam(defaultValue = "compute") String serviceName,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int pageSize) {
         try {
             Tenant tenant = tenantService.getById(tenantId);
             if (tenant == null) {
@@ -1392,11 +1394,12 @@ public class TenantController extends BaseController{
                 err.put("error", "租户不存在");
                 return ResponseEntity.badRequest().body(err);
             }
+            Map<String, Object> pagedResult = OciLimitsUtils.getSingleServiceQuotasPaged(tenant, serviceName, page, pageSize);
             Map<String, Object> result = new HashMap<>();
             result.put("region", tenant.getRegion() != null ? tenant.getRegion() : "");
             result.put("regionEn", tenant.getRegionEn() != null ? tenant.getRegionEn() : "");
             result.put("service", serviceName);
-            result.put("items", OciLimitsUtils.getSingleServiceQuotas(tenant, serviceName));
+            result.putAll(pagedResult);
             return ResponseEntity.ok(result);
         } catch (Exception e) {
             log.error("获取租户配额失败, tenantId: {}", tenantId, e);

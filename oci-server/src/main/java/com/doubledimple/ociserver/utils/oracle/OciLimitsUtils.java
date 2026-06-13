@@ -450,6 +450,146 @@ public class OciLimitsUtils {
     }
 
     /**
+     * 服务器端分页查询单服务配额，使用 hasNextPage 设计避免统计总条数。
+     * <p>
+     * 分两步执行：
+     * <ol>
+     *   <li>Step 1（可早退出）：单次 listLimitValues（不传 availabilityDomain）收集不重复的非零限额名，
+     *       OCI 返回的结果同时包含 AD 级（lv.getAvailabilityDomain() != null）和区域级条目。
+     *       只需收集到 {@code (page+1)*pageSize + 1} 条即可判断是否有下一页，无需遍历全量。</li>
+     *   <li>Step 2（按页）：只对当页 pageSize 条目调用 getResourceAvailability 获取精确数据。</li>
+     * </ol>
+     *
+     * @return Map 包含 items / page / pageSize / hasNextPage
+     */
+    public static Map<String, Object> getSingleServiceQuotasPaged(
+            Tenant tenant, String serviceName, int page, int pageSize) {
+        SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
+        // 只需比当前页末尾多取 1 条，即可判断是否存在下一页
+        int needed = (page + 1) * pageSize + 1;
+
+        try (LimitsClient limitsClient = LimitsClient.builder().build(provider);
+             IdentityClient identityClient = IdentityClient.builder().build(provider)) {
+
+            String compartmentId = provider.getTenantId();
+
+            // Step 1: 单次 listLimitValues（无 AD 过滤）收集不重复非零限额名，达到 needed 后早退出
+            // LinkedHashMap 保留首次出现顺序；value=true 表示 AD 级，false 表示区域级
+            Map<String, Boolean> limitIsAD = new LinkedHashMap<>();
+            boolean hasNextPage = false;
+
+            String ociNextPage = null;
+            outer:
+            do {
+                ListLimitValuesResponse resp = limitsClient.listLimitValues(
+                        ListLimitValuesRequest.builder()
+                                .compartmentId(compartmentId)
+                                .serviceName(serviceName)
+                                .page(ociNextPage)
+                                .build());
+                for (LimitValueSummary lv : resp.getItems()) {
+                    if (lv.getValue() == null || lv.getValue() <= 0) continue;
+                    if (!limitIsAD.containsKey(lv.getName())) {
+                        limitIsAD.put(lv.getName(), lv.getAvailabilityDomain() != null);
+                        if (limitIsAD.size() >= needed) {
+                            hasNextPage = true;
+                            break outer; // 已足够判断，提前结束
+                        }
+                    }
+                }
+                ociNextPage = resp.getOpcNextPage();
+            } while (ociNextPage != null);
+
+            // 取当前页的名称切片
+            int from = page * pageSize;
+            List<String> allNames = new ArrayList<>(limitIsAD.keySet());
+            if (from >= allNames.size()) {
+                Map<String, Object> result = new LinkedHashMap<>();
+                result.put("items", new ArrayList<>());
+                result.put("page", (long) 0);
+                result.put("pageSize", (long) pageSize);
+                result.put("hasNextPage", false);
+                return result;
+            }
+            List<String> pageNames = allNames.subList(from, Math.min(from + pageSize, allNames.size()));
+
+            // Step 2: 只对当页条目调用 getResourceAvailability
+            List<AvailabilityDomain> ads = identityClient.listAvailabilityDomains(
+                    ListAvailabilityDomainsRequest.builder()
+                            .compartmentId(compartmentId).build()).getItems();
+
+            List<Map<String, Object>> items = new ArrayList<>();
+            for (String limitName : pageNames) {
+                boolean isAD = Boolean.TRUE.equals(limitIsAD.get(limitName));
+                long totalVal = 0L, used = 0L, available = 0L;
+
+                if (isAD) {
+                    long aggUsed = 0L, aggAvail = 0L;
+                    for (AvailabilityDomain ad : ads) {
+                        try {
+                            ResourceAvailability ra = limitsClient.getResourceAvailability(
+                                    GetResourceAvailabilityRequest.builder()
+                                            .compartmentId(compartmentId)
+                                            .serviceName(serviceName)
+                                            .limitName(limitName)
+                                            .availabilityDomain(ad.getName())
+                                            .build()).getResourceAvailability();
+                            if (ra.getUsed() != null) aggUsed += ra.getUsed();
+                            if (ra.getAvailable() != null) aggAvail += ra.getAvailable();
+                        } catch (Exception ignored) {}
+                    }
+                    totalVal = aggUsed + aggAvail;
+                    used = aggUsed;
+                    available = aggAvail;
+                } else {
+                    try {
+                        ResourceAvailability ra = limitsClient.getResourceAvailability(
+                                GetResourceAvailabilityRequest.builder()
+                                        .compartmentId(compartmentId)
+                                        .serviceName(serviceName)
+                                        .limitName(limitName)
+                                        .build()).getResourceAvailability();
+                        used = ra.getUsed() != null ? ra.getUsed() : 0L;
+                        available = ra.getAvailable() != null ? ra.getAvailable() : 0L;
+                        totalVal = used + available;
+                    } catch (Exception ignored) {}
+                }
+
+                String displayName = limitName;
+                if (limitName.endsWith("-bytes")) {
+                    displayName = limitName.replace("-bytes", "-gb");
+                    totalVal /= 1073741824L;
+                    used /= 1073741824L;
+                    available /= 1073741824L;
+                }
+
+                Map<String, Object> item = new LinkedHashMap<>();
+                item.put("name", displayName);
+                item.put("total", totalVal);
+                item.put("used", used);
+                item.put("available", available);
+                items.add(item);
+            }
+
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("items", items);
+            result.put("page", (long) page);
+            result.put("pageSize", (long) pageSize);
+            result.put("hasNextPage", hasNextPage);
+            return result;
+
+        } catch (Exception e) {
+            log.error("分页获取服务 {} 配额失败: {}", serviceName, e.getMessage(), e);
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("items", new ArrayList<>());
+            result.put("page", (long) page);
+            result.put("pageSize", (long) pageSize);
+            result.put("hasNextPage", false);
+            return result;
+        }
+    }
+
+    /**
      * 针对 AD 级别的配额（如 AMD free tier），跨所有 AD 汇总 total/used/available。
      * 某些限额（例如 vm-standard-e2-1-micro-count）在不传 availabilityDomain 时 OCI 返回 400，
      * 必须逐 AD 查询后累加。

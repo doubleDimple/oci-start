@@ -1073,9 +1073,17 @@
             <div style="flex:1;min-width:160px;">
                 <div style="font-size:11px;font-weight:600;color:var(--text-secondary);margin-bottom:6px;letter-spacing:.4px;">服务类型</div>
                 <select id="quotaServiceSelect" class="form-control" data-custom-select>
-                    <option value="compute">计算 (Compute)</option>
-                    <option value="block-storage">块存储 (Block Storage)</option>
-                    <option value="object-storage">对象存储 (Object Storage)</option>
+                    <optgroup label="计算存储">
+                        <option value="compute">计算 (Compute)</option>
+                        <option value="block-storage">块存储 (Block Storage)</option>
+                        <option value="object-storage">对象存储 (Object Storage)</option>
+                    </optgroup>
+                    <optgroup label="数据库">
+                        <option value="mysql">MySQL HeatWave</option>
+                        <option value="database">Oracle Database (DBCS)</option>
+                        <option value="autonomous-database">自治数据库 (ADB)</option>
+                        <option value="nosql">NoSQL Database</option>
+                    </optgroup>
                 </select>
             </div>
             <button onclick="doQuotaQuery()" id="quotaQueryBtn" class="btn btn-primary" style="height:38px;padding:0 20px;white-space:nowrap;flex-shrink:0;">
