@@ -39,8 +39,10 @@ import com.doubledimple.ociserver.service.TenantService;
 import com.doubledimple.ociserver.service.TrafficAlertService;
 import com.doubledimple.ociserver.utils.PageUtils;
 import com.doubledimple.ociserver.utils.oracle.MFAUtils;
+import com.doubledimple.ociserver.utils.oracle.OciLimitsUtils;
 import com.doubledimple.ociserver.utils.oracle.notify.NotificationUtils;
 import com.doubledimple.ociserver.utils.oracle.region.OciRegionSubscriptionUtils;
+import com.oracle.bmc.limits.model.ResourceAvailability;
 import com.oracle.bmc.core.responses.UpdateBootVolumeResponse;
 import com.oracle.bmc.identity.model.Region;
 import com.oracle.bmc.identity.model.RegionSubscription;
@@ -1372,5 +1374,35 @@ public class TenantController extends BaseController{
         SseEmitter emitter = new SseEmitter(300000L);
         tenantService.analyzeAllTenantsStream(emitter);
         return emitter;
+    }
+
+    /**
+     * 查看账号配额（ARM/AMD 总配额与可用配额）
+     * 若该租户含子区域，则逐区域返回；否则只返回本租户的配额
+     */
+    @GetMapping("/quota")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> getTenantQuota(
+            @RequestParam Long tenantId,
+            @RequestParam(defaultValue = "compute") String serviceName) {
+        try {
+            Tenant tenant = tenantService.getById(tenantId);
+            if (tenant == null) {
+                Map<String, Object> err = new HashMap<>();
+                err.put("error", "租户不存在");
+                return ResponseEntity.badRequest().body(err);
+            }
+            Map<String, Object> result = new HashMap<>();
+            result.put("region", tenant.getRegion() != null ? tenant.getRegion() : "");
+            result.put("regionEn", tenant.getRegionEn() != null ? tenant.getRegionEn() : "");
+            result.put("service", serviceName);
+            result.put("items", OciLimitsUtils.getSingleServiceQuotas(tenant, serviceName));
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            log.error("获取租户配额失败, tenantId: {}", tenantId, e);
+            Map<String, Object> err = new HashMap<>();
+            err.put("error", "获取配额失败: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(err);
+        }
     }
 }
