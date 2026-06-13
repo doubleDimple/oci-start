@@ -91,6 +91,7 @@ logging:
   level:
     com.doubledimple.ociserver: INFO
     com.oracle.bmc.core.VirtualNetworkClient: ERROR
+    com.oracle.bmc.limits.LimitsClient: ERROR
     com.oracle.bmc.http.client.jersey.JerseyHttpClientBuilder: WARN
     com.oracle.bmc.core.BlockstorageClient: ERROR
     com.oracle.bmc.core.ComputeClient: ERROR
