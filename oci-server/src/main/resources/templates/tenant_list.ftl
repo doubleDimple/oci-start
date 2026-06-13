@@ -1067,7 +1067,7 @@
         <div style="display:flex;align-items:flex-end;gap:12px;padding:16px 24px;border-bottom:1px solid var(--card-border);background:var(--surface-2,var(--surface));flex-shrink:0;flex-wrap:wrap;">
             <div style="flex:1;min-width:180px;">
                 <div style="font-size:11px;font-weight:600;color:var(--text-secondary);margin-bottom:6px;letter-spacing:.4px;">租户</div>
-                <select id="quotaTenantSelect" class="form-control" data-custom-select data-placeholder="选择租户...">
+                <select id="quotaTenantSelect" class="form-control" data-custom-select data-searchable data-page-size="5" data-placeholder="选择租户...">
                 </select>
             </div>
             <div style="flex:1;min-width:160px;">
