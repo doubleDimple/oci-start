@@ -10,13 +10,7 @@ import com.doubledimple.ociserver.service.login.LoginUserService;
 import com.doubledimple.ociserver.pojo.request.RegisterRequest;
 import com.doubledimple.ociserver.pojo.request.UpdateUserRequest;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -72,13 +66,11 @@ public class LoginUserController  extends BaseController {
 
 
     @PostMapping("/update-user")
-    @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<?> updateUser(
-            @AuthenticationPrincipal UserDetails userDetails,
-            @RequestBody UpdateUserRequest request) {
+    public ResponseEntity<?> updateUser(@RequestBody UpdateUserRequest request) {
         try {
+            String currentUsername = com.doubledimple.ociserver.config.context.UserContext.getUsername();
             loginUserService.updateUser(
-                    userDetails.getUsername(),
+                    currentUsername,
                     request.getNewUsername(),
                     request.getNewPassword()
             );
@@ -88,12 +80,8 @@ public class LoginUserController  extends BaseController {
         }
     }
 
-    /**
-     * 获取当前登录用户的基本信息
-     */
     @GetMapping("/userInfo")
     @ResponseBody
-    @PreAuthorize("isAuthenticated()")
     public ApiResponse getUserInfo() {
         try {
             final String username = UserContext.getUsername();

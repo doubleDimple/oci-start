@@ -1,6 +1,6 @@
 package com.doubledimple.ociserver.service.login;
 
-
+import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.json.JSONUtil;
 import com.doubledimple.dao.entity.LoginUser;
@@ -12,11 +12,6 @@ import com.doubledimple.ociserver.pojo.request.PasswordUpdateRequest;
 import com.doubledimple.ociserver.service.InstallAppService;
 import com.doubledimple.ociserver.service.message.factory.MessageFactory;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -32,17 +27,10 @@ import static com.doubledimple.ocicommon.template.MessageTemplate.MESSAGE_MALICI
 import static com.doubledimple.ocicommon.utils.IpUtils.getClientIpAddress;
 import static com.doubledimple.ociserver.utils.PingUtil.getCurrentPublicIpAndAddress;
 
-/**
- * @version 1.0.0
- * @ClassName LoginUserService
- * @Description TODO
- * @Author doubleDimple
- * @Date 2024-11-21 11:02
- */
 @Service
 @Transactional
 @Slf4j
-public class LoginUserService implements UserDetailsService {
+public class LoginUserService {
 
     @Resource
     private LoginUserRepository loginUserRepository;
@@ -59,22 +47,28 @@ public class LoginUserService implements UserDetailsService {
     @Resource
     InstallAppService installAppService;
 
-    @Override
-    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+    /**
+     * 验证用户名和密码，返回 LoginUser（失败抛异常）
+     */
+    public LoginUser validateCredentials(String username, String password) {
         LoginUser user = loginUserRepository.findByUsername(username)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+                .orElseThrow(() -> new RuntimeException("用户名或密码错误"));
 
-        //检查版本更新
+        if (!passwordEncoder.matches(password, user.getPassword())) {
+            log.warn("用户 [{}] 密码验证失败", username);
+            throw new RuntimeException("用户名或密码错误");
+        }
+
         versionCheckTask.checkVersion();
+        return user;
+    }
 
-        //安装app
-        //installAppService.addOrUpdateInstallApp();
-
-        return org.springframework.security.core.userdetails.User
-                .withUsername(user.getUsername())
-                .password(user.getPassword())
-                .roles("USER")
-                .build();
+    /**
+     * 根据用户名查找用户（内部使用）
+     */
+    public LoginUser findByUsername(String username) {
+        return loginUserRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("用户不存在"));
     }
 
     public boolean isFirstTimeDeployment() {
@@ -96,7 +90,7 @@ public class LoginUserService implements UserDetailsService {
 
     public void updateUser(String currentUsername, String newUsername, String newPassword) {
         LoginUser user = loginUserRepository.findByUsername(currentUsername)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+                .orElseThrow(() -> new RuntimeException("用户不存在"));
 
         if (newUsername != null && !newUsername.equals(currentUsername)) {
             if (loginUserRepository.existsByUsername(newUsername)) {
@@ -112,15 +106,7 @@ public class LoginUserService implements UserDetailsService {
         loginUserRepository.save(user);
     }
 
-    // 添加GitHub用户注册/登录方法
-    /**
-     * 通用的第三方账号登录/注册逻辑
-     * @param externalId 第三方平台的唯一ID (GitHub是id, Google是email)
-     * @param username   第三方平台获取到的用户名或昵称
-     * @param loginType  第三方登录类型枚举
-     */
     public LoginUser registerThirdPartyUser(String externalId, String username, LoginTypeEnum loginType) {
-
         Optional<LoginUser> existingUser = loginUserRepository
                 .findByExternalIdAndLoginType(externalId, loginType);
 
@@ -134,9 +120,7 @@ public class LoginUserService implements UserDetailsService {
         String suffix = "_" + loginType.name().toLowerCase();
         newUser.setUsername(username + suffix);
         newUser.setExternalId(externalId);
-        String randomPassword = UUID.randomUUID().toString();
-        newUser.setPassword(passwordEncoder.encode(randomPassword));
-
+        newUser.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
         newUser.setLoginType(loginType);
 
         return loginUserRepository.save(newUser);
@@ -147,24 +131,23 @@ public class LoginUserService implements UserDetailsService {
     }
 
     public void updatePassword(PasswordUpdateRequest request, HttpServletRequest httpServletRequest) {
-        log.info("当前修改用户信息的请求参数是:{}", JSONUtil.toJsonStr(request));
-        // 获取当前用户
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        LoginUser user = loginUserRepository.findByUsername(auth.getName())
+        log.info("修改用户信息请求参数：{}", JSONUtil.toJsonStr(request));
+
+        String currentUsername = StpUtil.getLoginIdAsString();
+        LoginUser user = loginUserRepository.findByUsername(currentUsername)
                 .orElseThrow(() -> {
-                    log.warn("用户 [{}] 不存在，登录验证失败", auth.getName());
-                    final String clientIpAddress = getClientIpAddress(httpServletRequest).replace('.', '_');
-                    messageFactory.getType(MessageEnum.TELEGRAM).sendMessageTemplateText(String.format(MESSAGE_MALICIOUS_LOGIN_TEMPLATE_V_2,
-                            getCurrentPublicIpAndAddress(httpServletRequest), auth.getName(),clientIpAddress,clientIpAddress));
+                    log.warn("用户 [{}] 不存在，登录验证失败", currentUsername);
+                    final String clientIp = getClientIpAddress(httpServletRequest).replace('.', '_');
+                    messageFactory.getType(MessageEnum.TELEGRAM).sendMessageTemplateText(
+                            String.format(MESSAGE_MALICIOUS_LOGIN_TEMPLATE_V_2,
+                                    getCurrentPublicIpAndAddress(httpServletRequest), currentUsername, clientIp, clientIp));
                     return new RuntimeException("用户名或密码错误");
                 });
 
-        // 验证当前密码
         if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
             throw new RuntimeException("当前密码不正确");
         }
 
-        // 如果要更改用户名，检查新用户名是否已存在
         if (StringUtils.hasText(request.getNewUsername())
                 && !request.getNewUsername().equals(user.getUsername())) {
             if (loginUserRepository.existsByUsername(request.getNewUsername())) {
@@ -173,11 +156,9 @@ public class LoginUserService implements UserDetailsService {
             user.setUsername(request.getNewUsername());
         }
 
-        // 更新密码
-        log.info("修改后的用户信息是:{}",JSONUtil.toJsonStr(user));
-        if (StringUtils.hasText(request.getNewPassword())){
-            if (!ObjectUtil.equals(request.getNewPassword(),request.getCurrentPassword() )){
-                log.info("用户修改了密码,原密码是:{},修改后的密码是:{}",request.getCurrentPassword(),request.getNewPassword());
+        log.info("修改后的用户信息：{}", JSONUtil.toJsonStr(user));
+        if (StringUtils.hasText(request.getNewPassword())) {
+            if (!ObjectUtil.equals(request.getNewPassword(), request.getCurrentPassword())) {
                 user.setPassword(passwordEncoder.encode(request.getNewPassword()));
             }
         }

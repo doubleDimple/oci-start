@@ -2,9 +2,8 @@
 <html lang="zh">
 <head>
     <meta charset="UTF-8">
-    <meta name="_csrf" content="${_csrf.token}"/>
-    <meta name="_csrf_header" content="${_csrf.headerName}"/>
-    <input type="hidden" name="_csrf" value="${_csrf.token}">
+    <meta name="_csrf" content="">
+    <meta name="_csrf_header" content="X-CSRF-TOKEN">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VPS管理系统 - MFA管理</title>
     <script>
@@ -30,7 +29,6 @@
                 ${msg.get('mfa.form.add_title')}
             </h2>
             <form action="/save-secret" method="post" enctype="multipart/form-data" id="keyForm">
-                <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}"/>
                 <div class="form-group">
                     <label class="form-label" for="keyName">${msg.get('mfa.form.label_name')}:</label>
                     <input type="text" class="form-control" id="keyName" name="keyName" placeholder="${msg.get('mfa.form.placeholder_name')}">

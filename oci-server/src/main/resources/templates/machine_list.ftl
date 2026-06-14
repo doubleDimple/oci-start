@@ -2,9 +2,8 @@
 <html lang="zh">
 <head>
     <meta charset="UTF-8">
-    <meta name="_csrf" content="${_csrf.token}"/>
-    <meta name="_csrf_header" content="${_csrf.headerName}"/>
-    <input type="hidden" name="_csrf" value="${_csrf.token}">
+    <meta name="_csrf" content="">
+    <meta name="_csrf_header" content="X-CSRF-TOKEN">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VPS管理系统 - 实例列表</title>
 <#--
@@ -95,7 +94,6 @@
                                 <div class="btn-group">
                                     <form action="/boot/startBoot" method="get">
                                         <input type="hidden" name="bootId" value="${bootInstance.id}">
-                                        <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
                                         <button type="submit" class="btn btn-primary"
                                                 <#if bootInstance.status != 0>disabled</#if>>
                                             <i class="fas fa-play"></i>
@@ -103,7 +101,6 @@
                                     </form>
                                     <form action="/boot/stopBoot" method="get">
                                         <input type="hidden" name="bootId" value="${bootInstance.id}">
-                                        <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
                                         <button type="submit" class="btn btn-warning"
                                                 <#if bootInstance.status != 1>disabled</#if>>
                                             <i class="fas fa-stop"></i>
@@ -111,7 +108,6 @@
                                     </form>
                                     <form action="/boot/deleteBoot" method="get">
                                         <input type="hidden" name="bootId" value="${bootInstance.id}">
-                                        <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
                                         <button type="submit" class="btn btn-danger">
                                             <i class="fas fa-trash"></i>
                                         </button>

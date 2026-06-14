@@ -4,9 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VPS管理系统 - 监控管理</title>
-    <meta name="_csrf" content="${_csrf.token}"/>
-    <meta name="_csrf_header" content="${_csrf.headerName}"/>
-    <input type="hidden" name="_csrf" value="${_csrf.token}">
+    <meta name="_csrf" content="">
+    <meta name="_csrf_header" content="X-CSRF-TOKEN">
     <script>
         (function(){var t=localStorage.getItem('oci_theme');if(t)document.documentElement.dataset.theme=t;})();
     </script>
@@ -84,7 +83,6 @@
                         <!-- 其他列保持不变 -->
                         <td>${server.lastCheckTime!'-'}</td>
                         <td>
-                            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
                             <button class="btn btn-danger" onclick="handleDelete('${server.serverId}')">
                                 <i class="fas fa-trash"></i>
                                 <span>删除</span>
@@ -197,7 +195,6 @@
 
                         <!-- 在最后更新时间前添加操作区域 -->
                         <div class="card-actions">
-                            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
                             <button class="btn btn-danger" onclick="handleDelete('${server.serverId}')">
                                 <i class="fas fa-trash"></i>
                                 <span>删除</span>
