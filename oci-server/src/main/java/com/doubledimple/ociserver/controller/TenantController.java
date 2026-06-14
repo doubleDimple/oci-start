@@ -53,8 +53,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
+import com.doubledimple.ociserver.config.context.UserContext;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -890,13 +889,7 @@ public class TenantController extends BaseController{
     @PostMapping("/verify/sendExportCode")
     @ResponseBody
     public ResponseEntity<?> sendExportCode(HttpServletRequest request) {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-
-        if (authentication == null || !authentication.isAuthenticated()) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("未登录");
-        }
-        // 获取用户名
-        String username = authentication.getName();
+        String username = UserContext.getUsername();
         try {
             verifyService.sendVerifyCodeForExport(username, request);
             return ResponseEntity.ok().build();

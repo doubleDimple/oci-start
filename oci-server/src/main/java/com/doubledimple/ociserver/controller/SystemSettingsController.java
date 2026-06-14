@@ -29,7 +29,7 @@ import com.oracle.bmc.generativeai.model.ModelSummary;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
+import com.doubledimple.ociserver.config.context.UserContext;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -74,9 +74,9 @@ public class SystemSettingsController  extends BaseController{
     OciAiChatUtils ociAiChatUtils;
 
     @GetMapping("/settings")
-    public String showSettings(Model model, Authentication authentication) {
+    public String showSettings(Model model) {
         // 获取当前用户名
-        model.addAttribute("currentUsername", authentication.getName());
+        model.addAttribute("currentUsername", UserContext.getUsername());
 
         // 获取Telegram配置
         model.addAttribute("telegramConfig", systemConfigService.getTelegramConfig());
@@ -109,9 +109,9 @@ public class SystemSettingsController  extends BaseController{
     }
 
     @GetMapping("/notifySettings")
-    public String showNotifySettings(Model model, Authentication authentication) {
+    public String showNotifySettings(Model model) {
         // 获取当前用户名
-        model.addAttribute("currentUsername", authentication.getName());
+        model.addAttribute("currentUsername", UserContext.getUsername());
 
         // 获取Telegram配置
         TelegramConfig telegramConfig = systemConfigService.getTelegramConfig();
@@ -147,9 +147,9 @@ public class SystemSettingsController  extends BaseController{
     }
 
     @GetMapping("/ipSettings")
-    public String showIpSettings(Model model, Authentication authentication) {
+    public String showIpSettings(Model model) {
         // 获取当前用户名
-        model.addAttribute("currentUsername", authentication.getName());
+        model.addAttribute("currentUsername", UserContext.getUsername());
 
         // 获取IP质量检测配置
         IpCheckConfig ipCheckConfig = systemConfigService.getIpCheckConfig();
@@ -176,9 +176,9 @@ public class SystemSettingsController  extends BaseController{
 
 
     @GetMapping("/domainSettings")
-    public String showDomainSettings(Model model, Authentication authentication) {
+    public String showDomainSettings(Model model) {
         // 获取当前用户名
-        model.addAttribute("currentUsername", authentication.getName());
+        model.addAttribute("currentUsername", UserContext.getUsername());
 
         // 获取Cloudflare配置
         CloudflareConfig cloudflareConfig = systemConfigService.getCloudflareConfig();
@@ -196,9 +196,9 @@ public class SystemSettingsController  extends BaseController{
      * API Token配置页面
      */
     @GetMapping("/apiTokens")
-    public String showApiTokenConfig(Model model, Authentication authentication) {
+    public String showApiTokenConfig(Model model) {
         // 获取当前用户名
-        model.addAttribute("currentUsername", authentication.getName());
+        model.addAttribute("currentUsername", UserContext.getUsername());
 
         // 获取API Token配置
         ApiTokenConfig apiTokenConfig = systemConfigService.getApiTokenConfig();
@@ -236,9 +236,9 @@ public class SystemSettingsController  extends BaseController{
     }
 
     @GetMapping("/memPage")
-    public String memPage(Model model, Authentication authentication) {
+    public String memPage(Model model) {
         // 获取当前用户名
-        model.addAttribute("currentUsername", authentication.getName());
+        model.addAttribute("currentUsername", UserContext.getUsername());
         model.addAttribute("activePage", "api-memPage");
 
         return "memo";

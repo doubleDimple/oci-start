@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="_csrf" content="${_csrf.token}"/>
-    <meta name="_csrf_header" content="${_csrf.headerName}"/>
-    <input type="hidden" name="_csrf" value="${_csrf.token}">
+    <meta name="_csrf" content="">
+    <meta name="_csrf_header" content="X-CSRF-TOKEN">
     <title>VPS管理系统 - VPN代理列表</title>
 <#--
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">

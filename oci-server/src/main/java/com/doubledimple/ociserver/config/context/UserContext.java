@@ -1,8 +1,5 @@
 package com.doubledimple.ociserver.config.context;
 
-import org.apache.commons.lang3.StringUtils;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 
 /**
  * @version 1.0.0
