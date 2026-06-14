@@ -6,9 +6,8 @@
     <script>
         (function(){var t=localStorage.getItem('oci_theme')||'dark';if(t==='system')t=window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';document.documentElement.dataset.theme=t;})();
     </script>
-    <meta name="_csrf" content="${_csrf.token}"/>
-    <meta name="_csrf_header" content="${_csrf.headerName}"/>
-    <input type="hidden" name="_csrf" value="${_csrf.token}">
+    <meta name="_csrf" content="">
+    <meta name="_csrf_header" content="X-CSRF-TOKEN">
     <title>VPS管理系统 - 添加实例</title>
 <#--
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -43,7 +42,6 @@
             </div>
 
             <form action="/tenants/boot/save" method="post" id="bootForm">
-                <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}"/>
                 <input type="hidden" name="tenantId" id="tenantIdHidden" value="${tenantId?c}">
 
                 <div class="form-section" style="margin-bottom: 20px; padding: 15px;">

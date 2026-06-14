@@ -101,7 +101,7 @@ public class ApiTokenAspect {
      * curl --location 'localhost:9856/oci-start/open-api/v1/chat' \
      * --header 'Authorization: Bearer oci-start_api_..........' \
      * --header 'Content-Type: application/json' \
-     * --header 'Cookie: JSESSIONID=F9CCF7C6B9D6C61FE1FF28AC8195B0DE' \
+     * --header 'Content-Type: application/json' \
      * --data '{
      *     "userId": "123456789",
      *     "message" : "你好"

@@ -141,3 +141,11 @@ springdoc:
     path: /swagger-ui.html
     operations-sorter: method
   packages-to-scan: com.doubledimple.ociserver.third.openApi.controller
+
+sa-token:
+  token-name: satoken
+  timeout: 2592000
+  active-timeout: 7200
+  is-concurrent: false
+  token-style: uuid
+  is-log: false

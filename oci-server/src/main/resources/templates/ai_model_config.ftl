@@ -4,9 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script>(function(){var t=localStorage.getItem('oci_theme')||'dark';if(t==='system')t=window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';document.documentElement.dataset.theme=t;})();</script>
-    <meta name="_csrf" content="${_csrf.token}"/>
-    <meta name="_csrf_header" content="${_csrf.headerName}"/>
-    <input type="hidden" name="_csrf" value="${_csrf.token}">
+    <meta name="_csrf" content="">
+    <meta name="_csrf_header" content="X-CSRF-TOKEN">
     <title>VPS管理系统 - OCI AI管理</title>
     <link rel="stylesheet" href="/css/all.min.css">
     <link href="/css/sweetalert2.min.css" rel="stylesheet">
