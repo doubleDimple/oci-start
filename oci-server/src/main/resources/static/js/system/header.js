@@ -559,7 +559,7 @@ function executeUpdate() {
     // 复用 getCsrfConfig
     const csrf = getCsrfConfig();
     const newVersion = document.getElementById('newVersionNumber')?.textContent;
-    if(!csrf.token || !newVersion) return;
+    if(!newVersion) return;
 
     Swal.fire({
         title: i18n.version_update,
