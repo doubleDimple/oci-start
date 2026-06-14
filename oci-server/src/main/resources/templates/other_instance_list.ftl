@@ -4,9 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VPS管理系统 - 云实例管理</title>
-    <meta name="_csrf" content="${_csrf.token}"/>
-    <meta name="_csrf_header" content="${_csrf.headerName}"/>
-    <input type="hidden" name="_csrf" value="${_csrf.token}">
+    <meta name="_csrf" content="">
+    <meta name="_csrf_header" content="X-CSRF-TOKEN">
 <#--
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 -->
@@ -176,7 +175,6 @@
 
 <!-- CSRF Token -->
 <div style="display: none;">
-    <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
 </div>
 <script src="/js/common/request.js"></script>
 <script src="/js/common/loading.js"></script>
@@ -275,7 +273,7 @@
                 });
 
                 // 获取CSRF令牌
-                const csrfToken = document.querySelector('input[name="${_csrf.parameterName}"]').value;
+                const csrfToken = document.querySelector('input[name="_csrf"]').value;
 
                 // 发送删除请求
                 fetch(`/other/instances/`+ bootId+`/delete`, {
@@ -344,7 +342,7 @@
                 });
 
                 // 获取CSRF令牌
-                const csrfToken = document.querySelector('input[name="${_csrf.parameterName}"]').value;
+                const csrfToken = document.querySelector('input[name="_csrf"]').value;
 
                 // 发送刷新请求
                 fetch(`/other/instances/`+ bootId+`/refresh`, {
@@ -547,7 +545,7 @@
                 });
 
                 // 获取CSRF令牌
-                const csrfToken = document.querySelector('input[name="${_csrf.parameterName}"]').value;
+                const csrfToken = document.querySelector('input[name="_csrf"]').value;
 
                 // 发送切换IP请求
                 fetch(`/other/instances/` + bootId + `/changeIp`, {

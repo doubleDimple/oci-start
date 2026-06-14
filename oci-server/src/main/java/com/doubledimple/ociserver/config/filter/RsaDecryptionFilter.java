@@ -69,8 +69,6 @@ public class RsaDecryptionFilter extends OncePerRequestFilter {
                     if (rawPassword != null) {
                         ParameterRequestWrapper wrapper = new ParameterRequestWrapper(request);
                         wrapper.setParameter("password", rawPassword);
-                        session.removeAttribute(RSA_PRIVATE_KEY);
-                        session.removeAttribute(RSA_PUBLIC_KEY);
                         filterChain.doFilter(wrapper, response);
                         return;
                     }

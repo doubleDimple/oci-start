@@ -5,9 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VPS管理系统 - 流量监控</title>
     <input type="hidden" id="tenantIdParam" value="${tenantId!''}">
-    <meta name="_csrf" content="${_csrf.token}"/>
-    <meta name="_csrf_header" content="${_csrf.headerName}"/>
-    <input type="hidden" name="_csrf" value="${_csrf.token}">
+    <meta name="_csrf" content="">
+    <meta name="_csrf_header" content="X-CSRF-TOKEN">
     <script>
         (function(){var t=localStorage.getItem('oci_theme');if(t)document.documentElement.dataset.theme=t;})();
     </script>
@@ -25,7 +24,6 @@
 <body>
 <#--<#include "common/version_info.ftl">-->
 <#--<#--<#include "common/header.ftl" />-->-->
-<input type="hidden" name="_csrf" id="csrf_token" value="${_csrf.token}">
 
 <div class="layout">
     <#--<#include "common/sidebar.ftl" />-->

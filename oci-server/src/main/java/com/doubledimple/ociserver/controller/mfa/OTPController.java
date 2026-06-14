@@ -20,8 +20,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
+import com.doubledimple.ociserver.config.context.UserContext;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -81,8 +80,7 @@ public class OTPController  extends BaseController {
             model.addAttribute("otpKeys", otpKeys);
         }
         model.addAttribute("activePage", "mfa");
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        model.addAttribute("currentUsername", auth != null ? auth.getName() : "");
+        model.addAttribute("currentUsername", UserContext.getUsername());
         return "mobile/mfa";
     }
 
