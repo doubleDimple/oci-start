@@ -3,9 +3,8 @@
 <html lang="zh">
 <head>
     <meta charset="UTF-8">
-    <meta name="_csrf" content="${_csrf.token}"/>
-    <meta name="_csrf_header" content="${_csrf.headerName}"/>
-    <input type="hidden" name="_csrf" value="${_csrf.token}">
+    <meta name="_csrf" content="">
+    <meta name="_csrf_header" content="X-CSRF-TOKEN">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VPS管理系统 - 腾讯云EdgeOne DNS管理</title>
 <#--
@@ -325,7 +324,6 @@
     </main>
 </div>
 
-<input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}"/>
 
 <!-- 添加DNS记录模态框 -->
 <div id="addDnsModal" class="modal-overlay">

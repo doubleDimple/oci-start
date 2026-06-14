@@ -7,16 +7,11 @@ import com.doubledimple.ociserver.controller.BaseController;
 import com.doubledimple.ociserver.pojo.request.GithubConfig;
 import com.doubledimple.ociserver.pojo.request.GithubUser;
 import com.doubledimple.ociserver.service.impl.system.SystemConfigService;
-import com.doubledimple.ociserver.service.login.CustomerRememberMeService;
 import com.doubledimple.ociserver.service.login.LoginUserService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import cn.dev33.satoken.stp.StpUtil;
 import org.springframework.http.*;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -29,10 +24,12 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static com.doubledimple.ociserver.utils.DesktopUtils.isMobileRequest;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * @version 1.0.0
@@ -50,9 +47,6 @@ public class GithubLoginController extends BaseController {
 
     @Resource
     VersionCheckTask versionCheckTask;
-
-    @Resource
-    private CustomerRememberMeService customerRememberMeService;
 
     @Resource
     private LoginUserService loginUserService;
@@ -110,57 +104,6 @@ public class GithubLoginController extends BaseController {
     /**
      * GitHub 登录回调处理
      */
-    /*@GetMapping("/api/github/callback")
-    public void githubCallback(@RequestParam String code,
-                               @RequestParam String state,
-                               HttpServletRequest request,
-                               HttpServletResponse response) throws IOException {
-        try {
-            log.info("Receiving GitHub callback. Code len: {}, State: {}", code.length(), state);
-            Long expireTime = STATE_CACHE.get(state);
-            if (expireTime == null) {
-                log.warn("非法登录请求：State 不存在或已被使用. State: {}", state);
-                throw new RuntimeException("请求无效或页面已过期，请刷新后重试");
-            }
-            if (System.currentTimeMillis() > expireTime) {
-                STATE_CACHE.remove(state);
-                throw new RuntimeException("登录请求已超时，请重新登录");
-            }
-            STATE_CACHE.remove(state);
-
-            GithubConfig config = systemConfigService.getGithubConfig();
-            if (!config.isEnabled()) {
-                throw new RuntimeException("GitHub登录未启用");
-            }
-            String accessToken = getGithubAccessToken(code, config);
-            GithubUser githubUser = getGithubUser(accessToken);
-            if (!config.getGithubId().equals(String.valueOf(githubUser.getId()))) {
-                throw new RuntimeException("未授权的GitHub账号 (ID不匹配)");
-            }
-            Authentication authentication = createAuthentication(githubUser);
-            SecurityContextHolder.getContext().setAuthentication(authentication);
-            boolean isRememberMe = state.endsWith("_on");
-            try {
-                if (isRememberMe) {
-                    log.info("GitHub 登录触发 Remember-Me (Detected from state)");
-                    customerRememberMeService.loginSuccess(request, response, authentication);
-                }
-            } catch (Exception e) {
-                log.warn("Remember-Me 写入 Cookie 失败:{}", e.getMessage());
-            }
-            String redirectUrl = isMobileRequest(request) ? "/m/tenants" : "/index";
-            response.sendRedirect(redirectUrl);
-
-        } catch (Exception e) {
-            log.error("GitHub登录失败", e);
-            String loginUrl = isMobileRequest(request) ? "/m/login" : "/login";
-            response.sendRedirect(loginUrl + "?error=" + URLEncoder.encode(e.getMessage(), StandardCharsets.UTF_8.name()));
-        }
-    }*/
-
-    /**
-     * GitHub 登录回调处理
-     */
     @GetMapping("/api/github/callback")
     public void githubCallback(@RequestParam String code,
                                @RequestParam String state,
@@ -193,17 +136,8 @@ public class GithubLoginController extends BaseController {
                     LoginTypeEnum.GITHUB
             );
 
-            Authentication authentication = createAuthentication(localUser.getUsername());
-            SecurityContextHolder.getContext().setAuthentication(authentication);
+            StpUtil.login(localUser.getUsername(), stateInfo.rememberMe);
             log.info("GitHub login success, user={}, rememberMe={}", localUser.getUsername(), stateInfo.rememberMe);
-            if (stateInfo.rememberMe) {
-                try {
-                    customerRememberMeService.rememberLogin(response, authentication);
-                    log.info("GitHub Remember-Me cookie written for user: {}", localUser.getUsername());
-                } catch (Exception e) {
-                    log.warn("Remember-Me write Cookie Fail:{}", e.getMessage(), e);
-                }
-            }
 
             String redirectUrl = isMobileRequest(request) ? "/m/tenants" : "/index";
             response.sendRedirect(redirectUrl);
@@ -274,14 +208,4 @@ public class GithubLoginController extends BaseController {
         );
     }*/
 
-    private Authentication createAuthentication(String localUsername) {
-        List<GrantedAuthority> authorities = Collections.singletonList(
-                new SimpleGrantedAuthority("ROLE_USER")
-        );
-        return new UsernamePasswordAuthenticationToken(
-                localUsername,
-                "",
-                authorities
-        );
-    }
 }
