@@ -18,8 +18,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
+import com.doubledimple.ociserver.config.context.UserContext;
 import org.springframework.web.bind.annotation.ModelAttribute;
 
 import javax.annotation.Resource;
@@ -58,8 +57,8 @@ public class MobileController extends BaseController {
 
     @ModelAttribute("currentUsername")
     public String currentUsername() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        return auth != null ? auth.getName() : "";
+        String username = UserContext.getUsername();
+        return username != null ? username : "";
     }
 
     // ===================== 页面路由 =====================
@@ -140,7 +139,7 @@ public class MobileController extends BaseController {
     }
 
     @GetMapping("/settings")
-    public String settingsPage(Model model, Authentication authentication) {
+    public String settingsPage(Model model) {
         model.addAttribute("activePage", "settings");
         model.addAttribute("githubConfig", systemConfigService.getGithubConfig());
         model.addAttribute("googleConfig", systemConfigService.getGoogleConfig());

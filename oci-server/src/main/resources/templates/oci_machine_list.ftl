@@ -4,9 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VPS管理系统 - OCI实例管理</title>
-    <meta name="_csrf" content="${_csrf.token}"/>
-    <meta name="_csrf_header" content="${_csrf.headerName}"/>
-    <input type="hidden" name="_csrf" value="${_csrf.token}">
+    <meta name="_csrf" content="">
+    <meta name="_csrf_header" content="X-CSRF-TOKEN">
 <#--
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 -->
@@ -221,7 +220,6 @@
                         <!-- 操作列 -->
                         <td class="actions-cell">
                             <div style="display: none;">
-                                <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
                             </div>
 
                             <div class="dropdown">
