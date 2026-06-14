@@ -7,21 +7,16 @@ import com.doubledimple.ociserver.controller.BaseController;
 import com.doubledimple.ociserver.pojo.request.GoogleConfig;
 import com.doubledimple.ociserver.pojo.request.GoogleUser;
 import com.doubledimple.ociserver.service.impl.system.SystemConfigService;
-import com.doubledimple.ociserver.service.login.CustomerRememberMeService;
 import com.doubledimple.ociserver.service.login.LoginUserService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import cn.dev33.satoken.stp.StpUtil;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -40,10 +35,7 @@ import java.math.BigInteger;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
-import java.util.Collections;
-import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -59,9 +51,6 @@ public class GoogleLoginController extends BaseController {
 
     @Resource
     private SystemConfigService systemConfigService;
-
-    @Resource
-    private CustomerRememberMeService customerRememberMeService;
 
     @Resource
     VersionCheckTask versionCheckTask;
@@ -110,61 +99,6 @@ public class GoogleLoginController extends BaseController {
     /**
      * Google 登录回调处理
      */
-    /*@GetMapping("/api/google/callback")
-    public void googleCallback(@RequestParam String code,
-                               @RequestParam String state,
-                               HttpServletRequest request,
-                               HttpServletResponse response) throws IOException {
-        try {
-            log.info("Receiving Google callback. Code len: {}, State: {}", code.length(), state);
-            Long expireTime = STATE_CACHE.get(state);
-            if (expireTime == null) {
-                log.warn("非法登录请求：State 不存在或已被使用. State: {}", state);
-                throw new RuntimeException("Invalid request or the page has expired. Please refresh and try again.");
-            }
-            if (System.currentTimeMillis() > expireTime) {
-                STATE_CACHE.remove(state);
-                throw new RuntimeException("Login request timed out. Please log in again.");
-            }
-            STATE_CACHE.remove(state);
-            GoogleConfig config = systemConfigService.getGoogleConfig();
-            if (!config.isEnabled()) {
-                throw new RuntimeException("Google Sign-in is not enabled.");
-            }
-            String accessToken = getGoogleAccessToken(code, config);
-            GoogleUser googleUser = getGoogleUserInfo(accessToken);
-
-            String allowedEmail = config.getEmail();
-            if (StringUtils.isBlank(allowedEmail)) {
-                throw new RuntimeException("Access denied: No administrator email has been configured for login.");
-            }
-            if (!allowedEmail.equalsIgnoreCase(googleUser.getEmail())) {
-                log.warn("非授权 Google 账号尝试登录: {}", googleUser.getEmail());
-                throw new RuntimeException("your email " + googleUser.getEmail() + " Unauthorized access to this system");
-            }
-            Authentication authentication = createAuthentication(googleUser);
-            SecurityContextHolder.getContext().setAuthentication(authentication);
-            boolean isRememberMe = state.endsWith("_on");
-            try {
-                if (isRememberMe) {
-                    customerRememberMeService.loginSuccess(request, response, authentication);
-                }
-            } catch (Exception e) {
-                log.warn("Remember-Me 写入 Cookie 失败:{}", e.getMessage());
-            }
-            String redirectUrl = isMobileRequest(request) ? "/m/tenants" : "/index";
-            response.sendRedirect(redirectUrl);
-
-        } catch (Exception e) {
-            log.error("Google登录失败", e);
-            String loginUrl = isMobileRequest(request) ? "/m/login" : "/login";
-            response.sendRedirect(loginUrl + "?error=" + URLEncoder.encode(e.getMessage(), StandardCharsets.UTF_8.name()));
-        }
-    }*/
-
-    /**
-     * Google 登录回调处理
-     */
     @GetMapping("/api/google/callback")
     public void googleCallback(@RequestParam String code,
                                @RequestParam String state,
@@ -205,18 +139,9 @@ public class GoogleLoginController extends BaseController {
                     LoginTypeEnum.GOOGLE
             );
 
-            Authentication authentication = createAuthentication(localUser.getUsername());
-            SecurityContextHolder.getContext().setAuthentication(authentication);
-
             boolean isRememberMe = state.endsWith("_true") || state.endsWith("_on");
-            try {
-                if (isRememberMe) {
-                    log.info("Google Remember-Me (Detected from state)");
-                    customerRememberMeService.rememberLogin(response, authentication);
-                }
-            } catch (Exception e) {
-                log.warn("Remember-Me write Cookie fail:{}", e.getMessage());
-            }
+            StpUtil.login(localUser.getUsername(), isRememberMe);
+            log.info("Google login success, user={}, rememberMe={}", localUser.getUsername(), isRememberMe);
 
             String redirectUrl = isMobileRequest(request) ? "/m/tenants" : "/index";
             response.sendRedirect(redirectUrl);
@@ -300,14 +225,4 @@ public class GoogleLoginController extends BaseController {
         );
     }*/
 
-    private Authentication createAuthentication(String localUsername) {
-        List<GrantedAuthority> authorities = Collections.singletonList(
-                new SimpleGrantedAuthority("ROLE_USER")
-        );
-        return new UsernamePasswordAuthenticationToken(
-                localUsername,
-                "",
-                authorities
-        );
-    }
 }

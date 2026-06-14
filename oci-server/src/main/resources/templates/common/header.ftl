@@ -1,5 +1,5 @@
-<meta name="_csrf" content="${_csrf.token}">
-<meta name="_csrf_header" content="${_csrf.headerName}">
+<meta name="_csrf" content="">
+<meta name="_csrf_header" content="X-CSRF-TOKEN">
 
 <div class="top-nav">
     <a href="/index" class="brand">
@@ -131,7 +131,6 @@
                 </div>
 
                 <form action="/perform_logout" method="post" id="logoutFormMenu">
-                    <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}"/>
                     <div class="menu-item logout-item" onclick="document.getElementById('logoutFormMenu').submit();">
                         <div class="item-left">
                             <i class="fas fa-sign-out-alt menu-icon"></i> <span>${msg.get('header.logout')}</span>

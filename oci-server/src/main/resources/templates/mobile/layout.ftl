@@ -6,8 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="_csrf" content="${_csrf.token}">
-    <meta name="_csrf_header" content="${_csrf.headerName}">
+    <meta name="_csrf" content="">
+    <meta name="_csrf_header" content="X-CSRF-TOKEN">
     <title>${title} - OCI-START</title>
     <#noparse>
     <script>(function(){var t=localStorage.getItem('mob-theme')||'auto';var d=document.documentElement;d.setAttribute('data-theme',t==='auto'?(window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'):t);})();</script>
