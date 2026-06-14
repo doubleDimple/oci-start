@@ -4,9 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VPS管理系统 - SSH终端</title>
-    <meta name="_csrf" content="${_csrf.token}"/>
-    <meta name="_csrf_header" content="${_csrf.headerName}"/>
-    <input type="hidden" name="_csrf" value="${_csrf.token}">
+    <meta name="_csrf" content="">
+    <meta name="_csrf_header" content="X-CSRF-TOKEN">
 <#--
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 -->
@@ -44,7 +43,6 @@
     <main class="main-content">
 
         <div class="ssh-config-panel">
-            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}"/>
             <div class="ssh-config-form">
                 <div class="ssh-config-item">
                     <label class="ssh-config-label"><i class="fas fa-user"></i>${msg.get("ssh.user")}</label>
@@ -375,7 +373,7 @@
 
         Swal.fire({ title: 'loading', allowOutsideClick: false, showConfirmButton: false, didOpen: () => Swal.showLoading() });
 
-        var csrfToken = document.querySelector('input[name="${_csrf.parameterName}"]').value;
+        var csrfToken = document.querySelector('input[name="_csrf"]').value;
         var config = { instanceId: instanceId, username: username, port: port, password: password };
 
         fetch('/oci/ssh/config', {
