@@ -6,6 +6,7 @@
     <title>VPS管理系统 - SSH终端</title>
     <meta name="_csrf" content="">
     <meta name="_csrf_header" content="X-CSRF-TOKEN">
+    <script>function _getCsrfToken(){var i=document.querySelector('input[name="_csrf"]');if(i)return i.value;var m=document.querySelector('meta[name="_csrf"]');return m?(m.getAttribute('content')||''):''}</script>
 <#--
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 -->
@@ -373,7 +374,7 @@
 
         Swal.fire({ title: 'loading', allowOutsideClick: false, showConfirmButton: false, didOpen: () => Swal.showLoading() });
 
-        var csrfToken = document.querySelector('input[name="_csrf"]').value;
+        var csrfToken = _getCsrfToken();
         var config = { instanceId: instanceId, username: username, port: port, password: password };
 
         fetch('/oci/ssh/config', {

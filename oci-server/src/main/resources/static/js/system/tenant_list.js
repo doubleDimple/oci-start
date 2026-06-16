@@ -1,5 +1,12 @@
 let csrfToken, csrfHeaderName;
 
+function _getCsrfToken() {
+    const input = document.querySelector('input[name="_csrf"]');
+    if (input) return input.value;
+    const meta = document.querySelector('meta[name="_csrf"]');
+    return meta ? (meta.getAttribute('content') || '') : '';
+}
+
 let currentUserPage = 1;
 const userItemsPerPage = 5;
 let allUsers = [];
@@ -120,7 +127,7 @@ function handleSync(tenantId) {
     xhr.open('GET', '/tenants/syncOci?tenantId=' + tenantId, true);
 
     // 设置CSRF令牌
-    const token = document.querySelector('input[name="_csrf"]').value;
+    const token = _getCsrfToken();
     xhr.setRequestHeader('X-CSRF-TOKEN', token);
 
     xhr.onload = function() {
@@ -424,7 +431,7 @@ function handleDelete(tenantId) {
             xhr.open('GET', '/tenants/deleteApi?tenantId=' + tenantId, true);
 
             // 设置CSRF令牌
-            const token = document.querySelector('input[name="_csrf"]').value;
+            const token = _getCsrfToken();
             xhr.setRequestHeader('X-CSRF-TOKEN', token);
 
             // 设置超时时间（30秒）
@@ -503,7 +510,7 @@ function handleDelete(tenantId) {
             xhr.open('GET', '/tenants/updateAccountDetail?tenantId=' + tenantId, true);
 
             // 设置CSRF令牌
-            const token = document.querySelector('input[name="_csrf"]').value;
+            const token = _getCsrfToken();
             xhr.setRequestHeader('X-CSRF-TOKEN', token);
 
             // 设置超时时间（可选，比如30秒）
@@ -549,7 +556,7 @@ function handleUpdateAccountDetail(tenantId) {
         cancelButtonText: i18n.common_cancel
     }).then((result) => {
         if (result.isConfirmed) {
-            const token = document.querySelector('input[name="_csrf"]').value;
+            const token = _getCsrfToken();
             Swal.fire({
                 title: 'logs',
                 html: '<div id="sse-messages" style="text-align: left; height: 300px; overflow-y: auto; font-size: 14px; font-family: monospace; color: #333; padding: 12px; background: #f4f5f7; border: 1px solid #e1e4e8; border-radius: 4px;">[System] connecting...<br></div>',
@@ -674,7 +681,7 @@ function loadUserList(tenantId) {
 
     const xhr = new XMLHttpRequest();
     xhr.open('GET', '/tenants/oracle-users?tenantId=' + tenantId, true);
-    const token = document.querySelector('input[name="_csrf"]').value;
+    const token = _getCsrfToken();
     xhr.setRequestHeader('X-CSRF-TOKEN', token);
 
     xhr.onload = function() {
@@ -1000,7 +1007,7 @@ function createUser() {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', '/tenants/oracle-users', true);
     xhr.setRequestHeader('Content-Type', 'application/json');
-    const token = document.querySelector('input[name="_csrf"]').value;
+    const token = _getCsrfToken();
     xhr.setRequestHeader('X-CSRF-TOKEN', token);
 
     xhr.onload = function () {
@@ -1125,7 +1132,7 @@ function resetUserPassword(userId, userName) {
             xhr.open('POST', '/tenants/oracle-users/resetPassword', true);
             xhr.setRequestHeader('Content-Type', 'application/json');
 
-            const token = document.querySelector('input[name="_csrf"]').value;
+            const token = _getCsrfToken();
             xhr.setRequestHeader('X-CSRF-TOKEN', token);
 
             xhr.timeout = 30000;
@@ -1305,7 +1312,7 @@ function deleteOciUser(userId) {
             xhr.open('POST', '/tenants/oracle-users/deleteUser', true);
             xhr.setRequestHeader('Content-Type', 'application/json');
 
-            const token = document.querySelector('input[name="_csrf"]').value;
+            const token = _getCsrfToken();
             xhr.setRequestHeader('X-CSRF-TOKEN', token);
 
             // 设置30秒超时
@@ -1360,7 +1367,7 @@ function deleteOciUser(userId) {
     fetch('/tenants/export', {
         method: 'GET',
         headers: {
-            'X-CSRF-TOKEN': document.querySelector('input[name="_csrf"]').value
+            'X-CSRF-TOKEN': _getCsrfToken()
         }
     })
         .then(response => response.json())
@@ -1382,7 +1389,7 @@ function deleteOciUser(userId) {
     fetch('/tenants/exportByTenant?id='+id, {
         method: 'GET',
         headers: {
-            'X-CSRF-TOKEN': document.querySelector('input[name="_csrf"]').value
+            'X-CSRF-TOKEN': _getCsrfToken()
         }
     })
         .then(response => response.json())
@@ -1410,7 +1417,7 @@ function exportDataByTenant(id) {
 
 
 async function handleSecureExport(apiUrl, defaultFileName) {
-    const csrfToken = document.querySelector('input[name="_csrf"]').value;
+    const csrfToken = _getCsrfToken();
 
     try {
         const sendRes = await fetch('/tenants/verify/sendExportCode', {
@@ -1492,7 +1499,7 @@ function importData() {
             xhr.open('POST', '/tenants/import', true);
 
             // 设置请求头，包括 CSRF Token
-            const csrfToken = document.querySelector('input[name="_csrf"]').value;
+            const csrfToken = _getCsrfToken();
             xhr.setRequestHeader('Content-Type', 'application/json');
             xhr.setRequestHeader('X-CSRF-TOKEN', csrfToken);
 
@@ -1687,7 +1694,7 @@ function showBootVolumeManagement(tenantId) {
     tableView.style.display = 'none';
 
     // 获取CSRF token
-    const token = document.querySelector('input[name="_csrf"]').value;
+    const token = _getCsrfToken();
 
     var requestUrl = '/tenants/boot-volumes?tenantId=' + encodeURIComponent(tenantId);
     fetch(requestUrl, {
@@ -1909,7 +1916,7 @@ function fetchGroups(tenantId) {
         xhr.setRequestHeader('Content-Type', 'application/json');
 
         // Get CSRF token
-        const token = document.querySelector('input[name="_csrf"]').value;
+        const token = _getCsrfToken();
         xhr.setRequestHeader('X-CSRF-TOKEN', token);
 
         xhr.onload = function() {
@@ -2067,7 +2074,7 @@ function resetMfa() {
             const xhr = new XMLHttpRequest();
             xhr.open('POST', '/tenants/resetAccountFactor', true);
             xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-            const token = document.querySelector('input[name="_csrf"]').value;
+            const token = _getCsrfToken();
             xhr.setRequestHeader('X-CSRF-TOKEN', token);
             xhr.onload = function() {
                 if (xhr.status === 200) {
@@ -2133,7 +2140,7 @@ function showTrafficAlert(tenantId) {
     const xhr = new XMLHttpRequest();
     xhr.open('GET', `/tenants/traffic-alert/`+tenantId, true);
 
-    const token = document.querySelector('input[name="_csrf"]').value;
+    const token = _getCsrfToken();
     xhr.setRequestHeader('X-CSRF-TOKEN', token);
 
     xhr.onload = function() {
@@ -2209,7 +2216,7 @@ function saveTrafficAlert() {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', '/tenants/traffic-alert', true);
     xhr.setRequestHeader('Content-Type', 'application/json');
-    const token = document.querySelector('input[name="_csrf"]').value;
+    const token = _getCsrfToken();
     xhr.setRequestHeader('X-CSRF-TOKEN', token);
     xhr.onload = function() {
         if (xhr.status === 200) {
@@ -2395,7 +2402,7 @@ function saveCustomName() {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', '/tenants/updateCustomName', true);
     xhr.setRequestHeader('Content-Type', 'application/json');
-    const token = document.querySelector('input[name="_csrf"]').value;
+    const token = _getCsrfToken();
     xhr.setRequestHeader('X-CSRF-TOKEN', token);
 
     xhr.onload = function() {
@@ -2498,7 +2505,7 @@ function loadCurrentPasswordPolicy(tenantId) {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', '/tenants/oracle-users/getPasspolicy', true);
     xhr.setRequestHeader('Content-Type', 'application/json');
-    const token = document.querySelector('input[name="_csrf"]').value;
+    const token = _getCsrfToken();
     xhr.setRequestHeader('X-CSRF-TOKEN', token);
     xhr.onload = function() {
         const policyInfoSection = document.getElementById('policyInfoSection');
@@ -2582,7 +2589,7 @@ function saveTenantPasswordPolicy() {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', '/tenants/oracle-users/password-policy', true);
     xhr.setRequestHeader('Content-Type', 'application/json');
-    const token = document.querySelector('input[name="_csrf"]').value;
+    const token = _getCsrfToken();
     xhr.setRequestHeader('X-CSRF-TOKEN', token);
     xhr.onload = function() {
         if (xhr.status === 200) {
@@ -2719,7 +2726,7 @@ function loadNotificationRecipients() {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', '/tenants/notification/recipients', true);
     xhr.setRequestHeader('Content-Type', 'application/json');
-    const token = document.querySelector('input[name="_csrf"]').value;
+    const token = _getCsrfToken();
     xhr.setRequestHeader('X-CSRF-TOKEN', token);
 
     xhr.onload = function() {
@@ -2904,7 +2911,7 @@ function getCurrentNotificationRecipients(tenantId, callback) {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', '/tenants/notification/recipients', true);
     xhr.setRequestHeader('Content-Type', 'application/json');
-    const token = document.querySelector('input[name="_csrf"]').value;
+    const token = _getCsrfToken();
     xhr.setRequestHeader('X-CSRF-TOKEN', token);
 
     xhr.onload = function() {
@@ -2943,7 +2950,7 @@ function updateNotificationRecipientsList(tenantId, emails, callback) {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', '/tenants/notification/update', true);
     xhr.setRequestHeader('Content-Type', 'application/json');
-    const token = document.querySelector('input[name="_csrf"]').value;
+    const token = _getCsrfToken();
     xhr.setRequestHeader('X-CSRF-TOKEN', token);
 
     xhr.onload = function() {
@@ -3024,7 +3031,7 @@ function performMfaOperation(tenantId, enableEmail) {
     xhr.open('POST', '/tenants/mfa/email', true);
     xhr.setRequestHeader('Content-Type', 'application/json');
 
-    const token = document.querySelector('input[name="_csrf"]').value;
+    const token = _getCsrfToken();
     xhr.setRequestHeader('X-CSRF-TOKEN', token);
 
     xhr.onload = function() {
@@ -3077,7 +3084,7 @@ function refreshMfaStatus() {
     const xhr = new XMLHttpRequest();
     xhr.open('GET', `/tenants/mfa/status?tenantId=`+tenantId, true);
 
-    const token = document.querySelector('input[name="_csrf"]').value;
+    const token = _getCsrfToken();
     xhr.setRequestHeader('X-CSRF-TOKEN', token);
 
     xhr.onload = function() {
@@ -3204,7 +3211,7 @@ function updateMfaStatusDisplay(mfaData) {
     xhr.setRequestHeader('Content-Type', 'application/json');
 
     // 设置CSRF令牌
-    const token = document.querySelector('input[name="_csrf"]').value;
+    const token = _getCsrfToken();
     xhr.setRequestHeader('X-CSRF-TOKEN', token);
 
     xhr.onload = function() {
@@ -3292,7 +3299,7 @@ function enableEmailService(tenantId, isViewOnly = false) {
         const xhr = new XMLHttpRequest();
         xhr.open('POST', '/email/tenant/get', true);
         xhr.setRequestHeader('Content-Type', 'application/json');
-        xhr.setRequestHeader('X-CSRF-TOKEN', document.querySelector('input[name="_csrf"]').value);
+        xhr.setRequestHeader('X-CSRF-TOKEN', _getCsrfToken());
 
         xhr.onload = function() {
             if (xhr.status === 200) {
@@ -3386,7 +3393,7 @@ function executeEnableEmailService(tenantId, emailDomain) {
     xhr.open('POST', '/tenants/email/enable', true);
     xhr.setRequestHeader('Content-Type', 'application/json');
     // 获取 CSRF Token
-    const token = document.querySelector('input[name="_csrf"]').value;
+    const token = _getCsrfToken();
     xhr.setRequestHeader('X-CSRF-TOKEN', token);
     xhr.timeout = 60000;
 
@@ -3757,7 +3764,7 @@ function loadAvailableLoginTypes() {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', '/social/availableLoginTypes', true); // 注意你的Controller是POST还是GET，如果没参数建议GET，但你是REST风格
     // 设置 CSRF
-    const token = document.querySelector('input[name="_csrf"]').value;
+    const token = _getCsrfToken();
     xhr.setRequestHeader('X-CSRF-TOKEN', token);
     xhr.setRequestHeader('Content-Type', 'application/json');
 
@@ -3792,7 +3799,7 @@ function loadSocialList() {
 
     const xhr = new XMLHttpRequest();
     xhr.open('POST', '/social/list', true);
-    const token = document.querySelector('input[name="_csrf"]').value;
+    const token = _getCsrfToken();
     xhr.setRequestHeader('X-CSRF-TOKEN', token);
     xhr.setRequestHeader('Content-Type', 'application/json');
 
@@ -3957,7 +3964,7 @@ function saveSocialConfig() {
 
     const xhr = new XMLHttpRequest();
     xhr.open('POST', url, true);
-    const token = document.querySelector('input[name="_csrf"]').value;
+    const token = _getCsrfToken();
     xhr.setRequestHeader('X-CSRF-TOKEN', token);
     xhr.setRequestHeader('Content-Type', 'application/json');
 
@@ -4068,7 +4075,7 @@ function enableSocialConfig(item) {
             const xhr = new XMLHttpRequest();
             xhr.open('POST', '/social/enable', true);
 
-            const token = document.querySelector('input[name="_csrf"]').value;
+            const token = _getCsrfToken();
             xhr.setRequestHeader('X-CSRF-TOKEN', token);
             xhr.setRequestHeader('Content-Type', 'application/json');
 
@@ -4129,7 +4136,7 @@ function saveAccountCost(tenantId, newCost) {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', '/tenants/updateAccountCost', true);
     xhr.setRequestHeader('Content-Type', 'application/json');
-    const token = document.querySelector('input[name="_csrf"]').value;
+    const token = _getCsrfToken();
     xhr.setRequestHeader('X-CSRF-TOKEN', token);
 
     xhr.onload = function() {
@@ -4187,7 +4194,7 @@ function confirmTransfer() {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', '/tenants/transfer', true);
     xhr.setRequestHeader('Content-Type', 'application/json');
-    const token = document.querySelector('input[name="_csrf"]').value;
+    const token = _getCsrfToken();
     xhr.setRequestHeader('X-CSRF-TOKEN', token);
     xhr.onload = function() {
         if (xhr.status === 200) {

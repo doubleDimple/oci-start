@@ -1,3 +1,10 @@
+function _getCsrfToken() {
+    const input = document.querySelector('input[name="_csrf"]');
+    if (input) return input.value;
+    const meta = document.querySelector('meta[name="_csrf"]');
+    return meta ? (meta.getAttribute('content') || '') : '';
+}
+
 let currentPage = 1;
 const itemsPerPage = 5;
 let allRules = [];
@@ -89,7 +96,7 @@ function handleSync(tenantId) {
     xhr.open('GET', '/tenants/syncOci?tenantId=' + tenantId, true);
 
     // 设置CSRF令牌
-    const token = document.querySelector('input[name="_csrf"]').value;
+    const token = _getCsrfToken();
     xhr.setRequestHeader('X-CSRF-TOKEN', token);
 
     xhr.onload = function() {
@@ -312,7 +319,7 @@ document.addEventListener('DOMContentLoaded', () => {
             xhr.open('GET', '/tenants/deleteApi?tenantId=' + tenantId, true);
 
             // 设置CSRF令牌
-            const token = document.querySelector('input[name="_csrf"]').value;
+            const token = _getCsrfToken();
             xhr.setRequestHeader('X-CSRF-TOKEN', token);
 
             xhr.onload = function () {
@@ -404,7 +411,7 @@ function loadSecurityRules(tenantId) {
     tableBody.innerHTML = '';
     const xhr = new XMLHttpRequest();
     xhr.open('GET', `/tenants/security-rules?tenantId=`+tenantId +`&type=`+ activeTab+``, true);
-    const token = document.querySelector('input[name="_csrf"]').value;
+    const token = _getCsrfToken();
     xhr.setRequestHeader('X-CSRF-TOKEN', token);
     xhr.onload = function() {
         loadingContainer.style.display = 'none';
@@ -682,7 +689,7 @@ function saveRule() {
     const xhr = new XMLHttpRequest();
     xhr.open(method, url, true);
     xhr.setRequestHeader('Content-Type', 'application/json');
-    const token = document.querySelector('input[name="_csrf"]').value;
+    const token = _getCsrfToken();
     xhr.setRequestHeader('X-CSRF-TOKEN', token);
     xhr.onload = function() {
         if (xhr.status === 200) {
@@ -740,7 +747,7 @@ function deleteRule(compositeId) {
         if (result.isConfirmed) {
             const xhr = new XMLHttpRequest();
             xhr.open('DELETE', `/tenants/security-rules/`+compositeId, true);
-            const token = document.querySelector('input[name="_csrf"]').value;
+            const token = _getCsrfToken();
             xhr.setRequestHeader('X-CSRF-TOKEN', token);
             Swal.fire({
                 title: 'loading',
@@ -855,7 +862,7 @@ function saveRule() {
     const xhr = new XMLHttpRequest();
     xhr.open(method, url, true);
     xhr.setRequestHeader('Content-Type', 'application/json');
-    const token = document.querySelector('input[name="_csrf"]').value;
+    const token = _getCsrfToken();
     xhr.setRequestHeader('X-CSRF-TOKEN', token);
     xhr.onload = function() {
         if (xhr.status === 200) {
@@ -901,7 +908,7 @@ function showSecurityRules(tenantId) {
 
     const xhr = new XMLHttpRequest();
     xhr.open('GET', `/tenants/oracle-users?tenantId=` + tenantId, true);
-    const token = document.querySelector('input[name="_csrf"]').value;
+    const token = _getCsrfToken();
     xhr.setRequestHeader('X-CSRF-TOKEN', token);
     xhr.onload = function() {
         if (xhr.status === 200) {
@@ -1136,7 +1143,7 @@ function hideAddUserForm() {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', '/tenants/oracle-users', true);
     xhr.setRequestHeader('Content-Type', 'application/json');
-    const token = document.querySelector('input[name="_csrf"]').value;
+    const token = _getCsrfToken();
     xhr.setRequestHeader('X-CSRF-TOKEN', token);
 
     xhr.onload = function () {
@@ -1244,7 +1251,7 @@ function hideAddUserForm() {
     const xhr = new XMLHttpRequest();
     xhr.open('PUT', `/tenants/oracle-users/` +username + `/reset-password`, true);
     xhr.setRequestHeader('Content-Type', 'application/json');
-    const token = document.querySelector('input[name="_csrf"]').value;
+    const token = _getCsrfToken();
     xhr.setRequestHeader('X-CSRF-TOKEN', token);
 
     xhr.onload = function() {
@@ -1267,7 +1274,7 @@ function hideAddUserForm() {
     fetch('/tenants/export', {
         method: 'GET',
         headers: {
-            'X-CSRF-TOKEN': document.querySelector('input[name="_csrf"]').value
+            'X-CSRF-TOKEN': _getCsrfToken()
         }
     })
         .then(response => response.json())
@@ -1302,7 +1309,7 @@ function hideAddUserForm() {
             xhr.open('POST', '/tenants/import', true);
 
             // 设置请求头，包括 CSRF Token
-            const csrfToken = document.querySelector('input[name="_csrf"]').value;
+            const csrfToken = _getCsrfToken();
             xhr.setRequestHeader('Content-Type', 'application/json');
             xhr.setRequestHeader('X-CSRF-TOKEN', csrfToken);
 
@@ -1500,7 +1507,7 @@ function showBootVolumeManagement(tenantId) {
     loadingIndicator.style.display = 'flex';
     tableView.style.display = 'none';
 
-    const token = document.querySelector('input[name="_csrf"]').value;
+    const token = _getCsrfToken();
     var requestUrl = '/tenants/boot-volumes?tenantId=' + encodeURIComponent(tenantId);
     showLoading(i18n.tenant_volumeMgrLoad || '正在加载硬盘信息...');
     fetch(requestUrl, {
@@ -1819,7 +1826,7 @@ function fetchGroups(tenantId) {
         const xhr = new XMLHttpRequest();
         xhr.open('POST', '/tenants/groups', true);
         xhr.setRequestHeader('Content-Type', 'application/json');
-        const token = document.querySelector('input[name="_csrf"]').value;
+        const token = _getCsrfToken();
         xhr.setRequestHeader('X-CSRF-TOKEN', token);
         xhr.onload = function() {
             if (xhr.status === 200) {
@@ -1868,7 +1875,7 @@ function fetchGroups(tenantId) {
             xhr.open('POST', '/tenants/enableIcmp', true);
 
             // 设置CSRF令牌
-            const token = document.querySelector('input[name="_csrf"]').value;
+            const token = _getCsrfToken();
             xhr.setRequestHeader('X-CSRF-TOKEN', token);
             xhr.setRequestHeader('Content-Type', 'application/json');
 
@@ -2065,7 +2072,7 @@ function loadMysqlInfo(tenantId) {
 
     const xhr = new XMLHttpRequest();
     xhr.open('GET', '/tenants/mysql-info?tenantId=' + tenantId, true);
-    const token = document.querySelector('input[name="_csrf"]').value;
+    const token = _getCsrfToken();
     xhr.setRequestHeader('X-CSRF-TOKEN', token);
 
     xhr.onload = function() {
@@ -2180,7 +2187,7 @@ function syncMysqlFromCloud() {
 
     const xhr = new XMLHttpRequest();
     xhr.open('POST', '/tenants/sync-mysql?tenantId=' + tenantId, true);
-    const token = document.querySelector('input[name="_csrf"]').value;
+    const token = _getCsrfToken();
     xhr.setRequestHeader('X-CSRF-TOKEN', token);
 
     xhr.onload = function() {
@@ -2214,7 +2221,7 @@ function syncSingleMysql(configId, tenantId) {
 
     const xhr = new XMLHttpRequest();
     xhr.open('POST', '/tenants/sync-single-mysql?id=' + configId, true);
-    const token = document.querySelector('input[name="_csrf"]').value;
+    const token = _getCsrfToken();
     xhr.setRequestHeader('X-CSRF-TOKEN', token);
     xhr.onload = function() {
         try {
@@ -2258,7 +2265,7 @@ function handleMysqlAction(action, id) {
             const xhr = new XMLHttpRequest();
             xhr.open('POST', '/tenants/mysql-action', true);
             xhr.setRequestHeader('Content-Type', 'application/json');
-            const token = document.querySelector('input[name="_csrf"]').value;
+            const token = _getCsrfToken();
             xhr.setRequestHeader('X-CSRF-TOKEN', token);
 
             xhr.onload = function() {
@@ -2301,7 +2308,7 @@ function bindPublicIp(configId, tenantId) {
 
             const xhr = new XMLHttpRequest();
             xhr.open('POST', '/tenants/bind-public-ip?id=' + configId, true);
-            const token = document.querySelector('input[name="_csrf"]').value;
+            const token = _getCsrfToken();
             xhr.setRequestHeader('X-CSRF-TOKEN', token);
 
             xhr.onload = function() {
@@ -2407,7 +2414,7 @@ function resetMysqlAuth(id, tenantId) {
             params.append('tenantId', tenantId);
             const xhr = new XMLHttpRequest();
             xhr.open('POST', '/tenants/mysql-reset-auth', true);
-            const token = document.querySelector('input[name="_csrf"]').value;
+            const token = _getCsrfToken();
             xhr.setRequestHeader('X-CSRF-TOKEN', token);
             xhr.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
             xhr.onload = function() {
