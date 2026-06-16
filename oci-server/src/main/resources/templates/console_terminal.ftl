@@ -6,6 +6,7 @@
     <title>OCI控制台管理系统 - VNC终端</title>
     <meta name="_csrf" content="">
     <meta name="_csrf_header" content="X-CSRF-TOKEN">
+    <script>function _getCsrfToken(){var i=document.querySelector('input[name="_csrf"]');if(i)return i.value;var m=document.querySelector('meta[name="_csrf"]');return m?(m.getAttribute('content')||''):''}</script>
     <script>(function(){var t=localStorage.getItem('oci_theme')||'dark';if(t==='system')t=window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';document.documentElement.dataset.theme=t;})();</script>
     <link rel="stylesheet" href="/css/all.min.css">
     <link rel="stylesheet" href="/css/sweetalert2.min.css">
@@ -816,7 +817,7 @@
                 document.getElementById('rebootBtn').disabled = true;
                 document.getElementById('rebootBtn').innerHTML = '<i class="fas fa-spinner fa-spin"></i> '+i18n.vnc_reseting;
 
-                const csrfToken = document.querySelector('input[name="_csrf"]').value;
+                const csrfToken = _getCsrfToken();
                 const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content || 'X-CSRF-TOKEN';
 
                 fetch('/oci/console/heavyNewRestart', {

@@ -6,6 +6,7 @@
     <title>VPS管理系统 - 监控管理</title>
     <meta name="_csrf" content="">
     <meta name="_csrf_header" content="X-CSRF-TOKEN">
+    <script>function _getCsrfToken(){var i=document.querySelector('input[name="_csrf"]');if(i)return i.value;var m=document.querySelector('meta[name="_csrf"]');return m?(m.getAttribute('content')||''):''}</script>
     <script>
         (function(){var t=localStorage.getItem('oci_theme');if(t)document.documentElement.dataset.theme=t;})();
     </script>
@@ -457,7 +458,7 @@
         xhr.open('GET', '/api/metrics/deleteMetrics?serverId=' + serverId, true);
 
         // 设置CSRF令牌
-        const token = document.querySelector('input[name="_csrf"]').value;
+        const token = _getCsrfToken();
         xhr.setRequestHeader('X-CSRF-TOKEN', token);
 
         xhr.onload = function() {
