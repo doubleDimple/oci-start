@@ -6,6 +6,7 @@
     <title>VPS管理系统 - 云实例管理</title>
     <meta name="_csrf" content="">
     <meta name="_csrf_header" content="X-CSRF-TOKEN">
+    <script>function _getCsrfToken(){var i=document.querySelector('input[name="_csrf"]');if(i)return i.value;var m=document.querySelector('meta[name="_csrf"]');return m?(m.getAttribute('content')||''):''}</script>
 <#--
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 -->
@@ -273,7 +274,7 @@
                 });
 
                 // 获取CSRF令牌
-                const csrfToken = document.querySelector('input[name="_csrf"]').value;
+                const csrfToken = _getCsrfToken();
 
                 // 发送删除请求
                 fetch(`/other/instances/`+ bootId+`/delete`, {
@@ -342,7 +343,7 @@
                 });
 
                 // 获取CSRF令牌
-                const csrfToken = document.querySelector('input[name="_csrf"]').value;
+                const csrfToken = _getCsrfToken();
 
                 // 发送刷新请求
                 fetch(`/other/instances/`+ bootId+`/refresh`, {
@@ -545,7 +546,7 @@
                 });
 
                 // 获取CSRF令牌
-                const csrfToken = document.querySelector('input[name="_csrf"]').value;
+                const csrfToken = _getCsrfToken();
 
                 // 发送切换IP请求
                 fetch(`/other/instances/` + bootId + `/changeIp`, {

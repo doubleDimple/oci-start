@@ -1,3 +1,10 @@
+function _getCsrfToken() {
+    const input = document.querySelector('input[name="_csrf"]');
+    if (input) return input.value;
+    const meta = document.querySelector('meta[name="_csrf"]');
+    return meta ? (meta.getAttribute('content') || '') : '';
+}
+
 let csrfToken, csrfHeaderName;
 let availableRegions = [];
 let selectedRegions = [];
@@ -47,7 +54,7 @@ function loadRegionSummary() {
     var xhr = new XMLHttpRequest();
     xhr.open('GET', '/tenants/region-summary?tenantId=' + currentTenantId, true);
 
-    var token = document.querySelector('input[name="_csrf"]').value;
+    var token = _getCsrfToken();
     xhr.setRequestHeader('X-CSRF-TOKEN', token);
 
     xhr.onload = function() {
@@ -108,7 +115,7 @@ function loadAvailableRegions() {
     var xhr = new XMLHttpRequest();
     xhr.open('GET', '/tenants/unsubscribed-regions?tenantId=' + currentTenantId, true);
 
-    var token = document.querySelector('input[name="_csrf"]').value;
+    var token = _getCsrfToken();
     xhr.setRequestHeader('X-CSRF-TOKEN', token);
 
     xhr.onload = function() {
@@ -264,7 +271,7 @@ function performSubscription(regionKeys) {
     xhr.open('POST', '/tenants/subscribe-regions', true);
     xhr.setRequestHeader('Content-Type', 'application/json');
 
-    var token = document.querySelector('input[name="_csrf"]').value;
+    var token = _getCsrfToken();
     xhr.setRequestHeader('X-CSRF-TOKEN', token);
     var progressInterval = setInterval(function() {
         progress += progressIncrement;
@@ -402,7 +409,7 @@ function checkSubscriptionStatus(regionKey) {
     var xhr = new XMLHttpRequest();
     xhr.open('GET', '/tenants/check-subscription-status?tenantId=' + currentTenantId + '&regionKey=' + regionKey, true);
 
-    var token = document.querySelector('input[name="_csrf"]').value;
+    var token = _getCsrfToken();
     xhr.setRequestHeader('X-CSRF-TOKEN', token);
 
     xhr.onload = function() {
@@ -451,7 +458,7 @@ function loadSubscribedRegions() {
     var xhr = new XMLHttpRequest();
     xhr.open('GET', '/tenants/subscribed-regions-data?tenantId=' + currentTenantId, true);
 
-    var token = document.querySelector('input[name="_csrf"]').value;
+    var token = _getCsrfToken();
     xhr.setRequestHeader('X-CSRF-TOKEN', token);
 
     xhr.onload = function() {

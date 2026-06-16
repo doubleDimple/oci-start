@@ -6,6 +6,7 @@
     <title>VPS管理系统 - OCI实例管理</title>
     <meta name="_csrf" content="">
     <meta name="_csrf_header" content="X-CSRF-TOKEN">
+    <script>function _getCsrfToken(){var i=document.querySelector('input[name="_csrf"]');if(i)return i.value;var m=document.querySelector('meta[name="_csrf"]');return m?(m.getAttribute('content')||''):''}</script>
 <#--
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 -->
@@ -1062,7 +1063,7 @@
 
         // 发送请求
         const xhr = new XMLHttpRequest();
-        const csrfToken = document.querySelector('input[name="_csrf"]').value;
+        const csrfToken = _getCsrfToken();
 
         xhr.open('POST', '/oci/changeSpecIp', true);
         xhr.setRequestHeader('Content-Type', 'application/json');
@@ -1199,7 +1200,7 @@
         statusText.textContent = i18n.machine_startingIpv6;
 
         const xhr = new XMLHttpRequest();
-        const csrfToken = document.querySelector('input[name="_csrf"]').value;
+        const csrfToken = _getCsrfToken();
 
         xhr.open('POST', '/oci/enableIpv6', true);
         xhr.setRequestHeader('Content-Type', 'application/json');
@@ -1284,7 +1285,7 @@
 
         // 发送请求获取验证码
         const xhr = new XMLHttpRequest();
-        const csrfToken = document.querySelector('input[name="_csrf"]').value;
+        const csrfToken = _getCsrfToken();
 
         xhr.open('POST', '/oci/sendVerificationCode', true);
         xhr.setRequestHeader('Content-Type', 'application/json');
@@ -1337,7 +1338,7 @@
 
         // 发送终止请求
         const xhr = new XMLHttpRequest();
-        const csrfToken = document.querySelector('input[name="_csrf"]').value;
+        const csrfToken = _getCsrfToken();
 
         xhr.open('POST', '/oci/terminateInstance', true);
         xhr.setRequestHeader('Content-Type', 'application/json');
@@ -1418,7 +1419,7 @@
 
         // 发送更新请求
         const xhr = new XMLHttpRequest();
-        const csrfToken = document.querySelector('input[name="_csrf"]').value;
+        const csrfToken = _getCsrfToken();
 
         xhr.open('POST', '/oci/updateConfig', true);
         xhr.setRequestHeader('Content-Type', 'application/json');
@@ -1496,7 +1497,7 @@
 
         // 发送更新请求
         const xhr = new XMLHttpRequest();
-        const csrfToken = document.querySelector('input[name="_csrf"]').value;
+        const csrfToken = _getCsrfToken();
 
         xhr.open('POST', '/oci/updateName', true);
         xhr.setRequestHeader('Content-Type', 'application/json');
@@ -1622,7 +1623,7 @@
 
         // 发送更新请求
         const xhr = new XMLHttpRequest();
-        const csrfToken = document.querySelector('input[name="_csrf"]').value;
+        const csrfToken = _getCsrfToken();
 
         xhr.open('POST', '/oci/updateBootVolume', true);
         xhr.setRequestHeader('Content-Type', 'application/json');
@@ -1703,7 +1704,7 @@
 
         // 发送更新请求
         const xhr = new XMLHttpRequest();
-        const csrfToken = document.querySelector('input[name="_csrf"]').value;
+        const csrfToken = _getCsrfToken();
 
         xhr.open('POST', '/oci/updateRemark', true);
         xhr.setRequestHeader('Content-Type', 'application/json');
@@ -1752,7 +1753,7 @@
         const instanceSelect = document.getElementById('instanceSelect');
         instanceSelect.innerHTML = '<option value="">'+i18n.common_loading+'</option>';
         instanceSelect.disabled = true;
-        const csrfToken = document.querySelector('input[name="_csrf"]').value;
+        const csrfToken = _getCsrfToken();
         const options = {
             headers: {
                 'X-CSRF-TOKEN': csrfToken
@@ -1864,7 +1865,7 @@
         const tenantSelect = document.getElementById('tenantSelect');
         tenantSelect.innerHTML = '<option value="">'+i18n.common_loading+'</option>';
         tenantSelect.disabled = true;
-        const csrfToken = document.querySelector('input[name="_csrf"]').value;
+        const csrfToken = _getCsrfToken();
         const options = { headers: { 'X-CSRF-TOKEN': csrfToken } };
         fetch('/tenants/listParentTenants', options)
             .then(response => {
@@ -1910,7 +1911,7 @@
         regionSelect.innerHTML = '<option value="">'+i18n.common_loading+'</option>';
         regionSelect.disabled = true;
         goToInstanceBtn.disabled = true;
-        const csrfToken = document.querySelector('input[name="_csrf"]').value;
+        const csrfToken = _getCsrfToken();
         fetch('/tenants/listRegions?parentId=' + encodeURIComponent(selectedTenantId), {
             headers: { 'X-CSRF-TOKEN': csrfToken }
         })
@@ -2223,7 +2224,7 @@
 
         // 发送请求
         const xhr = new XMLHttpRequest();
-        const csrfToken = document.querySelector('input[name="_csrf"]').value;
+        const csrfToken = _getCsrfToken();
 
         xhr.open('POST', '/oci/startInstance', true);
         xhr.setRequestHeader('Content-Type', 'application/json');
@@ -2283,7 +2284,7 @@
 
         // 发送请求
         const xhr = new XMLHttpRequest();
-        const csrfToken = document.querySelector('input[name="_csrf"]').value;
+        const csrfToken = _getCsrfToken();
 
         xhr.open('POST', '/oci/stopInstance', true);
         xhr.setRequestHeader('Content-Type', 'application/json');
@@ -2739,7 +2740,7 @@
         statusMessage.style.display = 'block';
         statusText.textContent = i18n.common_loading;
 
-        const csrfToken = document.querySelector('input[name="_csrf"]').value;
+        const csrfToken = _getCsrfToken();
 
         fetch('/tenants/update-volumes/' + encodeURIComponent(bootVolumeId), {
             method: 'PUT',
