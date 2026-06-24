@@ -2458,7 +2458,7 @@ public class OciUtils {
      * 这是一个完全自动化的方法，无需手动提供Domain Endpoint
      *
      * @param tenant 租户信息
-     * @param expirationDays 密码过期天数，默认90天（3个月）
+     * @param expirationDays 密码过期天数，默认120天
      * @return 操作结果
      */
     public static boolean enablePasswordExpirationWithAutoDomain(Tenant tenant, Integer expirationDays) {

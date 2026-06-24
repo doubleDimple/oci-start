@@ -2566,8 +2566,10 @@ function closeTenantPasswordPolicyModal() {
 }
 function saveTenantPasswordPolicy() {
     const enablePasswordExpiry = document.getElementById('enableTenantPasswordExpiry').checked;
-    const expiryDays = parseInt(document.getElementById('tenantPasswordExpiryDays').value) || 120;
-    if (enablePasswordExpiry && (expiryDays < 1 || expiryDays > 365)) {
+    const expiryDaysInput = document.getElementById('tenantPasswordExpiryDays').value;
+    const parsedExpiryDays = parseInt(expiryDaysInput, 10);
+    const expiryDays = isNaN(parsedExpiryDays) ? 120 : parsedExpiryDays;
+    if (enablePasswordExpiry && (expiryDays < 0 || expiryDays > 365)) {
         Swal.fire({
             title: 'error',
             text: i18n.tenant_cds,
@@ -2642,11 +2644,14 @@ function displayPasswordPolicyInfo(policyList) {
     const enabledPolicies = policyList.filter(function(policy) {
         return policy.enablePasswordExpiry;
     });
+    const policiesWithExpiryDays = policyList.filter(function(policy) {
+        return policy.expiryDays != null;
+    });
     const hasEnabledPolicy = enabledPolicies.length > 0;
     let minExpiryDays = 120;
-    if (hasEnabledPolicy) {
-        const expiryDaysList = enabledPolicies.map(function(p) {
-            return p.expiryDays || 120;
+    if (policiesWithExpiryDays.length > 0) {
+        const expiryDaysList = policiesWithExpiryDays.map(function(p) {
+            return p.expiryDays == null ? 120 : p.expiryDays;
         });
         minExpiryDays = Math.min.apply(Math, expiryDaysList);
     }

@@ -691,6 +691,13 @@ public class TenantServiceImpl implements TenantService {
     */
     @Override
     public Boolean updateUserPasswordPolicy(String tenantId, boolean enablePasswordExpiry, Integer expiryDays) {
+        if (enablePasswordExpiry) {
+            int days = expiryDays == null ? 120 : expiryDays;
+            if (days < 0 || days > 365) {
+                throw new IllegalArgumentException("过期天数必须在0-365之间");
+            }
+            expiryDays = days;
+        }
         Tenant tenant = tenantRepository.findById(Long.valueOf(tenantId)).get();
         Boolean result = Boolean.TRUE;
         if (enablePasswordExpiry){
