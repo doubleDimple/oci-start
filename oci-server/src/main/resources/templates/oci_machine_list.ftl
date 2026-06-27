@@ -14,6 +14,7 @@
         (function(){var t=localStorage.getItem('oci_theme');if(t)document.documentElement.dataset.theme=t;})();
     </script>
     <link rel="stylesheet" href="/css/all.min.css">
+    <link rel="stylesheet" href="/css/common/fa-fix.css">
     <link rel="stylesheet" href="/css/common/loading.css">
     <link rel="stylesheet" href="/css/app/oci_machine_list.css">
     <link rel="stylesheet" href="/css/common/dropdown-menu.css">
