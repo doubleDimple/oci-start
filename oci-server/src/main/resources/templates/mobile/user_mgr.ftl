@@ -248,8 +248,9 @@ html[data-theme="dark"] .um-tab-btn.active { background:rgba(255,255,255,0.14);c
                 </label>
             </div>
             <div id="policyDaysRow" style="display:none;padding:14px;background:var(--mob-bg);border-radius:10px;margin-bottom:16px">
-                <div style="font-size:12px;color:var(--mob-text-muted);margin-bottom:6px">过期天数（天）</div>
-                <input type="number" id="policyDays" class="mob-tf-input" min="1" max="365" value="90" style="width:100%;box-sizing:border-box">
+                <div style="font-size:12px;color:var(--mob-text-muted);margin-bottom:6px">设置密码过期天数（0-365天）</div>
+                <input type="number" id="policyDays" class="mob-tf-input" min="0" max="365" value="120" style="width:100%;box-sizing:border-box">
+                <div style="font-size:11px;color:var(--mob-text-muted);margin-top:6px">当过期天数设置为0时，代表密码永不过期</div>
             </div>
             <button id="policyBtn" class="mob-btn" style="width:100%;background:linear-gradient(135deg,#1abc9c,#16a085);color:#fff;border:none;padding:13px;font-size:14px;font-weight:600;border-radius:12px;cursor:pointer;box-shadow:0 3px 12px rgba(26,188,156,0.35)" onclick="savePasswordPolicy()">
                 <i class="fas fa-save" style="margin-right:6px"></i>保存策略
@@ -481,7 +482,7 @@ async function loadPasswordPolicy() {
             var enableExpiry = !!p.enablePasswordExpiry;
             document.getElementById('policySubtitle').textContent = p.name || '默认策略';
             setExpiryToggle(enableExpiry);
-            document.getElementById('policyDays').value = p.expiryDays || 90;
+            document.getElementById('policyDays').value = p.expiryDays == null ? 120 : p.expiryDays;
         } else {
             document.getElementById('policySubtitle').textContent = '默认策略';
             setExpiryToggle(false);
@@ -511,7 +512,13 @@ async function savePasswordPolicy() {
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right:6px"></i>保存中…';
     var enableExpiry = document.getElementById('policyExpiry').checked;
-    var days = parseInt(document.getElementById('policyDays').value, 10) || 90;
+    var parsedDays = parseInt(document.getElementById('policyDays').value, 10);
+    var days = isNaN(parsedDays) ? 120 : parsedDays;
+    if (enableExpiry && (days < 0 || days > 365)) {
+        umToast('过期天数必须在0-365之间', 'error');
+        resetPolicyButton();
+        return;
+    }
     var csrf = (document.querySelector('meta[name="_csrf"]')||{}).content||'';
     try {
         var res  = await fetch('/tenants/oracle-users/password-policy', {
