@@ -21,6 +21,7 @@
     <script src="/js/common/loading.js"></script>
 
     <link rel="stylesheet" href="/css/all.min.css">
+    <link rel="stylesheet" href="/css/common/fa-fix.css">
     <link rel="stylesheet" href="/css/app/add_boot.css">
     <link rel="stylesheet" href="/css/common/loading.css">
     <link rel="stylesheet" href="/css/common/custom-select.css">

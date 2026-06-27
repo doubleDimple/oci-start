@@ -12,6 +12,7 @@
 -->
     <script>(function(){var t=localStorage.getItem('oci_theme')||'dark';if(t==='system')t=window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';document.documentElement.dataset.theme=t;})();</script>
     <link rel="stylesheet" href="/css/all.min.css">
+    <link rel="stylesheet" href="/css/common/fa-fix.css">
     <link rel="stylesheet" href="/css/leaflet.min.css" />
     <script src="/js/leaflet.min.js"></script>
     <link rel="stylesheet" href="/css/app/arm_records.css">
