@@ -58,6 +58,17 @@ public class defConfigurer implements WebMvcConfigurer {
         registry.addResourceHandler("/images/**")
                 .addResourceLocations("classpath:/static/images/")
                 .setCacheControl(CacheControl.maxAge(365, TimeUnit.DAYS).cachePublic());
+        // webfonts: long cache so FA icons don't re-fetch on every page load
+        registry.addResourceHandler("/webfonts/**")
+                .addResourceLocations("classpath:/static/webfonts/")
+                .setCacheControl(CacheControl.maxAge(365, TimeUnit.DAYS).cachePublic());
+        // css/js static assets: 7-day cache
+        registry.addResourceHandler("/css/**")
+                .addResourceLocations("classpath:/static/css/")
+                .setCacheControl(CacheControl.maxAge(7, TimeUnit.DAYS).cachePublic());
+        registry.addResourceHandler("/js/**")
+                .addResourceLocations("classpath:/static/js/")
+                .setCacheControl(CacheControl.maxAge(7, TimeUnit.DAYS).cachePublic());
         // 暴露 script 目录,让前端 install 指南能直接 wget/curl 下载脚本
         registry.addResourceHandler("/script/**")
                 .addResourceLocations("classpath:/script/")

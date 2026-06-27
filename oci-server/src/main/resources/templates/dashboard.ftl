@@ -6,6 +6,7 @@
     <title>VPS管理系统 - 仪表盘</title>
     <#--<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">-->
     <link rel="stylesheet" href="/css/all.min.css">
+    <link rel="stylesheet" href="/css/common/fa-fix.css">
     <#--<script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>-->
     <script src="/js/common/chart.js" defer></script>
     <link rel="stylesheet" href="/css/app/dashboard.css">
