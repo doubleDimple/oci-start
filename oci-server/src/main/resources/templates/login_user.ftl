@@ -8,6 +8,7 @@
     </script>
     <title>${msg.get('login.page.title')}</title>
     <link rel="stylesheet" href="/css/all.min.css">
+    <link rel="stylesheet" href="/css/common/fa-fix.css">
     <link rel="stylesheet" href="/css/app/login_user.css">
     <script src="/js/common/jsencrypt.min.js"></script>
     <#if turnstileEnabled?? && turnstileEnabled>

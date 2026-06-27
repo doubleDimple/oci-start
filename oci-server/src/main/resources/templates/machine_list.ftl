@@ -10,6 +10,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 -->
     <link rel="stylesheet" href="/css/all.min.css">
+    <link rel="stylesheet" href="/css/common/fa-fix.css">
     <link rel="stylesheet" href="/css/styles.css">
     <link rel="stylesheet" href="/css/app/machine_list.css">
     <link rel="stylesheet" href="/css/common/loading.css">

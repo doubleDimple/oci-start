@@ -9,6 +9,7 @@
     <!-- 防止主题切换闪烁 -->
     <script>(function(){var t=localStorage.getItem('mob-theme')||'dark';var d=document.documentElement;d.setAttribute('data-theme',t==='auto'?(window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'):t);})();</script>
     <link rel="stylesheet" href="/css/all.min.css">
+    <link rel="stylesheet" href="/css/common/fa-fix.css">
     <link rel="stylesheet" href="/css/mobile-app.css">
     <script src="/js/common/jsencrypt.min.js"></script>
     <#if turnstileEnabled?? && turnstileEnabled>
