@@ -99,6 +99,8 @@ public class SaTokenConfig implements WebMvcConfigurer {
                         "/api/monitor/report",
                         "/css/**",
                         "/js/**",
+                        "/webfonts/**",
+                        "/images/**",
                         "/script/**",
                         "/swagger-ui.html",
                         "/swagger-ui/**",

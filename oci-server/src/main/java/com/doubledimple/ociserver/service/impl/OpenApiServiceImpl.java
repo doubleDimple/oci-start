@@ -11,10 +11,12 @@ import com.doubledimple.ocicommon.param.OpenRegionNotify;
 import com.doubledimple.ocicommon.param.ThirdApiParam;
 import com.doubledimple.ociserver.service.OpenApiService;
 import com.doubledimple.ociserver.service.SystemKVStoreService;
+import com.doubledimple.ociserver.service.impl.system.SystemConfigService;
 import com.doubledimple.ociserver.utils.SignatureUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -47,6 +49,10 @@ public class OpenApiServiceImpl implements OpenApiService {
     @Resource
     private SystemKVStoreService systemKVStoreService;
 
+    @Resource
+    @Lazy
+    private SystemConfigService systemConfigService;
+
     private static final String DEVICE_TOKEN_KEY = "SYSTEM_DEVICE_API_TOKEN";
     // 用于记录增量拉取的时间戳
     private static final String LAST_SYNC_TIME_KEY = "SYSTEM_KV_STORE_LAST_SYNC_TIME";
@@ -66,6 +72,10 @@ public class OpenApiServiceImpl implements OpenApiService {
     @Override
     @Async
     public void notify(OpenInstanceNotify openInstanceNotify) {
+        if (!systemConfigService.getChannelNotifyEnabled()) {
+            log.debug("频道通知已关闭，跳过开机通知上报");
+            return;
+        }
         try {
             HttpRequest.post(cfDomain + "/api/notify")
                     .header("Authorization", "Bearer " + getDeviceToken())
