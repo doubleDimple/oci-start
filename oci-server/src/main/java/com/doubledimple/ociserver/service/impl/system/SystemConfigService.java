@@ -1132,6 +1132,19 @@ public class SystemConfigService {
         saveOrUpdateConfig("system.site.logo", logoName.trim());
     }
 
+    public boolean getChannelNotifyEnabled() {
+        Optional<SystemConfig> config = systemConfigRepository.findByKey("channel.notify.enabled");
+        return config.map(SystemConfig::isEnabled).orElse(true);
+    }
+
+    public void updateChannelNotifyConfig(boolean enabled) {
+        SystemConfig config = systemConfigRepository.findByKey("channel.notify.enabled")
+                .orElse(new SystemConfig());
+        config.setKey("channel.notify.enabled");
+        config.setEnabled(enabled);
+        systemConfigRepository.save(config);
+    }
+
     public void disTurnstile() {
         try {
             SystemConfig config = systemConfigRepository.findByKey("turnstile.enabled")

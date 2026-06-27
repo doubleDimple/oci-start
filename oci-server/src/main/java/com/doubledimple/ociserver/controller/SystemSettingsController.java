@@ -104,6 +104,9 @@ public class SystemSettingsController  extends BaseController{
         TurnstileConfig turnstileConfig = systemConfigService.getTurnstileConfig();
         model.addAttribute("turnstileConfig", turnstileConfig);
 
+        // 获取频道通知开关配置
+        model.addAttribute("channelNotifyEnabled", systemConfigService.getChannelNotifyEnabled());
+
         model.addAttribute("activePage", "api-settings");
         return "system_settings";
     }

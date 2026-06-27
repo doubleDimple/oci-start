@@ -11,6 +11,7 @@
 -->
     <script>(function(){var t=localStorage.getItem('oci_theme');if(t)document.documentElement.dataset.theme=t;})();</script>
     <link rel="stylesheet" href="/css/all.min.css">
+    <link rel="stylesheet" href="/css/common/fa-fix.css">
 
     <!-- SweetAlert2 CSS -->
     <link href="/css/sweetalert2.min.css" rel="stylesheet">

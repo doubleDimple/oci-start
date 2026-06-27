@@ -8,6 +8,7 @@
     <title>VPS管理系统 - 租户管理</title>
     <script>(function(){var t=localStorage.getItem('oci_theme')||'dark';if(t==='system')t=window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';document.documentElement.dataset.theme=t;})();</script>
     <link rel="stylesheet" href="/css/all.min.css">
+    <link rel="stylesheet" href="/css/common/fa-fix.css">
     <link href="/css/sweetalert2.min.css" rel="stylesheet">
     <link href="/css/common/sweetalert-overrides.css" rel="stylesheet">
     <script src="/js/sweetalert2.min.js"></script>
@@ -1533,6 +1534,6 @@
 <script src="/js/common/request.js"></script>
 <script src="/js/common/loading.js"></script>
 <script src="/js/common/custom-select.js"></script>
-<script src="/js/system/tenant_list.js"></script>
+<script src="/js/system/tenant_list.js?v=${.now?string('yyyyMMddHHmm')}"></script>
 </body>
 </html>

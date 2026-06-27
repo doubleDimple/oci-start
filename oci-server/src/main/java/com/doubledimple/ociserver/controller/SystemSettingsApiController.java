@@ -390,6 +390,21 @@ public class SystemSettingsApiController  extends BaseController{
         }
     }
 
+    @PostMapping("/updateChannelNotifyConfig")
+    public ResponseEntity<?> updateChannelNotifyConfig(@RequestBody Map<String, Boolean> request) {
+        try {
+            Boolean enabled = request.get("enabled");
+            if (enabled == null) {
+                return ResponseEntity.badRequest().body("enabled参数不能为空");
+            }
+            systemConfigService.updateChannelNotifyConfig(enabled);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            log.error("更新频道通知配置失败", e);
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
     @PostMapping("/updateTurnstileConfig")
     public ResponseEntity<?> updateTurnstileConfig(@RequestBody TurnstileConfigRequest request) {
         try {
