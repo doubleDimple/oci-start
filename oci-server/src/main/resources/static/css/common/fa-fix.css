@@ -1,0 +1,53 @@
+/*
+ * Fix Font Awesome icon loading issues:
+ * 1. Override font-display from "block" to "swap" so icons don't stay invisible
+ *    when missing optional font files cause 404s
+ * 2. Re-declare only the font faces that have actual files, removing
+ *    references to fa-regular-400 and fa-v4compatibility which are absent
+ */
+@font-face {
+    font-family: "Font Awesome 6 Free";
+    font-style: normal;
+    font-weight: 900;
+    font-display: swap;
+    src: url("/webfonts/fa-solid-900.woff2") format("woff2"),
+         url("/webfonts/fa-solid-900.ttf") format("truetype");
+}
+@font-face {
+    font-family: "Font Awesome 6 Free";
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url("/webfonts/fa-solid-900.woff2") format("woff2"),
+         url("/webfonts/fa-solid-900.ttf") format("truetype");
+}
+@font-face {
+    font-family: "Font Awesome 6 Brands";
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url("/webfonts/fa-brands-400.woff2") format("woff2"),
+         url("/webfonts/fa-brands-400.ttf") format("truetype");
+}
+@font-face {
+    font-family: "Font Awesome 5 Free";
+    font-style: normal;
+    font-weight: 900;
+    font-display: swap;
+    src: url("/webfonts/fa-solid-900.woff2") format("woff2"),
+         url("/webfonts/fa-solid-900.ttf") format("truetype");
+}
+@font-face {
+    font-family: "Font Awesome 5 Brands";
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url("/webfonts/fa-brands-400.woff2") format("woff2"),
+         url("/webfonts/fa-brands-400.ttf") format("truetype");
+}
+@font-face {
+    font-family: "FontAwesome";
+    font-display: swap;
+    src: url("/webfonts/fa-solid-900.woff2") format("woff2"),
+         url("/webfonts/fa-solid-900.ttf") format("truetype");
+}
