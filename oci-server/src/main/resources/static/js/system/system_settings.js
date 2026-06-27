@@ -745,6 +745,44 @@ async function saveLogoNameOnly(button) {
     }
 }
 
+// 更新开机频道通知配置
+async function updateChannelNotifyConfig(button) {
+    const enabled = document.getElementById('channelNotifyEnabled').checked;
+
+    const result = await Swal.fire({
+        title: enabled ? i18n.channel_notify_confirm_enable : i18n.channel_notify_confirm_disable,
+        icon: 'question',
+        showCancelButton: true,
+        ...swalConfig.confirmButton
+    });
+
+    if (!result.isConfirmed) return;
+
+    try {
+        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + i18n.common_saving;
+        button.disabled = true;
+
+        const response = await fetch('/api/system/updateChannelNotifyConfig', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                [csrfHeaderName]: csrfToken
+            },
+            body: JSON.stringify({ enabled })
+        });
+
+        await assertResponseOk(response, i18n.channel_notify_update_fail);
+
+        const Toast = Swal.mixin(swalConfig.toast);
+        Toast.fire({ icon: 'success', title: i18n.common_success });
+    } catch (error) {
+        await handleApiError(error, i18n.channel_notify_update_fail);
+    } finally {
+        button.innerHTML = '<i class="fas fa-save"></i> ' + i18n.channel_notify_save;
+        button.disabled = false;
+    }
+}
+
 // 更新 Turnstile 配置
 async function updateTurnstileConfig(button) {
     const form = document.getElementById('turnstileForm');

@@ -23,6 +23,7 @@
 
     <link rel="stylesheet" href="/css/common/loading.css">
     <link rel="stylesheet" href="/css/all.min.css">
+    <link rel="stylesheet" href="/css/common/fa-fix.css">
     <script src="/js/xterm.js"></script>
     <script src="/js/xterm-addon-fit.js"></script>
     <script src="/js/xterm-addon-web-links.js"></script>

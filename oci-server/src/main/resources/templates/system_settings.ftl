@@ -11,6 +11,7 @@
 -->
     <script>(function(){var t=localStorage.getItem('oci_theme');if(t)document.documentElement.dataset.theme=t;})();</script>
     <link rel="stylesheet" href="/css/all.min.css">
+    <link rel="stylesheet" href="/css/common/fa-fix.css">
 
     <!-- SweetAlert2 CSS -->
     <link href="/css/sweetalert2.min.css" rel="stylesheet">
@@ -49,7 +50,7 @@
                 <div class="settings-card">
                     <div class="settings-card-header">
                         <h3 class="settings-card-title">
-                            <i class="fas fa-shield-alt"></i>
+                            <i class="fas fa-user-lock" style="color:#4a9eff;"></i>
                             ${msg.get("sys.security")}
                         </h3>
                     </div>
@@ -62,20 +63,20 @@
                             </div>
                             <div class="form-row">
                                 <label class="form-label">Logo</label>
-                                <div class="form-control-with-tip">
-                                    <div style="display: flex; gap: 8px;">
-                                        <input type="text"
-                                               class="form-control"
-                                               id="siteLogoInput"
-                                               value="${siteLogoName!'OCI-START'}"
-                                               placeholder="OCI-START">
-                                        <button type="button"
-                                                class="btn btn-sm btn-info"
-                                                onclick="saveLogoNameOnly(this)">
-                                            <i class="fas fa-check"></i>
-                                            ${msg.get("common.save")}
-                                        </button>
-                                    </div>
+                                <div style="display: flex; gap: 8px; align-items: stretch;">
+                                    <input type="text"
+                                           class="form-control"
+                                           id="siteLogoInput"
+                                           value="${siteLogoName!'OCI-START'}"
+                                           placeholder="OCI-START"
+                                           style="flex: 1;">
+                                    <button type="button"
+                                            class="btn btn-info"
+                                            onclick="saveLogoNameOnly(this)"
+                                            style="white-space: nowrap;">
+                                        <i class="fas fa-check"></i>
+                                        ${msg.get("common.save")}
+                                    </button>
                                 </div>
                             </div>
                             <!-- 原密码验证 -->
@@ -121,7 +122,7 @@
                     <div class="settings-card-header">
                         <div class="header-with-toggle">
                             <h3 class="settings-card-title">
-                                <i class="fab fa-github"></i>
+                                <i class="fab fa-github" style="color:#adbac7;"></i>
                                 ${msg.get("sys.githubLogin")}
                             </h3>
                             <label class="switch">
@@ -194,7 +195,7 @@
                     <div class="settings-card-header">
                         <div class="header-with-toggle">
                             <h3 class="settings-card-title">
-                                <i class="fab fa-google"></i>
+                                <i class="fab fa-google" style="color:#4285f4;"></i>
                                 ${msg.get("sys.googleLogin")}
                             </h3>
                             <label class="switch">
@@ -255,7 +256,7 @@
                     <div class="settings-card-header">
                         <div class="header-with-toggle">
                             <h3 class="settings-card-title">
-                                <i class="fas fa-shield-alt"></i>
+                                <i class="fas fa-mobile-alt" style="color:#1abc9c;"></i>
                                 ${msg.get("sys.mfaVerify")}
                             </h3>
                             <label class="switch">
@@ -337,7 +338,7 @@
                     <div class="settings-card-header">
                         <div class="header-with-toggle">
                             <h3 class="settings-card-title">
-                                <i class="fas fa-shield-virus"></i>
+                                <i class="fas fa-robot" style="color:#f0881a;"></i>
                                 ${msg.get("sys.turnstile")}
                             </h3>
                             <label class="switch">
@@ -372,6 +373,48 @@
                         <button type="button" class="btn btn-sm btn-primary" onclick="updateTurnstileConfig(this)">
                             <i class="fas fa-save"></i>
                             ${msg.get("sys.turnstileSave")}
+                        </button>
+                    </div>
+                </div>
+                <!-- 开机频道通知配置 -->
+                <div class="settings-card">
+                    <div class="settings-card-header">
+                        <div class="header-with-toggle">
+                            <h3 class="settings-card-title">
+                                <i class="fas fa-satellite-dish" style="color:#9b59b6;"></i>
+                                ${msg.get("sys.channelNotify")}
+                            </h3>
+                            <label class="switch">
+                                <input type="checkbox" id="channelNotifyEnabled" ${channelNotifyEnabled?string('checked', '')}>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="settings-card-body">
+                        <div class="compact-form">
+                            <div class="form-row">
+                                <div class="form-tip" style="font-size:12px; line-height:1.8; color:var(--text-secondary);">
+                                    ${msg.get("sys.channelNotify.desc")}
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <label class="form-label">${msg.get("sys.channelNotify.privacy.title")}</label>
+                                <div class="form-tip" style="font-size:12px; line-height:1.8; color:var(--text-secondary);">
+                                    ${msg.get("sys.channelNotify.privacy.collected")}：${msg.get("sys.channelNotify.privacy.item.type")}、${msg.get("sys.channelNotify.privacy.item.region")}。<br>
+                                    ${msg.get("sys.channelNotify.privacy.not.collected")}
+                                </div>
+                            </div>
+                            <div class="form-row" style="margin-bottom:0;">
+                                <div class="form-tip" style="font-size:12px; line-height:1.8; color:var(--text-secondary);">
+                                    ${msg.get("sys.channelNotify.toggle.tip")}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="settings-card-footer">
+                        <button type="button" class="btn btn-sm btn-primary" onclick="updateChannelNotifyConfig(this)">
+                            <i class="fas fa-save"></i>
+                            ${msg.get("sys.channelNotify.save")}
                         </button>
                     </div>
                 </div>
@@ -466,6 +509,10 @@
         sys_googleUpdateFail: "${msg.get('sys.googleUpdateFail')?js_string}",
         sys_logoUpdateFail: "${msg.get('sys.logoUpdateFail')?js_string}",
         sys_turnstileUpdateFail: "${msg.get('sys.turnstileUpdateFail')?js_string}",
+        channel_notify_update_fail: "${msg.get('sys.channelNotify.updateFail')?js_string}",
+        channel_notify_confirm_enable: "${msg.get('sys.channelNotify.confirmEnable')?js_string}",
+        channel_notify_confirm_disable: "${msg.get('sys.channelNotify.confirmDisable')?js_string}",
+        channel_notify_save: "${msg.get('sys.channelNotify.save')?js_string}",
     }
 </script>
 <script src="/js/common/request.js"></script>
