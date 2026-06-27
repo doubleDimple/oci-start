@@ -373,7 +373,7 @@
             return;
         }
 
-        Swal.fire({ title: 'loading', allowOutsideClick: false, showConfirmButton: false, didOpen: () => Swal.showLoading() });
+        showLoading('loading');
 
         var csrfToken = _getCsrfToken();
         var config = { instanceId: instanceId, username: username, port: port, password: password };
@@ -384,10 +384,11 @@
         })
             .then(r => r.ok ? r.json() : Promise.reject('HTTP ' + r.status))
             .then(data => {
+                hideLoading();
                 if (data.success) Swal.fire({ title: 'success', text: 'successful', icon: 'success', confirmButtonText: i18n.common_confirm });
                 else Swal.fire({ title: 'error', text: data.message || 'error', icon: 'error', confirmButtonText: i18n.common_confirm });
             })
-            .catch(err => Swal.fire({ title: 'error', text: 'error: ' + err, icon: 'error', confirmButtonText: i18n.common_confirm }));
+            .catch(err => { hideLoading(); Swal.fire({ title: 'error', text: 'error: ' + err, icon: 'error', confirmButtonText: i18n.common_confirm }); });
     }
 
     function loadSshConfig() {

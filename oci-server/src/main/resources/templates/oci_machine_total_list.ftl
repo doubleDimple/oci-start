@@ -729,16 +729,6 @@
 <script src="/js/common/loading.js"></script>
 <script>
 
-    function showLoading(title) {
-        Swal.fire({
-            title: title,
-            allowOutsideClick: false,
-            didOpen: () => {
-                Swal.showLoading();
-            }
-        });
-    }
-
     function showSuccess(title, text) {
         Swal.fire({
             icon: 'success',

@@ -543,14 +543,7 @@
         });
     }
     function createProxyConfig(config) {
-        Swal.fire({
-            title: window.I18N.nginx_modal_creating,
-            html: window.I18N.nginx_modal_creatingDesc,
-            allowOutsideClick: false,
-            didOpen: () => {
-                Swal.showLoading();
-            }
-        });
+        showLoading(window.I18N.nginx_modal_creating);
         fetch('/ssl/proxy/create', {
             method: 'POST',
             headers: {
@@ -561,6 +554,7 @@
         })
             .then(response => response.json())
             .then(data => {
+                hideLoading();
                 if (data.success) {
                     Swal.fire({
                         icon: 'success',
@@ -575,6 +569,7 @@
                 }
             })
             .catch(error => {
+                hideLoading();
                 Swal.fire({
                     icon: 'error',
                     title: window.I18N.nginx_toast_createFail,
@@ -610,13 +605,7 @@
             });
     }
     function updateProxyConfig(config) {
-        Swal.fire({
-            title: window.I18N.nginx_modal_updating,
-            allowOutsideClick: false,
-            didOpen: () => {
-                Swal.showLoading();
-            }
-        });
+        showLoading(window.I18N.nginx_modal_updating);
         fetch('/ssl/proxy/' + config.id, {
             method: 'PUT',
             headers: {
@@ -627,6 +616,7 @@
         })
             .then(response => response.json())
             .then(data => {
+                hideLoading();
                 if (data.success) {
                     Swal.fire({
                         icon: 'success',
@@ -640,6 +630,7 @@
                 }
             })
             .catch(error => {
+                hideLoading();
                 Swal.fire({
                     icon: 'error',
                     title: window.I18N.nginx_toast_updateFail,
@@ -1977,14 +1968,7 @@
         });
     }
     function startOpenResty() {
-        Swal.fire({
-            title: '正在启动OpenResty...',
-            html: '请稍候，正在启动服务',
-            allowOutsideClick: false,
-            didOpen: () => {
-                Swal.showLoading();
-            }
-        });
+        showLoading('正在启动OpenResty...');
         fetch('/ssl/openresty/start', {
             method: 'POST',
             headers: {
@@ -1993,6 +1977,7 @@
         })
             .then(response => response.json())
             .then(data => {
+                hideLoading();
                 if (data.success) {
                     Swal.fire({
                         icon: 'success',
@@ -2009,6 +1994,7 @@
                 }
             })
             .catch(error => {
+                hideLoading();
                 Swal.fire({
                     icon: 'error',
                     title: '启动失败',

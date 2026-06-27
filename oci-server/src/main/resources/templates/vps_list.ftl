@@ -13,6 +13,7 @@
     <link href="/css/sweetalert2.min.css" rel="stylesheet">
     <link href="/css/common/sweetalert-overrides.css" rel="stylesheet">
     <link rel="stylesheet" href="/css/app/vps_list.css">
+    <link rel="stylesheet" href="/css/common/loading.css">
 
     <script src="/js/sweetalert2.min.js"></script>
     <script src="/js/common/jquery.min.js"></script>
@@ -482,20 +483,13 @@
     function manualPingTest() {
         const csrfToken = $("meta[name='_csrf']").attr("content");
         const csrfHeader = $("meta[name='_csrf_header']").attr("content");
-        Swal.fire({
-            title: '正在检测中...',
-            text: '正在向后端发送 Ping 指令，请稍候',
-            icon: 'info',
-            allowOutsideClick: false,
-            showConfirmButton: false,
-            didOpen: () => { Swal.showLoading(); }
-        });
+        showLoading('正在检测中...');
         $.ajax({
             url: '/vps/instances/ping',
             type: 'POST',
             beforeSend: function(xhr) { if(csrfHeader) xhr.setRequestHeader(csrfHeader, csrfToken); },
-            success: function(res) { Swal.fire('指令已发送', 'Ping 测试将在后台执行', 'success'); },
-            error: function() { Swal.fire('失败', '请求失败', 'error'); }
+            success: function(res) { hideLoading(); Swal.fire('指令已发送', 'Ping 测试将在后台执行', 'success'); },
+            error: function() { hideLoading(); Swal.fire('失败', '请求失败', 'error'); }
         });
     }
 
@@ -608,6 +602,7 @@
     }
     </#noparse>
 </script>
+<script src="/js/common/loading.js"></script>
 
 </body>
 </html>

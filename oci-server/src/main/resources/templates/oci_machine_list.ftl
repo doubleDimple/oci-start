@@ -841,16 +841,6 @@
 
     const i18n = window.I18N;
 
-    function showLoading(title) {
-        Swal.fire({
-            title: title,
-            allowOutsideClick: false,
-            didOpen: () => {
-                Swal.showLoading();
-            }
-        });
-    }
-
     function showSuccess(title, text) {
         Swal.fire({
             icon: 'success',

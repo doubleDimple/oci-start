@@ -408,7 +408,7 @@
             return;
         }
 
-        Swal.fire({ title: '保存中...', allowOutsideClick: false, showConfirmButton: false, didOpen: () => Swal.showLoading() });
+        showLoading('保存中...');
 
         var csrfToken = _getCsrfToken();
         var config = { instanceId: instanceId, username: username, port: port, password: password };
@@ -419,10 +419,11 @@
         })
             .then(r => r.ok ? r.json() : Promise.reject('HTTP ' + r.status))
             .then(data => {
+                hideLoading();
                 if (data.success) Swal.fire({ title: '成功', text: '配置保存成功', icon: 'success', confirmButtonText: '确定' });
                 else Swal.fire({ title: '错误', text: data.message || '保存失败', icon: 'error', confirmButtonText: '确定' });
             })
-            .catch(err => Swal.fire({ title: '错误', text: '保存失败: ' + err, icon: 'error', confirmButtonText: '确定' }));
+            .catch(err => { hideLoading(); Swal.fire({ title: '错误', text: '保存失败: ' + err, icon: 'error', confirmButtonText: '确定' }); });
     }
 
     function loadSshConfig() {
@@ -467,7 +468,7 @@
             return;
         }
 
-        connecting = true; showLoading();
+        connecting = true; showSshLoading();
         if (websocket) websocket.close();
 
         var protocol = location.protocol === 'https:' ? 'wss://' : 'ws://';
@@ -501,17 +502,17 @@
                 resizeTerminal(); // 首次连接立即同步尺寸
             }
 
-            hideLoading(); connecting = false;
+            hideSshLoading(); connecting = false;
         };
 
         websocket.onclose = function() {
             if (!isDisconnecting) disconnectFromSsh();
-            hideLoading(); connecting = false; isDisconnecting = false;
+            hideSshLoading(); connecting = false; isDisconnecting = false;
         };
 
         websocket.onerror = function() {
             term.writeln('\r\n\x1b[31mWebSocket连接错误\x1b[0m');
-            disconnectFromSsh(); hideLoading(); connecting = false;
+            disconnectFromSsh(); hideSshLoading(); connecting = false;
         };
     }
 
@@ -531,12 +532,12 @@
         document.getElementById('status-text').textContent = isConnected ? '连接已建立' : '等待连接...';
     }
 
-    function showLoading() {
+    function showSshLoading() {
         const overlay = document.querySelector('.loading-overlay');
         overlay.style.display = 'flex';
         overlay.style.pointerEvents = 'auto';
     }
-    function hideLoading() {
+    function hideSshLoading() {
         const overlay = document.querySelector('.loading-overlay');
         overlay.style.display = 'none';
         overlay.style.pointerEvents = 'none';

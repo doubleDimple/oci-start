@@ -24,16 +24,7 @@ var currentEmailBodyId = '';
 const i18n = window.I18N;
 
 function refreshTenants() {
-    Swal.fire({
-        title: '加载中...',
-        icon: 'info',
-        showConfirmButton: false,
-        allowOutsideClick: false,
-        timer: 2000,
-        didOpen: () => {
-            Swal.showLoading();
-        }
-    });
+    showLoading('加载中...');
     loadTenantsList();
 }
 
@@ -53,6 +44,7 @@ function loadTenantsList() {
 
     xhr.onreadystatechange = function() {
         if (xhr.readyState === 4) {
+            hideLoading();
             if (xhr.status === 200) {
                 var response = JSON.parse(xhr.responseText);
                 if (response.success) {
@@ -93,16 +85,7 @@ function updateTenantSelect() {
 }
 
 function refreshContacts() {
-    Swal.fire({
-        title: '加载中...',
-        icon: 'info',
-        showConfirmButton: false,
-        allowOutsideClick: false,
-        timer: 2000,
-        didOpen: () => {
-            Swal.showLoading();
-        }
-    });
+    showLoading('加载中...');
     loadContactsList();
 }
 
@@ -117,20 +100,12 @@ function deleteContact(id) {
         cancelButtonText: i18n.common_cancel
     }).then((result) => {
         if (result.isConfirmed) {
-            //
-            Swal.fire({
-                title: '加载中...',
-                icon: 'info',
-                showConfirmButton: false,
-                allowOutsideClick: false,
-                didOpen: () => {
-                    Swal.showLoading();
-                }
-            });
+            showLoading('加载中...');
 
             var xhr = new XMLHttpRequest();
             var timeout = setTimeout(function() {
                 xhr.abort();
+                hideLoading();
                 showError();
             }, 15000);
 
@@ -141,6 +116,7 @@ function deleteContact(id) {
             xhr.onreadystatechange = function() {
                 if (xhr.readyState === 4) {
                     clearTimeout(timeout);
+                    hideLoading();
 
                     if (xhr.status === 200) {
                         var response = JSON.parse(xhr.responseText);
@@ -168,16 +144,7 @@ function deleteContact(id) {
 }
 
 function refreshRecords() {
-    Swal.fire({
-        title: '加载中...',
-        icon: 'info',
-        showConfirmButton: false,
-        allowOutsideClick: false,
-        timer: 2000,
-        didOpen: () => {
-            Swal.showLoading();
-        }
-    });
+    showLoading('加载中...');
     loadEmailRecords();
 }
 
@@ -218,6 +185,7 @@ function loadContactsList() {
 
     xhr.onreadystatechange = function() {
         if (xhr.readyState === 4) {
+            hideLoading();
             if (xhr.status === 200) {
                 var response = JSON.parse(xhr.responseText);
                 if (response.success) {
@@ -439,19 +407,12 @@ function saveContact() {
     };
 
     // 显示保存中的加载提示
-    Swal.fire({
-        title: '加载中...',
-        icon: 'info',
-        showConfirmButton: false,
-        allowOutsideClick: false,
-        didOpen: () => {
-            Swal.showLoading();
-        }
-    });
+    showLoading('加载中...');
 
     var xhr = new XMLHttpRequest();
     var timeout = setTimeout(function() {
         xhr.abort();
+        hideLoading();
         showError();
     }, 15000);
 
@@ -462,6 +423,7 @@ function saveContact() {
     xhr.onreadystatechange = function() {
         if (xhr.readyState === 4) {
             clearTimeout(timeout);
+            hideLoading();
 
             if (xhr.status === 200) {
                 var response = JSON.parse(xhr.responseText);
@@ -547,27 +509,14 @@ function sendEmail() {
     };
 
     // 显示发送中的加载提示
-    Swal.fire({
-        title: '加载中...',
-        icon: 'info',
-        showConfirmButton: false,
-        allowOutsideClick: false,
-        didOpen: () => {
-            Swal.showLoading();
-        }
-    });
+    showLoading('加载中...');
 
     var xhr = new XMLHttpRequest();
     var timeout = setTimeout(function() {
         xhr.abort();
-        Swal.fire({
-            icon: 'info',
-            title: '加载中...',
-            confirmButtonColor: '#007bff'
-        }).then(() => {
-            closeEmailComposeModal();
-            refreshRecords();
-        });
+        hideLoading();
+        closeEmailComposeModal();
+        refreshRecords();
     }, 30000); // 30秒超时
 
     xhr.open('POST', '/email/send', true);
@@ -577,6 +526,7 @@ function sendEmail() {
     xhr.onreadystatechange = function() {
         if (xhr.readyState === 4) {
             clearTimeout(timeout);
+            hideLoading();
 
             if (xhr.status === 200) {
                 var response = JSON.parse(xhr.responseText);
@@ -735,19 +685,12 @@ function disableEmailService(tenantId, tenantName) {
     }).then((result) => {
         if (result.isConfirmed) {
             // 显示禁用中的加载提示
-            Swal.fire({
-                title: '加载中...',
-                icon: 'info',
-                showConfirmButton: false,
-                allowOutsideClick: false,
-                didOpen: () => {
-                    Swal.showLoading();
-                }
-            });
+            showLoading('加载中...');
 
             var xhr = new XMLHttpRequest();
             var timeout = setTimeout(function() {
                 xhr.abort();
+                hideLoading();
                 showError();
             }, 30000); // 30秒超时
 
@@ -758,6 +701,7 @@ function disableEmailService(tenantId, tenantName) {
             xhr.onreadystatechange = function() {
                 if (xhr.readyState === 4) {
                     clearTimeout(timeout);
+                    hideLoading();
 
                     if (xhr.status === 200) {
                         var response = JSON.parse(xhr.responseText);
@@ -937,7 +881,7 @@ function submitEnableEmail(tenantId) {
         return;
     }
 
-    Swal.fire({ title: '开启中...', icon: 'info', showConfirmButton: false, allowOutsideClick: false, didOpen: function() { Swal.showLoading(); } });
+    showLoading('开启中...');
 
     fetch('/tenants/email/enable', {
         method: 'POST',
@@ -949,6 +893,7 @@ function submitEnableEmail(tenantId) {
     })
     .then(function(r) { return r.json(); })
     .then(function(data) {
+        hideLoading();
         if (data.success) {
             Swal.fire({ icon: 'success', title: '开启成功', confirmButtonColor: '#28a745', timer: 2000, timerProgressBar: true })
             .then(function() {
@@ -960,7 +905,7 @@ function submitEnableEmail(tenantId) {
             Swal.fire({ icon: 'error', title: data.message || '开启失败', confirmButtonColor: '#dc3545' });
         }
     })
-    .catch(function() { showError(); });
+    .catch(function() { hideLoading(); showError(); });
 }
 
 function goToNotEnabledPage(page) {
@@ -1047,6 +992,7 @@ function loadEmailRecords() {
 
     xhr.onreadystatechange = function() {
         if (xhr.readyState === 4) {
+            hideLoading();
             if (xhr.status === 200) {
                 var response = JSON.parse(xhr.responseText);
                 if (response.success) {
@@ -1271,15 +1217,7 @@ function batchDeleteAllRecords() {
     }).then((result) => {
         if (result.isConfirmed) {
             // 显示删除中提示
-            Swal.fire({
-                title: '加载中...',
-                icon: 'info',
-                showConfirmButton: false,
-                allowOutsideClick: false,
-                didOpen: () => {
-                    Swal.showLoading();
-                }
-            });
+            showLoading('加载中...');
 
             var xhr = new XMLHttpRequest();
             xhr.open('POST', '/email/body/batchDelete', true);
@@ -1288,6 +1226,7 @@ function batchDeleteAllRecords() {
 
             xhr.onreadystatechange = function() {
                 if (xhr.readyState === 4) {
+                    hideLoading();
                     if (xhr.status === 200) {
                         var response = JSON.parse(xhr.responseText);
                         if (response.success) {
@@ -1323,19 +1262,12 @@ function deleteEmailRecord(recordId) {
     }).then((result) => {
         if (result.isConfirmed) {
             // 显示删除中的加载提示
-            Swal.fire({
-                title: '加载中...',
-                icon: 'info',
-                showConfirmButton: false,
-                allowOutsideClick: false,
-                didOpen: () => {
-                    Swal.showLoading();
-                }
-            });
+            showLoading('加载中...');
 
             var xhr = new XMLHttpRequest();
             var timeout = setTimeout(function() {
                 xhr.abort();
+                hideLoading();
                 showError();
             }, 15000);
 
@@ -1346,6 +1278,7 @@ function deleteEmailRecord(recordId) {
             xhr.onreadystatechange = function() {
                 if (xhr.readyState === 4) {
                     clearTimeout(timeout);
+                    hideLoading();
 
                     if (xhr.status === 200) {
                         var response = JSON.parse(xhr.responseText);

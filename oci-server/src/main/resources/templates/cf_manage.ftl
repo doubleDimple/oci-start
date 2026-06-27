@@ -703,14 +703,7 @@
         }
 
         // 显示加载状态
-        Swal.fire({
-            title: '${msg.get("common.loading")?js_string}',
-            text: '${msg.get("common.loading")}',
-            allowOutsideClick: false,
-            didOpen: () => {
-                Swal.showLoading();
-            }
-        });
+        showLoading('${msg.get("common.loading")?js_string}');
 
         fetch('/dns/cloudflare/api/records', {
             method: 'POST',
@@ -722,6 +715,7 @@
         })
             .then(response => response.json())
             .then(apiResponse => {
+                hideLoading();
                 if (apiResponse.success) {
                     Swal.fire({
                         title: '${msg.get("common.success")?js_string}',
@@ -744,6 +738,7 @@
                 }
             })
             .catch(error => {
+                hideLoading();
                 console.error('添加DNS记录失败:', error);
                 Swal.fire({
                     title: '${msg.get("common.error")?js_string}',
@@ -815,13 +810,7 @@
         }
 
         // 显示加载状态
-        Swal.fire({
-            title: '${msg.get("common.loading")?js_string}',
-            allowOutsideClick: false,
-            didOpen: () => {
-                Swal.showLoading();
-            }
-        });
+        showLoading('${msg.get("common.loading")?js_string}');
 
         fetch(`/dns/cloudflare/api/records/`+recordId, {
             method: 'PUT',
@@ -833,6 +822,7 @@
         })
             .then(response => response.json())
             .then(apiResponse => {
+                hideLoading();
                 if (apiResponse.success) {
                     closeEditDnsModal();
                     const currentPage = ${currentPage!0};
@@ -849,6 +839,7 @@
                 }
             })
             .catch(error => {
+                hideLoading();
                 console.error('更新DNS记录失败:', error);
                 Swal.fire({
                     title: '${msg.get("common.error")?js_string}',
@@ -876,13 +867,7 @@
         }).then((result) => {
             if (result.isConfirmed) {
                 // 显示加载状态
-                Swal.fire({
-                    title: '${msg.get("common.loading")?js_string}',
-                    allowOutsideClick: false,
-                    didOpen: () => {
-                        Swal.showLoading();
-                    }
-                });
+                showLoading('${msg.get("common.loading")?js_string}');
 
                 const currentZoneId = '${selectedZoneId!""}';
                 const deleteUrl = `/dns/cloudflare/api/records/` + recordId
@@ -896,6 +881,7 @@
                 })
                     .then(response => response.json())
                     .then(apiResponse => {
+                        hideLoading();
                         if (apiResponse.success) {
                             const currentPage = ${currentPage!0};
                             const currentSize = ${size!20};
@@ -910,6 +896,7 @@
                         }
                     })
                     .catch(error => {
+                        hideLoading();
                         console.error('删除DNS记录失败:', error);
                         Swal.fire({
                             title: '${msg.get("common.error")?js_string}',
@@ -950,13 +937,7 @@
         }).then((result) => {
             if (result.isConfirmed) {
                 // 显示加载状态
-                Swal.fire({
-                    title: '${msg.get("common.loading")?js_string}',
-                    allowOutsideClick: false,
-                    didOpen: () => {
-                        Swal.showLoading();
-                    }
-                });
+                showLoading('${msg.get("common.loading")?js_string}');
 
                 fetch(`/dns/cloudflare/api/zones/`+ currentZoneId+`/sync`, {
                     method: 'POST',
@@ -971,6 +952,7 @@
                 })
                     .then(response => response.json())
                     .then(apiResponse => {
+                        hideLoading();
                         if (apiResponse.success) {
                             const syncCount = apiResponse.data ? apiResponse.data.syncCount : 0;
                             Swal.fire({
@@ -990,6 +972,7 @@
                         }
                     })
                     .catch(error => {
+                        hideLoading();
                         console.error('同步DNS记录失败:', error);
                         Swal.fire({
                             title: '${msg.get("common.error")?js_string}',
@@ -1028,8 +1011,8 @@
         return token ? token.value : '';
     }
 
-    // 显示/隐藏加载指示器
-    function showLoading(show) {
+    // 显示/隐藏加载指示器（DOM容器）
+    function showDomLoading(show) {
         const loadingContainer = document.getElementById('loadingContainer');
         loadingContainer.style.display = show ? 'block' : 'none';
     }
@@ -1164,12 +1147,7 @@
         }
 
         // 显示加载状态
-        Swal.fire({
-            title: '${msg.get("common.loading")?js_string}',
-            text: '${msg.get("common.saving")}',
-            allowOutsideClick: false,
-            didOpen: () => Swal.showLoading()
-        });
+        showLoading('${msg.get("common.loading")?js_string}');
 
         updateConfigStatus('pending');
 
@@ -1212,6 +1190,7 @@
                 });
             })
             .then(data => {
+                hideLoading();
                 // 保存成功后直接刷新页面
                 Swal.fire({
                     title: '${msg.get("common.success")?js_string}',
@@ -1225,6 +1204,7 @@
                 });
             })
             .catch(error => {
+                hideLoading();
                 console.error('保存配置失败:', error);
                 updateConfigStatus('disconnected');
                 Swal.fire({
@@ -1274,11 +1254,7 @@
         }
 
         // 显示加载状态
-        Swal.fire({
-            title: '${msg.get("common.loading")?js_string}',
-            allowOutsideClick: false,
-            didOpen: () => Swal.showLoading()
-        });
+        showLoading('${msg.get("common.loading")?js_string}');
 
         updateConfigStatus('pending');
 
@@ -1295,6 +1271,7 @@
         })
             .then(response => response.json())
             .then(data => {
+                hideLoading();
                 if (data.success) {
                     updateConfigStatus('connected');
                     Swal.fire({
@@ -1308,6 +1285,7 @@
                 }
             })
             .catch(error => {
+                hideLoading();
                 updateConfigStatus('disconnected');
                 Swal.fire({
                     title: '${msg.get("common.error")?js_string}',

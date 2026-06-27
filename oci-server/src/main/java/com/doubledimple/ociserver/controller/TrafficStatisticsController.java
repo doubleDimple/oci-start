@@ -107,6 +107,9 @@ public class TrafficStatisticsController  extends BaseController{
     @GetMapping("/api/traffic/alert")
     @ResponseBody
     public ApiResponse getTrafficAlert(@RequestParam(required = false) String tenantId) {
+        if (tenantId == null || tenantId.isEmpty()) {
+            return ApiResponse.success();
+        }
         Optional<TrafficAlert> alertOpt = trafficAlertRepository.findByTenantId(Long.valueOf(tenantId));
         if (alertOpt.isPresent()){
             return ApiResponse.success(alertOpt.get());

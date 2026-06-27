@@ -266,13 +266,7 @@
         }).then((result) => {
             if (result.isConfirmed) {
                 // 显示加载状态
-                Swal.fire({
-                    title: '正在终止实例...',
-                    allowOutsideClick: false,
-                    didOpen: () => {
-                        Swal.showLoading();
-                    }
-                });
+                showLoading('正在终止实例...');
 
                 // 获取CSRF令牌
                 const csrfToken = _getCsrfToken();
@@ -291,6 +285,7 @@
                 })
                     .then(response => response.json())
                     .then(data => {
+                        hideLoading();
                         if (data.success) {
                             Swal.fire({
                                 title: '终止成功！',
@@ -310,6 +305,7 @@
                         }
                     })
                     .catch(error => {
+                        hideLoading();
                         console.error('终止实例失败:', error);
                         Swal.fire({
                             title: '网络错误',
@@ -335,13 +331,7 @@
         }).then((result) => {
             if (result.isConfirmed) {
                 // 显示加载状态
-                Swal.fire({
-                    title: '正在刷新状态...',
-                    allowOutsideClick: false,
-                    didOpen: () => {
-                        Swal.showLoading();
-                    }
-                });
+                showLoading('正在刷新状态...');
 
                 // 获取CSRF令牌
                 const csrfToken = _getCsrfToken();
@@ -360,6 +350,7 @@
                 })
                     .then(response => response.json())
                     .then(data => {
+                        hideLoading();
                         if (data.success) {
                             Swal.fire({
                                 title: '刷新成功！',
@@ -379,6 +370,7 @@
                         }
                     })
                     .catch(error => {
+                        hideLoading();
                         console.error('刷新实例状态失败:', error);
                         Swal.fire({
                             title: '网络错误',

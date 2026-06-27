@@ -7,6 +7,7 @@
     <input type="hidden" id="tenantIdParam" value="${tenantId!''}">
     <meta name="_csrf" content="">
     <meta name="_csrf_header" content="X-CSRF-TOKEN">
+    <input type="hidden" id="csrf_token" name="_csrf" value="">
     <script>
         (function(){var t=localStorage.getItem('oci_theme');if(t)document.documentElement.dataset.theme=t;})();
     </script>

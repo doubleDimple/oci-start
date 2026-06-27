@@ -779,16 +779,7 @@
                     submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 创建中...';
 
                     // 显示创建中的提示
-                    Swal.fire({
-                        title: '正在创建实例...',
-                        text: '请稍候，正在为您创建GCP实例',
-                        icon: 'info',
-                        allowOutsideClick: false,
-                        showConfirmButton: false,
-                        didOpen: () => {
-                            Swal.showLoading();
-                        }
-                    });
+                    showLoading('正在创建实例...');
 
                     // 提交表单
                     form.submit();

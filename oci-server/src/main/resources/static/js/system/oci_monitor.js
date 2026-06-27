@@ -305,14 +305,7 @@ function getEndDate() {
 async function loadTrafficData() {
     if (selectedRegionIds.length === 0) return;
 
-    Swal.fire({
-        title: 'loading',
-        allowOutsideClick: false,
-        showConfirmButton: false,
-        didOpen: () => {
-            Swal.showLoading();
-        }
-    });
+    showLoading('loading');
 
     const requestData = {
         tenantIds: selectedRegionIds,
@@ -338,7 +331,7 @@ async function loadTrafficData() {
         updateChartAndStats([]);
         showError('error');
     } finally {
-        Swal.close();
+        hideLoading();
         myChart.hideLoading();
     }
 }
@@ -417,21 +410,6 @@ async function fetchTrafficAlertThreshold() {
         alertThresholdGB = 10240;
         document.getElementById('thresholdTraffic').textContent = formatTBorGB(alertThresholdGB);
     }
-}
-
-function showGlobalLoading(message = '加载中，请稍候...') {
-    Swal.fire({
-        title: message,
-        allowOutsideClick: false,
-        showConfirmButton: false,
-        didOpen: () => {
-            Swal.showLoading();
-        }
-    });
-}
-
-function hideGlobalLoading() {
-    Swal.close();
 }
 
 function renderInstanceCharts(data) {
