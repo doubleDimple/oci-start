@@ -8,6 +8,7 @@
     <meta name="_csrf_header" content="X-CSRF-TOKEN">
 
     <link rel="stylesheet" href="/css/all.min.css">
+    <link rel="stylesheet" href="/css/common/fa-fix.css">
     <link rel="stylesheet" href="/css/app/header.css">
     <link rel="stylesheet" href="/css/app/sidebar.css">
     <style>

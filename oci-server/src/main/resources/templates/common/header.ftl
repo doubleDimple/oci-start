@@ -150,6 +150,7 @@
 <link rel="preload" href="/css/app/header.css" as="style" onload="this.rel='stylesheet'">
 <noscript>
     <link rel="stylesheet" href="/css/all.min.css">
+    <link rel="stylesheet" href="/css/common/fa-fix.css">
 </noscript>
 <script>
     window.I18N = {
