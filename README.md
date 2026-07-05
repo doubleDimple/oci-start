@@ -86,7 +86,7 @@ wget -O oci-start.sh https://raw.githubusercontent.com/doubleDimple/shell-tools/
 chmod +x oci-start.sh
 
 # 一键安装
-./oci-start.sh install
+./oci-start.sh start
 ```
 
 常用命令:
