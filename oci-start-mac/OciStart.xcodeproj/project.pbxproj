@@ -1,0 +1,444 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		011A5821FA4ACF0D6BB11F72 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA2B546A45B7BBD5255F88A0 /* ContentView.swift */; };
+		0687FEE9FAA9045AD0F146B5 /* ArmRecordsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80AE2D53A22B36786849E479 /* ArmRecordsView.swift */; };
+		07D903B03A9FE2DC2698BABD /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EE26C35E75A61142F0198C7 /* SettingsView.swift */; };
+		118A50C03DC860D4F00E7EF8 /* Compat.swift in Sources */ = {isa = PBXBuildFile; fileRef = A34B5EA8612169EE6160C4CC /* Compat.swift */; };
+		17F41FE64BBB866774A2DAB9 /* InstanceDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30F0F148D7C12771290C91F /* InstanceDetailView.swift */; };
+		26CCE17CDA43B34612C629BE /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B82E269083EF07C8139DFCA4 /* LoginView.swift */; };
+		3C9698D9E6BEB172389FDCF1 /* NotificationSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 821A8D8B74E3A8C328271492 /* NotificationSettingsView.swift */; };
+		5FCBF68BFE25B94E12B222ED /* OciWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F237D61FA3F78523193BE551 /* OciWebView.swift */; };
+		6904910718F065B0A76CDE8A /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1D177E751FDF362B925CDF0 /* AppState.swift */; };
+		6BCF1E3BAC152C06DA249419 /* SpeedTestView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39B7870495C690E0CFDB8DFB /* SpeedTestView.swift */; };
+		72E8EA9A028C8B8BF837EFC0 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7668775A44BB6E366703EDAE /* AuthService.swift */; };
+		8240D63945A64289C51A6233 /* NetworkService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F1E13A687553BD8C09CA415 /* NetworkService.swift */; };
+		8E9C1536FB2664C82061F03C /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48CC0B925B4D57713457982A /* Models.swift */; };
+		9482D21A0032A9E9582DD91E /* SshTerminalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20ED738D2BA7472276B742ED /* SshTerminalView.swift */; };
+		9C3F2440FB064F7217E46CCF /* InstancesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C75CB72B0D5DA39ED87A1F1D /* InstancesView.swift */; };
+		A6AB007B305316E845C8DA95 /* ApiTokenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF2E8306E9AA8137ABD17173 /* ApiTokenView.swift */; };
+		AF633841DB8B14E4DFC6B40D /* BackendManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C1186E531668AA46A22D922 /* BackendManager.swift */; };
+		BA59B4237B07ADA50BF9FE27 /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F700E2F6F137500FA38B4811 /* MainView.swift */; };
+		BC548636FB02FD6A030FF434 /* AddTenantView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4CC9D5ABD2430830FA02659 /* AddTenantView.swift */; };
+		BEEB079AD97C2500002170A8 /* TenantListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FE0762EBFD2C586EEACAA3A /* TenantListView.swift */; };
+		C26E484006FAE05311431896 /* MemoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B27CD54811623B0000FEA03 /* MemoView.swift */; };
+		CD8AD96EB04EF3DE3CE9F830 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CAEE4D12BBD01CE9559258F /* DashboardView.swift */; };
+		CDEF02C15910BB778F6599EB /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A73C41AF426662F463E1700F /* Assets.xcassets */; };
+		D27F0C12B44C3F2185F906C4 /* OciStartApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2900C4EAB1AAF755E6B3A25D /* OciStartApp.swift */; };
+		DD3A574C48EB111793AFB99A /* VpsMonitorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A3C24AC7E749D549CD48E7F /* VpsMonitorView.swift */; };
+		DD7EC1499C55C33D2042C2CD /* RSAHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC4E1F0EA8205CC3848576A7 /* RSAHelper.swift */; };
+		EBA01CF722F1EA9615C6EAC1 /* ObjectStorageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1B7C5E6A70D759CE64AD1FE /* ObjectStorageView.swift */; };
+		F7C125505BCF2F0313D1F900 /* MfaBackupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CD6BCE86796CA485FF8DAC2 /* MfaBackupView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		0EF9658A2CC5D4E5FA2CE5C9 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		20ED738D2BA7472276B742ED /* SshTerminalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SshTerminalView.swift; sourceTree = "<group>"; };
+		2900C4EAB1AAF755E6B3A25D /* OciStartApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OciStartApp.swift; sourceTree = "<group>"; };
+		2F1E13A687553BD8C09CA415 /* NetworkService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkService.swift; sourceTree = "<group>"; };
+		39B7870495C690E0CFDB8DFB /* SpeedTestView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedTestView.swift; sourceTree = "<group>"; };
+		3C1377BD1A0EFAD5A6961399 /* OciStart.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OciStart.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		3CAEE4D12BBD01CE9559258F /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
+		48CC0B925B4D57713457982A /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		4EE26C35E75A61142F0198C7 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		4FE0762EBFD2C586EEACAA3A /* TenantListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TenantListView.swift; sourceTree = "<group>"; };
+		5A3C24AC7E749D549CD48E7F /* VpsMonitorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VpsMonitorView.swift; sourceTree = "<group>"; };
+		5B27CD54811623B0000FEA03 /* MemoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoView.swift; sourceTree = "<group>"; };
+		62315FCDF66D952D0F47EF99 /* OciStart.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = OciStart.entitlements; sourceTree = "<group>"; };
+		7668775A44BB6E366703EDAE /* AuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthService.swift; sourceTree = "<group>"; };
+		7CD6BCE86796CA485FF8DAC2 /* MfaBackupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MfaBackupView.swift; sourceTree = "<group>"; };
+		80AE2D53A22B36786849E479 /* ArmRecordsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArmRecordsView.swift; sourceTree = "<group>"; };
+		821A8D8B74E3A8C328271492 /* NotificationSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationSettingsView.swift; sourceTree = "<group>"; };
+		9C1186E531668AA46A22D922 /* BackendManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendManager.swift; sourceTree = "<group>"; };
+		A34B5EA8612169EE6160C4CC /* Compat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Compat.swift; sourceTree = "<group>"; };
+		A73C41AF426662F463E1700F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		B4CC9D5ABD2430830FA02659 /* AddTenantView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddTenantView.swift; sourceTree = "<group>"; };
+		B82E269083EF07C8139DFCA4 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
+		C1D177E751FDF362B925CDF0 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		C30F0F148D7C12771290C91F /* InstanceDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstanceDetailView.swift; sourceTree = "<group>"; };
+		C75CB72B0D5DA39ED87A1F1D /* InstancesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstancesView.swift; sourceTree = "<group>"; };
+		CA2B546A45B7BBD5255F88A0 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		DF2E8306E9AA8137ABD17173 /* ApiTokenView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApiTokenView.swift; sourceTree = "<group>"; };
+		F1B7C5E6A70D759CE64AD1FE /* ObjectStorageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObjectStorageView.swift; sourceTree = "<group>"; };
+		F237D61FA3F78523193BE551 /* OciWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OciWebView.swift; sourceTree = "<group>"; };
+		F700E2F6F137500FA38B4811 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
+		FC4E1F0EA8205CC3848576A7 /* RSAHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RSAHelper.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		3A94B4D6D342EBCB1626995B = {
+			isa = PBXGroup;
+			children = (
+				FDA1366E259E61244A4414B6 /* OciStart */,
+				EF4A2335C19EBAF423F16893 /* Products */,
+			);
+			indentWidth = 4;
+			sourceTree = "<group>";
+			tabWidth = 4;
+		};
+		7323783B932D964484A538A2 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				7668775A44BB6E366703EDAE /* AuthService.swift */,
+				9C1186E531668AA46A22D922 /* BackendManager.swift */,
+				A34B5EA8612169EE6160C4CC /* Compat.swift */,
+				2F1E13A687553BD8C09CA415 /* NetworkService.swift */,
+				FC4E1F0EA8205CC3848576A7 /* RSAHelper.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		81BE744F15297B21E0C93421 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				B4CC9D5ABD2430830FA02659 /* AddTenantView.swift */,
+				DF2E8306E9AA8137ABD17173 /* ApiTokenView.swift */,
+				80AE2D53A22B36786849E479 /* ArmRecordsView.swift */,
+				CA2B546A45B7BBD5255F88A0 /* ContentView.swift */,
+				3CAEE4D12BBD01CE9559258F /* DashboardView.swift */,
+				C30F0F148D7C12771290C91F /* InstanceDetailView.swift */,
+				C75CB72B0D5DA39ED87A1F1D /* InstancesView.swift */,
+				B82E269083EF07C8139DFCA4 /* LoginView.swift */,
+				F700E2F6F137500FA38B4811 /* MainView.swift */,
+				5B27CD54811623B0000FEA03 /* MemoView.swift */,
+				7CD6BCE86796CA485FF8DAC2 /* MfaBackupView.swift */,
+				821A8D8B74E3A8C328271492 /* NotificationSettingsView.swift */,
+				F1B7C5E6A70D759CE64AD1FE /* ObjectStorageView.swift */,
+				F237D61FA3F78523193BE551 /* OciWebView.swift */,
+				4EE26C35E75A61142F0198C7 /* SettingsView.swift */,
+				39B7870495C690E0CFDB8DFB /* SpeedTestView.swift */,
+				20ED738D2BA7472276B742ED /* SshTerminalView.swift */,
+				4FE0762EBFD2C586EEACAA3A /* TenantListView.swift */,
+				5A3C24AC7E749D549CD48E7F /* VpsMonitorView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		EF4A2335C19EBAF423F16893 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				3C1377BD1A0EFAD5A6961399 /* OciStart.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		FDA1366E259E61244A4414B6 /* OciStart */ = {
+			isa = PBXGroup;
+			children = (
+				C1D177E751FDF362B925CDF0 /* AppState.swift */,
+				A73C41AF426662F463E1700F /* Assets.xcassets */,
+				0EF9658A2CC5D4E5FA2CE5C9 /* Info.plist */,
+				48CC0B925B4D57713457982A /* Models.swift */,
+				62315FCDF66D952D0F47EF99 /* OciStart.entitlements */,
+				2900C4EAB1AAF755E6B3A25D /* OciStartApp.swift */,
+				7323783B932D964484A538A2 /* Services */,
+				81BE744F15297B21E0C93421 /* Views */,
+			);
+			path = OciStart;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		3B52001FB939B738804A9073 /* OciStart */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 39FCC3739F1836FBFA0068F0 /* Build configuration list for PBXNativeTarget "OciStart" */;
+			buildPhases = (
+				5E4141F305F0EDF0FF620C05 /* Sources */,
+				00B8ABA64DB65D81B6EB1F5E /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = OciStart;
+			packageProductDependencies = (
+			);
+			productName = OciStart;
+			productReference = 3C1377BD1A0EFAD5A6961399 /* OciStart.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		877A08F2E8D33676B4C68BA8 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					3B52001FB939B738804A9073 = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 04971BD7789D4D24B3CEEDC0 /* Build configuration list for PBXProject "OciStart" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 3A94B4D6D342EBCB1626995B;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = EF4A2335C19EBAF423F16893 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				3B52001FB939B738804A9073 /* OciStart */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		00B8ABA64DB65D81B6EB1F5E /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CDEF02C15910BB778F6599EB /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		5E4141F305F0EDF0FF620C05 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BC548636FB02FD6A030FF434 /* AddTenantView.swift in Sources */,
+				A6AB007B305316E845C8DA95 /* ApiTokenView.swift in Sources */,
+				6904910718F065B0A76CDE8A /* AppState.swift in Sources */,
+				0687FEE9FAA9045AD0F146B5 /* ArmRecordsView.swift in Sources */,
+				72E8EA9A028C8B8BF837EFC0 /* AuthService.swift in Sources */,
+				AF633841DB8B14E4DFC6B40D /* BackendManager.swift in Sources */,
+				118A50C03DC860D4F00E7EF8 /* Compat.swift in Sources */,
+				011A5821FA4ACF0D6BB11F72 /* ContentView.swift in Sources */,
+				CD8AD96EB04EF3DE3CE9F830 /* DashboardView.swift in Sources */,
+				17F41FE64BBB866774A2DAB9 /* InstanceDetailView.swift in Sources */,
+				9C3F2440FB064F7217E46CCF /* InstancesView.swift in Sources */,
+				26CCE17CDA43B34612C629BE /* LoginView.swift in Sources */,
+				BA59B4237B07ADA50BF9FE27 /* MainView.swift in Sources */,
+				C26E484006FAE05311431896 /* MemoView.swift in Sources */,
+				F7C125505BCF2F0313D1F900 /* MfaBackupView.swift in Sources */,
+				8E9C1536FB2664C82061F03C /* Models.swift in Sources */,
+				8240D63945A64289C51A6233 /* NetworkService.swift in Sources */,
+				3C9698D9E6BEB172389FDCF1 /* NotificationSettingsView.swift in Sources */,
+				EBA01CF722F1EA9615C6EAC1 /* ObjectStorageView.swift in Sources */,
+				D27F0C12B44C3F2185F906C4 /* OciStartApp.swift in Sources */,
+				5FCBF68BFE25B94E12B222ED /* OciWebView.swift in Sources */,
+				DD7EC1499C55C33D2042C2CD /* RSAHelper.swift in Sources */,
+				07D903B03A9FE2DC2698BABD /* SettingsView.swift in Sources */,
+				6BCF1E3BAC152C06DA249419 /* SpeedTestView.swift in Sources */,
+				9482D21A0032A9E9582DD91E /* SshTerminalView.swift in Sources */,
+				BEEB079AD97C2500002170A8 /* TenantListView.swift in Sources */,
+				DD3A574C48EB111793AFB99A /* VpsMonitorView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		0C4EC7C8643515E896F14AD5 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		910000AE7575A70F71B574E3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		B799B5B5BFA400E2DF7BB346 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = OciStart/OciStart.entitlements;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_HARDENED_RUNTIME = YES;
+				INFOPLIST_FILE = OciStart/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.doubledimple.ocistart;
+				PRODUCT_NAME = OciStart;
+				SDKROOT = macosx;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Release;
+		};
+		D38F42A76BEF838E37674B02 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = OciStart/OciStart.entitlements;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_HARDENED_RUNTIME = YES;
+				INFOPLIST_FILE = OciStart/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.doubledimple.ocistart;
+				PRODUCT_NAME = OciStart;
+				SDKROOT = macosx;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		04971BD7789D4D24B3CEEDC0 /* Build configuration list for PBXProject "OciStart" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				910000AE7575A70F71B574E3 /* Debug */,
+				0C4EC7C8643515E896F14AD5 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		39FCC3739F1836FBFA0068F0 /* Build configuration list for PBXNativeTarget "OciStart" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D38F42A76BEF838E37674B02 /* Debug */,
+				B799B5B5BFA400E2DF7BB346 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 877A08F2E8D33676B4C68BA8 /* Project object */;
+}

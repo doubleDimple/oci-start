@@ -2006,7 +2006,7 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
 
             // 更换IP + IPv6
             keyboard.add(row(
-                    button("🔄 更换IP", "inst_cip_" + regionId + "_" + dbId),
+                    button("🔄 更换IPV4", "inst_cip_" + regionId + "_" + dbId),
                     button(hasIpv6 ? "🔷 刷新IPv6" : "🔷 启用IPv6", "inst_ipv6_" + regionId + "_" + dbId)
             ));
 
@@ -2114,7 +2114,7 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
 
     private void handleInstChangeIp(Long chatId, Integer messageId, Long regionId, Long dbId) {
         sendOrEdit(chatId, messageId,
-                "🔄 <b>正在更换IP</b>\n" + DIVIDER + "\n\n⏳ 请稍候，这可能需要一些时间…", null);
+                "🔄 <b>正在更换IPV4</b>\n" + DIVIDER + "\n\n⏳ 请稍候，这可能需要一些时间…", null);
         new Thread(() -> {
             try {
                 com.doubledimple.ociserver.pojo.request.IpSwitchRequest req =
@@ -2146,13 +2146,13 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
                         if (body != null) errMsg = String.valueOf(body.getOrDefault("message", ""));
                     } catch (Exception ignored) {}
                     sendOrEdit(chatId, messageId,
-                            "❌ <b>IP更换失败</b>\n" + DIVIDER + "\n\n" + safe(errMsg),
+                            "❌ <b>IPV4更换失败</b>\n" + DIVIDER + "\n\n" + safe(errMsg),
                             instanceBackMarkup(regionId, dbId));
                 }
             } catch (Exception e) {
-                log.error("更换IP失败 dbId={}: {}", dbId, e.getMessage(), e);
+                log.error("更换IPV4失败 dbId={}: {}", dbId, e.getMessage(), e);
                 sendOrEdit(chatId, messageId,
-                        "❌ <b>更换IP失败</b>\n" + DIVIDER + "\n\n" + safe(e.getMessage()),
+                        "❌ <b>更换IPV4失败</b>\n" + DIVIDER + "\n\n" + safe(e.getMessage()),
                         instanceBackMarkup(regionId, dbId));
             }
         }, "tg-inst-cip-" + dbId).start();
