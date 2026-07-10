@@ -6,12 +6,15 @@ import com.doubledimple.dao.entity.Tenant;
 import com.doubledimple.ociai.chat.ChatAiService;
 import com.doubledimple.ocicommon.enums.BootInstanceStatusEnum;
 import com.doubledimple.ocicommon.enums.RegionEnum;
+import com.doubledimple.ocicommon.utils.PasswordGenerator;
 
 import com.doubledimple.ociserver.config.task.DynamicDailyTask;
 import com.doubledimple.ociserver.config.task.InstanceTrafficTask;
 import com.doubledimple.ociserver.config.task.VersionCheckTask;
 import com.doubledimple.ociserver.pojo.request.TelegramConfig;
 import com.doubledimple.ociserver.pojo.response.AccountCheckRes;
+import com.doubledimple.dao.entity.BootInstance;
+import com.doubledimple.ociserver.service.BootInstanceService;
 import com.doubledimple.ociserver.pojo.response.BootInstanceRes;
 import com.doubledimple.ociserver.pojo.response.InstanceDetailsRes;
 import com.doubledimple.ociserver.pojo.response.TenantTrafficStats;
@@ -81,10 +84,66 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
     private static final int PAGE_SIZE_BOOT_LOG = 5;
     private static final int QUOTA_TG_PAGE_SIZE = 5;
 
+    /** 免费架构：[key, 展示标签, 默认CPU, 默认内存, 默认磁盘] */
+    private static final Object[][] FREE_ARCH = {
+        {"ARM", "ARM A1", 1, 6,  50},
+        {"AMD", "AMD E2", 1, 1,  50},
+    };
+
+    /** 付费架构：[key, 展示标签, 默认CPU, 默认内存, 默认磁盘] */
+    private static final Object[][] PAID_ARCH = {
+        {"ARM_PAID_A2",  "ARM A2", 4, 24, 200},
+        {"AMD_PAID_E3",  "AMD E3", 4, 16, 50},
+        {"AMD_PAID_E4",  "AMD E4", 4, 16, 50},
+        {"AMD_PAID_E5",  "AMD E5", 4, 16, 50},
+    };
+
 
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
+    /** 等待用户输入自定义配置值的状态（chatId → 待填字段信息）*/
+    private final java.util.concurrent.ConcurrentHashMap<Long, PendingBootInput> pendingBootInputs =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** 开机配置草稿（每个 chatId 独立，避免每次点击都查 DB）*/
+    private final java.util.concurrent.ConcurrentHashMap<Long, DraftBootConfig> draftConfigs =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** 异步任务线程池，复用线程避免每次 new Thread() 的开销 */
+    private final java.util.concurrent.ExecutorService executor =
+            java.util.concurrent.Executors.newCachedThreadPool(r -> {
+                Thread t = new Thread(r);
+                t.setDaemon(true);
+                return t;
+            });
+
+    private static class PendingBootInput {
+        final String field; // cpu | mem | disk | count | loop
+        final Long tenantId;
+        final String arch;
+        final int ocpu, memory, disk, count, loopTime;
+        final Integer messageId;
+        PendingBootInput(String field, Long tenantId, String arch,
+                int ocpu, int memory, int disk, int count, int loopTime, Integer messageId) {
+            this.field = field; this.tenantId = tenantId; this.arch = arch;
+            this.ocpu = ocpu; this.memory = memory; this.disk = disk;
+            this.count = count; this.loopTime = loopTime; this.messageId = messageId;
+        }
+    }
+
+    private static class DraftBootConfig {
+        final Long tenantId;
+        final String regionName;
+        String arch;
+        int cpu, mem, disk, count, loopTime;
+        DraftBootConfig(Long tenantId, String regionName, String arch,
+                        int cpu, int mem, int disk, int count, int loopTime) {
+            this.tenantId = tenantId; this.regionName = regionName; this.arch = arch;
+            this.cpu = cpu; this.mem = mem; this.disk = disk;
+            this.count = count; this.loopTime = loopTime;
+        }
+    }
 
     private ApplicationContext applicationContext;
 
@@ -144,6 +203,10 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
 
     private InstanceTrafficTask getInstanceTrafficTask() {
         return applicationContext.getBean(InstanceTrafficTask.class);
+    }
+
+    private BootInstanceService getBootInstanceService() {
+        return applicationContext.getBean(BootInstanceService.class);
     }
 
     /**
@@ -233,6 +296,13 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
             //也要检查用户权限
             if (!telegramUserService.checkUser(user.getId())){
                 sendTextMessage(chatId, "🚫 抱歉，您没有权限使用此机器人。");
+                return;
+            }
+
+            // 优先处理自定义配置输入（等待用户输入数字）
+            PendingBootInput pending = pendingBootInputs.remove(chatId);
+            if (pending != null) {
+                handleBootCustomInput(chatId, pending, text);
                 return;
             }
 
@@ -370,10 +440,11 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
         String callbackData = callbackQuery.getData();
         User user = callbackQuery.getFrom();
 
-        log.info("[TG-CB] 收到所有回调: {} 来自: {}", callbackData, chatId);
+        log.debug("[TG-CB] 收到所有回调: {} 来自: {}", callbackData, chatId);
 
-        // 立即应答回调查询：消除客户端按钮上的"转圈"等待动画，点击即刻有响应（丝滑体验的关键）
-        answerCallback(callbackQuery.getId());
+        // 第一时间应答，立即停止 Telegram 按钮的加载动画，之后再做鉴权和业务处理
+        String callbackId = callbackQuery.getId();
+        answerCallback(callbackId);
 
         try {
             TelegramUserService telegramUserService = getTelegramUserService();
@@ -409,6 +480,9 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
                 case "boot_log":
                     sendBootLogPage(chatId, messageId, 1);
                     break;
+                case "add_boot":
+                    handleAddBootSelectTenant(chatId, messageId);
+                    break;
                 case "monthly_traffic":
                     handleMonthlyTraffic(chatId, messageId, 1);
                     break;
@@ -442,6 +516,112 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
                     else if (callbackData.startsWith("boot_log_page_")) {
                         int page = Integer.parseInt(callbackData.replace("boot_log_page_", ""));
                         sendBootLogPage(chatId, messageId, page);
+                    }
+
+                    else if (callbackData.startsWith("boot_add_t_")) {
+                        Long parentId = Long.valueOf(callbackData.substring("boot_add_t_".length()));
+                        handleAddBootSelectRegion(chatId, messageId, parentId);
+                    }
+                    else if (callbackData.startsWith("boot_add_r_")) {
+                        Long tenantId = Long.valueOf(callbackData.substring("boot_add_r_".length()));
+                        handleBootConfigMenu(chatId, messageId, tenantId, "ARM", 1, 6, 50, 1, 60);
+                    }
+                    else if (callbackData.startsWith("boot_cfg_ok_")) {
+                        String[] parts = callbackData.substring("boot_cfg_ok_".length()).split("\\|");
+                        Long tid = Long.valueOf(parts[0]);
+                        DraftBootConfig draft = draftConfigs.get(chatId);
+                        if (draft != null && draft.tenantId.equals(tid)) {
+                            // 使用草稿中记录的最新配置（包含所有快选点击的结果）
+                            handleAddBootExecute(chatId, messageId, draft.tenantId, draft.arch,
+                                    draft.cpu, draft.mem, draft.disk, draft.count, draft.loopTime);
+                        } else {
+                            // 无草稿时降级使用回调数据（兼容旧消息按钮）
+                            handleAddBootExecute(chatId, messageId, tid, parts[1],
+                                    Integer.parseInt(parts[2]), Integer.parseInt(parts[3]),
+                                    Integer.parseInt(parts[4]), Integer.parseInt(parts[5]), Integer.parseInt(parts[6]));
+                        }
+                    }
+                    else if (callbackData.startsWith("boot_opt_")) {
+                        // 格式: boot_opt_{field}_{tenantId}|{value}
+                        String rest = callbackData.substring("boot_opt_".length());
+                        int under = rest.indexOf('_');
+                        String field = rest.substring(0, under);
+                        String[] parts = rest.substring(under + 1).split("\\|");
+                        Long tid = Long.valueOf(parts[0]);
+                        int value = Integer.parseInt(parts[1]);
+                        handleBootOptChange(chatId, callbackId, messageId, tid, field, value);
+                    }
+                    else if (callbackData.startsWith("boot_more_")) {
+                        // 格式: boot_more_{field}_{tenantId}，从草稿读取当前完整状态
+                        String rest = callbackData.substring("boot_more_".length());
+                        int under = rest.indexOf('_');
+                        String field = rest.substring(0, under);
+                        Long tid = Long.valueOf(rest.substring(under + 1));
+                        DraftBootConfig draft = draftConfigs.get(chatId);
+                        if (draft != null && draft.tenantId.equals(tid)) {
+                            final DraftBootConfig d = draft;
+                            executor.submit(() -> showBootMoreOptions(chatId, messageId, field, tid,
+                                    d.arch, d.cpu, d.mem, d.disk, d.count, d.loopTime));
+                        }
+                    }
+                    else if (callbackData.startsWith("boot_sel_")) {
+                        // 从"更多"子菜单中选定一个值，更新草稿并返回主配置界面
+                        String rest = callbackData.substring("boot_sel_".length());
+                        int sep = rest.indexOf('_');
+                        String[] parts = rest.substring(sep + 1).split("\\|");
+                        Long tid = Long.valueOf(parts[0]);
+                        String a = parts[1];
+                        int c = Integer.parseInt(parts[2]), m = Integer.parseInt(parts[3]);
+                        int d = Integer.parseInt(parts[4]), cnt = Integer.parseInt(parts[5]);
+                        int lt = Integer.parseInt(parts[6]);
+                        // 更新草稿并重新渲染主配置页（需要一次 API 调用，但"更多"不常用）
+                        DraftBootConfig draft = draftConfigs.get(chatId);
+                        if (draft != null) {
+                            draft.arch = a; draft.cpu = c; draft.mem = m; draft.disk = d;
+                            draft.count = cnt; draft.loopTime = lt;
+                        }
+                        handleBootConfigMenu(chatId, messageId, tid, a, c, m, d, cnt, lt);
+                    }
+                    else if (callbackData.startsWith("boot_ask_")) {
+                        // boot_ask_{field}_{tenantId}|{arch}|{ocpu}|{mem}|{disk}|{count}|{loop}
+                        String rest = callbackData.substring("boot_ask_".length());
+                        int sep = rest.indexOf('_');
+                        String field = rest.substring(0, sep);
+                        String[] parts = rest.substring(sep + 1).split("\\|");
+                        pendingBootInputs.put(chatId, new PendingBootInput(field,
+                                Long.valueOf(parts[0]), parts[1],
+                                Integer.parseInt(parts[2]), Integer.parseInt(parts[3]),
+                                Integer.parseInt(parts[4]), Integer.parseInt(parts[5]),
+                                Integer.parseInt(parts[6]), messageId));
+                        Map<String, String> fieldNames = new java.util.LinkedHashMap<>();
+                        fieldNames.put("cpu",   "CPU 核数 (整数)");
+                        fieldNames.put("mem",   "内存大小 GB (整数)");
+                        fieldNames.put("disk",  "磁盘大小 GB (整数)");
+                        fieldNames.put("count", "实例数量 (整数)");
+                        fieldNames.put("loop",  "轮询间隔秒数 (整数，最小 12)");
+                        String hint = fieldNames.getOrDefault(field, field);
+                        sendOrEdit(chatId, messageId,
+                                "✏️ <b>自定义输入</b>\n" + DIVIDER + "\n\n" +
+                                "请直接发送 <b>" + hint + "</b>：\n\n" +
+                                "<i>发送任意非数字可取消</i>",
+                                onlyBackToMainMarkup());
+                    }
+                    else if (callbackData.startsWith("boot_cfg_")) {
+                        String[] parts = callbackData.substring("boot_cfg_".length()).split("\\|");
+                        handleBootConfigMenu(chatId, messageId, Long.valueOf(parts[0]),
+                                parts[1], Integer.parseInt(parts[2]), Integer.parseInt(parts[3]),
+                                Integer.parseInt(parts[4]), Integer.parseInt(parts[5]), Integer.parseInt(parts[6]));
+                    }
+                    else if (callbackData.startsWith("boot_rst_")) {
+                        String[] parts = callbackData.substring("boot_rst_".length()).split("\\|");
+                        Long tid = Long.valueOf(parts[0]);
+                        String a = parts[1];
+                        int[] defs = bootArchDefaults(a);
+                        // 同步立即重置草稿，防止异步线程时序问题导致恢复无效
+                        DraftBootConfig cur = draftConfigs.get(chatId);
+                        String cachedRegion = cur != null ? cur.regionName : "未知";
+                        draftConfigs.put(chatId, new DraftBootConfig(tid, cachedRegion, a, defs[0], defs[1], defs[2], 1, 60));
+                        handleBootConfigMenu(chatId, messageId, tid, a, defs[0], defs[1], defs[2], 1, 60);
                     }
 
                     else if (callbackData.startsWith("tenant_page_")) {
@@ -642,11 +822,14 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
                 button("📊 本月流量", "monthly_traffic")
         ));
 
-        // 第三行：开机日志和帮助
+        // 第三行：开机日志和添加开机
         keyboard.add(row(
                 button("📋 开机日志", "boot_log"),
-                button("💡 使用帮助", "help")
+                button("➕ 添加开机", "add_boot")
         ));
+
+        // 第四行：使用帮助
+        keyboard.add(Collections.singletonList(button("💡 使用帮助", "help")));
 
         // 第四行：GitHub
         InlineKeyboardButton githubBtn = new InlineKeyboardButton();
@@ -673,7 +856,7 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
         sendOrEdit(chatId, messageId,
                 "🩺 <b>账号测活</b>\n" + DIVIDER + "\n\n⏳ 正在批量检测账号活跃状态，请稍候…",
                 onlyBackToMainMarkup());
-        new Thread(() -> {
+        executor.submit(() -> {
             String resultText;
             try {
                 AccountCheckRes res = getTenantService().checkBatchAccounts();
@@ -683,7 +866,7 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
                 resultText = "❌ <b>账号测活失败</b>\n" + DIVIDER + "\n\n" + safe(e.getMessage());
             }
             sendOrEdit(chatId, messageId, resultText, onlyBackToMainMarkup());
-        }, "tg-account-check-" + chatId).start();
+        });
     }
 
     private String formatAccountCheckResult(AccountCheckRes res) {
@@ -732,7 +915,7 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
                 "🚀 <b>正在执行系统升级</b>\n" + DIVIDER +
                         "\n\n⏳ 升级过程中助手将暂时离线，完成后会自动回来～",
                 null);
-        new Thread(() -> {
+        executor.submit(() -> {
             try {
                 Thread.sleep(800);
             } catch (InterruptedException ignored) {
@@ -746,7 +929,7 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
                         "❌ <b>升级失败</b>\n" + DIVIDER + "\n\n" + safe(e.getMessage()),
                         onlyBackToMainMarkup());
             }
-        }, "tg-upgrade-" + chatId).start();
+        });
     }
 
     /**
@@ -932,13 +1115,14 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
                 }
             }
 
-            // 2. 构建底部操作行：查询配额 + 更新实例 + 返回
+            // 2. 构建底部操作行：查询配额 + 更新实例 + 添加开机 + 返回
             Long parenId = region.getParenId();
             if (parenId == 0L) parenId = region.getId();
             keyboard.add(row(
                     button("📊 查询配额", "quota_region_" + region.getId()),
                     button("🔄 更新实例", "update_instances_" + region.getId())
             ));
+            keyboard.add(Collections.singletonList(button("➕ 添加开机", "boot_add_r_" + region.getId())));
             keyboard.add(Collections.singletonList(button(BTN_BACK, "tenant_detail_" + parenId)));
             keyboard.add(Collections.singletonList(button(BTN_BACK_MAIN, "back_to_main")));
 
@@ -1146,7 +1330,7 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
 
         sendOrEdit(chatId, messageId, loadingText, null);
 
-        new Thread(() -> {
+        executor.submit(() -> {
             TenantTrafficStats stats;
             try {
                 stats = getInstanceTrafficTask().queryTenantTraffic(region);
@@ -1159,7 +1343,7 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
             }
             String text = renderTrafficStats(stats, region);
             sendOrEdit(chatId, messageId, text, trafficResultMarkup(regionId, backParentId));
-        }, "tg-traffic-" + regionId).start();
+        });
     }
 
     private String renderTrafficStats(TenantTrafficStats stats, Tenant region) {
@@ -1334,7 +1518,7 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
         sendOrEdit(chatId, messageId, loadingText, null);
 
         final Tenant finalTenant = tenant;
-        new Thread(() -> {
+        executor.submit(() -> {
             Map<String, Object> pagedResult;
             try {
                 pagedResult = OciLimitsUtils.getSingleServiceQuotasPaged(finalTenant, serviceName, page, QUOTA_TG_PAGE_SIZE);
@@ -1352,7 +1536,7 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
 
             String text = renderQuotaResult(items, regionName, svcLabel, curPage, hasNextPage);
             sendOrEdit(chatId, messageId, text, quotaResultMarkup(tenantId, serviceName, curPage, hasNextPage));
-        }, "tg-quota-" + tenantId).start();
+        });
     }
 
     private String renderQuotaResult(List<Map<String, Object>> items, String regionName, String svcLabel,
@@ -1514,6 +1698,17 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
                     .build());
         } catch (TelegramApiException e) {
             // 回调过期等情况可安全忽略
+            log.debug("应答回调失败（可忽略）: {}", e.getMessage());
+        }
+    }
+
+    private void answerCallback(String callbackQueryId, String text) {
+        try {
+            execute(AnswerCallbackQuery.builder()
+                    .callbackQueryId(callbackQueryId)
+                    .text(text)
+                    .build());
+        } catch (TelegramApiException e) {
             log.debug("应答回调失败（可忽略）: {}", e.getMessage());
         }
     }
@@ -1686,7 +1881,7 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
         }
 
         // 在异步线程中执行流式对话
-        new Thread(() -> {
+        executor.submit(() -> {
             try {
                 StringBuilder fullReply = new StringBuilder();
                 long[] lastEditTime = {System.currentTimeMillis()};
@@ -1732,7 +1927,7 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
                 log.error("流式AI对话异常: {}", e.getMessage(), e);
                 editMessage(chatId, placeholderMessageId, "😥 抱歉，AI 服务暂时不可用，请稍后重试。");
             }
-        }, "tg-ai-stream-" + userId).start();
+        });
     }
 
     /**
@@ -1906,7 +2101,7 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
         sendOrEdit(chatId, messageId,
                 "🔄 <b>正在同步实例信息</b>\n" + DIVIDER + "\n\n⏳ 请稍候…",
                 null);
-        new Thread(() -> {
+        executor.submit(() -> {
             try {
                 getTenantService().syncOci(regionId);
             } catch (Exception e) {
@@ -1918,7 +2113,7 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
             }
             // 同步完成后直接刷新区域实例视图
             showRegionInfo(chatId, messageId, regionId);
-        }, "tg-update-instances-" + regionId).start();
+        });
     }
 
     // ============== 实例操作功能 ==============
@@ -2041,7 +2236,7 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
 
     private void handleInstStart(Long chatId, Integer messageId, Long regionId, Long dbId) {
         sendOrEdit(chatId, messageId, "▶️ <b>正在启动实例</b>\n" + DIVIDER + "\n\n⏳ 请稍候…", null);
-        new Thread(() -> {
+        executor.submit(() -> {
             try {
                 boolean success = getOracleInstanceService().startInstance(dbId.toString());
                 String resultText = success
@@ -2054,12 +2249,12 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
                         "❌ <b>启动失败</b>\n" + DIVIDER + "\n\n" + safe(e.getMessage()),
                         instanceBackMarkup(regionId, dbId));
             }
-        }, "tg-inst-start-" + dbId).start();
+        });
     }
 
     private void handleInstStop(Long chatId, Integer messageId, Long regionId, Long dbId) {
         sendOrEdit(chatId, messageId, "⏹ <b>正在停止实例</b>\n" + DIVIDER + "\n\n⏳ 请稍候…", null);
-        new Thread(() -> {
+        executor.submit(() -> {
             try {
                 boolean success = getOracleInstanceService().stopInstanceByInstanceId(dbId.toString());
                 String resultText = success
@@ -2072,7 +2267,7 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
                         "❌ <b>停止失败</b>\n" + DIVIDER + "\n\n" + safe(e.getMessage()),
                         instanceBackMarkup(regionId, dbId));
             }
-        }, "tg-inst-stop-" + dbId).start();
+        });
     }
 
     private void handleInstTerminate(Long chatId, Integer messageId, Long regionId, Long dbId) {
@@ -2097,7 +2292,7 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
 
     private void handleInstTerminateConfirm(Long chatId, Integer messageId, Long regionId, Long dbId) {
         sendOrEdit(chatId, messageId, "⚠️ <b>正在终止实例</b>\n" + DIVIDER + "\n\n⏳ 请稍候…", null);
-        new Thread(() -> {
+        executor.submit(() -> {
             try {
                 getOracleInstanceService().killInstance(dbId);
                 sendOrEdit(chatId, messageId,
@@ -2109,13 +2304,13 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
                         "❌ <b>终止失败</b>\n" + DIVIDER + "\n\n" + safe(e.getMessage()),
                         instanceBackMarkup(regionId, dbId));
             }
-        }, "tg-inst-term-" + dbId).start();
+        });
     }
 
     private void handleInstChangeIp(Long chatId, Integer messageId, Long regionId, Long dbId) {
         sendOrEdit(chatId, messageId,
                 "🔄 <b>正在更换IPV4</b>\n" + DIVIDER + "\n\n⏳ 请稍候，这可能需要一些时间…", null);
-        new Thread(() -> {
+        executor.submit(() -> {
             try {
                 com.doubledimple.ociserver.pojo.request.IpSwitchRequest req =
                         com.doubledimple.ociserver.pojo.request.IpSwitchRequest.builder()
@@ -2155,7 +2350,7 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
                         "❌ <b>更换IPV4失败</b>\n" + DIVIDER + "\n\n" + safe(e.getMessage()),
                         instanceBackMarkup(regionId, dbId));
             }
-        }, "tg-inst-cip-" + dbId).start();
+        });
     }
 
     private void showInstConfigMenu(Long chatId, Integer messageId, Long regionId, Long dbId) {
@@ -2214,7 +2409,7 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
     private void handleInstConfigSet(Long chatId, Integer messageId, Long regionId, Long dbId, int cpu, int mem) {
         sendOrEdit(chatId, messageId,
                 "⚙️ <b>正在修改配置</b>\n" + DIVIDER + "\n\n⏳ 设置 " + cpu + "核 / " + mem + "GB，请稍候…", null);
-        new Thread(() -> {
+        executor.submit(() -> {
             try {
                 getOracleInstanceService().updateInstanceConfig(dbId.toString(), cpu, mem);
                 sendOrEdit(chatId, messageId,
@@ -2226,7 +2421,7 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
                         "❌ <b>配置修改失败</b>\n" + DIVIDER + "\n\n" + safe(e.getMessage()),
                         instanceBackMarkup(regionId, dbId));
             }
-        }, "tg-inst-cfg-" + dbId).start();
+        });
     }
 
     private void showInstDiskMenu(Long chatId, Integer messageId, Long regionId, Long dbId) {
@@ -2268,7 +2463,7 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
     private void handleInstDiskSet(Long chatId, Integer messageId, Long regionId, Long dbId, long sizeGb) {
         sendOrEdit(chatId, messageId,
                 "💾 <b>正在调整磁盘大小</b>\n" + DIVIDER + "\n\n⏳ 设置为 " + sizeGb + "GB，请稍候…", null);
-        new Thread(() -> {
+        executor.submit(() -> {
             try {
                 getOracleInstanceService().handleExpansion(dbId.toString(), sizeGb);
                 sendOrEdit(chatId, messageId,
@@ -2280,12 +2475,12 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
                         "❌ <b>磁盘调整失败</b>\n" + DIVIDER + "\n\n" + safe(e.getMessage()),
                         instanceBackMarkup(regionId, dbId));
             }
-        }, "tg-inst-disk-" + dbId).start();
+        });
     }
 
     private void handleInstIpv6(Long chatId, Integer messageId, Long regionId, Long dbId) {
         sendOrEdit(chatId, messageId, "🔷 <b>正在处理IPv6</b>\n" + DIVIDER + "\n\n⏳ 请稍候…", null);
-        new Thread(() -> {
+        executor.submit(() -> {
             try {
                 String ipv6 = getOracleInstanceService().enableOrRefreshIpv6(dbId, false);
                 String resultText = ipv6 != null && !ipv6.isEmpty()
@@ -2298,7 +2493,7 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
                         "❌ <b>IPv6处理失败</b>\n" + DIVIDER + "\n\n" + safe(e.getMessage()),
                         instanceBackMarkup(regionId, dbId));
             }
-        }, "tg-inst-ipv6-" + dbId).start();
+        });
     }
 
     private void handleInstDeleteRecord(Long chatId, Integer messageId, Long regionId, Long dbId) {
@@ -2351,7 +2546,7 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
         String mode = softReset ? "软重启" : "硬重启";
         sendOrEdit(chatId, messageId,
                 "🔁 <b>正在" + mode + "</b>\n" + DIVIDER + "\n\n⏳ 重启中，完成前请勿重复操作…", null);
-        new Thread(() -> {
+        executor.submit(() -> {
             try {
                 Tenant region = getTenantService().getById(regionId);
                 if (region == null) {
@@ -2375,7 +2570,7 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
                         "❌ <b>" + mode + "失败</b>\n" + DIVIDER + "\n\n" + safe(e.getMessage()),
                         instanceBackMarkup(regionId, dbId));
             }
-        }, "tg-inst-reboot-" + dbId).start();
+        });
     }
 
     private void handleInstDeleteRecordConfirm(Long chatId, Integer messageId, Long regionId, Long dbId) {
@@ -2393,5 +2588,421 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
     }
 
     // 剧透处理
+
+    // ---- 添加开机流程 ----
+
+    private void handleAddBootSelectTenant(Long chatId, Integer messageId) {
+        sendOrEdit(chatId, messageId, "⏳ 加载账号列表中…", onlyBackToMainMarkup());
+        executor.submit(() -> {
+            List<Tenant> tenants = getAllParentTenants();
+            if (tenants == null || tenants.isEmpty()) {
+                sendOrEdit(chatId, messageId,
+                        "➕ <b>添加开机</b>\n" + DIVIDER + "\n\n暂无账号，请先添加租户。",
+                        onlyBackToMainMarkup());
+                return;
+            }
+            InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+            List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
+            for (Tenant tenant : tenants) {
+                String displayName = resolveDisplayName(tenant);
+                keyboard.add(Collections.singletonList(
+                        button(displayName, "boot_add_t_" + tenant.getId())));
+            }
+            keyboard.add(Collections.singletonList(button(BTN_BACK_MAIN, "back_to_main")));
+            markup.setKeyboard(keyboard);
+            sendOrEdit(chatId, messageId,
+                    "➕ <b>添加开机 · 选择账号</b>\n" + DIVIDER + "\n\n请选择要开机的账号",
+                    markup);
+        });
+    }
+
+    private void handleAddBootSelectRegion(Long chatId, Integer messageId, Long parentId) {
+        sendOrEdit(chatId, messageId, "⏳ 加载区域列表中…", onlyBackToMainMarkup());
+        executor.submit(() -> {
+            List<Tenant> children = getTenantService().regionList(parentId);
+            if (children == null || children.isEmpty()) {
+                sendOrEdit(chatId, messageId,
+                        "➕ <b>添加开机</b>\n" + DIVIDER + "\n\n该账号暂无区域信息。",
+                        onlyBackToMainMarkup());
+                return;
+            }
+            InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+            List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
+            List<InlineKeyboardButton> currentRow = new ArrayList<>();
+            for (int i = 0; i < children.size(); i++) {
+                Tenant child = children.get(i);
+                String regionDisplay = child.getRegion() != null ? child.getRegion() : "未知区域";
+                currentRow.add(button(regionDisplay, "boot_add_r_" + child.getId()));
+                if (currentRow.size() == 2 || i == children.size() - 1) {
+                    keyboard.add(new ArrayList<>(currentRow));
+                    currentRow.clear();
+                }
+            }
+            keyboard.add(Collections.singletonList(button(BTN_BACK_MAIN, "back_to_main")));
+            markup.setKeyboard(keyboard);
+            sendOrEdit(chatId, messageId,
+                    "➕ <b>添加开机 · 选择区域</b>\n" + DIVIDER + "\n\n请选择要开机的区域",
+                    markup);
+        });
+    }
+
+    /**
+     * 统一配置菜单：免费/付费 → 架构 → CPU → 内存 → 磁盘 → 数量 → 间隔，全部在一页完成
+     * state 编码: tenantId|arch|ocpu|memory|disk|count|loopTime（用 | 分隔）
+     */
+    private void handleBootConfigMenu(Long chatId, Integer messageId,
+            Long tenantId, String arch, int ocpu, int memory, int disk, int count, int loopTime) {
+        executor.submit(() -> buildAndSendBootConfigMenu(chatId, messageId, tenantId, arch, ocpu, memory, disk, count, loopTime));
+    }
+
+    private void buildAndSendBootConfigMenu(Long chatId, Integer messageId,
+            Long tenantId, String arch, int ocpu, int memory, int disk, int count, int loopTime) {
+        // 优先从草稿缓存取 regionName，避免每次渲染都查 DB
+        DraftBootConfig existingDraft = draftConfigs.get(chatId);
+        String regionName;
+        if (existingDraft != null && existingDraft.tenantId.equals(tenantId)
+                && existingDraft.regionName != null && !"未知".equals(existingDraft.regionName)) {
+            regionName = existingDraft.regionName;
+        } else {
+            Tenant tenant = getTenantService().getById(tenantId);
+            regionName = tenant != null && tenant.getRegion() != null ? tenant.getRegion() : "未知";
+        }
+        // 保存/更新草稿
+        draftConfigs.put(chatId, new DraftBootConfig(tenantId, regionName, arch, ocpu, memory, disk, count, loopTime));
+        boolean isFreeTier = "ARM".equals(arch) || "AMD".equals(arch);
+
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
+
+        // ── 类型行：固定 5 列 [类型] [免费] [付费] [  ] [  ] ──
+        Object[] freeFirst = FREE_ARCH[0];
+        Object[] paidFirst = PAID_ARCH[0];
+        String freeCb = "boot_cfg_" + tenantId + "|" + freeFirst[0] + "|" + freeFirst[2] + "|" + freeFirst[3] + "|" + freeFirst[4] + "|" + count + "|" + loopTime;
+        String paidCb = "boot_cfg_" + tenantId + "|" + paidFirst[0] + "|" + paidFirst[2] + "|" + paidFirst[3] + "|" + paidFirst[4] + "|" + count + "|" + loopTime;
+        keyboard.add(java.util.Arrays.asList(
+                button("类型", "divider"),
+                button(isFreeTier  ? "[免费]" : "免费", freeCb),
+                button(!isFreeTier ? "[付费]" : "付费", paidCb),
+                button(" ", "divider"),
+                button(" ", "divider")
+        ));
+
+        // ── 架构行：固定 5 列，按钮只显示短标识（如 A1/E2）避免遮挡 ──
+        Object[][] archList = isFreeTier ? FREE_ARCH : PAID_ARCH;
+        List<InlineKeyboardButton> archRow = new ArrayList<>();
+        archRow.add(button("架构", "divider"));
+        for (Object[] a : archList) {
+            String aKey   = (String) a[0];
+            String aLabel = (String) a[1];
+            // "ARM A1" → "A1"，"AMD E3" → "E3"，短标识防止文字被截断
+            String aShort = aLabel.contains(" ") ? aLabel.substring(aLabel.lastIndexOf(' ') + 1) : aLabel;
+            String cb = "boot_cfg_" + tenantId + "|" + aKey + "|" + a[2] + "|" + a[3] + "|" + a[4] + "|" + count + "|" + loopTime;
+            archRow.add(button(aKey.equals(arch) ? "[" + aShort + "]" : aShort, cb));
+        }
+        while (archRow.size() < 5) archRow.add(button(" ", "divider"));
+        keyboard.add(archRow);
+
+        // ── 参数行：固定 5 列（说明标签 | 预设1 | 预设2 | 预设3 | 更多）──
+        // 选项不足 3 个时用空占位保持列宽一致
+        // boot_opt_ 按钮只携带「字段」和「新值」，其余参数始终从草稿读取，避免旧按钮数据覆盖已更改的字段
+        String archBase = tenantId + "|" + arch;
+        String fullState = archBase + "|" + ocpu + "|" + memory + "|" + disk + "|" + count + "|" + loopTime;
+
+        keyboard.add(buildOptionRow5("CPU", bootCpuOptions(arch),
+                v -> v + "C", v -> v == ocpu,
+                v -> "boot_opt_cpu_" + tenantId + "|" + v,
+                ocpu, "boot_more_cpu_" + tenantId));
+
+        keyboard.add(buildOptionRow5("内存", bootMemOptions(arch),
+                v -> v + "G", v -> v == memory,
+                v -> "boot_opt_mem_" + tenantId + "|" + v,
+                memory, "boot_more_mem_" + tenantId));
+
+        keyboard.add(buildOptionRow5("磁盘", bootDiskOptions(arch),
+                v -> v + "G", v -> v == disk,
+                v -> "boot_opt_disk_" + tenantId + "|" + v,
+                disk, "boot_more_disk_" + tenantId));
+
+        keyboard.add(buildOptionRow5("数量", new int[]{1, 2, 3},
+                v -> "x" + v, v -> v == count,
+                v -> "boot_opt_count_" + tenantId + "|" + v,
+                count, "boot_more_count_" + tenantId));
+
+        keyboard.add(buildOptionRow5("间隔", new int[]{30, 60, 120},
+                v -> v + "s", v -> v == loopTime,
+                v -> "boot_opt_loop_" + tenantId + "|" + v,
+                loopTime, "boot_more_loop_" + tenantId));
+
+        // ── 恢复默认 / 确认 / 返回 ──
+        keyboard.add(java.util.Arrays.asList(
+                button("恢复默认", "boot_rst_" + tenantId + "|" + arch),
+                button("确认创建", "boot_cfg_ok_" + fullState),
+                button("返回主菜单", "back_to_main")
+        ));
+
+        markup.setKeyboard(keyboard);
+
+        String archLabel = bootArchLabel(arch);
+        String tierLabel = isFreeTier ? "免费" : "付费";
+        StringBuilder sb = new StringBuilder();
+        sb.append("<b>添加开机配置</b>\n");
+        sb.append(DIVIDER).append("\n");
+        sb.append("区域：<b>").append(escape(regionName)).append("</b>\n");
+        sb.append(DIVIDER_THIN).append("\n");
+        sb.append("类型：<code>").append(tierLabel).append("</code>    ");
+        sb.append("架构：<code>").append(escape(archLabel)).append("</code>\n");
+        sb.append("CPU：<code>").append(ocpu).append("C</code>    ");
+        sb.append("内存：<code>").append(memory).append("G</code>    ");
+        sb.append("磁盘：<code>").append(disk).append("G</code>\n");
+        sb.append("数量：<code>x").append(count).append("</code>    ");
+        sb.append("间隔：<code>").append(loopTime).append("s</code>\n");
+        sb.append(DIVIDER_THIN).append("\n");
+        sb.append("<i>[值] 表示当前选中，点击预设快速切换；点「更多」展开更多选项</i>");
+
+        sendOrEdit(chatId, messageId, sb.toString(), markup);
+    }
+
+    /**
+     * 构建固定 5 列的参数行：[标签] [预设1] [预设2] [预设3] [更多/当前值]
+     * 若 currentValue 不在预设列表中，"更多"列显示 [当前值] 表示已自定义
+     */
+    private List<InlineKeyboardButton> buildOptionRow5(
+            String label, int[] options,
+            java.util.function.IntFunction<String> toText,
+            java.util.function.IntPredicate isSelected,
+            java.util.function.IntFunction<String> toCb,
+            int currentValue,
+            String customCb) {
+        List<InlineKeyboardButton> row = new ArrayList<>();
+        row.add(button(label, "divider"));
+        boolean hitPreset = false;
+        for (int v : options) {
+            String text = toText.apply(v);
+            boolean sel = isSelected.test(v);
+            if (sel) hitPreset = true;
+            row.add(button(sel ? "[" + text + "]" : text, toCb.apply(v)));
+        }
+        while (row.size() < 4) {
+            row.add(button(" ", "divider"));
+        }
+        // 非预设值时在"更多"按钮显示当前自定义值
+        String moreBtnLabel = hitPreset ? "更多" : "[" + toText.apply(currentValue) + "]";
+        row.add(button(moreBtnLabel, customCb));
+        return row;
+    }
+
+    private String bootArchLabel(String arch) {
+        for (Object[] row : FREE_ARCH) {
+            if (row[0].equals(arch)) return (String) row[1];
+        }
+        for (Object[] row : PAID_ARCH) {
+            if (row[0].equals(arch)) return (String) row[1];
+        }
+        return arch;
+    }
+
+    /** 返回指定架构的默认 [cpu, mem, disk] */
+    private int[] bootArchDefaults(String arch) {
+        for (Object[] row : FREE_ARCH) {
+            if (row[0].equals(arch)) return new int[]{(int) row[2], (int) row[3], (int) row[4]};
+        }
+        for (Object[] row : PAID_ARCH) {
+            if (row[0].equals(arch)) return new int[]{(int) row[2], (int) row[3], (int) row[4]};
+        }
+        return new int[]{1, 6, 50};
+    }
+
+    private int[] bootCpuOptions(String arch) {
+        switch (arch) {
+            case "AMD":         return new int[]{1};
+            case "ARM":         return new int[]{1, 2, 4};
+            case "ARM_PAID_A2": return new int[]{4, 8, 16};
+            default:            return new int[]{4, 8, 16};
+        }
+    }
+
+    private int[] bootMemOptions(String arch) {
+        switch (arch) {
+            case "AMD":         return new int[]{1};
+            case "ARM":         return new int[]{6, 12, 24};
+            case "ARM_PAID_A2": return new int[]{24, 48, 96};
+            default:            return new int[]{8, 16, 32};
+        }
+    }
+
+    private int[] bootDiskOptions(String arch) {
+        switch (arch) {
+            case "AMD":         return new int[]{50};
+            case "ARM":         return new int[]{50, 100, 200};
+            case "ARM_PAID_A2": return new int[]{100, 200, 500};
+            default:            return new int[]{50, 100, 200}; // AMD_PAID_E3/E4/E5 默认磁盘 50，需在预设中
+        }
+    }
+
+    private void handleBootOptChange(Long chatId, String callbackId, Integer messageId,
+            Long tenantId, String field, int value) {
+        DraftBootConfig draft = draftConfigs.get(chatId);
+        if (draft == null || !draft.tenantId.equals(tenantId)) {
+            return;
+        }
+        // 只更新被点击的那一个字段，其余字段保持草稿中的当前值，避免旧按钮数据把已改的字段覆盖回去
+        switch (field) {
+            case "cpu":   draft.cpu       = value; break;
+            case "mem":   draft.mem       = value; break;
+            case "disk":  draft.disk      = value; break;
+            case "count": draft.count     = value; break;
+            case "loop":  draft.loopTime  = value; break;
+        }
+        final int c = draft.cpu, m = draft.mem, d = draft.disk, cnt = draft.count, lt = draft.loopTime;
+        final String a = draft.arch;
+        executor.submit(() -> buildAndSendBootConfigMenu(chatId, messageId, tenantId, a, c, m, d, cnt, lt));
+    }
+
+    private void showBootMoreOptions(Long chatId, Integer messageId, String field,
+            Long tenantId, String arch, int cpu, int mem, int disk, int count, int loopTime) {
+        int[] allOpts;
+        int[] basicOpts;
+        String unit;
+        switch (field) {
+            case "cpu":   allOpts = bootCpuOptionsExt(arch);   basicOpts = bootCpuOptions(arch);   unit = "C"; break;
+            case "mem":   allOpts = bootMemOptionsExt(arch);   basicOpts = bootMemOptions(arch);   unit = "G"; break;
+            case "disk":  allOpts = bootDiskOptionsExt(arch);  basicOpts = bootDiskOptions(arch);  unit = "G"; break;
+            case "count": allOpts = new int[]{1,2,3,5,8,10};  basicOpts = new int[]{1,2,3};       unit = "x"; break;
+            case "loop":  allOpts = new int[]{12,30,60,120,200,300,500}; basicOpts = new int[]{30,60,120}; unit = "s"; break;
+            default:      allOpts = new int[]{};               basicOpts = new int[]{};             unit = "";
+        }
+
+        // 过滤掉主菜单已显示的预设值，只展示额外选项
+        java.util.Set<Integer> basicSet = new java.util.HashSet<>();
+        for (int v : basicOpts) basicSet.add(v);
+        List<Integer> extraOpts = new ArrayList<>();
+        for (int v : allOpts) {
+            if (!basicSet.contains(v)) extraOpts.add(v);
+        }
+
+        String stateBase = tenantId + "|" + arch + "|" + cpu + "|" + mem + "|" + disk + "|" + count + "|" + loopTime;
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
+
+        if (extraOpts.isEmpty()) {
+            keyboard.add(Collections.singletonList(button("暂无更多预设，请使用自定义输入", "divider")));
+        } else {
+            List<InlineKeyboardButton> row = new ArrayList<>();
+            for (int i = 0; i < extraOpts.size(); i++) {
+                int v = extraOpts.get(i);
+                String newState;
+                switch (field) {
+                    case "cpu":   newState = tenantId+"|"+arch+"|"+v+"|"+mem+"|"+disk+"|"+count+"|"+loopTime; break;
+                    case "mem":   newState = tenantId+"|"+arch+"|"+cpu+"|"+v+"|"+disk+"|"+count+"|"+loopTime; break;
+                    case "disk":  newState = tenantId+"|"+arch+"|"+cpu+"|"+mem+"|"+v+"|"+count+"|"+loopTime;  break;
+                    case "count": newState = tenantId+"|"+arch+"|"+cpu+"|"+mem+"|"+disk+"|"+v+"|"+loopTime;   break;
+                    case "loop":  newState = tenantId+"|"+arch+"|"+cpu+"|"+mem+"|"+disk+"|"+count+"|"+v;      break;
+                    default:      newState = stateBase;
+                }
+                String label = "count".equals(field) ? unit + v : v + unit;
+                row.add(button(label, "boot_sel_" + field + "_" + newState));
+                if (row.size() == 4 || i == extraOpts.size() - 1) {
+                    keyboard.add(new ArrayList<>(row));
+                    row.clear();
+                }
+            }
+        }
+
+        // 自定义输入按钮
+        keyboard.add(Collections.singletonList(
+                button("✏️ 自定义输入", "boot_ask_" + field + "_" + stateBase)));
+        keyboard.add(Collections.singletonList(button("↩️ 返回配置", "boot_cfg_" + stateBase)));
+        markup.setKeyboard(keyboard);
+
+        Map<String,String> fieldLabel = new java.util.LinkedHashMap<>();
+        fieldLabel.put("cpu","CPU"); fieldLabel.put("mem","内存");
+        fieldLabel.put("disk","磁盘"); fieldLabel.put("count","数量"); fieldLabel.put("loop","间隔");
+        sendOrEdit(chatId, messageId,
+                "<b>更多 " + fieldLabel.getOrDefault(field, field) + " 选项</b>\n" + DIVIDER_THIN +
+                "\n点击选择，或用「✏️ 自定义输入」填写任意值",
+                markup);
+    }
+
+    private int[] bootCpuOptionsExt(String arch) {
+        switch (arch) {
+            case "AMD":         return new int[]{1};
+            case "ARM":         return new int[]{1, 2, 3, 4};
+            case "ARM_PAID_A2": return new int[]{2, 4, 8, 12, 16, 24, 32};
+            default:            return new int[]{2, 4, 8, 12, 16, 24, 32, 48, 64};
+        }
+    }
+
+    private int[] bootMemOptionsExt(String arch) {
+        switch (arch) {
+            case "AMD":         return new int[]{1};
+            case "ARM":         return new int[]{6, 12, 18, 24};
+            case "ARM_PAID_A2": return new int[]{12, 24, 48, 96, 128, 192};
+            default:            return new int[]{8, 16, 32, 64, 128, 256};
+        }
+    }
+
+    private int[] bootDiskOptionsExt(String arch) {
+        switch (arch) {
+            case "AMD": return new int[]{50};
+            case "ARM": return new int[]{50, 100, 150, 200};
+            default:    return new int[]{50, 100, 200, 300, 500, 1000};
+        }
+    }
+
+    private void handleBootCustomInput(Long chatId, PendingBootInput p, String text) {
+        int value;
+        try {
+            value = Integer.parseInt(text.trim());
+        } catch (NumberFormatException e) {
+            sendTextMessage(chatId, "⚠️ 输入无效，已取消自定义输入。");
+            return;
+        }
+        int ocpu = p.ocpu, memory = p.memory, disk = p.disk, count = p.count, loopTime = p.loopTime;
+        switch (p.field) {
+            case "cpu":   ocpu     = Math.max(1, value);  break;
+            case "mem":   memory   = Math.max(1, value);  break;
+            case "disk":  disk     = Math.max(1, value);  break;
+            case "count": count    = Math.max(1, value);  break;
+            case "loop":  loopTime = Math.max(12, value); break;
+        }
+        handleBootConfigMenu(chatId, p.messageId, p.tenantId, p.arch, ocpu, memory, disk, count, loopTime);
+    }
+
+    private void handleAddBootExecute(Long chatId, Integer messageId, Long tenantId, String arch, int ocpu, int memory, int disk, int count, int loopTime) {
+        sendOrEdit(chatId, messageId,
+                "⏳ <b>正在创建开机任务</b>\n" + DIVIDER + "\n\n请稍候…", null);
+        executor.submit(() -> {
+            try {
+                String rootPassword = PasswordGenerator.generatePassword2();
+                BootInstance bootInstance = new BootInstance();
+                bootInstance.setTenantId(tenantId);
+                bootInstance.setArchitecture(arch);
+                bootInstance.setOcpu(ocpu);
+                bootInstance.setMemory(memory);
+                bootInstance.setDisk(disk);
+                bootInstance.setInstanceCount(count);
+                bootInstance.setLoopTime(loopTime);
+                bootInstance.setRootPassword(rootPassword);
+                getBootInstanceService().saveBootInstance(bootInstance);
+
+                Tenant tenant = getTenantService().getById(tenantId);
+                String regionName = tenant != null && tenant.getRegion() != null ? tenant.getRegion() : "未知";
+                sendOrEdit(chatId, messageId,
+                        "✅ <b>开机任务创建成功</b>\n" + DIVIDER + "\n\n" +
+                        "区域：<code>" + escape(regionName) + "</code>\n" +
+                        "规格：<code>" + escape(arch) + "</code>  " + ocpu + "C/" + memory + "G/" + disk + "G\n" +
+                        "数量：<code>" + count + "</code> 个\n" +
+                        "间隔：<code>" + loopTime + "s</code>\n" +
+                        "密码：<code>" + rootPassword + "</code>\n\n" +
+                        "<i>任务已启动，可在「开机日志」中查看进度。</i>",
+                        onlyBackToMainMarkup());
+            } catch (Exception e) {
+                log.error("创建开机任务失败 tenantId={}: {}", tenantId, e.getMessage(), e);
+                sendOrEdit(chatId, messageId,
+                        "❌ <b>创建开机任务失败</b>\n" + DIVIDER + "\n\n" + safe(e.getMessage()),
+                        onlyBackToMainMarkup());
+            }
+        });
+    }
 
 }
