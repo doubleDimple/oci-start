@@ -108,6 +108,17 @@
 
                     <div class="tb-divider"></div>
 
+                    <!-- 文件传输 -->
+                    <button class="tb-btn" id="uploadFileBtn" title="上传文件到服务器 (SFTP)">
+                        <i class="fas fa-upload"></i>
+                    </button>
+                    <button class="tb-btn" id="downloadFileBtn" title="从服务器下载文件 (SFTP)">
+                        <i class="fas fa-file-download"></i>
+                    </button>
+                    <input type="file" id="uploadFileInput" style="display:none">
+
+                    <div class="tb-divider"></div>
+
                     <!-- 字体大小 -->
                     <button class="tb-btn" id="fontDecBtn" title="减小字号 (Ctrl+-)">
                         <i class="fas fa-minus"></i>
@@ -154,6 +165,11 @@
 
             <div id="terminal"></div>
 
+            <!-- 文件上传进度条 -->
+            <div class="sftp-progress" id="sftpProgress">
+                <div class="sftp-progress-bar" id="sftpProgressBar"></div>
+            </div>
+
             <!-- 底部状态栏 -->
             <div class="terminal-footer">
                 <span id="status-text">${msg.get("ssh.waitConn")}</span>
@@ -186,6 +202,9 @@
     <div class="ctx-sep"></div>
     <div class="ctx-item" id="ctxCopyCmd"><i class="fas fa-link"></i> 复制 SSH 命令</div>
     <div class="ctx-item" id="ctxDownload"><i class="fas fa-download"></i> 下载日志</div>
+    <div class="ctx-sep"></div>
+    <div class="ctx-item" id="ctxUploadFile"><i class="fas fa-upload"></i> 上传文件</div>
+    <div class="ctx-item" id="ctxDownloadFile"><i class="fas fa-file-download"></i> 下载文件</div>
 </div>
 
 <script src="/js/common/loading.js"></script>
@@ -572,6 +591,134 @@ function loadSshConfig() {
         .catch(err => console.error('加载SSH配置失败:', err));
 }
 
+/* ── 文件上传 (SFTP) ── */
+function triggerUpload() {
+    if (!connected) {
+        term.writeln('\r\n\x1b[31m请先建立 SSH 连接\x1b[0m');
+        return;
+    }
+    document.getElementById('uploadFileInput').click();
+}
+
+function uploadFileToServer(file) {
+    var host     = document.getElementById('host').value.trim();
+    var username = document.getElementById('username').value.trim();
+    var port     = document.getElementById('port').value.trim();
+    var password = document.getElementById('password').value;
+
+    Swal.fire({
+        title: '上传文件',
+        html: '<div style="text-align:left;margin-bottom:8px;color:#aaa;">文件: <strong>' + file.name + '</strong></div>' +
+              '<input id="swal-remote-path" class="swal2-input" placeholder="远程目录 (如 /home/' + username + '/)" value="/home/' + username + '/">',
+        showCancelButton: true,
+        confirmButtonText: '上传',
+        cancelButtonText: '取消',
+        preConfirm: function() {
+            var v = document.getElementById('swal-remote-path').value.trim();
+            if (!v) { Swal.showValidationMessage('请输入远程路径'); return false; }
+            return v;
+        }
+    }).then(function(result) {
+        if (!result.isConfirmed) return;
+        var remotePath = result.value;
+
+        term.writeln('\r\n\x1b[33m▶ 正在上传 ' + file.name + ' ...\x1b[0m');
+
+        var progress = document.getElementById('sftpProgress');
+        var bar      = document.getElementById('sftpProgressBar');
+        progress.classList.add('active');
+        bar.style.width = '0%';
+
+        var formData = new FormData();
+        formData.append('host',       host);
+        formData.append('port',       port);
+        formData.append('username',   username);
+        formData.append('password',   password);
+        formData.append('remotePath', remotePath);
+        formData.append('file',       file);
+
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', '/oci/sftp/upload', true);
+        xhr.setRequestHeader('X-CSRF-TOKEN', _getCsrfToken());
+
+        xhr.upload.onprogress = function(e) {
+            if (e.lengthComputable) bar.style.width = Math.round(e.loaded / e.total * 90) + '%';
+        };
+        xhr.onload = function() {
+            bar.style.width = '100%';
+            setTimeout(function() { progress.classList.remove('active'); bar.style.width = '0%'; }, 600);
+            try {
+                var data = JSON.parse(xhr.responseText);
+                if (data.success) {
+                    term.writeln('\r\n\x1b[32m✅ 上传成功: ' + (data.data || remotePath) + '\x1b[0m');
+                } else {
+                    term.writeln('\r\n\x1b[31m❌ 上传失败: ' + (data.message || '未知错误') + '\x1b[0m');
+                }
+            } catch(e) {
+                term.writeln('\r\n\x1b[31m❌ 解析响应失败\x1b[0m');
+            }
+        };
+        xhr.onerror = function() {
+            progress.classList.remove('active');
+            term.writeln('\r\n\x1b[31m❌ 上传请求失败\x1b[0m');
+        };
+        xhr.send(formData);
+    });
+}
+
+/* ── 文件下载 (SFTP) ── */
+function downloadFileFromServer() {
+    if (!connected) {
+        term.writeln('\r\n\x1b[31m请先建立 SSH 连接\x1b[0m');
+        return;
+    }
+    var host     = document.getElementById('host').value.trim();
+    var username = document.getElementById('username').value.trim();
+    var port     = document.getElementById('port').value.trim();
+    var password = document.getElementById('password').value;
+
+    Swal.fire({
+        title: '下载文件',
+        html: '<input id="swal-dl-path" class="swal2-input" placeholder="远程文件路径 (如 /home/' + username + '/file.txt)">',
+        showCancelButton: true,
+        confirmButtonText: '下载',
+        cancelButtonText: '取消',
+        preConfirm: function() {
+            var v = document.getElementById('swal-dl-path').value.trim();
+            if (!v) { Swal.showValidationMessage('请输入远程文件路径'); return false; }
+            return v;
+        }
+    }).then(function(result) {
+        if (!result.isConfirmed) return;
+        var remotePath = result.value;
+
+        term.writeln('\r\n\x1b[33m▶ 正在下载 ' + remotePath + ' ...\x1b[0m');
+
+        fetch('/oci/sftp/download', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': _getCsrfToken() },
+            body: JSON.stringify({ host: host, port: parseInt(port), username: username, password: password, remotePath: remotePath })
+        })
+        .then(function(r) {
+            if (!r.ok) return r.text().then(function(t) { return Promise.reject(t); });
+            var cd = r.headers.get('Content-Disposition') || '';
+            var match = cd.match(/filename\*?=(?:UTF-8'')?["']?([^"';\r\n]+)/i);
+            var filename = match ? decodeURIComponent(match[1]) : remotePath.split('/').pop() || 'download';
+            return r.blob().then(function(blob) { return { blob: blob, filename: filename }; });
+        })
+        .then(function(obj) {
+            var url = URL.createObjectURL(obj.blob);
+            var a = document.createElement('a');
+            a.href = url; a.download = obj.filename; a.click();
+            URL.revokeObjectURL(url);
+            term.writeln('\r\n\x1b[32m✅ 下载成功: ' + remotePath + '\x1b[0m');
+        })
+        .catch(function(err) {
+            term.writeln('\r\n\x1b[31m❌ 下载失败: ' + err + '\x1b[0m');
+        });
+    });
+}
+
 /* ── 搜索栏（简单文本高亮，xterm 4.x 不依赖 addon）── */
 (function initSearch(){
     var bar  = document.getElementById('searchBar');
@@ -655,8 +802,10 @@ function loadSshConfig() {
     };
     document.getElementById('ctxSelectAll').onclick = () => { term.selectAll(); hideMenu(); term.focus(); };
     document.getElementById('ctxClear').onclick     = () => { clearTerminal();  hideMenu(); term.focus(); };
-    document.getElementById('ctxCopyCmd').onclick   = () => { copySshCommand(); hideMenu(); };
-    document.getElementById('ctxDownload').onclick  = () => { downloadLog();    hideMenu(); };
+    document.getElementById('ctxCopyCmd').onclick       = () => { copySshCommand();         hideMenu(); };
+    document.getElementById('ctxDownload').onclick      = () => { downloadLog();             hideMenu(); };
+    document.getElementById('ctxUploadFile').onclick   = () => { triggerUpload();            hideMenu(); };
+    document.getElementById('ctxDownloadFile').onclick = () => { downloadFileFromServer();   hideMenu(); };
 
     // 键盘快捷键
     window.addEventListener('keydown', async e => {
@@ -693,6 +842,15 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('fullscreenBtn').addEventListener('click', toggleFullscreen);
     document.getElementById('fontIncBtn').addEventListener('click',    () => setFontSize(currentFontSize + 1));
     document.getElementById('fontDecBtn').addEventListener('click',    () => setFontSize(currentFontSize - 1));
+
+    document.getElementById('uploadFileBtn').addEventListener('click',   triggerUpload);
+    document.getElementById('downloadFileBtn').addEventListener('click', downloadFileFromServer);
+    document.getElementById('uploadFileInput').addEventListener('change', function() {
+        if (this.files && this.files[0]) {
+            uploadFileToServer(this.files[0]);
+            this.value = '';
+        }
+    });
 
     var sel = document.getElementById('themeSelect');
     sel.value = getSavedThemeKey();

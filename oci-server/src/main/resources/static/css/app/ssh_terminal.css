@@ -154,6 +154,7 @@ body {
     flex-direction: column;
     border: 1px solid var(--card-border);
     box-shadow: 0 2px 8px var(--shadow-color);
+    position: relative;
 }
 
 /* 全屏态 */
@@ -397,6 +398,27 @@ body {
     background: var(--terminal-bg);
     width: 100%;
     min-height: 0;
+    overflow: hidden;
+}
+
+/* 上传进度条 */
+.sftp-progress {
+    position: absolute;
+    bottom: 28px;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: rgba(255,255,255,.08);
+    z-index: 10;
+    overflow: hidden;
+    display: none;
+}
+.sftp-progress.active { display: block; }
+.sftp-progress-bar {
+    height: 100%;
+    background: var(--accent-blue);
+    transition: width .3s;
+    width: 0%;
 }
 
 /* ── 底部状态栏 ── */
