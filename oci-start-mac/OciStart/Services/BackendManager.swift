@@ -6,7 +6,6 @@ enum BackendState: Equatable {
     case failed(String)
 }
 
-@MainActor
 final class BackendManager: ObservableObject {
 
     static let shared = BackendManager()
@@ -15,12 +14,14 @@ final class BackendManager: ObservableObject {
     @Published var logBuffer: [String] = []
 
     private var process: Process?
+    private let processLock = NSLock()
     private let port = 9856
 
     private init() {}
 
     // MARK: - Public
 
+    @MainActor
     func start() async {
         // If already running on the port (e.g. dev mode), treat as ready
         if await ping(URL(string: "http://localhost:\(port)/login")!) {
@@ -78,7 +79,9 @@ final class BackendManager: ObservableObject {
             state = .failed("启动 Java 进程失败：\(error.localizedDescription)")
             return
         }
+        processLock.lock()
         self.process = proc
+        processLock.unlock()
 
         // Poll until Spring Boot is ready (up to 90 s)
         let healthURL = URL(string: "http://localhost:\(port)/login")!
@@ -97,13 +100,27 @@ final class BackendManager: ObservableObject {
         state = .failed("后端启动超时（90 秒）")
     }
 
+    /// Thread-safe: safe to call from AppDelegate.terminate
     func stop() {
-        process?.terminate()
+        processLock.lock()
+        let proc = process
         process = nil
+        processLock.unlock()
+
+        guard let proc = proc, proc.isRunning else { return }
+        let pid = proc.processIdentifier
+        proc.terminate()
+        DispatchQueue.global().asyncAfter(deadline: .now() + 3) {
+            if kill(pid, 0) == 0 {
+                kill(pid, SIGKILL)
+            }
+        }
     }
 
+    @MainActor
     func restart() async {
         stop()
+        try? await Task.sleep(nanoseconds: 800_000_000)
         state = .starting
         await start()
     }

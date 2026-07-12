@@ -204,17 +204,75 @@ document.getElementById('registerForm')?.addEventListener('submit', async functi
 });
 
 
+/** 抖动空输入框（无弹框提示） */
+function shakeEmptyInputs(inputs) {
+    const list = (inputs || []).filter(Boolean);
+    if (!list.length) return;
+    list.forEach((el) => {
+        el.classList.remove('input-shake');
+        // 强制重启动画
+        void el.offsetWidth;
+        el.classList.add('input-shake');
+        const onEnd = () => {
+            el.classList.remove('input-shake');
+            el.removeEventListener('animationend', onEnd);
+        };
+        el.addEventListener('animationend', onEnd);
+    });
+    // 聚焦第一个空字段
+    try {
+        list[0].focus();
+    } catch (e) { /* ignore */ }
+}
+
+function isBlank(value) {
+    return !value || !String(value).trim();
+}
+
 document.getElementById('loginForm')?.addEventListener('submit', async function(e) {
     e.preventDefault();
 
-    const username = document.getElementById('username').value;
+    const usernameInput = document.getElementById('username');
     const passwordInput = document.getElementById('password');
-    const rawPassword = passwordInput.value;
+    const username = usernameInput ? usernameInput.value : '';
+    const rawPassword = passwordInput ? passwordInput.value : '';
 
-    if (!username || !rawPassword) {
-        showMessage('error', i18n.login_input_userAndName);
+    // 未填写的必填项：抖动提示，不弹错误框
+    const emptyFields = [];
+    if (isBlank(username)) emptyFields.push(usernameInput);
+    if (isBlank(rawPassword)) emptyFields.push(passwordInput);
+
+    if (messageEnabled || mfaEnabled) {
+        const verificationCodeInput = document.getElementById('verificationCode');
+        const mfaCodeInput = document.getElementById('mfaCode');
+        const verificationCode = verificationCodeInput?.value;
+        const mfaCode = mfaCodeInput?.value;
+        const verificationVisible = verificationCodeInput &&
+            verificationCodeInput.offsetParent !== null;
+        const mfaVisible = mfaCodeInput && mfaCodeInput.offsetParent !== null;
+
+        if (messageEnabled && mfaEnabled) {
+            // 双开时：当前激活方式对应的输入框不能为空
+            if (currentVerificationMethod === 'message' && verificationVisible && isBlank(verificationCode)) {
+                emptyFields.push(verificationCodeInput);
+            } else if (currentVerificationMethod === 'mfa' && mfaVisible && isBlank(mfaCode)) {
+                emptyFields.push(mfaCodeInput);
+            } else if (!verificationCode && !mfaCode) {
+                if (verificationVisible) emptyFields.push(verificationCodeInput);
+                else if (mfaVisible) emptyFields.push(mfaCodeInput);
+            }
+        } else if (messageEnabled && verificationVisible && isBlank(verificationCode)) {
+            emptyFields.push(verificationCodeInput);
+        } else if (mfaEnabled && mfaVisible && isBlank(mfaCode)) {
+            emptyFields.push(mfaCodeInput);
+        }
+    }
+
+    if (emptyFields.length) {
+        shakeEmptyInputs(emptyFields);
         return;
     }
+
     let finalPassword = rawPassword;
     if (window.RSA_PUBLIC_KEY && window.RSA_PUBLIC_KEY.length > 0) {
         const encrypt = new JSEncrypt();
@@ -225,23 +283,6 @@ document.getElementById('loginForm')?.addEventListener('submit', async function(
             console.log("RSA 加密成功");
         } else {
             console.error("RSA 加密失败，请检查公钥格式");
-        }
-    }
-    if (messageEnabled || mfaEnabled) {
-        const verificationCode = document.getElementById('verificationCode')?.value;
-        const mfaCode = document.getElementById('mfaCode')?.value;
-
-        if (messageEnabled && mfaEnabled) {
-            if (!verificationCode && !mfaCode) {
-                showMessage('error', i18n.login_input_codeAndMfaCode);
-                return;
-            }
-        } else if (messageEnabled && !verificationCode) {
-            showMessage('error', i18n.login_input_msgCode);
-            return;
-        } else if (mfaEnabled && !mfaCode) {
-            showMessage('error', i18n.login_input_mfaCode);
-            return;
         }
     }
     const verificationCodeInput = document.getElementById('verificationCode');
@@ -295,6 +336,7 @@ document.getElementById('loginForm')?.addEventListener('submit', async function(
             // 1. 判断是否密码错误退回了登录页
             if (text.includes('error=true') || (text.includes('login') && text.includes('form'))) {
                 showMessage('error', i18n.login_input_login_userOrNameError);
+                heroCryOnLoginFail();
             } else {
                 // 2. 核心修改：尝试解析后端传来的 JSON
                 try {
@@ -311,10 +353,12 @@ document.getElementById('loginForm')?.addEventListener('submit', async function(
             }
         } else {
             showMessage('error', i18n.login_input_login_failAndRetry);
+            heroCryOnLoginFail();
         }
 
     } catch (error) {
         showMessage('error', i18n.common_network_error);
+        heroCryOnLoginFail();
     }
     loginButton.disabled = false;
     loginButton.innerHTML = '<i class="fas fa-sign-in-alt"></i><span>'+i18n.login_title+'</span>';
@@ -403,10 +447,22 @@ function showMessage(type, content) {
 
     container.insertBefore(messageDiv, container.firstChild);
 
+    // 成功消息时恢复正常表情
+    if (type === 'success' && typeof window.setHeroMood === 'function') {
+        window.setHeroMood('normal');
+    }
+
     // 自动消失
     setTimeout(() => {
         messageDiv.remove();
     }, 3000);
+}
+
+/** 登录失败时左侧角色变哭脸 */
+function heroCryOnLoginFail() {
+    if (typeof window.setHeroMood === 'function') {
+        window.setHeroMood('cry');
+    }
 }
 
 // GitHub 登录

@@ -2,6 +2,7 @@ name: OciStart
 options:
   bundleIdPrefix: com.doubledimple
   deploymentTarget:
+    # Product support floor: macOS Big Sur 11.7.11+
     macOS: "11.0"
   createIntermediateGroups: true
   indentWidth: 4

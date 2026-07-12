@@ -1,13 +1,17 @@
 import SwiftUI
 
+/// Web: /vps/instances/list — same instance data source + batch ping controls
 struct VpsMonitorView: View {
     @EnvironmentObject var appState: AppState
+    @Environment(\.colorScheme) private var scheme
+
     @State private var searchText = ""
     @State private var filterOnline = false
+    @State private var busy = false
 
     var stats: (total: Int, online: Int, offline: Int) {
         let all = appState.instances
-        let on  = all.filter { $0.onLineEnable == 1 }.count
+        let on = all.filter { $0.onLineEnable == 1 }.count
         return (all.count, on, all.count - on)
     }
 
@@ -25,35 +29,32 @@ struct VpsMonitorView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Summary bar
             HStack(spacing: 24) {
-                monitorStat("总计",   count: stats.total,   color: .primary)
-                monitorStat("在线",   count: stats.online,  color: .green)
-                monitorStat("离线",   count: stats.offline, color: .red)
+                monitorStat("总计", count: stats.total, color: AppTheme.text(scheme))
+                monitorStat("在线", count: stats.online, color: AppTheme.success)
+                monitorStat("离线", count: stats.offline, color: AppTheme.danger)
                 Spacer()
                 Toggle("仅显示在线", isOn: $filterOnline)
                     .toggleStyle(.checkbox)
                     .font(.callout)
             }
             .padding(.horizontal, 16).padding(.vertical, 10)
-            .background(Color(NSColor.controlBackgroundColor))
+            .background(AppTheme.surface(scheme))
 
             Divider()
 
-            // Search
             HStack(spacing: 6) {
-                Image(systemName: "magnifyingglass").foregroundColor(.secondary).font(.callout)
+                Image(systemName: "magnifyingglass").foregroundColor(AppTheme.muted(scheme)).font(.callout)
                 TextField("搜索实例名、IP、租户…", text: $searchText).textFieldStyle(.plain)
                 if !searchText.isEmpty {
                     Button(action: { searchText = "" }) {
-                        Image(systemName: "xmark.circle.fill").foregroundColor(.secondary)
+                        Image(systemName: "xmark.circle.fill").foregroundColor(AppTheme.muted(scheme))
                     }.buttonStyle(.plain)
                 }
             }
             .padding(.horizontal, 12).padding(.vertical, 7)
-            .background(Color(NSColor.controlBackgroundColor))
+            .background(AppTheme.elevated(scheme))
 
-            // Column headers
             HStack(spacing: 0) {
                 Text("状态").frame(width: 70, alignment: .leading)
                 Text("实例名").frame(maxWidth: .infinity, alignment: .leading)
@@ -63,103 +64,131 @@ struct VpsMonitorView: View {
                 Text("租户").frame(width: 130, alignment: .leading)
             }
             .padding(.horizontal, 16).padding(.vertical, 6)
-            .font(.caption.weight(.semibold)).foregroundColor(.secondary)
-            .background(Color(NSColor.controlBackgroundColor))
+            .font(.caption.weight(.semibold))
+            .foregroundColor(AppTheme.muted(scheme))
+            .background(AppTheme.elevated(scheme))
 
             Divider()
 
-            if appState.vpsLoading && appState.instances.isEmpty {
-                VStack { Spacer(); ProgressView("加载中…"); Spacer() }
+            if (appState.vpsLoading || appState.instancesLoading) && appState.instances.isEmpty {
+                PageLoadingView()
             } else if filtered.isEmpty {
-                VStack {
-                    Spacer()
-                    VStack(spacing: 8) {
-                        Image(systemName: "display.2").font(.largeTitle).foregroundColor(.secondary)
-                        Text("暂无数据").foregroundColor(.secondary)
-                    }
-                    Spacer()
-                }
+                EmptyStateView(icon: "list.bullet", title: "暂无数据")
             } else {
                 List(filtered) { instance in
                     VpsRowView(instance: instance)
                         .listRowInsets(EdgeInsets())
+                        .listRowBackground(AppTheme.pageBg(scheme))
                 }
                 .listStyle(.plain)
             }
         }
-        .navigationTitle("资源监控")
+        .background(AppTheme.pageBg(scheme).ignoresSafeArea())
+        .navigationTitle("实例列表")
         .toolbar {
             ToolbarItem {
-                Text("\(filtered.count) 台").font(.caption).foregroundColor(.secondary)
+                Text("\(filtered.count) 台").font(.caption).foregroundColor(AppTheme.muted(scheme))
             }
             ToolbarItem {
-                if appState.vpsLoading { ProgressView().scaleEffect(0.75) }
+                if busy || appState.vpsLoading { ProgressView().scaleEffect(0.75) }
             }
             ToolbarItem {
-                Button(action: { Task {
-                    appState.vpsLoading = true
-                    await appState.loadInstances()
-                    appState.vpsLoading = false
-                }}) {
+                Button(action: { Task { await run { await appState.vpsEnablePing() } } }) {
+                    Label("启用 Ping", systemImage: "antenna.radiowaves.left.and.right")
+                }
+                .disabled(busy)
+            }
+            ToolbarItem {
+                Button(action: { Task { await run { await appState.vpsDisablePing() } } }) {
+                    Label("停用 Ping", systemImage: "pause.circle")
+                }
+                .disabled(busy)
+            }
+            ToolbarItem {
+                Button(action: { Task { await run { await appState.vpsPingNow() } } }) {
+                    Label("立即 Ping", systemImage: "bolt.horizontal")
+                }
+                .disabled(busy)
+            }
+            ToolbarItem {
+                Button(action: {
+                    Task {
+                        appState.vpsLoading = true
+                        await appState.loadInstances()
+                        appState.vpsLoading = false
+                    }
+                }) {
                     Label("刷新", systemImage: "arrow.clockwise")
                 }
             }
         }
         .onAppear {
-            if appState.instances.isEmpty { Task { await appState.loadInstances() } }
+            if appState.instances.isEmpty {
+                Task {
+                    appState.vpsLoading = true
+                    await appState.loadInstances()
+                    appState.vpsLoading = false
+                }
+            }
         }
+    }
+
+    private func run(_ work: () async -> Void) async {
+        busy = true
+        defer { busy = false }
+        await work()
     }
 
     private func monitorStat(_ label: String, count: Int, color: Color) -> some View {
         HStack(spacing: 6) {
             Circle().fill(color).frame(width: 8, height: 8)
-            Text(label).font(.callout).foregroundColor(.secondary)
-            Text("\(count)").font(.callout.weight(.semibold))
+            Text(label).font(.callout).foregroundColor(AppTheme.muted(scheme))
+            Text("\(count)").font(.callout.weight(.semibold)).foregroundColor(AppTheme.text(scheme))
         }
     }
 }
 
 struct VpsRowView: View {
+    @Environment(\.colorScheme) private var scheme
     let instance: OciInstance
 
     var body: some View {
         HStack(spacing: 0) {
-            // Online/offline
             HStack(spacing: 4) {
-                Circle().fill(instance.onLineEnable == 1 ? Color.green : Color.red).frame(width: 7, height: 7)
+                Circle().fill(instance.onLineEnable == 1 ? AppTheme.success : AppTheme.danger).frame(width: 7, height: 7)
                 Text(instance.onLineEnable == 1 ? "在线" : "离线")
-                    .font(.caption).foregroundColor(.secondary)
+                    .font(.caption).foregroundColor(AppTheme.muted(scheme))
             }
             .frame(width: 70, alignment: .leading)
 
             Text(instance.displayName ?? "—")
                 .fontWeight(.medium).lineLimit(1)
+                .foregroundColor(AppTheme.text(scheme))
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             Text(instance.displayPublicIP)
                 .font(.system(.callout, design: .monospaced)).lineLimit(1)
+                .foregroundColor(AppTheme.text(scheme))
                 .frame(width: 140, alignment: .leading)
 
-            // Latency
             Group {
                 if let ct = instance.connTime, ct > 0 {
                     Text("\(ct) ms")
-                        .foregroundColor(ct < 100 ? .green : ct < 300 ? .orange : .red)
+                        .foregroundColor(ct < 100 ? AppTheme.success : ct < 300 ? AppTheme.warning : AppTheme.danger)
                 } else {
-                    Text("—").foregroundColor(.secondary)
+                    Text("—").foregroundColor(AppTheme.muted(scheme))
                 }
             }
             .font(.callout)
             .frame(width: 80, alignment: .leading)
 
-            // Ping enabled
             Image(systemName: instance.enablePing == 1 ? "checkmark.circle.fill" : "circle")
-                .foregroundColor(instance.enablePing == 1 ? .green : .secondary)
+                .foregroundColor(instance.enablePing == 1 ? AppTheme.success : AppTheme.muted(scheme))
                 .font(.callout)
                 .frame(width: 60, alignment: .center)
 
             Text(instance.displayTenant)
-                .font(.caption).foregroundColor(.secondary).lineLimit(1)
+                .font(.caption).foregroundColor(AppTheme.muted(scheme)).lineLimit(1)
                 .frame(width: 130, alignment: .leading)
         }
         .padding(.vertical, 7).padding(.horizontal, 16)

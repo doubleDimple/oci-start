@@ -14,23 +14,36 @@
 		17F41FE64BBB866774A2DAB9 /* InstanceDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30F0F148D7C12771290C91F /* InstanceDetailView.swift */; };
 		26CCE17CDA43B34612C629BE /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B82E269083EF07C8139DFCA4 /* LoginView.swift */; };
 		3C9698D9E6BEB172389FDCF1 /* NotificationSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 821A8D8B74E3A8C328271492 /* NotificationSettingsView.swift */; };
+		3D650F6C5E15905C4F6B5010 /* AddBootTaskView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E6643A78CD7E8D63CF51F7D /* AddBootTaskView.swift */; };
+		43254AE12390FE381AA3E77A /* AiChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2DFFAAF03B4490074119DBC /* AiChatView.swift */; };
+		44F00FC011B1F7B2DE1F60C2 /* CloudflareDnsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99585FD75C702F76D2F1BEAE /* CloudflareDnsView.swift */; };
+		46E93E69F18F968C8CDDFF92 /* MigrationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0238D6A62066D5767E69E37 /* MigrationView.swift */; };
+		5C9530C419B46FF664B59BDB /* DnsSharedComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34164AA2DF9AD1FCBED79EB5 /* DnsSharedComponents.swift */; };
 		5FCBF68BFE25B94E12B222ED /* OciWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F237D61FA3F78523193BE551 /* OciWebView.swift */; };
 		6904910718F065B0A76CDE8A /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1D177E751FDF362B925CDF0 /* AppState.swift */; };
 		6BCF1E3BAC152C06DA249419 /* SpeedTestView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39B7870495C690E0CFDB8DFB /* SpeedTestView.swift */; };
 		72E8EA9A028C8B8BF837EFC0 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7668775A44BB6E366703EDAE /* AuthService.swift */; };
+		7658F936B6D48854E85B7E36 /* EmailManageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEFCEE08B9A9288A9FA3AF34 /* EmailManageView.swift */; };
+		7FDBFBAE80D6E00F440E6053 /* BootTasksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 221D299027470F2E258F2FDD /* BootTasksView.swift */; };
 		8240D63945A64289C51A6233 /* NetworkService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F1E13A687553BD8C09CA415 /* NetworkService.swift */; };
+		8463CCA266978C3EE6BF41CD /* EdgeOneDnsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B7E4A2776A7480941BAC98F /* EdgeOneDnsView.swift */; };
+		87EB538ED385FC78FC1A4F40 /* SystemLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBC810221C2BDC75B56D68E0 /* SystemLogView.swift */; };
+		8CF7466835C146861575140C /* IpSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79F0A9FE0367BE39E07A311C /* IpSettingsView.swift */; };
 		8E9C1536FB2664C82061F03C /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48CC0B925B4D57713457982A /* Models.swift */; };
 		9482D21A0032A9E9582DD91E /* SshTerminalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20ED738D2BA7472276B742ED /* SshTerminalView.swift */; };
 		9C3F2440FB064F7217E46CCF /* InstancesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C75CB72B0D5DA39ED87A1F1D /* InstancesView.swift */; };
+		A6820E6C5B20CB11784188FF /* VpnProxyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51EC2D3EF45D6F20A6141FF8 /* VpnProxyView.swift */; };
 		A6AB007B305316E845C8DA95 /* ApiTokenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF2E8306E9AA8137ABD17173 /* ApiTokenView.swift */; };
 		AF633841DB8B14E4DFC6B40D /* BackendManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C1186E531668AA46A22D922 /* BackendManager.swift */; };
 		BA59B4237B07ADA50BF9FE27 /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F700E2F6F137500FA38B4811 /* MainView.swift */; };
 		BC548636FB02FD6A030FF434 /* AddTenantView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4CC9D5ABD2430830FA02659 /* AddTenantView.swift */; };
 		BEEB079AD97C2500002170A8 /* TenantListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FE0762EBFD2C586EEACAA3A /* TenantListView.swift */; };
 		C26E484006FAE05311431896 /* MemoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B27CD54811623B0000FEA03 /* MemoView.swift */; };
+		C5FE63805F866F79C4C3C022 /* AiModelsHubView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7399C6627626A5BFF0764A9B /* AiModelsHubView.swift */; };
 		CD8AD96EB04EF3DE3CE9F830 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CAEE4D12BBD01CE9559258F /* DashboardView.swift */; };
 		CDEF02C15910BB778F6599EB /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A73C41AF426662F463E1700F /* Assets.xcassets */; };
 		D27F0C12B44C3F2185F906C4 /* OciStartApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2900C4EAB1AAF755E6B3A25D /* OciStartApp.swift */; };
+		D752925A0B422C003ACA67F1 /* DomainSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F470B49E3DD69C5B9B17ABB1 /* DomainSettingsView.swift */; };
 		DD3A574C48EB111793AFB99A /* VpsMonitorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A3C24AC7E749D549CD48E7F /* VpsMonitorView.swift */; };
 		DD7EC1499C55C33D2042C2CD /* RSAHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC4E1F0EA8205CC3848576A7 /* RSAHelper.swift */; };
 		EBA01CF722F1EA9615C6EAC1 /* ObjectStorageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1B7C5E6A70D759CE64AD1FE /* ObjectStorageView.swift */; };
@@ -40,33 +53,46 @@
 /* Begin PBXFileReference section */
 		0EF9658A2CC5D4E5FA2CE5C9 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		20ED738D2BA7472276B742ED /* SshTerminalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SshTerminalView.swift; sourceTree = "<group>"; };
+		221D299027470F2E258F2FDD /* BootTasksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BootTasksView.swift; sourceTree = "<group>"; };
 		2900C4EAB1AAF755E6B3A25D /* OciStartApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OciStartApp.swift; sourceTree = "<group>"; };
 		2F1E13A687553BD8C09CA415 /* NetworkService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkService.swift; sourceTree = "<group>"; };
+		34164AA2DF9AD1FCBED79EB5 /* DnsSharedComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DnsSharedComponents.swift; sourceTree = "<group>"; };
 		39B7870495C690E0CFDB8DFB /* SpeedTestView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedTestView.swift; sourceTree = "<group>"; };
 		3C1377BD1A0EFAD5A6961399 /* OciStart.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OciStart.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3CAEE4D12BBD01CE9559258F /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		48CC0B925B4D57713457982A /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		4B7E4A2776A7480941BAC98F /* EdgeOneDnsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EdgeOneDnsView.swift; sourceTree = "<group>"; };
 		4EE26C35E75A61142F0198C7 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		4FE0762EBFD2C586EEACAA3A /* TenantListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TenantListView.swift; sourceTree = "<group>"; };
+		51EC2D3EF45D6F20A6141FF8 /* VpnProxyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VpnProxyView.swift; sourceTree = "<group>"; };
 		5A3C24AC7E749D549CD48E7F /* VpsMonitorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VpsMonitorView.swift; sourceTree = "<group>"; };
 		5B27CD54811623B0000FEA03 /* MemoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoView.swift; sourceTree = "<group>"; };
 		62315FCDF66D952D0F47EF99 /* OciStart.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = OciStart.entitlements; sourceTree = "<group>"; };
+		7399C6627626A5BFF0764A9B /* AiModelsHubView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AiModelsHubView.swift; sourceTree = "<group>"; };
 		7668775A44BB6E366703EDAE /* AuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthService.swift; sourceTree = "<group>"; };
+		79F0A9FE0367BE39E07A311C /* IpSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IpSettingsView.swift; sourceTree = "<group>"; };
 		7CD6BCE86796CA485FF8DAC2 /* MfaBackupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MfaBackupView.swift; sourceTree = "<group>"; };
+		7E6643A78CD7E8D63CF51F7D /* AddBootTaskView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddBootTaskView.swift; sourceTree = "<group>"; };
 		80AE2D53A22B36786849E479 /* ArmRecordsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArmRecordsView.swift; sourceTree = "<group>"; };
 		821A8D8B74E3A8C328271492 /* NotificationSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationSettingsView.swift; sourceTree = "<group>"; };
+		99585FD75C702F76D2F1BEAE /* CloudflareDnsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudflareDnsView.swift; sourceTree = "<group>"; };
 		9C1186E531668AA46A22D922 /* BackendManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendManager.swift; sourceTree = "<group>"; };
 		A34B5EA8612169EE6160C4CC /* Compat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Compat.swift; sourceTree = "<group>"; };
 		A73C41AF426662F463E1700F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		AEFCEE08B9A9288A9FA3AF34 /* EmailManageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmailManageView.swift; sourceTree = "<group>"; };
 		B4CC9D5ABD2430830FA02659 /* AddTenantView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddTenantView.swift; sourceTree = "<group>"; };
 		B82E269083EF07C8139DFCA4 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		C1D177E751FDF362B925CDF0 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		C2DFFAAF03B4490074119DBC /* AiChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AiChatView.swift; sourceTree = "<group>"; };
 		C30F0F148D7C12771290C91F /* InstanceDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstanceDetailView.swift; sourceTree = "<group>"; };
 		C75CB72B0D5DA39ED87A1F1D /* InstancesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstancesView.swift; sourceTree = "<group>"; };
 		CA2B546A45B7BBD5255F88A0 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		DBC810221C2BDC75B56D68E0 /* SystemLogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemLogView.swift; sourceTree = "<group>"; };
 		DF2E8306E9AA8137ABD17173 /* ApiTokenView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApiTokenView.swift; sourceTree = "<group>"; };
+		F0238D6A62066D5767E69E37 /* MigrationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MigrationView.swift; sourceTree = "<group>"; };
 		F1B7C5E6A70D759CE64AD1FE /* ObjectStorageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObjectStorageView.swift; sourceTree = "<group>"; };
 		F237D61FA3F78523193BE551 /* OciWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OciWebView.swift; sourceTree = "<group>"; };
+		F470B49E3DD69C5B9B17ABB1 /* DomainSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DomainSettingsView.swift; sourceTree = "<group>"; };
 		F700E2F6F137500FA38B4811 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
 		FC4E1F0EA8205CC3848576A7 /* RSAHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RSAHelper.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -97,24 +123,37 @@
 		81BE744F15297B21E0C93421 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				7E6643A78CD7E8D63CF51F7D /* AddBootTaskView.swift */,
 				B4CC9D5ABD2430830FA02659 /* AddTenantView.swift */,
+				C2DFFAAF03B4490074119DBC /* AiChatView.swift */,
+				7399C6627626A5BFF0764A9B /* AiModelsHubView.swift */,
 				DF2E8306E9AA8137ABD17173 /* ApiTokenView.swift */,
 				80AE2D53A22B36786849E479 /* ArmRecordsView.swift */,
+				221D299027470F2E258F2FDD /* BootTasksView.swift */,
+				99585FD75C702F76D2F1BEAE /* CloudflareDnsView.swift */,
 				CA2B546A45B7BBD5255F88A0 /* ContentView.swift */,
 				3CAEE4D12BBD01CE9559258F /* DashboardView.swift */,
+				34164AA2DF9AD1FCBED79EB5 /* DnsSharedComponents.swift */,
+				F470B49E3DD69C5B9B17ABB1 /* DomainSettingsView.swift */,
+				4B7E4A2776A7480941BAC98F /* EdgeOneDnsView.swift */,
+				AEFCEE08B9A9288A9FA3AF34 /* EmailManageView.swift */,
 				C30F0F148D7C12771290C91F /* InstanceDetailView.swift */,
 				C75CB72B0D5DA39ED87A1F1D /* InstancesView.swift */,
+				79F0A9FE0367BE39E07A311C /* IpSettingsView.swift */,
 				B82E269083EF07C8139DFCA4 /* LoginView.swift */,
 				F700E2F6F137500FA38B4811 /* MainView.swift */,
 				5B27CD54811623B0000FEA03 /* MemoView.swift */,
 				7CD6BCE86796CA485FF8DAC2 /* MfaBackupView.swift */,
+				F0238D6A62066D5767E69E37 /* MigrationView.swift */,
 				821A8D8B74E3A8C328271492 /* NotificationSettingsView.swift */,
 				F1B7C5E6A70D759CE64AD1FE /* ObjectStorageView.swift */,
 				F237D61FA3F78523193BE551 /* OciWebView.swift */,
 				4EE26C35E75A61142F0198C7 /* SettingsView.swift */,
 				39B7870495C690E0CFDB8DFB /* SpeedTestView.swift */,
 				20ED738D2BA7472276B742ED /* SshTerminalView.swift */,
+				DBC810221C2BDC75B56D68E0 /* SystemLogView.swift */,
 				4FE0762EBFD2C586EEACAA3A /* TenantListView.swift */,
+				51EC2D3EF45D6F20A6141FF8 /* VpnProxyView.swift */,
 				5A3C24AC7E749D549CD48E7F /* VpsMonitorView.swift */,
 			);
 			path = Views;
@@ -213,21 +252,32 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3D650F6C5E15905C4F6B5010 /* AddBootTaskView.swift in Sources */,
 				BC548636FB02FD6A030FF434 /* AddTenantView.swift in Sources */,
+				43254AE12390FE381AA3E77A /* AiChatView.swift in Sources */,
+				C5FE63805F866F79C4C3C022 /* AiModelsHubView.swift in Sources */,
 				A6AB007B305316E845C8DA95 /* ApiTokenView.swift in Sources */,
 				6904910718F065B0A76CDE8A /* AppState.swift in Sources */,
 				0687FEE9FAA9045AD0F146B5 /* ArmRecordsView.swift in Sources */,
 				72E8EA9A028C8B8BF837EFC0 /* AuthService.swift in Sources */,
 				AF633841DB8B14E4DFC6B40D /* BackendManager.swift in Sources */,
+				7FDBFBAE80D6E00F440E6053 /* BootTasksView.swift in Sources */,
+				44F00FC011B1F7B2DE1F60C2 /* CloudflareDnsView.swift in Sources */,
 				118A50C03DC860D4F00E7EF8 /* Compat.swift in Sources */,
 				011A5821FA4ACF0D6BB11F72 /* ContentView.swift in Sources */,
 				CD8AD96EB04EF3DE3CE9F830 /* DashboardView.swift in Sources */,
+				5C9530C419B46FF664B59BDB /* DnsSharedComponents.swift in Sources */,
+				D752925A0B422C003ACA67F1 /* DomainSettingsView.swift in Sources */,
+				8463CCA266978C3EE6BF41CD /* EdgeOneDnsView.swift in Sources */,
+				7658F936B6D48854E85B7E36 /* EmailManageView.swift in Sources */,
 				17F41FE64BBB866774A2DAB9 /* InstanceDetailView.swift in Sources */,
 				9C3F2440FB064F7217E46CCF /* InstancesView.swift in Sources */,
+				8CF7466835C146861575140C /* IpSettingsView.swift in Sources */,
 				26CCE17CDA43B34612C629BE /* LoginView.swift in Sources */,
 				BA59B4237B07ADA50BF9FE27 /* MainView.swift in Sources */,
 				C26E484006FAE05311431896 /* MemoView.swift in Sources */,
 				F7C125505BCF2F0313D1F900 /* MfaBackupView.swift in Sources */,
+				46E93E69F18F968C8CDDFF92 /* MigrationView.swift in Sources */,
 				8E9C1536FB2664C82061F03C /* Models.swift in Sources */,
 				8240D63945A64289C51A6233 /* NetworkService.swift in Sources */,
 				3C9698D9E6BEB172389FDCF1 /* NotificationSettingsView.swift in Sources */,
@@ -238,7 +288,9 @@
 				07D903B03A9FE2DC2698BABD /* SettingsView.swift in Sources */,
 				6BCF1E3BAC152C06DA249419 /* SpeedTestView.swift in Sources */,
 				9482D21A0032A9E9582DD91E /* SshTerminalView.swift in Sources */,
+				87EB538ED385FC78FC1A4F40 /* SystemLogView.swift in Sources */,
 				BEEB079AD97C2500002170A8 /* TenantListView.swift in Sources */,
+				A6820E6C5B20CB11784188FF /* VpnProxyView.swift in Sources */,
 				DD3A574C48EB111793AFB99A /* VpsMonitorView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

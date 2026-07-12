@@ -3,43 +3,42 @@ import AppKit
 
 struct ObjectStorageView: View {
     @EnvironmentObject var appState: AppState
+    @Environment(\.colorScheme) private var scheme
 
     @State private var selectedTenant: Tenant?
     @State private var selectedBucket: StorageBucket?
     @State private var objectToDelete: StorageObject?
     @State private var showDeleteAlert = false
+    @State private var showCreateBucket = false
+    @State private var newBucketName = ""
+    @State private var prefixFilter = ""
 
     var body: some View {
         HSplitView {
-            // Left: bucket list
-            bucketPanel
-                .frame(minWidth: 200, maxWidth: 260)
-
-            // Right: object list
+            bucketPanel.frame(minWidth: 200, maxWidth: 280)
             objectPanel
         }
+        .background(AppTheme.pageBg(scheme).ignoresSafeArea())
         .navigationTitle("对象存储")
         .toolbar { toolbarItems }
         .alert(isPresented: $showDeleteAlert) {
             Alert(
                 title: Text("确认删除"),
                 message: Text("删除文件「\(objectToDelete?.name ?? "")」？"),
-                primaryButton: .destructive(Text("删除")) {
-                    deleteSelectedObject()
-                },
+                primaryButton: .destructive(Text("删除")) { deleteSelectedObject() },
                 secondaryButton: .cancel()
             )
+        }
+        .sheet(isPresented: $showCreateBucket) {
+            createBucketSheet
         }
         .onAppear {
             if appState.allTenants.isEmpty { Task { await appState.loadAllTenants() } }
         }
     }
 
-    // MARK: - Bucket Panel
-
     private var bucketPanel: some View {
         VStack(spacing: 0) {
-            // Tenant picker
             Picker("租户", selection: $selectedTenant) {
                 Text("选择租户…").tag(Optional<Tenant>.none)
                 ForEach(appState.allTenants) { t in
@@ -58,19 +57,18 @@ struct ObjectStorageView: View {
             Divider()
 
             if appState.storageLoading && appState.buckets.isEmpty {
-                VStack { Spacer(); ProgressView(); Spacer() }
+                PageLoadingView()
             } else if appState.buckets.isEmpty {
-                VStack {
-                    Spacer()
-                    Text(selectedTenant == nil ? "请选择租户" : "暂无 Bucket")
-                        .font(.caption).foregroundColor(.secondary)
-                    Spacer()
-                }
+                EmptyStateView(
+                    icon: "externaldrive",
+                    title: selectedTenant == nil ? "请选择租户" : "暂无 Bucket",
+                    subtitle: selectedTenant == nil ? nil : "可点击工具栏创建存储桶"
+                )
             } else {
                 List(appState.buckets, selection: $selectedBucket) { bucket in
                     HStack {
-                        Image(systemName: "externaldrive").foregroundColor(.accentColor)
-                        Text(bucket.name).lineLimit(1)
+                        Image(systemName: "externaldrive").foregroundColor(AppTheme.accent(scheme))
+                        Text(bucket.name).lineLimit(1).foregroundColor(AppTheme.text(scheme))
                     }
                     .tag(bucket)
                 }
@@ -81,24 +79,30 @@ struct ObjectStorageView: View {
                 }
             }
         }
+        .background(AppTheme.surface(scheme))
     }
-
-    // MARK: - Object Panel
 
     private var objectPanel: some View {
         VStack(spacing: 0) {
             if selectedBucket == nil {
-                VStack {
-                    Spacer()
-                    VStack(spacing: 8) {
-                        Image(systemName: "externaldrive.badge.questionmark")
-                            .font(.largeTitle).foregroundColor(.secondary)
-                        Text("请选择 Bucket").foregroundColor(.secondary)
-                    }
-                    Spacer()
-                }
+                EmptyStateView(icon: "folder", title: "请选择 Bucket")
             } else {
-                // Column headers
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass").foregroundColor(AppTheme.muted(scheme))
+                    TextField("前缀筛选", text: $prefixFilter)
+                        .textFieldStyle(.plain)
+                    Button("筛选") { reloadObjects() }
+                        .buttonStyle(.plain)
+                        .foregroundColor(AppTheme.accent(scheme))
+                    if !prefixFilter.isEmpty {
+                        Button("清除") { prefixFilter = ""; reloadObjects() }
+                            .buttonStyle(.plain)
+                            .foregroundColor(AppTheme.accent(scheme))
+                    }
+                }
+                .padding(.horizontal, 12).padding(.vertical, 8)
+                .background(AppTheme.elevated(scheme))
+
                 HStack(spacing: 0) {
                     Text("文件名").frame(maxWidth: .infinity, alignment: .leading)
                     Text("大小").frame(width: 100, alignment: .trailing)
@@ -106,22 +110,25 @@ struct ObjectStorageView: View {
                     Text("操作").frame(width: 100, alignment: .center)
                 }
                 .padding(.horizontal, 16).padding(.vertical, 6)
-                .font(.caption.weight(.semibold)).foregroundColor(.secondary)
-                .background(Color(NSColor.controlBackgroundColor))
+                .font(.caption.weight(.semibold))
+                .foregroundColor(AppTheme.muted(scheme))
+                .background(AppTheme.elevated(scheme))
 
                 Divider()
 
                 if appState.storageLoading {
-                    VStack { Spacer(); ProgressView("加载中…"); Spacer() }
+                    PageLoadingView()
                 } else if appState.storageObjects.isEmpty {
-                    VStack { Spacer(); Text("Bucket 为空").foregroundColor(.secondary); Spacer() }
+                    EmptyStateView(icon: "doc", title: "Bucket 为空", subtitle: "可点击工具栏上传文件")
                 } else {
                     List(appState.storageObjects) { obj in
-                        ObjectRowView(object: obj,
+                        ObjectRowView(
+                            object: obj,
                             onDownload: { downloadObject(obj) },
                             onDelete: { objectToDelete = obj; showDeleteAlert = true }
                         )
                         .listRowInsets(EdgeInsets())
+                        .listRowBackground(AppTheme.pageBg(scheme))
                     }
                     .listStyle(.plain)
                 }
@@ -129,10 +136,50 @@ struct ObjectStorageView: View {
         }
     }
 
+    private var createBucketSheet: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("创建存储桶").font(.headline)
+            TextField("bucket-name", text: $newBucketName)
+                .textFieldStyle(.roundedBorder)
+            Text("名称需全局唯一，建议小写字母与连字符。")
+                .font(.caption).foregroundColor(AppTheme.muted(scheme))
+            HStack {
+                Spacer()
+                Button("取消") { showCreateBucket = false }
+                Button("创建") {
+                    guard let t = selectedTenant else { return }
+                    let name = newBucketName.trimmingCharacters(in: .whitespaces)
+                    guard !name.isEmpty else { return }
+                    Task {
+                        await appState.createBucket(tenantId: t.id, name: name)
+                        showCreateBucket = false
+                        newBucketName = ""
+                    }
+                }
+                .buttonStyle(ProminentButton())
+                .disabled(selectedTenant == nil || newBucketName.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+        }
+        .padding(22)
+        .frame(width: 360)
+    }
+
     @ToolbarContentBuilder
     private var toolbarItems: some ToolbarContent {
         ToolbarItem {
             if appState.storageLoading { ProgressView().scaleEffect(0.75) }
+        }
+        ToolbarItem {
+            Button(action: { showCreateBucket = true }) {
+                Label("创建桶", systemImage: "plus.rectangle.on.folder")
+            }
+            .disabled(selectedTenant == nil)
+        }
+        ToolbarItem {
+            Button(action: pickAndUpload) {
+                Label("上传", systemImage: "arrow.up.doc")
+            }
+            .disabled(selectedTenant == nil || selectedBucket == nil)
         }
         ToolbarItem {
             Button(action: refresh) {
@@ -146,8 +193,32 @@ struct ObjectStorageView: View {
         guard let t = selectedTenant else { return }
         Task {
             await appState.loadBuckets(tenantId: t.id)
-            if let b = selectedBucket, let ns = b.namespace {
-                await appState.loadObjects(tenantId: t.id, namespace: ns, bucketName: b.name)
+            reloadObjects()
+        }
+    }
+
+    private func reloadObjects() {
+        guard let t = selectedTenant, let b = selectedBucket, let ns = b.namespace else { return }
+        Task {
+            await appState.loadObjects(tenantId: t.id, namespace: ns, bucketName: b.name)
+            // client-side prefix filter (API also supports prefix; keep simple for 11.7)
+            if !prefixFilter.isEmpty {
+                let p = prefixFilter
+                appState.storageObjects = appState.storageObjects.filter { $0.name.hasPrefix(p) }
+            }
+        }
+    }
+
+    private func pickAndUpload() {
+        guard let t = selectedTenant, let b = selectedBucket, let ns = b.namespace else { return }
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.begin { resp in
+            guard resp == .OK, let url = panel.url else { return }
+            Task {
+                await appState.uploadObject(tenantId: t.id, namespace: ns, bucketName: b.name, fileURL: url)
             }
         }
     }
@@ -155,11 +226,8 @@ struct ObjectStorageView: View {
     private func downloadObject(_ obj: StorageObject) {
         guard let t = selectedTenant, let b = selectedBucket, let ns = b.namespace else { return }
         guard let url = appState.network.downloadURLForObject(
-            baseURL: appState.serverURL,
-            tenantId: t.id,
-            namespace: ns,
-            bucketName: b.name,
-            objectName: obj.name
+            baseURL: appState.serverURL, tenantId: t.id, namespace: ns,
+            bucketName: b.name, objectName: obj.name
         ) else { return }
 
         let panel = NSSavePanel()
@@ -191,6 +259,7 @@ struct ObjectStorageView: View {
 }
 
 struct ObjectRowView: View {
+    @Environment(\.colorScheme) private var scheme
     let object: StorageObject
     let onDownload: () -> Void
     let onDelete: () -> Void
@@ -198,44 +267,29 @@ struct ObjectRowView: View {
     var body: some View {
         HStack(spacing: 0) {
             HStack(spacing: 6) {
-                Image(systemName: fileIcon).foregroundColor(.secondary).font(.callout)
-                Text(object.name).lineLimit(1)
+                Image(systemName: "doc").foregroundColor(AppTheme.muted(scheme)).font(.callout)
+                Text(object.name).lineLimit(1).foregroundColor(AppTheme.text(scheme))
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
             Text(object.sizeDisplay)
-                .font(.callout).foregroundColor(.secondary)
+                .font(.callout).foregroundColor(AppTheme.muted(scheme))
                 .frame(width: 100, alignment: .trailing)
 
             Text(object.timeModified.map { String($0.prefix(10)) } ?? "—")
-                .font(.caption).foregroundColor(.secondary)
+                .font(.caption).foregroundColor(AppTheme.muted(scheme))
                 .frame(width: 160, alignment: .leading)
 
             HStack(spacing: 8) {
                 Button(action: onDownload) {
-                    Image(systemName: "arrow.down.circle").foregroundColor(.accentColor)
+                    Image(systemName: "arrow.down.circle").foregroundColor(AppTheme.accent(scheme))
                 }.buttonStyle(.plain).help("下载")
-
                 Button(action: onDelete) {
-                    Image(systemName: "trash").foregroundColor(.red)
+                    Image(systemName: "trash").foregroundColor(AppTheme.danger)
                 }.buttonStyle(.plain).help("删除")
             }
             .frame(width: 100, alignment: .center)
         }
         .padding(.vertical, 7).padding(.horizontal, 16)
-    }
-
-    private var fileIcon: String {
-        let ext = (object.name as NSString).pathExtension.lowercased()
-        switch ext {
-        case "jpg","jpeg","png","gif","webp","svg": return "photo"
-        case "mp4","avi","mov","mkv":               return "film"
-        case "mp3","wav","aac","flac":              return "music.note"
-        case "zip","tar","gz","7z","rar":           return "archivebox"
-        case "pdf":                                 return "doc.richtext"
-        case "txt","md","log":                      return "doc.text"
-        case "sh","py","js","java","swift":         return "doc.badge.gearshape"
-        default:                                    return "doc"
-        }
     }
 }

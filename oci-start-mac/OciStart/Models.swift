@@ -254,3 +254,228 @@ struct NotifyConfig: Codable {
     var dingTalk: DingTalkConfig?
     var bark: BarkConfig?
 }
+
+// MARK: - Boot tasks (one-click boot)
+
+struct BootTask: Identifiable, Codable, Equatable {
+    let id: Int64?
+    let bootId: String?
+    let tenantId: Int64?
+    let ocpu: Int?
+    let memory: Int?
+    let disk: Int?
+    let status: Int?
+    let architecture: String?
+    let publicIp: String?
+    let successCount: Int?
+    let addCount: Int64?
+    let remark: String?
+    let userName: String?
+    let tenancyName: String?
+    let regionName: String?
+    let createAtStr: String?
+    let currentAttemptCount: Int?
+
+    var displayId: Int64 { id ?? 0 }
+    var statusLabel: String {
+        switch status ?? -1 {
+        case 0: return "未启动"
+        case 1: return "抢机中"
+        case 2: return "已成功"
+        default: return "未知"
+        }
+    }
+    var displayTenant: String { tenancyName ?? userName ?? "—" }
+    var displayShape: String {
+        let o = ocpu.map { "\($0)" } ?? "?"
+        let m = memory.map { "\($0)" } ?? "?"
+        let d = disk.map { "\($0)" } ?? "?"
+        return "\(o)C/\(m)G/\(d)G"
+    }
+}
+
+struct BootTaskListData: Codable {
+    let list: [BootTask]?
+    let total: Int64?
+    let runningCount: Int64?
+}
+
+// MARK: - Notify configs (load)
+
+struct NotifyConfigsBundle: Codable {
+    var telegram: TelegramNotifyConfig?
+    var dingTalk: DingTalkNotifyConfig?
+    var bark: BarkNotifyConfig?
+    var feishu: FeishuNotifyConfig?
+}
+
+struct TelegramNotifyConfig: Codable {
+    var enabled: Bool?
+    var botToken: String?
+    var chatId: String?
+    var chatName: String?
+}
+
+struct DingTalkNotifyConfig: Codable {
+    var enabled: Bool?
+    var webhook: String?
+    var secret: String?
+}
+
+struct BarkNotifyConfig: Codable {
+    var enabled: Bool?
+    var url: String?
+    var deviceKey: String?
+}
+
+struct FeishuNotifyConfig: Codable {
+    var enabled: Bool?
+    var webhook: String?
+    var secret: String?
+}
+
+// MARK: - Tenant account check
+
+struct AccountCheckResult: Codable {
+    let totalAccounts: Int?
+    let activeAccounts: Int?
+    let inactiveAccounts: Int?
+    let inactiveAccountNames: [String]?
+
+    var summary: String {
+        let total = totalAccounts ?? 0
+        let active = activeAccounts ?? 0
+        let inactive = inactiveAccounts ?? 0
+        var s = "共 \(total) 个账号，正常 \(active)，异常 \(inactive)"
+        if let names = inactiveAccountNames, !names.isEmpty {
+            s += "：\(names.prefix(5).joined(separator: ", "))"
+            if names.count > 5 { s += "…" }
+        }
+        return s
+    }
+}
+
+// MARK: - AI Chat
+
+enum ChatRole: String, Codable {
+    case user
+    case assistant
+    case system
+}
+
+struct ChatMessage: Identifiable, Equatable {
+    let id: UUID
+    let role: ChatRole
+    var content: String
+    var isStreaming: Bool
+    let time: Date
+
+    init(id: UUID = UUID(), role: ChatRole, content: String, isStreaming: Bool = false, time: Date = Date()) {
+        self.id = id
+        self.role = role
+        self.content = content
+        self.isStreaming = isStreaming
+        self.time = time
+    }
+}
+
+struct AiTenant: Identifiable, Codable, Hashable {
+    let id: String
+    let name: String?
+
+    var displayName: String { (name?.isEmpty == false) ? name! : "Tenant \(id)" }
+}
+
+struct AiChatModel: Identifiable, Codable, Hashable {
+    let id: String
+    let name: String?
+    let description: String?
+    let provider: String?
+    let modelName: String?
+    let enabled: Bool?
+    let tenantId: String?
+
+    var label: String {
+        if let n = name, !n.isEmpty { return n }
+        if let m = modelName, !m.isEmpty { return m }
+        return id
+    }
+}
+
+// MARK: - Domain provider keys
+
+struct DomainProviderBundle: Codable {
+    var cloudflare: CloudflareProviderConfig?
+    var edgeOne: EdgeOneProviderConfig?
+}
+
+struct CloudflareProviderConfig: Codable {
+    var enabled: Bool?
+    var apiToken: String?
+    var email: String?
+    var zoneId: String?
+}
+
+struct EdgeOneProviderConfig: Codable {
+    var enabled: Bool?
+    var secretId: String?
+    var secretKey: String?
+    var region: String?
+}
+
+// MARK: - IP quality check
+
+struct IpCheckConfigModel: Codable {
+    var enabled: Bool?
+    var checkInterval: Int?
+}
+
+struct OperatorVpsConfig: Codable {
+    var enabled: Bool?
+    var serverIp: String?
+    var username: String?
+    var password: String?
+    var sshPort: Int?
+    var type: String?
+}
+
+struct IpSettingsBundle: Codable {
+    var ipCheck: IpCheckConfigModel?
+    var telecom: OperatorVpsConfig?
+    var unicom: OperatorVpsConfig?
+    var mobile: OperatorVpsConfig?
+}
+
+// MARK: - VPN proxy
+
+struct VpnProxyRecord: Identifiable, Equatable {
+    let id: Int64
+    var proxyType: String
+    var proxyHost: String
+    var proxyPort: Int
+    var proxyUsername: String
+    var proxyPassword: String
+    var availableStatus: Int
+
+    var isEnabled: Bool { availableStatus == 1 }
+
+    init?(dict: [String: Any]) {
+        let idNum: Int64?
+        if let i = dict["id"] as? Int64 { idNum = i }
+        else if let i = dict["id"] as? Int { idNum = Int64(i) }
+        else if let i = dict["id"] as? String { idNum = Int64(i) }
+        else { idNum = nil }
+        guard let id = idNum else { return nil }
+        self.id = id
+        self.proxyType = (dict["proxyType"] as? String) ?? "HTTP"
+        self.proxyHost = (dict["proxyHost"] as? String) ?? ""
+        if let p = dict["proxyPort"] as? Int { self.proxyPort = p }
+        else if let p = dict["proxyPort"] as? String { self.proxyPort = Int(p) ?? 0 }
+        else { self.proxyPort = 0 }
+        self.proxyUsername = (dict["proxyUsername"] as? String) ?? ""
+        self.proxyPassword = (dict["proxyPassword"] as? String) ?? ""
+        if let s = dict["availableStatus"] as? Int { self.availableStatus = s }
+        else if let s = dict["availableStatus"] as? String { self.availableStatus = Int(s) ?? 0 }
+        else { self.availableStatus = 0 }
+    }
+}

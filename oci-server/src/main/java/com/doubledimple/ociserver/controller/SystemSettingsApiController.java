@@ -68,6 +68,28 @@ public class SystemSettingsApiController  extends BaseController{
         }
     }
 
+    /**
+     * 聚合返回通知渠道配置（Mac / 原生客户端加载表单用）
+     */
+    @GetMapping("/notifyConfigs")
+    public ResponseEntity<?> notifyConfigs() {
+        try {
+            Map<String, Object> data = new HashMap<>();
+            data.put("telegram", systemConfigService.getTelegramConfig());
+            data.put("dingTalk", systemConfigService.getDingTalkConfig());
+            data.put("bark", systemConfigService.getBarkConfig());
+            data.put("feishu", systemConfigService.getFeishuConfig());
+            Map<String, Object> body = new HashMap<>();
+            body.put("success", true);
+            body.put("data", data);
+            return ResponseEntity.ok(body);
+        } catch (Exception e) {
+            log.error("获取通知配置失败", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(e.getMessage());
+        }
+    }
+
     @PostMapping("/updateTelegramConfig")
     public ResponseEntity<?> updateTelegramConfig(@RequestBody TelegramConfigRequest request) {
         try {
@@ -171,6 +193,28 @@ public class SystemSettingsApiController  extends BaseController{
     }
 
     /**
+     * 聚合返回 IP 质量检测配置（Mac / 原生客户端加载表单用）
+     */
+    @GetMapping("/ipSettingsConfigs")
+    public ResponseEntity<?> ipSettingsConfigs() {
+        try {
+            Map<String, Object> data = new HashMap<>();
+            data.put("ipCheck", systemConfigService.getIpCheckConfig());
+            data.put("telecom", systemConfigService.getVPSConfig("telecom"));
+            data.put("unicom", systemConfigService.getVPSConfig("unicom"));
+            data.put("mobile", systemConfigService.getVPSConfig("mobile"));
+            Map<String, Object> body = new HashMap<>();
+            body.put("success", true);
+            body.put("data", data);
+            return ResponseEntity.ok(body);
+        } catch (Exception e) {
+            log.error("获取 IP 质量检测配置失败", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(e.getMessage());
+        }
+    }
+
+    /**
     * ip质量检测的开关
     */
     @PostMapping("/updateIpCheckConfig")
@@ -202,6 +246,26 @@ public class SystemSettingsApiController  extends BaseController{
             log.error("发送Bark测试消息失败", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .build();
+        }
+    }
+
+    /**
+     * 聚合返回域名服务商密钥配置（Mac / 原生客户端加载表单用）
+     */
+    @GetMapping("/domainProviderConfigs")
+    public ResponseEntity<?> domainProviderConfigs() {
+        try {
+            Map<String, Object> data = new HashMap<>();
+            data.put("cloudflare", systemConfigService.getCloudflareConfig());
+            data.put("edgeOne", systemConfigService.getEdgeOneConfig());
+            Map<String, Object> body = new HashMap<>();
+            body.put("success", true);
+            body.put("data", data);
+            return ResponseEntity.ok(body);
+        } catch (Exception e) {
+            log.error("获取域名服务商配置失败", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(e.getMessage());
         }
     }
 

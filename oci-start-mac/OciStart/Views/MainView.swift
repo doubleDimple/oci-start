@@ -1,140 +1,159 @@
 import SwiftUI
 
-enum Nav: String, Hashable {
-    // 服务管理
-    case dashboard      = "仪表板"
-    case armRecords     = "ARM 区域"
-    case tenants        = "租户管理"
+// MARK: - Navigation (must match Web sidebar.ftl structure & items)
+
+enum Nav: String, Hashable, CaseIterable {
+    // 服务管理 — order mirrors sidebar.ftl
+    case dashboard      = "系统监控"
+    case armRecords     = "OCI 区域"
+    case tenants        = "OCI 租户"
     case instances      = "OCI 实例"
-    case fullBootList   = "一键开机"
+    case email          = "邮件管理"
     case objectStorage  = "对象存储"
-    case aiModels       = "AI 模型"
+    case fullBootList   = "一键开机"
+    case aiModels       = "OCI AI管理"
     case speedTest      = "延迟测试"
     case bootLog        = "开机日志"
-    case otherInstances = "其他云实例"
-    case ociCost        = "费用分析"
-    case ociMonitor     = "流量监控"
-    case addBoot        = "添加开机"
-    case gcpAddBoot     = "GCP 开机"
-    case fullMachineList = "全部机器"
-    case speedAdd       = "测速配置"
-    // VPS 管理
-    case vpsMonitor     = "资源监控"
-    // 域名管理
-    case domainSettings = "域名配置"
+    case gcpAccounts    = "GCP 账号"
+    case otherInstances = "GCP 实例"
+    case azureVms       = "Azure 虚拟机"
+    case azureResources = "Azure 资源"
+    case azureStorage   = "Azure 存储"
+    case azureNetworks  = "Azure 网络"
+    case awsEc2         = "AWS EC2"
+    case awsS3          = "AWS S3"
+    case awsLambda      = "AWS Lambda"
+    case awsRds         = "AWS RDS"
+    // 代理管理
+    case domainSettings = "密钥配置"
     case cloudflare     = "Cloudflare"
     case edgeone        = "EdgeOne"
-    case nginxConfig    = "Nginx 配置"
-    // AI 工具
-    case aiChat         = "AI 对话"
-    // 工具
-    case memo           = "便签"
-    case sshTerminal    = "SSH 终端"
-    case mfaBackup      = "MFA 备份"
-    case email          = "邮件管理"
+    // VPS
+    case vpsMonitor     = "实例列表"
     // 系统管理
-    case ipSettings     = "IP 设置"
+    case ipSettings     = "质量检测"
     case sysLog         = "系统日志"
-    case vpnProxy       = "VPN 代理"
-    case notifications  = "通知设置"
+    case settings       = "安全管理"
+    case vpnProxy       = "代理配置"
+    // 我的工具
+    case notifications  = "通知管理"
+    case memo           = "笔记管理"
     case migration      = "数据迁移"
-    case apiToken       = "API Token"
-    case settings       = "系统设置"
-    case tenantRegionList = "租户区域"
-    case regionSub      = "区域订阅"
-    case networkManage  = "网络管理"
-    case sysHelp        = "系统救援"
-    case metrics        = "监控管理"
+    case mfaBackup      = "MFA 备份"
+    // 开发者
+    case apiToken       = "Token 配置"
 
     var icon: String {
         switch self {
         case .dashboard:        return "chart.pie.fill"
-        case .armRecords:       return "map"
+        case .armRecords:       return "globe"
         case .tenants:          return "person.2.fill"
         case .instances:        return "server.rack"
-        case .fullBootList:     return "play.circle.fill"
-        case .objectStorage:    return "externaldrive.fill"
-        case .aiModels:         return "brain"
-        case .speedTest:        return "speedometer"
-        case .bootLog:          return "doc.text.magnifyingglass"
-        case .otherInstances:   return "cloud"
-        case .ociCost:          return "dollarsign.circle"
-        case .ociMonitor:       return "chart.line.uptrend.xyaxis"
-        case .addBoot:          return "plus.circle.fill"
-        case .gcpAddBoot:       return "g.circle.fill"
-        case .fullMachineList:  return "list.bullet.rectangle"
-        case .speedAdd:         return "speedometer"
-        case .vpsMonitor:       return "display.2"
-        case .domainSettings:   return "globe"
-        case .cloudflare:       return "shield.checkerboard"
-        case .edgeone:          return "network"
-        case .nginxConfig:      return "server.rack"
-        case .aiChat:           return "bubble.left.and.bubble.right.fill"
-        case .memo:             return "note.text"
-        case .sshTerminal:      return "terminal.fill"
-        case .mfaBackup:        return "lock.shield.fill"
         case .email:            return "envelope.fill"
-        case .ipSettings:       return "network.badge.shield.half.filled"
+        case .objectStorage:    return "externaldrive.fill"
+        case .fullBootList:     return "play.circle.fill"
+        case .aiModels:         return "cpu"
+        case .speedTest:        return "gauge"
+        case .bootLog:          return "doc.text.magnifyingglass"
+        case .gcpAccounts:      return "person.crop.circle"
+        case .otherInstances:   return "cloud"
+        case .azureVms:         return "desktopcomputer"
+        case .azureResources:   return "square.stack.3d.up"
+        case .azureStorage:     return "externaldrive"
+        case .azureNetworks:    return "network"
+        case .awsEc2:           return "server.rack"
+        case .awsS3:            return "icloud"
+        case .awsLambda:        return "function"
+        case .awsRds:           return "cylinder"
+        case .domainSettings:   return "key.fill"
+        case .cloudflare:       return "shield.lefthalf.fill"
+        case .edgeone:          return "globe"
+        case .vpsMonitor:       return "list.bullet"
+        case .ipSettings:       return "checkmark.shield"
         case .sysLog:           return "doc.text"
+        case .settings:         return "slider.horizontal.3"
         case .vpnProxy:         return "arrow.triangle.branch"
         case .notifications:    return "bell.fill"
+        case .memo:             return "book"
         case .migration:        return "arrow.left.arrow.right"
+        case .mfaBackup:        return "lock.shield.fill"
         case .apiToken:         return "key.fill"
-        case .settings:         return "gear"
-        case .tenantRegionList: return "mappin.and.ellipse"
-        case .regionSub:        return "map.fill"
-        case .networkManage:    return "point.3.connected.trianglepath.dotted"
-        case .sysHelp:          return "lifepreserver.fill"
-        case .metrics:          return "chart.bar.xaxis"
         }
     }
+
+    var searchKeywords: String { "\(rawValue) \(icon)" }
 }
 
-private struct NavSection {
+private struct NavSection: Identifiable {
+    let id: String
     let title: String
     let items: [Nav]
 }
 
+/// Exactly aligned with oci-server/.../sidebar.ftl section order & entries
 private let navSections: [NavSection] = [
-    NavSection(title: "服务管理", items: [
-        .dashboard, .armRecords, .tenants, .instances,
-        .fullBootList, .addBoot, .gcpAddBoot, .fullMachineList, .speedAdd,
-        .objectStorage, .aiModels, .speedTest, .bootLog,
-        .otherInstances, .ociCost, .ociMonitor
+    NavSection(id: "service", title: "服务管理", items: [
+        .dashboard, .armRecords, .tenants, .instances, .email,
+        .objectStorage, .fullBootList, .aiModels, .speedTest, .bootLog,
+        .gcpAccounts, .otherInstances,
+        .azureVms, .azureResources, .azureStorage, .azureNetworks,
+        .awsEc2, .awsS3, .awsLambda, .awsRds
     ]),
-    NavSection(title: "VPS 管理", items: [.vpsMonitor]),
-    NavSection(title: "域名管理", items: [.domainSettings, .cloudflare, .edgeone, .nginxConfig]),
-    NavSection(title: "AI 工具", items: [.aiChat]),
-    NavSection(title: "工具", items: [.memo, .sshTerminal, .mfaBackup, .email]),
-    NavSection(title: "系统管理", items: [
-        .ipSettings, .sysLog, .vpnProxy, .notifications,
-        .migration, .apiToken, .settings,
-        .tenantRegionList, .regionSub, .networkManage,
-        .sysHelp, .metrics
+    NavSection(id: "proxy", title: "代理管理", items: [
+        .domainSettings, .cloudflare, .edgeone
+    ]),
+    NavSection(id: "vps", title: "VPS管理", items: [
+        .vpsMonitor
+    ]),
+    NavSection(id: "system", title: "系统管理", items: [
+        .ipSettings, .sysLog, .settings, .vpnProxy
+    ]),
+    NavSection(id: "tools", title: "我的工具", items: [
+        .notifications, .memo, .migration, .mfaBackup
+    ]),
+    NavSection(id: "dev", title: "开发者配置", items: [
+        .apiToken
     ]),
 ]
 
+// MARK: - Main shell
+
 struct MainView: View {
     @EnvironmentObject var appState: AppState
-    @State private var selection: Nav? = .dashboard
+    @Environment(\.colorScheme) private var scheme
+
+    @State private var searchText = ""
+    @State private var sidebarCollapsed = false
+    @State private var expandedSections: Set<String> = Set(navSections.map(\.id))
+
+    private var selectionBinding: Binding<Nav?> {
+        Binding(
+            get: { appState.selectedNav },
+            set: { appState.selectedNav = $0 }
+        )
+    }
+
+    private var filteredSections: [NavSection] {
+        let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !q.isEmpty else { return navSections }
+        return navSections.compactMap { section in
+            let items = section.items.filter {
+                $0.rawValue.lowercased().contains(q) || $0.searchKeywords.lowercased().contains(q)
+            }
+            return items.isEmpty ? nil : NavSection(id: section.id, title: section.title, items: items)
+        }
+    }
 
     var body: some View {
         NavigationView {
             sidebar
-            detailView(for: selection ?? .dashboard)
+            detailView(for: appState.selectedNav ?? .dashboard)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(AppTheme.pageBg(scheme).ignoresSafeArea())
+                .id(appState.selectedNav)
         }
-        .frame(minWidth: 1020, minHeight: 620)
-        .overlay(
-            Group {
-                if let msg = appState.toastMessage {
-                    ToastView(message: msg)
-                        .padding(.bottom, 20)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                        .animation(.spring(), value: appState.toastMessage)
-                }
-            },
-            alignment: .bottom
-        )
+        .frame(minWidth: 1020, minHeight: 640)
+        .overlay(toastOverlay, alignment: .bottom)
         .alert(isPresented: Binding(
             get: { appState.errorMessage != nil },
             set: { if !$0 { appState.errorMessage = nil } }
@@ -145,88 +164,178 @@ struct MainView: View {
                 dismissButton: .default(Text("确定")) { appState.errorMessage = nil }
             )
         }
+        .onAppear {
+            // Map legacy nav raw values if needed
+            if appState.selectedNav == nil { appState.selectedNav = .dashboard }
+        }
     }
 
-    // MARK: - Sidebar
+    // MARK: Sidebar
 
     private var sidebar: some View {
-        List(selection: $selection) {
-            ForEach(navSections, id: \.title) { section in
-                Section(header: Text(section.title)) {
-                    ForEach(section.items, id: \.self) { item in
-                        Label(item.rawValue, systemImage: item.icon)
-                            .tag(item)
+        VStack(spacing: 0) {
+            if !sidebarCollapsed {
+                HStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(AppTheme.muted(scheme))
+                        .font(.system(size: 12))
+                    TextField("搜索菜单…", text: $searchText)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 12))
+                    if !searchText.isEmpty {
+                        Button(action: { searchText = "" }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(AppTheme.muted(scheme))
+                                .font(.system(size: 11))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background(RoundedRectangle(cornerRadius: 8).fill(AppTheme.elevated(scheme)))
+                .padding(.horizontal, 10)
+                .padding(.top, 10)
+                .padding(.bottom, 6)
+            }
+
+            List(selection: selectionBinding) {
+                ForEach(filteredSections) { section in
+                    Section(header: sectionHeader(section)) {
+                        if searchText.isEmpty ? expandedSections.contains(section.id) : true {
+                            ForEach(section.items, id: \.self) { item in
+                                Label {
+                                    if !sidebarCollapsed {
+                                        Text(item.rawValue).font(.system(size: 13))
+                                    }
+                                } icon: {
+                                    Image(systemName: item.icon).font(.system(size: 12))
+                                }
+                                .tag(item)
+                                .help(item.rawValue)
+                            }
+                        }
+                    }
+                }
+                if filteredSections.isEmpty {
+                    Text("无匹配菜单")
+                        .font(.caption)
+                        .foregroundColor(AppTheme.muted(scheme))
+                }
+            }
+            .listStyle(.sidebar)
+
+            Divider()
+            HStack {
+                if !sidebarCollapsed {
+                    Text("OCI-START")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(AppTheme.muted(scheme))
+                    Spacer()
+                }
+                Button(action: {
+                    withAnimation(.easeInOut(duration: 0.2)) { sidebarCollapsed.toggle() }
+                }) {
+                    Image(systemName: sidebarCollapsed ? "sidebar.left" : "sidebar.leading")
+                        .font(.system(size: 13))
+                        .foregroundColor(AppTheme.muted(scheme))
+                }
+                .buttonStyle(.plain)
+                if sidebarCollapsed { Spacer(minLength: 0) }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+        }
+        .frame(minWidth: sidebarCollapsed ? 56 : 180,
+               idealWidth: sidebarCollapsed ? 56 : 200,
+               maxWidth: sidebarCollapsed ? 64 : 240)
+        .background(AppTheme.surface(scheme))
+    }
+
+    private func sectionHeader(_ section: NavSection) -> some View {
+        Button(action: {
+            if searchText.isEmpty {
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    if expandedSections.contains(section.id) {
+                        expandedSections.remove(section.id)
+                    } else {
+                        expandedSections.insert(section.id)
+                    }
+                }
+            }
+        }) {
+            HStack(spacing: 4) {
+                if !sidebarCollapsed {
+                    Text(section.title)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(AppTheme.muted(scheme))
+                    Spacer()
+                    if searchText.isEmpty {
+                        Image(systemName: expandedSections.contains(section.id) ? "chevron.down" : "chevron.right")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(AppTheme.muted(scheme))
                     }
                 }
             }
         }
-        .listStyle(.sidebar)
-        .frame(minWidth: 170, maxWidth: 200)
+        .buttonStyle(.plain)
     }
 
-    // MARK: - Detail routing
+    @ViewBuilder
+    private var toastOverlay: some View {
+        if let msg = appState.toastMessage {
+            AppToastView(message: msg)
+                .padding(.bottom, 22)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .animation(.spring(), value: appState.toastMessage)
+        }
+    }
+
+    // MARK: Detail routing — paths match web sidebar hrefs
 
     @ViewBuilder
     private func detailView(for nav: Nav) -> some View {
         switch nav {
-        // Native views
+        // Native
         case .dashboard:        DashboardView()
         case .armRecords:       ArmRecordsView()
         case .tenants:          TenantListView()
+        case .gcpAccounts:      TenantListView() // web: same /tenants/list
         case .instances:        InstancesView()
         case .objectStorage:    ObjectStorageView()
+        case .fullBootList:     BootTasksView()
         case .vpsMonitor:       VpsMonitorView()
         case .memo:             MemoView()
         case .notifications:    NotificationSettingsView()
         case .apiToken:         ApiTokenView()
         case .settings:         SettingsView()
         case .mfaBackup:        MfaBackupView()
-        // Embedded web pages — 服务管理
-        case .fullBootList:     EmbeddedPage(title: "一键开机", path: "/boot/fullBootList")
-        case .addBoot:          EmbeddedPage(title: "添加开机", path: "/tenants/bootPage")
-        case .gcpAddBoot:       EmbeddedPage(title: "GCP 开机", path: "/tenants/gcpBootPage")
-        case .fullMachineList:  EmbeddedPage(title: "全部机器", path: "/tenants/bootList")
-        case .speedAdd:         EmbeddedPage(title: "测速配置", path: "/tenants/addSpeed")
-        case .aiModels:         EmbeddedPage(title: "AI 模型配置", path: "/system/ai/models")
-        case .speedTest:        EmbeddedPage(title: "延迟测试", path: "/delayTest")
-        case .bootLog:          EmbeddedPage(title: "开机日志", path: "/system/openLogs")
-        case .otherInstances:   EmbeddedPage(title: "其他云实例", path: "/other/instances/list")
-        case .ociCost:          EmbeddedPage(title: "费用分析", path: "/cost/costPage")
-        case .ociMonitor:       EmbeddedPage(title: "流量监控", path: "/monitor/homePage")
-        // Embedded web pages — 域名管理
-        case .domainSettings:   EmbeddedPage(title: "域名配置", path: "/system/domainSettings")
-        case .cloudflare:       EmbeddedPage(title: "Cloudflare DNS", path: "/dns/cloudflare")
-        case .edgeone:          EmbeddedPage(title: "EdgeOne DNS", path: "/dns/edgeone")
-        case .nginxConfig:      EmbeddedPage(title: "Nginx 配置", path: "/nginx/management")
-        // Embedded web pages — AI / 工具
-        case .aiChat:           EmbeddedPage(title: "AI 对话", path: "/ai/chat")
-        case .sshTerminal:      EmbeddedPage(title: "SSH 终端", path: "/ssh/terminal")
-        case .email:            EmbeddedPage(title: "邮件管理", path: "/email/management")
-        // Embedded web pages — 系统管理
-        case .ipSettings:       EmbeddedPage(title: "IP 设置", path: "/system/ipSettings")
-        case .sysLog:           EmbeddedPage(title: "系统日志", path: "/main?path=/system/logs&active=api-logs")
-        case .vpnProxy:         EmbeddedPage(title: "VPN 代理", path: "/vpnProxy/page")
-        case .migration:        EmbeddedPage(title: "数据迁移", path: "/migration/migPage")
-        case .tenantRegionList: EmbeddedPage(title: "租户区域", path: "/tenants/regionList")
-        case .regionSub:        EmbeddedPage(title: "区域订阅", path: "/tenants/regionSubList")
-        case .networkManage:    EmbeddedPage(title: "网络管理", path: "/oci/vnic/manage")
-        case .sysHelp:          EmbeddedPage(title: "系统救援", path: "/oci/sysHelp")
-        case .metrics:          EmbeddedPage(title: "监控管理", path: "/oci/metricsPage")
+        // Web content pages (sidebar targets)
+        case .email:            EmailManageView()
+        case .aiModels:         AiModelsHubView()
+        case .speedTest:        SpeedTestView()
+        case .bootLog:          SystemLogView(isBootLog: true)
+        case .otherInstances:   EmbeddedPage(title: "GCP 实例", path: "/other/instances/list")
+        case .azureVms:         EmbeddedPage(title: "Azure 虚拟机", path: "/azure/vms")
+        case .azureResources:   EmbeddedPage(title: "Azure 资源", path: "/azure/resources")
+        case .azureStorage:     EmbeddedPage(title: "Azure 存储", path: "/azure/storage")
+        case .azureNetworks:    EmbeddedPage(title: "Azure 网络", path: "/azure/networks")
+        case .awsEc2:           EmbeddedPage(title: "AWS EC2", path: "/aws/ec2")
+        case .awsS3:            EmbeddedPage(title: "AWS S3", path: "/aws/s3")
+        case .awsLambda:        EmbeddedPage(title: "AWS Lambda", path: "/aws/lambda")
+        case .awsRds:           EmbeddedPage(title: "AWS RDS", path: "/aws/rds")
+        case .domainSettings:   DomainSettingsView()
+        case .cloudflare:       CloudflareDnsView()
+        case .edgeone:          EdgeOneDnsView()
+        case .ipSettings:       IpSettingsView()
+        case .sysLog:           SystemLogView(isBootLog: false)
+        case .vpnProxy:         VpnProxyView()
+        case .migration:        MigrationView()
         }
     }
 }
 
-// MARK: - Toast
-
 struct ToastView: View {
     let message: String
-    var body: some View {
-        Text(message)
-            .font(.callout)
-            .padding(.horizontal, 18).padding(.vertical, 9)
-            .background(Color.accentColor)
-            .foregroundColor(.white)
-            .clipShape(Capsule())
-            .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
-    }
+    var body: some View { AppToastView(message: message) }
 }

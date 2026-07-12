@@ -369,6 +369,55 @@
             background:#4d9eff!important;color:#fff!important;border:none!important}
         [data-theme="dark"] footer a{color:var(--muted)!important}
 
+        /* --- 左侧角色：哭脸表情 --- */
+        #heroSvg .mouth-sad,
+        #heroSvg .tears{opacity:0;pointer-events:none;transition:opacity .28s ease}
+        #heroSvg .mouth-happy{opacity:1;transition:opacity .28s ease}
+        #heroSvg.is-crying .mouth-happy{opacity:0}
+        #heroSvg.is-crying .mouth-sad,
+        #heroSvg.is-crying .tears{opacity:1}
+        #heroSvg.is-crying .tears .tear{
+            transform-box:fill-box;
+            transform-origin:center top;
+            animation:heroTearDrop 1.1s ease-in infinite;
+        }
+        #heroSvg.is-crying .tears .tear:nth-child(2){animation-delay:.18s}
+        #heroSvg.is-crying .tears .tear:nth-child(3){animation-delay:.36s}
+        #heroSvg.is-crying .tears .tear:nth-child(4){animation-delay:.12s}
+        #heroSvg.is-crying .tears .tear:nth-child(5){animation-delay:.28s}
+        #heroSvg.is-crying .tears .tear:nth-child(6){animation-delay:.42s}
+        #heroSvg.is-crying .tears .tear:nth-child(7){animation-delay:.2s}
+        #heroSvg.is-crying .tears .tear:nth-child(8){animation-delay:.34s}
+        @keyframes heroTearDrop{
+            0%{opacity:0;transform:translateY(0)}
+            20%{opacity:.95}
+            100%{opacity:0;transform:translateY(14px)}
+        }
+        #heroSvg.is-crying{animation:heroCryShake .45s ease}
+        @keyframes heroCryShake{
+            0%,100%{transform:translateX(0)}
+            25%{transform:translateX(-3px)}
+            75%{transform:translateX(3px)}
+        }
+
+        /* 空输入框抖动提示 */
+        .form-control.input-shake{
+            animation:inputShake .45s ease;
+            border-bottom-color:#ef4444 !important;
+        }
+        @keyframes inputShake{
+            0%,100%{transform:translateX(0)}
+            15%{transform:translateX(-8px)}
+            30%{transform:translateX(8px)}
+            45%{transform:translateX(-6px)}
+            60%{transform:translateX(6px)}
+            75%{transform:translateX(-3px)}
+            90%{transform:translateX(3px)}
+        }
+        [data-theme="dark"] .form-control.input-shake{
+            border-bottom-color:#f87171 !important;
+        }
+
     </style>
 </head>
 <body>
@@ -384,51 +433,85 @@
             <section class="hero-panel" aria-hidden="true">
                 <div class="hero-inner">
                     <svg id="heroSvg" viewBox="0 0 520 520" xmlns="http://www.w3.org/2000/svg">
-
-
+                        <!-- 紫色角色 -->
                         <g>
                             <rect x="160" y="130" width="170" height="260" rx="18" fill="#5B3DF6"/>
                             <circle cx="215" cy="198" r="14" fill="#FFFFFF"/>
                             <circle cx="275" cy="198" r="14" fill="#FFFFFF"/>
                             <circle data-pupil="1" data-max="6" cx="215" cy="198" r="5.5" fill="#111827"/>
                             <circle data-pupil="1" data-max="6" cx="275" cy="198" r="5.5" fill="#111827"/>
-                            <path d="M232 230 C246 240 260 240 274 230" fill="none" stroke="#111827" stroke-width="8" stroke-linecap="round"/>
+                            <path class="mouth-happy" d="M232 230 C246 240 260 240 274 230" fill="none" stroke="#111827" stroke-width="8" stroke-linecap="round"/>
+                            <path class="mouth-sad" d="M232 244 C246 232 260 232 274 244" fill="none" stroke="#111827" stroke-width="8" stroke-linecap="round"/>
+                            <g class="tears">
+                                <ellipse class="tear" cx="208" cy="218" rx="3.2" ry="5" fill="#7DD3FC"/>
+                                <ellipse class="tear" cx="282" cy="218" rx="3.2" ry="5" fill="#7DD3FC"/>
+                            </g>
                         </g>
 
+                        <!-- 黑色角色 -->
                         <g>
                             <rect x="320" y="175" width="70" height="215" rx="16" fill="#111827"/>
                             <circle cx="342" cy="230" r="10" fill="#FFFFFF"/>
                             <circle cx="368" cy="230" r="10" fill="#FFFFFF"/>
                             <circle data-pupil="1" data-max="5" cx="342" cy="230" r="4" fill="#111827"/>
                             <circle data-pupil="1" data-max="5" cx="368" cy="230" r="4" fill="#111827"/>
+                            <path class="mouth-happy" d="M346 252 L364 252" fill="none" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" opacity=".55"/>
+                            <path class="mouth-sad" d="M346 258 C352 252 358 252 364 258" fill="none" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round"/>
+                            <g class="tears">
+                                <ellipse class="tear" cx="338" cy="245" rx="2.4" ry="4" fill="#7DD3FC"/>
+                                <ellipse class="tear" cx="372" cy="245" rx="2.4" ry="4" fill="#7DD3FC"/>
+                            </g>
                         </g>
 
+                        <!-- 黄色角色 -->
                         <g>
                             <rect x="396" y="220" width="108" height="190" rx="44" fill="#F4C21A"/>
-                            <path d="M434 270 L486 270" stroke="#111827" stroke-width="8" stroke-linecap="round"/>
+                            <circle cx="430" cy="268" r="12" fill="#FFFFFF"/>
+                            <circle cx="470" cy="268" r="12" fill="#FFFFFF"/>
+                            <circle data-pupil="1" data-max="5" cx="430" cy="268" r="4.5" fill="#111827"/>
+                            <circle data-pupil="1" data-max="5" cx="470" cy="268" r="4.5" fill="#111827"/>
+                            <path class="mouth-happy" d="M434 298 L486 298" stroke="#111827" stroke-width="8" stroke-linecap="round"/>
+                            <path class="mouth-sad" d="M438 308 C452 296 468 296 482 308" fill="none" stroke="#111827" stroke-width="8" stroke-linecap="round"/>
+                            <g class="tears">
+                                <ellipse class="tear" cx="424" cy="286" rx="3" ry="4.5" fill="#38BDF8"/>
+                                <ellipse class="tear" cx="476" cy="286" rx="3" ry="4.5" fill="#38BDF8"/>
+                            </g>
                         </g>
 
+                        <!-- 橙色角色 -->
                         <g>
                             <path d="M70 410 C70 320 140 250 230 250 C320 250 390 320 390 410" fill="#FF7A3B"/>
                             <circle cx="160" cy="332" r="16" fill="#FFFFFF"/>
                             <circle cx="220" cy="332" r="16" fill="#FFFFFF"/>
                             <circle data-pupil="1" data-max="6" cx="160" cy="332" r="6" fill="#111827"/>
                             <circle data-pupil="1" data-max="6" cx="220" cy="332" r="6" fill="#111827"/>
-                            <path d="M170 368 C186 386 210 386 226 368" fill="none" stroke="#111827" stroke-width="10" stroke-linecap="round"/>
+                            <path class="mouth-happy" d="M170 368 C186 386 210 386 226 368" fill="none" stroke="#111827" stroke-width="10" stroke-linecap="round"/>
+                            <path class="mouth-sad" d="M170 386 C186 368 210 368 226 386" fill="none" stroke="#111827" stroke-width="10" stroke-linecap="round"/>
+                            <g class="tears">
+                                <ellipse class="tear" cx="152" cy="354" rx="3.5" ry="5.5" fill="#7DD3FC"/>
+                                <ellipse class="tear" cx="228" cy="354" rx="3.5" ry="5.5" fill="#7DD3FC"/>
+                            </g>
                         </g>
+
+                        <!-- oci-start 小条 -->
                         <g id="ociBuddy">
                             <rect x="10" y="350" width="140" height="60" rx="20" fill="#111827" opacity="0.92"/>
                             <circle cx="62" cy="372" r="12" fill="#FFFFFF"/>
                             <circle cx="98" cy="372" r="12" fill="#FFFFFF"/>
                             <circle data-pupil="1" data-max="8" cx="62" cy="372" r="5.5" fill="#111827"/>
                             <circle data-pupil="1" data-max="8" cx="98" cy="372" r="5.5" fill="#111827"/>
+                            <path class="mouth-happy" d="M70 388 C76 392 84 392 90 388" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" opacity=".7"/>
+                            <path class="mouth-sad" d="M70 392 C76 388 84 388 90 392" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round"/>
+                            <g class="tears">
+                                <ellipse class="tear" cx="58" cy="386" rx="2.2" ry="3.5" fill="#7DD3FC"/>
+                                <ellipse class="tear" cx="102" cy="386" rx="2.2" ry="3.5" fill="#7DD3FC"/>
+                            </g>
                             <text x="80" y="398" text-anchor="middle"
                                   font-size="15"
                                   font-family="system-ui, -apple-system, Segoe UI, Roboto"
                                   font-weight="900"
                                   fill="#FFFFFF">oci-start</text>
                         </g>
-
 
                         <g opacity=".22">
                             <path d="M62 118 L98 94" stroke="#111827" stroke-width="8" stroke-linecap="round"/>
@@ -456,7 +539,7 @@
                         </div>
                     </#if>
 
-                    <form id="loginForm" method="post" action="/perform_login" class="auth-form ${(allowRegister?? && allowRegister)?string('active','auth-form-single')}">
+                    <form id="loginForm" method="post" action="/perform_login" novalidate class="auth-form ${(allowRegister?? && allowRegister)?string('active','auth-form-single')}">
                         <#if turnstileEnabled?? && turnstileEnabled>
                         <div id="turnstileContainer" style="margin-bottom:18px;text-align:center;">
                             <div class="cf-turnstile"
@@ -719,22 +802,225 @@
 </script>
 <script>
     function setLocale(code){var u=new URL(window.location.href);var c1=code;var c2=String(code).replace('_','-');u.searchParams.set('lang',c1);u.searchParams.set('locale',c1);u.searchParams.set('kc_locale',c2);u.searchParams.set('ui_locales',c2);window.location.href=u.toString()}
-    (function(){function init(){var svg=document.getElementById('heroSvg');if(!svg)return;var host=document.querySelector('.hero-panel');if(!host)return;var pupils=[].slice.call(svg.querySelectorAll('[data-pupil]')).map(function(el){return{el:el,parent:el.parentNode,baseX:parseFloat(el.getAttribute('cx')||0),baseY:parseFloat(el.getAttribute('cy')||0),max:parseFloat(el.getAttribute('data-max')||6),ox:0,oy:0}});var cx=null,cy=null;function onMove(e){var p=(e.touches&&e.touches[0])?e.touches[0]:e;cx=p.clientX;cy=p.clientY}
-        function clear(){cx=null;cy=null}
-        function tick(){pupils.forEach(function(p){var dx=0,dy=0;if(cx!=null){var pt=svg.createSVGPoint();pt.x=cx;pt.y=cy;var m=p.parent&&p.parent.getScreenCTM?p.parent.getScreenCTM():null;if(m){var lp=pt.matrixTransform(m.inverse());dx=lp.x-p.baseX;dy=lp.y-p.baseY}}var d=Math.sqrt(dx*dx+dy*dy)||1;var mm=Math.min(p.max,d);var tx=dx/d*mm;var ty=dy/d*mm;p.ox+=(tx-p.ox)*0.40;p.oy+=(ty-p.oy)*0.40;p.el.setAttribute('transform','translate('+p.ox.toFixed(3)+' '+p.oy.toFixed(3)+')')});requestAnimationFrame(tick)}
-        host.addEventListener('mousemove',onMove,{passive:true});host.addEventListener('pointermove',onMove,{passive:true});host.addEventListener('touchmove',onMove,{passive:true});host.addEventListener('mouseleave',clear,{passive:true});host.addEventListener('pointerleave',clear,{passive:true});host.addEventListener('touchend',clear,{passive:true});requestAnimationFrame(tick)}
-        if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',init)}else{init()}})();
-</script>
-<script src="/js/login/login_user_v1.js">
-    (function(){
-        const pupils = Array.from(document.querySelectorAll('[data-pupil="1"]'));
-        pupils.forEach(p => {
-            const cx = parseFloat(p.getAttribute('cx'));
-            const cy = parseFloat(p.getAttribute('cy'));
-            p.dataset.cx = String(cx);
-            p.dataset.cy = String(cy);
-        });
+
+    /**
+     * 左侧 SVG 角色：
+     * - 眼球跟踪鼠标 / 输入框
+     * - 密码框害羞低头
+     * - 登录失败哭脸（window.setHeroMood）
+     */
+    (function () {
+        var cryTimer = null;
+        var isCrying = false;
+
+        /** @param {'cry'|'normal'} mood @param {{duration?:number}} [opts] */
+        window.setHeroMood = function (mood, opts) {
+            var svg = document.getElementById('heroSvg');
+            if (!svg) return;
+            if (cryTimer) {
+                clearTimeout(cryTimer);
+                cryTimer = null;
+            }
+            if (mood === 'cry') {
+                isCrying = true;
+                svg.classList.remove('is-crying');
+                // 重触发 shake 动画
+                void svg.offsetWidth;
+                svg.classList.add('is-crying');
+                var duration = (opts && opts.duration) || 4200;
+                cryTimer = setTimeout(function () {
+                    window.setHeroMood('normal');
+                }, duration);
+            } else {
+                isCrying = false;
+                svg.classList.remove('is-crying');
+            }
+        };
+
+        function initEyeTrack() {
+            var svg = document.getElementById('heroSvg');
+            if (!svg) return;
+
+            var formPanel = document.querySelector('.form-panel');
+            var pupils = [].slice.call(svg.querySelectorAll('[data-pupil]')).map(function (el) {
+                return {
+                    el: el,
+                    parent: el.parentNode,
+                    baseX: parseFloat(el.getAttribute('cx') || 0),
+                    baseY: parseFloat(el.getAttribute('cy') || 0),
+                    max: parseFloat(el.getAttribute('data-max') || 6),
+                    ox: 0,
+                    oy: 0
+                };
+            });
+            if (!pupils.length) return;
+
+            var targetX = null;
+            var targetY = null;
+            var hasPointer = false;
+            var focusedInput = null;
+            var shyMode = false;
+
+            function setTarget(x, y) {
+                targetX = x;
+                targetY = y;
+            }
+
+            function clearTarget() {
+                if (!focusedInput) {
+                    targetX = null;
+                    targetY = null;
+                }
+            }
+
+            function lookAtInput(input) {
+                if (!input) return;
+                var rect = input.getBoundingClientRect();
+                var x = rect.left + Math.min(rect.width * 0.35, 48);
+                var y = rect.top + rect.height / 2;
+
+                try {
+                    if (typeof input.selectionStart === 'number' && input.type !== 'password') {
+                        var style = window.getComputedStyle(input);
+                        var mirror = document.createElement('span');
+                        mirror.style.cssText = [
+                            'position:absolute', 'visibility:hidden', 'white-space:pre',
+                            'font:' + style.font, 'letter-spacing:' + style.letterSpacing,
+                            'padding-left:' + style.paddingLeft, 'border-left:' + style.borderLeftWidth + ' solid transparent'
+                        ].join(';');
+                        var text = (input.value || '').slice(0, input.selectionStart);
+                        mirror.textContent = text || '.';
+                        document.body.appendChild(mirror);
+                        var caretOffset = mirror.getBoundingClientRect().width;
+                        document.body.removeChild(mirror);
+                        if (!text) caretOffset = 0;
+                        x = rect.left + parseFloat(style.paddingLeft || 0) + Math.min(caretOffset, rect.width - 12);
+                    }
+                } catch (e) { /* ignore */ }
+
+                if (shyMode) {
+                    x = rect.left + rect.width * 0.5;
+                    y = rect.top + rect.height + 18;
+                }
+
+                setTarget(x, y);
+            }
+
+            function onPointerMove(e) {
+                if (isCrying) return; // 哭脸时低头不追鼠标
+                var p = (e.touches && e.touches[0]) ? e.touches[0] : e;
+                if (typeof p.clientX !== 'number') return;
+                hasPointer = true;
+                if (shyMode && focusedInput) {
+                    lookAtInput(focusedInput);
+                    return;
+                }
+                setTarget(p.clientX, p.clientY);
+            }
+
+            function onPointerLeave() {
+                hasPointer = false;
+                if (focusedInput) {
+                    lookAtInput(focusedInput);
+                } else {
+                    clearTarget();
+                }
+            }
+
+            function isTrackableInput(el) {
+                if (!el || el.tagName !== 'INPUT') return false;
+                var t = (el.type || 'text').toLowerCase();
+                return t === 'text' || t === 'password' || t === 'email' || t === 'tel' || t === 'number' || t === 'search';
+            }
+
+            function onFocusIn(e) {
+                var el = e.target;
+                if (!isTrackableInput(el)) return;
+                if (formPanel && !formPanel.contains(el) && !el.closest('.modal-overlay')) return;
+                focusedInput = el;
+                shyMode = (el.type || '').toLowerCase() === 'password';
+                if (!isCrying) lookAtInput(el);
+            }
+
+            function onFocusOut(e) {
+                if (e.target !== focusedInput) return;
+                focusedInput = null;
+                shyMode = false;
+                if (!hasPointer && !isCrying) clearTarget();
+            }
+
+            function onInputOrSelect(e) {
+                // 用户开始改输入：收起哭脸
+                if (isCrying && isTrackableInput(e.target)) {
+                    window.setHeroMood('normal');
+                }
+                if (e.target === focusedInput && !isCrying) lookAtInput(focusedInput);
+            }
+
+            function tick() {
+                pupils.forEach(function (p) {
+                    var dx = 0, dy = 0;
+                    if (isCrying) {
+                        // 哭脸：瞳孔往下看
+                        dx = 0;
+                        dy = p.max;
+                    } else if (targetX != null && targetY != null) {
+                        var pt = svg.createSVGPoint();
+                        pt.x = targetX;
+                        pt.y = targetY;
+                        var m = p.parent && p.parent.getScreenCTM ? p.parent.getScreenCTM() : null;
+                        if (m) {
+                            var lp = pt.matrixTransform(m.inverse());
+                            dx = lp.x - p.baseX;
+                            dy = lp.y - p.baseY;
+                        }
+                    }
+                    var d = Math.sqrt(dx * dx + dy * dy) || 1;
+                    var mm = Math.min(p.max, d);
+                    var tx = dx / d * mm;
+                    var ty = dy / d * mm;
+                    if (shyMode && !isCrying) {
+                        ty = Math.min(p.max, Math.max(ty, p.max * 0.55));
+                    }
+                    var ease = isCrying ? 0.2 : (focusedInput ? 0.28 : 0.22);
+                    p.ox += (tx - p.ox) * ease;
+                    p.oy += (ty - p.oy) * ease;
+                    if (targetX == null && !isCrying) {
+                        p.ox += (0 - p.ox) * 0.12;
+                        p.oy += (0 - p.oy) * 0.12;
+                    }
+                    p.el.setAttribute('transform', 'translate(' + p.ox.toFixed(3) + ' ' + p.oy.toFixed(3) + ')');
+                });
+                requestAnimationFrame(tick);
+            }
+
+            document.addEventListener('mousemove', onPointerMove, { passive: true });
+            document.addEventListener('pointermove', onPointerMove, { passive: true });
+            document.addEventListener('touchmove', onPointerMove, { passive: true });
+            document.addEventListener('mouseleave', onPointerLeave, { passive: true });
+            window.addEventListener('blur', onPointerLeave, { passive: true });
+
+            document.addEventListener('focusin', onFocusIn, true);
+            document.addEventListener('focusout', onFocusOut, true);
+            document.addEventListener('input', onInputOrSelect, true);
+            document.addEventListener('keyup', onInputOrSelect, true);
+            document.addEventListener('click', onInputOrSelect, true);
+            document.addEventListener('select', onInputOrSelect, true);
+
+            window.addEventListener('resize', function () {
+                if (focusedInput && !isCrying) lookAtInput(focusedInput);
+            }, { passive: true });
+
+            requestAnimationFrame(tick);
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initEyeTrack);
+        } else {
+            initEyeTrack();
+        }
     })();
 </script>
+<script src="/js/login/login_user_v1.js"></script>
 </body>
 </html>

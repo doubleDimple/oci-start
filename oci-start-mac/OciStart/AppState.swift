@@ -33,10 +33,18 @@ final class AppState: ObservableObject {
     // MARK: - VPS Monitor (reuses instances list)
     @Published var vpsLoading = false
 
+    // MARK: - Boot tasks
+    @Published var bootTasks: [BootTask] = []
+    @Published var bootTasksLoading = false
+    @Published var bootRunningCount: Int64 = 0
+
     // MARK: - Global UI
     @Published var errorMessage: String?
     @Published var toastMessage: String?
     @Published var isLoading = false
+
+    /// Sidebar navigation selection (shared for dashboard jumps)
+    @Published var selectedNav: Nav? = .dashboard
 
     var serverURL: String {
         get { UserDefaults.standard.string(forKey: "serverURL") ?? "http://localhost:9856" }
@@ -52,6 +60,10 @@ final class AppState: ObservableObject {
         self.network = net
         self.auth = AuthService(network: net)
         // Session check is now triggered by ContentView after backend is ready
+    }
+
+    func navigate(to nav: Nav) {
+        selectedNav = nav
     }
 
     // MARK: - Auth
@@ -121,9 +133,24 @@ final class AppState: ObservableObject {
         } catch { errorMessage = error.localizedDescription }
     }
 
-    func terminateInstance(_ instanceId: String) async {
+    func sendTerminateCode(_ instanceId: String) async -> Bool {
         do {
-            let r = try await network.terminateInstance(baseURL: serverURL, instanceId: instanceId)
+            let r = try await network.sendTerminateVerificationCode(baseURL: serverURL, instanceId: instanceId)
+            showToast(r.message ?? "验证码已发送")
+            return r.success != false
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    func terminateInstance(_ instanceId: String, verificationCode: String) async {
+        do {
+            let r = try await network.terminateInstance(baseURL: serverURL, instanceId: instanceId, verificationCode: verificationCode)
+            if r.success == false {
+                errorMessage = r.message ?? "终止失败"
+                return
+            }
             showToast(r.message ?? "终止请求已发送")
             await loadInstances()
         } catch { errorMessage = error.localizedDescription }
@@ -133,6 +160,42 @@ final class AppState: ObservableObject {
         do {
             let r = try await network.changeIP(baseURL: serverURL, instanceDetailId: instanceDetailId)
             showToast(r.message ?? "换IP请求已发送")
+            await loadInstances()
+        } catch { errorMessage = error.localizedDescription }
+    }
+
+    func updateInstanceName(_ instanceId: String, newName: String) async {
+        do {
+            let r = try await network.updateInstanceName(baseURL: serverURL, instanceId: instanceId, newName: newName)
+            if r.success == false {
+                errorMessage = r.message ?? "改名失败"
+                return
+            }
+            showToast(r.message ?? "名称已更新")
+            await loadInstances()
+        } catch { errorMessage = error.localizedDescription }
+    }
+
+    func updateInstanceRemark(_ instanceId: String, remark: String) async {
+        do {
+            let r = try await network.updateInstanceRemark(baseURL: serverURL, instanceId: instanceId, remark: remark)
+            if r.success == false {
+                errorMessage = r.message ?? "备注更新失败"
+                return
+            }
+            showToast(r.message ?? "备注已更新")
+            await loadInstances()
+        } catch { errorMessage = error.localizedDescription }
+    }
+
+    func enableIpv6(_ instanceDetailId: String) async {
+        do {
+            let r = try await network.enableIpv6(baseURL: serverURL, instanceDetailId: instanceDetailId)
+            if r.success == false {
+                errorMessage = r.message ?? "IPv6 操作失败"
+                return
+            }
+            showToast(r.message ?? "IPv6 已处理")
             await loadInstances()
         } catch { errorMessage = error.localizedDescription }
     }
@@ -155,8 +218,21 @@ final class AppState: ObservableObject {
     func deleteTenant(_ id: Int64) async {
         do {
             let r = try await network.deleteTenant(baseURL: serverURL, tenantId: id)
+            if r.success == false {
+                errorMessage = r.message ?? "删除失败"
+                return
+            }
             showToast(r.message ?? "已删除")
             await loadTenants()
+        } catch { errorMessage = error.localizedDescription }
+    }
+
+    func checkTenantAccounts() async {
+        tenantsLoading = true
+        defer { tenantsLoading = false }
+        do {
+            let r = try await network.checkTenantAccounts(baseURL: serverURL)
+            showToast(r.summary)
         } catch { errorMessage = error.localizedDescription }
     }
 
@@ -186,6 +262,113 @@ final class AppState: ObservableObject {
         do {
             let r = try await network.deleteObject(baseURL: serverURL, tenantId: tenantId, namespace: namespace, bucketName: bucketName, objectName: objectName)
             showToast(r.message ?? "已删除")
+        } catch { errorMessage = error.localizedDescription }
+    }
+
+    func createBucket(tenantId: Int64, name: String) async {
+        do {
+            let r = try await network.createBucket(baseURL: serverURL, tenantId: tenantId, bucketName: name)
+            if r.success == false {
+                errorMessage = r.message ?? "创建失败"
+                return
+            }
+            showToast(r.message ?? "存储桶已创建")
+            await loadBuckets(tenantId: tenantId)
+        } catch { errorMessage = error.localizedDescription }
+    }
+
+    func uploadObject(tenantId: Int64, namespace: String, bucketName: String, fileURL: URL) async {
+        storageLoading = true
+        defer { storageLoading = false }
+        do {
+            let r = try await network.uploadObject(
+                baseURL: serverURL, tenantId: tenantId, namespace: namespace,
+                bucketName: bucketName, objectName: nil, fileURL: fileURL)
+            if r.success == false {
+                errorMessage = r.message ?? "上传失败"
+                return
+            }
+            showToast(r.message ?? "上传成功")
+            await loadObjects(tenantId: tenantId, namespace: namespace, bucketName: bucketName)
+        } catch { errorMessage = error.localizedDescription }
+    }
+
+    // MARK: - Boot tasks
+
+    func loadBootTasks() async {
+        bootTasksLoading = true
+        defer { bootTasksLoading = false }
+        do {
+            let data = try await network.getBootTasks(baseURL: serverURL)
+            bootTasks = data.list ?? []
+            bootRunningCount = data.runningCount ?? 0
+        } catch NetworkError.unauthorized { isAuthenticated = false }
+        catch { errorMessage = error.localizedDescription }
+    }
+
+    func startBootTask(_ id: Int64) async {
+        do {
+            let r = try await network.startBootTask(baseURL: serverURL, bootId: id)
+            showToast(r.message ?? "已启动")
+            await loadBootTasks()
+        } catch { errorMessage = error.localizedDescription }
+    }
+
+    func stopBootTask(_ id: Int64) async {
+        do {
+            let r = try await network.stopBootTask(baseURL: serverURL, bootId: id)
+            showToast(r.message ?? "已停止")
+            await loadBootTasks()
+        } catch { errorMessage = error.localizedDescription }
+    }
+
+    func deleteBootTask(_ id: Int64) async {
+        do {
+            let r = try await network.deleteBootTask(baseURL: serverURL, bootId: id)
+            showToast(r.message ?? "已删除")
+            await loadBootTasks()
+        } catch { errorMessage = error.localizedDescription }
+    }
+
+    func batchStartBoots() async {
+        do {
+            let r = try await network.batchStartBoots(baseURL: serverURL)
+            showToast(r.message ?? "批量启动已提交")
+            await loadBootTasks()
+        } catch { errorMessage = error.localizedDescription }
+    }
+
+    func batchStopBoots() async {
+        do {
+            let r = try await network.batchStopBoots(baseURL: serverURL)
+            showToast(r.message ?? "批量停止已提交")
+            await loadBootTasks()
+        } catch { errorMessage = error.localizedDescription }
+    }
+
+    // MARK: - VPS ping
+
+    func vpsEnablePing() async {
+        do {
+            let r = try await network.enablePingBatch(baseURL: serverURL)
+            showToast(r.message ?? "已启用 Ping")
+            await loadInstances()
+        } catch { errorMessage = error.localizedDescription }
+    }
+
+    func vpsDisablePing() async {
+        do {
+            let r = try await network.disablePingBatch(baseURL: serverURL)
+            showToast(r.message ?? "已停用 Ping")
+            await loadInstances()
+        } catch { errorMessage = error.localizedDescription }
+    }
+
+    func vpsPingNow() async {
+        do {
+            let r = try await network.pingInstances(baseURL: serverURL)
+            showToast(r.message ?? "Ping 完成")
+            await loadInstances()
         } catch { errorMessage = error.localizedDescription }
     }
 

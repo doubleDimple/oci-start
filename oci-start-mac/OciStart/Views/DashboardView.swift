@@ -11,6 +11,7 @@ struct DashboardView: View {
             VStack(alignment: .leading, spacing: 24) {
                 pageHeader
                 statsGrid
+                quickLinks
                 instanceSection
                 Spacer(minLength: 0)
             }
@@ -23,6 +24,7 @@ struct DashboardView: View {
                 Button(action: { Task {
                     await appState.loadDashboard()
                     await appState.loadInstances()
+                    await appState.loadTenants()
                 }}) {
                     Label("刷新", systemImage: "arrow.clockwise")
                 }
@@ -36,17 +38,54 @@ struct DashboardView: View {
         }
     }
 
-    // MARK: - Colors (mirrors dashboard.css)
-    private var dbBg:      Color { scheme == .dark ? Color(hex: "1a1d21") : Color(hex: "f0f4f8") }
-    private var surface:   Color { scheme == .dark ? Color(hex: "22262b") : Color.white }
-    private var border:    Color { scheme == .dark ? Color(hex: "31363d") : Color(hex: "dde3ec") }
-    private var textPrim:  Color { scheme == .dark ? Color(hex: "cdd9e5") : Color(hex: "1a202c") }
-    private var textMuted: Color { scheme == .dark ? Color(hex: "768390") : Color(hex: "64748b") }
-    private var dbBlue:    Color { scheme == .dark ? Color(hex: "4d9eff") : Color(hex: "2563eb") }
-    private var dbGreen:   Color { scheme == .dark ? Color(hex: "3fb950") : Color(hex: "16a34a") }
-    private var dbOrange:  Color { scheme == .dark ? Color(hex: "f78166") : Color(hex: "ea580c") }
-    private var dbRed:     Color { scheme == .dark ? Color(hex: "ff6b6b") : Color(hex: "dc2626") }
-    private var dbCyan:    Color { scheme == .dark ? Color(hex: "39c5cf") : Color(hex: "0891b2") }
+    // MARK: - Quick links
+    private var quickLinks: some View {
+        HStack(spacing: 12) {
+            quickBtn("OCI 实例", icon: "server.rack", color: dbBlue) {
+                appState.navigate(to: .instances)
+            }
+            quickBtn("OCI 租户", icon: "person.2.fill", color: dbGreen) {
+                appState.navigate(to: .tenants)
+            }
+            quickBtn("一键开机", icon: "play.circle.fill", color: dbOrange) {
+                appState.navigate(to: .fullBootList)
+            }
+            quickBtn("对象存储", icon: "externaldrive.fill", color: dbCyan) {
+                appState.navigate(to: .objectStorage)
+            }
+            Spacer()
+        }
+    }
+
+    private func quickBtn(_ title: String, icon: String, color: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .foregroundColor(color)
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(textPrim)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(surface)
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(border, lineWidth: 1))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Colors (AppTheme — mirrors dashboard.css / web tokens)
+    private var dbBg:      Color { AppTheme.pageBg(scheme) }
+    private var surface:   Color { AppTheme.surface(scheme) }
+    private var border:    Color { AppTheme.border(scheme) }
+    private var textPrim:  Color { AppTheme.text(scheme) }
+    private var textMuted: Color { AppTheme.muted(scheme) }
+    private var dbBlue:    Color { AppTheme.accent(scheme) }
+    private var dbGreen:   Color { AppTheme.success }
+    private var dbOrange:  Color { AppTheme.warning }
+    private var dbRed:     Color { AppTheme.danger }
+    private var dbCyan:    Color { AppTheme.cyan }
 
     // MARK: - Page Header
     private var pageHeader: some View {
@@ -160,30 +199,42 @@ struct DashboardView: View {
                     .frame(height: 80)
             } else {
                 HStack(spacing: 12) {
-                    instanceBadge(
-                        label: "全部",
-                        value: appState.instances.count,
-                        fg: textPrim,
-                        bg: border.opacity(0.5)
-                    )
-                    instanceBadge(
-                        label: "运行中",
-                        value: appState.instances.filter(\.isRunning).count,
-                        fg: dbGreen,
-                        bg: dbGreen.opacity(0.12)
-                    )
-                    instanceBadge(
-                        label: "已停止",
-                        value: appState.instances.filter(\.isStopped).count,
-                        fg: dbRed,
-                        bg: dbRed.opacity(0.12)
-                    )
-                    instanceBadge(
-                        label: "转换中",
-                        value: appState.instances.filter(\.isTransitioning).count,
-                        fg: dbOrange,
-                        bg: dbOrange.opacity(0.12)
-                    )
+                    Button(action: { appState.navigate(to: .instances) }) {
+                        instanceBadge(
+                            label: "全部",
+                            value: appState.instances.count,
+                            fg: textPrim,
+                            bg: border.opacity(0.5)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    Button(action: { appState.navigate(to: .instances) }) {
+                        instanceBadge(
+                            label: "运行中",
+                            value: appState.instances.filter(\.isRunning).count,
+                            fg: dbGreen,
+                            bg: dbGreen.opacity(0.12)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    Button(action: { appState.navigate(to: .instances) }) {
+                        instanceBadge(
+                            label: "已停止",
+                            value: appState.instances.filter(\.isStopped).count,
+                            fg: dbRed,
+                            bg: dbRed.opacity(0.12)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    Button(action: { appState.navigate(to: .instances) }) {
+                        instanceBadge(
+                            label: "转换中",
+                            value: appState.instances.filter(\.isTransitioning).count,
+                            fg: dbOrange,
+                            bg: dbOrange.opacity(0.12)
+                        )
+                    }
+                    .buttonStyle(.plain)
                     Spacer()
                 }
             }

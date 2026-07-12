@@ -1,7 +1,9 @@
 import SwiftUI
 import WebKit
+import AppKit
 
-/// Generic embedded web page — shares session cookies from URLSession.shared
+/// Embedded content page — injects Sa-Token (`satoken`) from shared cookie jar.
+/// Used as transition for pages not yet natively rewritten.
 struct OciWebView: NSViewRepresentable {
     let url: URL
 
@@ -10,32 +12,69 @@ struct OciWebView: NSViewRepresentable {
         prefs.allowsContentJavaScript = true
         let config = WKWebViewConfiguration()
         config.defaultWebpagePreferences = prefs
-        // Use non-persistent store so we can inject cookies manually
-        config.websiteDataStore = .nonPersistent()
+        // default store so cookies can persist within the app session
+        config.websiteDataStore = .default()
 
         let wv = WKWebView(frame: .zero, configuration: config)
         wv.navigationDelegate = context.coordinator
+        wv.setValue(false, forKey: "drawsBackground")
 
-        let store = config.websiteDataStore.httpCookieStore
-        let cookies = HTTPCookieStorage.shared.cookies ?? []
-        let group = DispatchGroup()
-        cookies.forEach { c in
-            group.enter()
-            store.setCookie(c) { group.leave() }
+        injectCookies(into: config.websiteDataStore.httpCookieStore) {
+            wv.load(URLRequest(url: url))
         }
-        group.notify(queue: .main) { wv.load(URLRequest(url: url)) }
         return wv
     }
 
     func updateNSView(_ wv: WKWebView, context: Context) {
-        if wv.url?.absoluteString != url.absoluteString {
+        let current = wv.url?.absoluteString ?? ""
+        let target = url.absoluteString
+        guard current != target else { return }
+        injectCookies(into: wv.configuration.websiteDataStore.httpCookieStore) {
             wv.load(URLRequest(url: url))
         }
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
+    private func injectCookies(into store: WKHTTPCookieStore, done: @escaping () -> Void) {
+        let cookies = HTTPCookieStorage.shared.cookies ?? []
+        // Prefer satoken + session cookies for this host
+        let host = url.host
+        let relevant = cookies.filter { c in
+            if let host = host, let domain = c.domain as String? {
+                let d = domain.hasPrefix(".") ? String(domain.dropFirst()) : domain
+                if !(host == d || host.hasSuffix(".\(d)") || d == "localhost") {
+                    // still allow exact host-less cookies
+                    if c.domain != "localhost" && !c.domain.isEmpty && host != "localhost" {
+                        return c.name == "satoken" || c.name.uppercased().contains("SESSION")
+                    }
+                }
+            }
+            return true
+        }
+        let group = DispatchGroup()
+        for c in relevant {
+            group.enter()
+            store.setCookie(c) { group.leave() }
+        }
+        group.notify(queue: .main, execute: done)
+    }
+
     final class Coordinator: NSObject, WKNavigationDelegate {
+        func webView(_ wv: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
+                     decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+            // Open external http(s) targets that leave localhost in system browser
+            if navigationAction.navigationType == .linkActivated,
+               let u = navigationAction.request.url,
+               let host = u.host,
+               host != "localhost", host != "127.0.0.1" {
+                NSWorkspace.shared.open(u)
+                decisionHandler(.cancel)
+                return
+            }
+            decisionHandler(.allow)
+        }
+
         func webView(_ wv: WKWebView, decidePolicyFor response: WKNavigationResponse,
                      decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
             decisionHandler(.allow)
@@ -51,20 +90,46 @@ struct EmbeddedPage: View {
     @State private var reloadToken = UUID()
 
     var body: some View {
-        OciWebView(url: pageURL)
-            .id(reloadToken)
-            .navigationTitle(title)
-            .toolbar {
-                ToolbarItem {
-                    Button(action: { reloadToken = UUID() }) {
-                        Label("刷新", systemImage: "arrow.clockwise")
-                    }
+        VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                Image(systemName: "safari")
+                    .foregroundColor(.secondary)
+                Text("网页嵌入模式 · 复杂页暂用 Web 渲染")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Spacer()
+                Text(path)
+                    .font(.system(.caption2, design: .monospaced))
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(Color.secondary.opacity(0.08))
+            OciWebView(url: pageURL)
+                .id(reloadToken)
+        }
+        .navigationTitle(title)
+        .toolbar {
+            ToolbarItem {
+                Button(action: { reloadToken = UUID() }) {
+                    Label("刷新", systemImage: "arrow.clockwise")
                 }
             }
+            ToolbarItem {
+                Button(action: openInBrowser) {
+                    Label("浏览器打开", systemImage: "arrow.up.right.square")
+                }
+            }
+        }
     }
 
     private var pageURL: URL {
         URL(string: "\(appState.serverURL)\(path)") ?? URL(string: "about:blank")!
+    }
+
+    private func openInBrowser() {
+        NSWorkspace.shared.open(pageURL)
     }
 }
 

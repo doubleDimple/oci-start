@@ -124,8 +124,17 @@ final class NetworkService {
         return try await post(try makeURL("\(baseURL)/oci/stopInstance"), body: ["instanceId": instanceId])
     }
 
-    func terminateInstance(baseURL: String, instanceId: String) async throws -> ActionResponse {
-        return try await post(try makeURL("\(baseURL)/oci/terminateInstance"), body: ["instanceId": instanceId])
+    func terminateInstance(baseURL: String, instanceId: String, verificationCode: String) async throws -> ActionResponse {
+        return try await post(try makeURL("\(baseURL)/oci/terminateInstance"), body: [
+            "instanceId": instanceId,
+            "verificationCode": verificationCode
+        ])
+    }
+
+    func sendTerminateVerificationCode(baseURL: String, instanceId: String) async throws -> ActionResponse {
+        return try await post(try makeURL("\(baseURL)/oci/sendVerificationCode"), body: [
+            "instanceId": instanceId
+        ])
     }
 
     func changeIP(baseURL: String, instanceDetailId: String) async throws -> ActionResponse {
@@ -133,11 +142,44 @@ final class NetworkService {
         return try await get(url)
     }
 
+    func updateInstanceName(baseURL: String, instanceId: String, newName: String) async throws -> ActionResponse {
+        struct Body: Encodable { let instanceId: String; let newName: String }
+        return try await postJSON(try makeURL("\(baseURL)/oci/updateName"), body: Body(instanceId: instanceId, newName: newName))
+    }
+
+    func updateInstanceRemark(baseURL: String, instanceId: String, remark: String) async throws -> ActionResponse {
+        struct Body: Encodable { let instanceId: String; let remark: String }
+        return try await postJSON(try makeURL("\(baseURL)/oci/updateRemark"), body: Body(instanceId: instanceId, remark: remark))
+    }
+
+    func enableIpv6(baseURL: String, instanceDetailId: String) async throws -> ActionResponse {
+        // Server returns { status, message } — map via flexible decode
+        let url = try makeURL("\(baseURL)/oci/enableIpv6")
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        req.setValue("XMLHttpRequest", forHTTPHeaderField: "X-Requested-With")
+        req.httpBody = try? JSONEncoder().encode(["tenantId": instanceDetailId])
+        let (data, response) = try await session.compatData(for: req)
+        try checkHTTP(response)
+        if let map = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            let ok = (map["status"] as? String) == "success" || (map["success"] as? Bool) == true
+            let msg = (map["message"] as? String) ?? (ok ? "IPv6 操作成功" : "IPv6 操作失败")
+            return ActionResponse(success: ok, message: msg)
+        }
+        return try decode(data)
+    }
+
     // MARK: - Tenants
 
-    func getTenants(baseURL: String, page: Int = 0, size: Int = 50, keyword: String? = nil) async throws -> TenantListResponse {
+    func getTenants(baseURL: String, page: Int = 0, size: Int = 50,
+                    keyword: String? = nil, cloudType: Int? = nil,
+                    emailEnable: Int? = nil) async throws -> TenantListResponse {
         var params: [String: String] = ["page": "\(page)", "size": "\(size)"]
         if let kw = keyword, !kw.isEmpty { params["keyword"] = kw }
+        if let ct = cloudType { params["cloudType"] = "\(ct)" }
+        if let ee = emailEnable { params["emailEnable"] = "\(ee)" }
         let url = try makeURL("\(baseURL)/tenants/list/json", params: params)
         return try await get(url)
     }
@@ -149,7 +191,37 @@ final class NetworkService {
     }
 
     func deleteTenant(baseURL: String, tenantId: Int64) async throws -> ActionResponse {
-        return try await post(try makeURL("\(baseURL)/tenants/delete"), body: ["id": "\(tenantId)"])
+        // Server: GET /tenants/deleteApi?tenantId=
+        let url = try makeURL("\(baseURL)/tenants/deleteApi", params: ["tenantId": "\(tenantId)"])
+        // deleteApi returns Map — may not match ActionResponse strictly
+        var req = URLRequest(url: url)
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        req.setValue("XMLHttpRequest", forHTTPHeaderField: "X-Requested-With")
+        let (data, response) = try await session.compatData(for: req)
+        try checkHTTP(response)
+        if let map = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            let ok = (map["success"] as? Bool) ?? true
+            let msg = (map["message"] as? String) ?? (ok ? "已删除" : "删除失败")
+            return ActionResponse(success: ok, message: msg)
+        }
+        return ActionResponse(success: true, message: "已删除")
+    }
+
+    func checkTenantAccounts(baseURL: String) async throws -> AccountCheckResult {
+        let url = try makeURL("\(baseURL)/tenants/checkAccounts")
+        return try await get(url)
+    }
+
+    // MARK: - AI Chat
+
+    func getAiTenants(baseURL: String) async throws -> [AiTenant] {
+        let url = try makeURL("\(baseURL)/system/ai/tenants")
+        return try await get(url)
+    }
+
+    func fetchChatModels(baseURL: String, tenantId: String) async throws -> [AiChatModel] {
+        let url = try makeURL("\(baseURL)/system/ai/modelsByTenant", params: ["tenantId": tenantId])
+        return try await get(url)
     }
 
     // MARK: - Object Storage
@@ -189,7 +261,90 @@ final class NetworkService {
         ])
     }
 
+    // MARK: - Boot tasks (reuse mobile JSON APIs under /m)
+
+    func getBootTasks(baseURL: String, page: Int = 0, size: Int = 100) async throws -> BootTaskListData {
+        let url = try makeURL("\(baseURL)/m/api/boot", params: ["page": "\(page)", "size": "\(size)"])
+        let resp: GenericResponse<BootTaskListData> = try await get(url)
+        return resp.data ?? BootTaskListData(list: [], total: 0, runningCount: 0)
+    }
+
+    func startBootTask(baseURL: String, bootId: Int64) async throws -> ActionResponse {
+        return try await post(try makeURL("\(baseURL)/m/api/boot/\(bootId)/start"), body: [:])
+    }
+
+    func stopBootTask(baseURL: String, bootId: Int64) async throws -> ActionResponse {
+        return try await post(try makeURL("\(baseURL)/m/api/boot/\(bootId)/stop"), body: [:])
+    }
+
+    func deleteBootTask(baseURL: String, bootId: Int64) async throws -> ActionResponse {
+        return try await post(try makeURL("\(baseURL)/m/api/boot/\(bootId)/delete"), body: [:])
+    }
+
+    func batchStartBoots(baseURL: String) async throws -> ActionResponse {
+        return try await post(try makeURL("\(baseURL)/boot/batchStart"), body: [:])
+    }
+
+    func batchStopBoots(baseURL: String) async throws -> ActionResponse {
+        return try await post(try makeURL("\(baseURL)/boot/batchStop"), body: [:])
+    }
+
+    // MARK: - Object storage write
+
+    func createBucket(baseURL: String, tenantId: Int64, bucketName: String, publicAccessType: String = "NoPublicAccess") async throws -> ActionResponse {
+        struct Body: Encodable {
+            let tenantId: Int64
+            let bucketName: String
+            let publicAccessType: String
+        }
+        return try await postJSON(try makeURL("\(baseURL)/oci/storage/bucket/create"),
+                                  body: Body(tenantId: tenantId, bucketName: bucketName, publicAccessType: publicAccessType))
+    }
+
+    func uploadObject(baseURL: String, tenantId: Int64, namespace: String, bucketName: String,
+                      objectName: String?, fileURL: URL) async throws -> ActionResponse {
+        let url = try makeURL("\(baseURL)/oci/storage/object/upload")
+        let boundary = "Boundary-\(UUID().uuidString)"
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        req.setValue("XMLHttpRequest", forHTTPHeaderField: "X-Requested-With")
+
+        let fileData = try Data(contentsOf: fileURL)
+        let filename = fileURL.lastPathComponent
+        let objName = (objectName?.isEmpty == false) ? objectName! : filename
+
+        var body = Data()
+        func appendField(_ name: String, _ value: String) {
+            body.append("--\(boundary)\r\n".data(using: .utf8)!)
+            body.append("Content-Disposition: form-data; name=\"\(name)\"\r\n\r\n".data(using: .utf8)!)
+            body.append("\(value)\r\n".data(using: .utf8)!)
+        }
+        appendField("tenantId", "\(tenantId)")
+        appendField("namespace", namespace)
+        appendField("bucketName", bucketName)
+        appendField("objectName", objName)
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(filename)\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: application/octet-stream\r\n\r\n".data(using: .utf8)!)
+        body.append(fileData)
+        body.append("\r\n".data(using: .utf8)!)
+        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+        req.httpBody = body
+
+        let (data, response) = try await session.compatData(for: req)
+        try checkHTTP(response)
+        if let map = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            let ok = (map["success"] as? Bool) ?? false
+            let msg = (map["message"] as? String) ?? (ok ? "上传成功" : "上传失败")
+            return ActionResponse(success: ok, message: msg)
+        }
+        return try decode(data)
+    }
+
     // MARK: - VPS Monitor
+    // Web VPS list uses same instance source; ping APIs are batch (no body).
 
     func getVpsInstances(baseURL: String, page: Int = 0, size: Int = 1000) async throws -> InstanceListResponse {
         let url = try makeURL("\(baseURL)/oci/list/json", params: ["page": "\(page)", "size": "\(size)"])
@@ -197,15 +352,41 @@ final class NetworkService {
     }
 
     func pingInstances(baseURL: String) async throws -> ActionResponse {
-        return try await post(try makeURL("\(baseURL)/vps/instances/ping"), body: [:])
+        return try await postFlexible(try makeURL("\(baseURL)/vps/instances/ping"))
     }
 
-    func enablePing(baseURL: String, instanceId: String) async throws -> ActionResponse {
-        return try await post(try makeURL("\(baseURL)/vps/instances/enablePing"), body: ["instanceId": instanceId])
+    func enablePingBatch(baseURL: String) async throws -> ActionResponse {
+        return try await postFlexible(try makeURL("\(baseURL)/vps/instances/enablePing"))
     }
 
-    func disablePing(baseURL: String, instanceId: String) async throws -> ActionResponse {
-        return try await post(try makeURL("\(baseURL)/vps/instances/disablePing"), body: ["instanceId": instanceId])
+    func disablePingBatch(baseURL: String) async throws -> ActionResponse {
+        return try await postFlexible(try makeURL("\(baseURL)/vps/instances/disablePing"))
+    }
+
+    /// ApiResponse may use success+message without matching ActionResponse strictly
+    private func postFlexible(_ url: URL) async throws -> ActionResponse {
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        req.setValue("XMLHttpRequest", forHTTPHeaderField: "X-Requested-With")
+        req.httpBody = "{}".data(using: .utf8)
+        let (data, response) = try await session.compatData(for: req)
+        try checkHTTP(response)
+        if let map = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            let ok = (map["success"] as? Bool) ?? true
+            let msg = (map["message"] as? String) ?? (ok ? "完成" : "失败")
+            return ActionResponse(success: ok, message: msg)
+        }
+        return ActionResponse(success: true, message: "完成")
+    }
+
+    // MARK: - Notify configs load
+
+    func getNotifyConfigs(baseURL: String) async throws -> NotifyConfigsBundle {
+        let url = try makeURL("\(baseURL)/api/system/notifyConfigs")
+        let resp: GenericResponse<NotifyConfigsBundle> = try await get(url)
+        return resp.data ?? NotifyConfigsBundle()
     }
 
     // MARK: - Memos
@@ -251,10 +432,10 @@ final class NetworkService {
     // MARK: - System Settings
 
     func updatePassword(baseURL: String, oldPassword: String, newPassword: String) async throws -> ActionResponse {
-        return try await post(try makeURL("\(baseURL)/api/system/updatePassword"), body: [
-            "oldPassword": oldPassword,
-            "newPassword": newPassword
-        ])
+        struct Body: Encodable { let oldPassword: String; let newPassword: String }
+        return try await postJSONAction(
+            try makeURL("\(baseURL)/api/system/updatePassword"),
+            body: Body(oldPassword: oldPassword, newPassword: newPassword))
     }
 
     func updateTelegramConfig(baseURL: String, enabled: Bool, botToken: String, chatId: String) async throws -> ActionResponse {
@@ -309,7 +490,514 @@ final class NetworkService {
         req.httpBody = comps.percentEncodedQuery?.data(using: .utf8)
         let (data, response) = try await session.compatData(for: req)
         try checkHTTP(response)
-        return try decode(data)
+        if data.isEmpty { return ActionResponse(success: true, message: "实例创建成功") }
+        if let map = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            let ok = (map["success"] as? Bool) ?? true
+            let msg = (map["message"] as? String) ?? (ok ? "实例创建成功" : "创建失败")
+            return ActionResponse(success: ok, message: msg)
+        }
+        return (try? decode(data)) ?? ActionResponse(success: true, message: "实例创建成功")
+    }
+
+    // MARK: - Cloudflare DNS
+
+    func cfZones(baseURL: String) async throws -> [[String: Any]] {
+        try await apiDataArray(try makeURL("\(baseURL)/dns/cloudflare/api/zones"))
+    }
+
+    func cfRecords(baseURL: String, zoneId: String, page: Int = 1, size: Int = 50) async throws -> [[String: Any]] {
+        let url = try makeURL("\(baseURL)/dns/cloudflare/api/zones/\(zoneId)/records",
+                              params: ["page": "\(page)", "size": "\(size)"])
+        let data = try await apiDataAny(url)
+        // paginated map may contain result/records/list/content
+        if let arr = data as? [[String: Any]] { return arr }
+        if let map = data as? [String: Any] {
+            for key in ["result", "records", "list", "content", "items", "data"] {
+                if let arr = map[key] as? [[String: Any]] { return arr }
+            }
+        }
+        return []
+    }
+
+    func cfAddRecord(baseURL: String, zoneId: String, type: String, name: String,
+                     content: String, ttl: Int, proxied: Bool) async throws -> ActionResponse {
+        struct Body: Encodable {
+            let zoneId: String; let type: String; let name: String
+            let content: String; let ttl: Int; let proxied: Bool
+        }
+        return try await postJSONAction(try makeURL("\(baseURL)/dns/cloudflare/api/records"),
+                                        body: Body(zoneId: zoneId, type: type, name: name,
+                                                   content: content, ttl: ttl, proxied: proxied))
+    }
+
+    func cfUpdateRecord(baseURL: String, recordId: String, zoneId: String,
+                        type: String, name: String, content: String,
+                        ttl: Int, proxied: Bool) async throws -> ActionResponse {
+        struct Body: Encodable {
+            let zoneId: String; let recordType: String; let recordName: String
+            let content: String; let ttl: Int; let proxied: Bool
+        }
+        return try await putJSONAction(
+            try makeURL("\(baseURL)/dns/cloudflare/api/records/\(recordId)"),
+            body: Body(zoneId: zoneId, recordType: type, recordName: name,
+                       content: content, ttl: ttl, proxied: proxied))
+    }
+
+    func cfDeleteRecord(baseURL: String, recordId: String, zoneId: String?) async throws -> ActionResponse {
+        var params: [String: String] = [:]
+        if let z = zoneId { params["zoneId"] = z }
+        let url = try makeURL("\(baseURL)/dns/cloudflare/api/records/\(recordId)", params: params)
+        return try await deleteAction(url)
+    }
+
+    func cfSyncZone(baseURL: String, zoneId: String, domainName: String) async throws -> ActionResponse {
+        struct Body: Encodable { let domainName: String }
+        return try await postJSONAction(
+            try makeURL("\(baseURL)/dns/cloudflare/api/zones/\(zoneId)/sync"),
+            body: Body(domainName: domainName))
+    }
+
+    // MARK: - EdgeOne DNS
+
+    func eoZones(baseURL: String) async throws -> [[String: Any]] {
+        try await apiDataArray(try makeURL("\(baseURL)/dns/edgeone/api/zones"))
+    }
+
+    func eoRecords(baseURL: String, zoneId: String) async throws -> [[String: Any]] {
+        let url = try makeURL("\(baseURL)/dns/edgeone/api/records",
+                              params: ["zoneId": zoneId, "type": "dns"])
+        return try await apiDataArray(url)
+    }
+
+    func eoAddRecord(baseURL: String, zoneId: String, type: String, name: String,
+                     content: String, ttl: Int) async throws -> ActionResponse {
+        struct Body: Encodable {
+            let zoneId: String; let type: String; let name: String
+            let content: String; let ttl: Int
+        }
+        return try await postJSONAction(try makeURL("\(baseURL)/dns/edgeone/api/records"),
+                                        body: Body(zoneId: zoneId, type: type, name: name,
+                                                   content: content, ttl: ttl))
+    }
+
+    func eoUpdateRecord(baseURL: String, recordId: String, zoneId: String,
+                        type: String, name: String, content: String, ttl: Int) async throws -> ActionResponse {
+        struct Body: Encodable {
+            let zoneId: String; let recordType: String; let recordName: String
+            let content: String; let ttl: Int
+        }
+        return try await putJSONAction(
+            try makeURL("\(baseURL)/dns/edgeone/api/records/\(recordId)"),
+            body: Body(zoneId: zoneId, recordType: type, recordName: name, content: content, ttl: ttl))
+    }
+
+    func eoDeleteRecord(baseURL: String, recordId: String) async throws -> ActionResponse {
+        try await deleteAction(try makeURL("\(baseURL)/dns/edgeone/api/records/\(recordId)"))
+    }
+
+    func eoSyncZone(baseURL: String, zoneId: String, domainName: String) async throws -> ActionResponse {
+        struct Body: Encodable { let domainName: String }
+        return try await postJSONAction(
+            try makeURL("\(baseURL)/dns/edgeone/api/zones/\(zoneId)/sync"),
+            body: Body(domainName: domainName))
+    }
+
+    // MARK: - IP quality settings
+
+    func getIpSettingsConfigs(baseURL: String) async throws -> IpSettingsBundle {
+        let url = try makeURL("\(baseURL)/api/system/ipSettingsConfigs")
+        let resp: GenericResponse<IpSettingsBundle> = try await get(url)
+        guard let data = resp.data else { throw NetworkError.serverError(resp.message ?? "无数据") }
+        return data
+    }
+
+    func updateIpCheckConfig(baseURL: String, enabled: Bool, checkInterval: Int) async throws -> ActionResponse {
+        struct Body: Encodable { let enabled: Bool; let checkInterval: Int }
+        return try await postJSONAction(try makeURL("\(baseURL)/api/system/updateIpCheckConfig"),
+                                        body: Body(enabled: enabled, checkInterval: checkInterval))
+    }
+
+    func saveOperatorVpsConfig(baseURL: String, type: String, enabled: Bool,
+                               serverIp: String, username: String,
+                               sshPort: Int, password: String) async throws -> ActionResponse {
+        struct Body: Encodable {
+            let type: String; let enabled: Bool; let serverIp: String
+            let username: String; let sshPort: Int; let password: String
+        }
+        return try await postJSONAction(try makeURL("\(baseURL)/system/vps/saveConfig"),
+                                        body: Body(type: type, enabled: enabled, serverIp: serverIp,
+                                                   username: username, sshPort: sshPort, password: password))
+    }
+
+    func testOperatorVpsConnection(baseURL: String, type: String, serverIp: String,
+                                   username: String, sshPort: Int, password: String) async throws -> ActionResponse {
+        struct Body: Encodable {
+            let type: String; let serverIp: String; let username: String
+            let sshPort: Int; let password: String
+        }
+        return try await postJSONAction(try makeURL("\(baseURL)/system/vps/testConnection"),
+                                        body: Body(type: type, serverIp: serverIp, username: username,
+                                                   sshPort: sshPort, password: password))
+    }
+
+    // MARK: - VPN proxy
+
+    func vpnProxyList(baseURL: String, pageNum: Int = 1, pageSize: Int = 50) async throws -> [[String: Any]] {
+        struct Body: Encodable { let pageNum: Int; let pageSize: Int }
+        let data = try await postJSONAny(try makeURL("\(baseURL)/vpnProxy/pageList"),
+                                         body: Body(pageNum: pageNum, pageSize: pageSize))
+        return pageContent(data)
+    }
+
+    func vpnProxySave(baseURL: String, id: Int64?, proxyType: String, proxyHost: String,
+                      proxyPort: Int, proxyUsername: String?, proxyPassword: String?,
+                      availableStatus: Int) async throws -> ActionResponse {
+        struct Body: Encodable {
+            let id: Int64?
+            let proxyType: String
+            let proxyHost: String
+            let proxyPort: Int
+            let proxyUsername: String?
+            let proxyPassword: String?
+            let availableStatus: Int
+        }
+        return try await postJSONAction(
+            try makeURL("\(baseURL)/vpnProxy/saveOrUpdate"),
+            body: Body(id: id, proxyType: proxyType, proxyHost: proxyHost, proxyPort: proxyPort,
+                       proxyUsername: proxyUsername, proxyPassword: proxyPassword,
+                       availableStatus: availableStatus))
+    }
+
+    func vpnProxyDelete(baseURL: String, id: Int64) async throws -> ActionResponse {
+        struct Body: Encodable { let id: Int64 }
+        return try await postJSONAction(try makeURL("\(baseURL)/vpnProxy/delete"),
+                                        body: Body(id: id))
+    }
+
+    // MARK: - Domain provider keys (CF / EdgeOne)
+
+    func getDomainProviderConfigs(baseURL: String) async throws -> DomainProviderBundle {
+        let url = try makeURL("\(baseURL)/api/system/domainProviderConfigs")
+        let resp: GenericResponse<DomainProviderBundle> = try await get(url)
+        guard let data = resp.data else { throw NetworkError.serverError(resp.message ?? "无数据") }
+        return data
+    }
+
+    func updateCloudflareConfig(baseURL: String, enabled: Bool, apiToken: String,
+                                email: String, zoneId: String = "") async throws -> ActionResponse {
+        struct Body: Encodable {
+            let enabled: Bool; let apiToken: String; let email: String; let zoneId: String
+        }
+        return try await postJSONAction(
+            try makeURL("\(baseURL)/api/system/updateCloudflareConfig"),
+            body: Body(enabled: enabled, apiToken: apiToken, email: email, zoneId: zoneId))
+    }
+
+    func testCloudflareConfig(baseURL: String, enabled: Bool, apiToken: String,
+                              email: String, zoneId: String = "") async throws -> ActionResponse {
+        struct Body: Encodable {
+            let enabled: Bool; let apiToken: String; let email: String; let zoneId: String
+        }
+        return try await postJSONAction(
+            try makeURL("\(baseURL)/api/system/testCloudflareConnection"),
+            body: Body(enabled: enabled, apiToken: apiToken, email: email, zoneId: zoneId))
+    }
+
+    func updateEdgeOneConfig(baseURL: String, enabled: Bool, secretId: String,
+                             secretKey: String, region: String = "ap-beijing") async throws -> ActionResponse {
+        struct Body: Encodable {
+            let enabled: Bool; let secretId: String; let secretKey: String; let region: String
+        }
+        return try await postJSONAction(
+            try makeURL("\(baseURL)/api/system/updateEdgeOneConfig"),
+            body: Body(enabled: enabled, secretId: secretId, secretKey: secretKey, region: region))
+    }
+
+    func testEdgeOneConfig(baseURL: String, enabled: Bool, secretId: String,
+                           secretKey: String, region: String = "ap-beijing") async throws -> ActionResponse {
+        struct Body: Encodable {
+            let enabled: Bool; let secretId: String; let secretKey: String; let region: String
+        }
+        return try await postJSONAction(
+            try makeURL("\(baseURL)/api/system/testEdgeOneConnection"),
+            body: Body(enabled: enabled, secretId: secretId, secretKey: secretKey, region: region))
+    }
+
+    // MARK: - Email
+
+    func emailReceiveList(baseURL: String, pageNum: Int = 1, pageSize: Int = 50) async throws -> [[String: Any]] {
+        struct Body: Encodable { let pageNum: Int; let pageSize: Int }
+        let data = try await postJSONAny(try makeURL("\(baseURL)/email/receive/list"),
+                                         body: Body(pageNum: pageNum, pageSize: pageSize))
+        return pageContent(data)
+    }
+
+    func emailReceiveAdd(baseURL: String, name: String, email: String) async throws -> ActionResponse {
+        struct Body: Encodable { let name: String; let email: String }
+        return try await postJSONAction(try makeURL("\(baseURL)/email/receive/add"),
+                                        body: Body(name: name, email: email))
+    }
+
+    func emailReceiveDelete(baseURL: String, id: Int64) async throws -> ActionResponse {
+        // Server: @RequestParam Long id
+        let url = try makeURL("\(baseURL)/email/receive/delete", params: ["id": "\(id)"])
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        req.setValue("XMLHttpRequest", forHTTPHeaderField: "X-Requested-With")
+        let (data, response) = try await session.compatData(for: req)
+        try checkHTTP(response)
+        if data.isEmpty { return ActionResponse(success: true, message: "删除成功") }
+        if let map = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            return ActionResponse(success: (map["success"] as? Bool) ?? true,
+                                  message: map["message"] as? String)
+        }
+        return ActionResponse(success: true, message: "删除成功")
+    }
+
+    func emailTenantConfigs(baseURL: String, pageNum: Int = 1, pageSize: Int = 100) async throws -> [[String: Any]] {
+        struct Body: Encodable { let pageNum: Int; let pageSize: Int }
+        let data = try await postJSONAny(try makeURL("\(baseURL)/email/tenant/list"),
+                                         body: Body(pageNum: pageNum, pageSize: pageSize))
+        return pageContent(data)
+    }
+
+    func emailBodyList(baseURL: String, pageNum: Int = 1, pageSize: Int = 50) async throws -> [[String: Any]] {
+        struct Body: Encodable {
+            let pageNum: Int; let pageSize: Int; let sort: String; let order: String
+        }
+        let data = try await postJSONAny(try makeURL("\(baseURL)/email/body/list"),
+                                         body: Body(pageNum: pageNum, pageSize: pageSize,
+                                                    sort: "createTime", order: "desc"))
+        return pageContent(data)
+    }
+
+    func emailSendRecords(baseURL: String, emailBodyId: String,
+                          pageNum: Int = 1, pageSize: Int = 50) async throws -> [[String: Any]] {
+        struct Body: Encodable {
+            let emailBodyId: String; let pageNum: Int; let pageSize: Int
+            let sort: String; let order: String
+        }
+        let data = try await postJSONAny(try makeURL("\(baseURL)/email/send/list"),
+                                         body: Body(emailBodyId: emailBodyId, pageNum: pageNum,
+                                                    pageSize: pageSize, sort: "createTime", order: "desc"))
+        return pageContent(data)
+    }
+
+    func emailSend(baseURL: String, title: String, content: String,
+                   tenantEmailConfigId: Int64, emailReceiveIds: [Int64]) async throws -> ActionResponse {
+        struct Body: Encodable {
+            let title: String; let content: String
+            let tenantEmailConfigId: Int64; let emailReceiveIds: [Int64]
+        }
+        return try await postJSONAction(
+            try makeURL("\(baseURL)/email/send"),
+            body: Body(title: title, content: content,
+                       tenantEmailConfigId: tenantEmailConfigId, emailReceiveIds: emailReceiveIds))
+    }
+
+    func emailBodyDelete(baseURL: String, id: Int64) async throws -> ActionResponse {
+        struct Body: Encodable { let id: Int64 }
+        return try await postJSONAction(try makeURL("\(baseURL)/email/body/delete"),
+                                        body: Body(id: id))
+    }
+
+    /// Disable email service for a TenantEmailConfig row (`id` = config primary key).
+    func emailConfigDisable(baseURL: String, configId: Int64) async throws -> ActionResponse {
+        struct Body: Encodable { let id: Int64 }
+        return try await postJSONAction(try makeURL("\(baseURL)/email/disable"),
+                                        body: Body(id: configId))
+    }
+
+    /// Enable OCI email for tenant (`tenantId` = tenants table id).
+    func enableTenantEmail(baseURL: String, tenantId: Int64, emailDomain: String) async throws -> ActionResponse {
+        struct Body: Encodable { let tenantId: Int64; let emailDomain: String }
+        return try await postJSONAction(try makeURL("\(baseURL)/tenants/email/enable"),
+                                        body: Body(tenantId: tenantId, emailDomain: emailDomain))
+    }
+
+    // MARK: - ApiResponse helpers (dynamic JSON)
+
+    private func apiEnvelope(_ data: Data) throws -> (ok: Bool, message: String?, data: Any?) {
+        guard let map = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw NetworkError.invalidResponse
+        }
+        let ok = (map["success"] as? Bool) ?? true
+        let msg = map["message"] as? String
+        if !ok { throw NetworkError.serverError(msg ?? "请求失败") }
+        return (ok, msg, map["data"])
+    }
+
+    private func apiDataAny(_ url: URL) async throws -> Any? {
+        var req = URLRequest(url: url)
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        req.setValue("XMLHttpRequest", forHTTPHeaderField: "X-Requested-With")
+        let (data, response) = try await session.compatData(for: req)
+        try checkHTTP(response)
+        return try apiEnvelope(data).data
+    }
+
+    private func apiDataArray(_ url: URL) async throws -> [[String: Any]] {
+        let data = try await apiDataAny(url)
+        if let arr = data as? [[String: Any]] { return arr }
+        return []
+    }
+
+    private func postJSONAny<B: Encodable>(_ url: URL, body: B) async throws -> Any? {
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        req.setValue("XMLHttpRequest", forHTTPHeaderField: "X-Requested-With")
+        req.httpBody = try? JSONEncoder().encode(body)
+        let (data, response) = try await session.compatData(for: req)
+        try checkHTTP(response)
+        return try apiEnvelope(data).data
+    }
+
+    private func putJSONAction<B: Encodable>(_ url: URL, body: B) async throws -> ActionResponse {
+        var req = URLRequest(url: url)
+        req.httpMethod = "PUT"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        req.setValue("XMLHttpRequest", forHTTPHeaderField: "X-Requested-With")
+        req.httpBody = try? JSONEncoder().encode(body)
+        let (data, response) = try await session.compatData(for: req)
+        try checkHTTP(response)
+        if data.isEmpty { return ActionResponse(success: true, message: "ok") }
+        if let map = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            return ActionResponse(success: (map["success"] as? Bool) ?? true,
+                                  message: map["message"] as? String)
+        }
+        return ActionResponse(success: true, message: "ok")
+    }
+
+    private func deleteAction(_ url: URL) async throws -> ActionResponse {
+        var req = URLRequest(url: url)
+        req.httpMethod = "DELETE"
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        req.setValue("XMLHttpRequest", forHTTPHeaderField: "X-Requested-With")
+        let (data, response) = try await session.compatData(for: req)
+        try checkHTTP(response)
+        if data.isEmpty { return ActionResponse(success: true, message: "ok") }
+        if let map = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            return ActionResponse(success: (map["success"] as? Bool) ?? true,
+                                  message: map["message"] as? String)
+        }
+        return ActionResponse(success: true, message: "ok")
+    }
+
+    private func pageContent(_ data: Any?) -> [[String: Any]] {
+        guard let data = data else { return [] }
+        if let arr = data as? [[String: Any]] { return arr }
+        if let map = data as? [String: Any] {
+            for key in ["content", "list", "records", "items"] {
+                if let arr = map[key] as? [[String: Any]] { return arr }
+            }
+        }
+        return []
+    }
+
+    // MARK: - Speed test / IP
+
+    func getOracleEndpoints(baseURL: String) async throws -> [[String: Any]] {
+        try await apiDataArray(try makeURL("\(baseURL)/api/getOracleEndpoint"))
+    }
+
+    func getCurrentIpDisplay(baseURL: String) async throws -> String {
+        let data = try await apiDataAny(try makeURL("\(baseURL)/api/getCurrentIp"))
+        if let s = data as? String { return s }
+        return "—"
+    }
+
+    // MARK: - Migration file transfer
+
+    func downloadMigrationExport(baseURL: String) async throws -> (Data, String) {
+        let url = try makeURL("\(baseURL)/migration/export")
+        var req = URLRequest(url: url)
+        req.setValue("XMLHttpRequest", forHTTPHeaderField: "X-Requested-With")
+        let (data, response) = try await session.compatData(for: req)
+        try checkHTTP(response)
+        let name = suggestedFilename(from: response) ?? "oci-start_backup.sql"
+        return (data, name)
+    }
+
+    func downloadMigrationExportEncrypted(baseURL: String) async throws -> (Data, String, String?) {
+        let url = try makeURL("\(baseURL)/migration/exportEncrypted")
+        var req = URLRequest(url: url)
+        req.setValue("XMLHttpRequest", forHTTPHeaderField: "X-Requested-With")
+        let (data, response) = try await session.compatData(for: req)
+        try checkHTTP(response)
+        var masterKey: String?
+        if let http = response as? HTTPURLResponse {
+            masterKey = http.value(forHTTPHeaderField: "master-key")
+                ?? http.value(forHTTPHeaderField: "Master-Key")
+                ?? http.value(forHTTPHeaderField: "X-Master-Key")
+        }
+        let name = suggestedFilename(from: response) ?? "oci-start_backup.enc"
+        return (data, name, masterKey)
+    }
+
+    func importMigrationSQL(baseURL: String, fileURL: URL) async throws -> String {
+        try await multipartUpload(
+            url: try makeURL("\(baseURL)/migration/import"),
+            fileURL: fileURL,
+            fieldName: "file",
+            extraFields: [:])
+    }
+
+    func importMigrationEncrypted(baseURL: String, fileURL: URL, masterKey: String) async throws -> String {
+        try await multipartUpload(
+            url: try makeURL("\(baseURL)/migration/importEncrypted"),
+            fileURL: fileURL,
+            fieldName: "file",
+            extraFields: ["masterKey": masterKey])
+    }
+
+    private func multipartUpload(url: URL, fileURL: URL, fieldName: String,
+                                 extraFields: [String: String]) async throws -> String {
+        let boundary = "Boundary-\(UUID().uuidString)"
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        req.setValue("XMLHttpRequest", forHTTPHeaderField: "X-Requested-With")
+        let fileData = try Data(contentsOf: fileURL)
+        let filename = fileURL.lastPathComponent
+        var body = Data()
+        for (k, v) in extraFields {
+            body.append("--\(boundary)\r\n".data(using: .utf8)!)
+            body.append("Content-Disposition: form-data; name=\"\(k)\"\r\n\r\n".data(using: .utf8)!)
+            body.append("\(v)\r\n".data(using: .utf8)!)
+        }
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"\(fieldName)\"; filename=\"\(filename)\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: application/octet-stream\r\n\r\n".data(using: .utf8)!)
+        body.append(fileData)
+        body.append("\r\n".data(using: .utf8)!)
+        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+        req.httpBody = body
+        let (data, response) = try await session.compatData(for: req)
+        if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+            let msg = String(data: data, encoding: .utf8) ?? "导入失败"
+            throw NetworkError.serverError(msg)
+        }
+        return String(data: data, encoding: .utf8) ?? "导入成功"
+    }
+
+    private func suggestedFilename(from response: URLResponse) -> String? {
+        guard let http = response as? HTTPURLResponse,
+              let cd = http.value(forHTTPHeaderField: "Content-Disposition") else { return nil }
+        // filename="..."
+        if let r = cd.range(of: "filename=\"") {
+            let rest = cd[r.upperBound...]
+            if let end = rest.firstIndex(of: "\"") {
+                return String(rest[..<end])
+            }
+        }
+        if let r = cd.range(of: "filename=") {
+            return String(cd[r.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        return nil
     }
 
     // MARK: - Generic HTTP helpers
@@ -354,6 +1042,25 @@ final class NetworkService {
             return try decode(data)
         } catch let e as NetworkError { throw e }
         catch { throw NetworkError.networkError(error) }
+    }
+
+    /// POST JSON; empty 200 body is treated as success (many system config endpoints return no body).
+    func postJSONAction<B: Encodable>(_ url: URL, body: B) async throws -> ActionResponse {
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        req.setValue("XMLHttpRequest", forHTTPHeaderField: "X-Requested-With")
+        req.httpBody = try? JSONEncoder().encode(body)
+        let (data, response) = try await session.compatData(for: req)
+        try checkHTTP(response)
+        if data.isEmpty { return ActionResponse(success: true, message: "ok") }
+        if let map = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            let ok = (map["success"] as? Bool) ?? true
+            let msg = (map["message"] as? String) ?? "ok"
+            return ActionResponse(success: ok, message: msg)
+        }
+        return (try? decode(data)) ?? ActionResponse(success: true, message: "ok")
     }
 
     private func putJSON<T: Decodable, B: Encodable>(_ url: URL, body: B) async throws -> T {

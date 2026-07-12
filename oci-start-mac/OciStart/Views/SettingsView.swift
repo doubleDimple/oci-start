@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject var appState: AppState
+    @Environment(\.colorScheme) private var scheme
     @State private var selectedTab = 0
 
     var body: some View {
@@ -27,7 +28,8 @@ struct SettingsView: View {
                 .padding(24)
             }
         }
-        .navigationTitle("系统设置")
+        .background(AppTheme.pageBg(scheme).ignoresSafeArea())
+        .navigationTitle("安全管理")
     }
 }
 
@@ -89,6 +91,7 @@ struct ConnectionPanel: View {
 
 struct SecurityPanel: View {
     @EnvironmentObject var appState: AppState
+    @Environment(\.colorScheme) private var scheme
     @State private var oldPassword = ""
     @State private var newPassword = ""
     @State private var confirmPassword = ""
@@ -104,7 +107,7 @@ struct SecurityPanel: View {
                     SecureField("确认新密码", text: $confirmPassword).textFieldStyle(.roundedBorder)
 
                     if let err = errorText {
-                        Text(err).font(.caption).foregroundColor(.red)
+                        Text(err).font(.caption).foregroundColor(AppTheme.danger)
                     }
 
                     Button(isSaving ? "保存中…" : "修改密码") {
@@ -133,7 +136,8 @@ struct SecurityPanel: View {
         do {
             let r = try await appState.network.updatePassword(
                 baseURL: appState.serverURL, oldPassword: oldPassword, newPassword: newPassword)
-            if r.success == true {
+            // 服务端常返回空 body；postJSONAction 记 success=true
+            if r.success != false {
                 appState.showToast("密码修改成功，请重新登录")
                 oldPassword = ""; newPassword = ""; confirmPassword = ""
                 await appState.logout()
@@ -153,11 +157,26 @@ struct AboutPanel: View {
                 VStack(alignment: .leading, spacing: 8) {
                     infoRow("应用名称", "OCI Start macOS Client")
                     infoRow("版本", "1.0.0")
-                    infoRow("最低系统", "macOS 11 Big Sur")
+                    infoRow("最低系统", "macOS 11.7.11+")
                     infoRow("开发语言", "Swift 5.9 + SwiftUI")
                     infoRow("项目", "oci-start")
                 }
                 .padding(8)
+            }
+            GroupBox(label: Label("打包", systemImage: "shippingbox")) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("本地：`./build-dmg.sh`（默认 ad-hoc 签名）")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text("对外：Developer ID + notarytool 公证，见 README「签名与公证」")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text("数据目录：~/Library/Application Support/OciStart/")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .padding(8)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
     }

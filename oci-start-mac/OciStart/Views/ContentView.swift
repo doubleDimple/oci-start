@@ -1,17 +1,32 @@
 import SwiftUI
+import AppKit
 
 struct ContentView: View {
     @EnvironmentObject var appState: AppState
     @EnvironmentObject var backend: BackendManager
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
+        Group {
+            switch backend.state {
+            case .starting:
+                StartupView()
+            case .failed(let msg):
+                StartupFailedView(message: msg)
+            case .ready:
+                mainContent
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(AppTheme.pageBg(scheme).ignoresSafeArea())
+        .animation(.easeInOut(duration: 0.25), value: backendStateKey)
+    }
+
+    private var backendStateKey: String {
         switch backend.state {
-        case .starting:
-            StartupView()
-        case .failed(let msg):
-            StartupFailedView(message: msg)
-        case .ready:
-            mainContent
+        case .starting: return "starting"
+        case .ready: return "ready"
+        case .failed: return "failed"
         }
     }
 
@@ -20,12 +35,13 @@ struct ContentView: View {
         ZStack {
             if appState.isAuthenticated {
                 MainView()
+                    .transition(.opacity)
             } else {
                 LoginView()
+                    .transition(.opacity)
             }
         }
         .onAppear {
-            // Trigger session check only after backend is ready
             Task { await appState.checkSessionPublic() }
         }
         .alert(isPresented: Binding(
@@ -47,45 +63,64 @@ struct ContentView: View {
 
 struct StartupView: View {
     @EnvironmentObject var backend: BackendManager
+    @Environment(\.colorScheme) private var scheme
     @State private var dots = ""
     @State private var timer: Timer?
+    @State private var pulse = false
 
     var body: some View {
-        VStack(spacing: 24) {
-            Image(systemName: "cloud.fill")
-                .font(.system(size: 64))
-                .foregroundColor(.accentColor)
+        VStack(spacing: 22) {
+            ZStack {
+                Circle()
+                    .fill(AppTheme.accent(scheme).opacity(0.15))
+                    .frame(width: 100, height: 100)
+                    .scaleEffect(pulse ? 1.08 : 0.95)
+                Image(systemName: "cloud.fill")
+                    .font(.system(size: 44))
+                    .foregroundColor(AppTheme.accent(scheme))
+            }
 
             Text("OCI Start")
-                .font(.largeTitle.weight(.bold))
+                .font(.system(size: 28, weight: .bold))
+                .foregroundColor(AppTheme.text(scheme))
 
             ProgressView()
                 .scaleEffect(0.9)
 
             Text("正在启动后端服务\(dots)")
                 .font(.callout)
-                .foregroundColor(.secondary)
-                .frame(width: 200, alignment: .center)
+                .foregroundColor(AppTheme.muted(scheme))
+                .frame(width: 220, alignment: .center)
 
             if !backend.logBuffer.isEmpty {
                 ScrollView {
-                    Text(backend.logBuffer.suffix(8).joined())
+                    Text(backend.logBuffer.suffix(10).joined())
                         .font(.system(size: 10, design: .monospaced))
-                        .foregroundColor(.secondary)
+                        .foregroundColor(AppTheme.muted(scheme))
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .frame(width: 480, height: 80)
-                .background(Color(NSColor.controlBackgroundColor))
-                .cornerRadius(6)
+                .frame(width: 500, height: 90)
+                .padding(8)
+                .background(AppTheme.surface(scheme))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(AppTheme.border(scheme), lineWidth: 1)
+                )
+                .cornerRadius(8)
             }
         }
-        .frame(width: 560, height: 360)
-        .onAppear { startDots() }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear {
+            startDots()
+            withAnimation(Animation.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
+                pulse = true
+            }
+        }
         .onDisappear { timer?.invalidate() }
     }
 
     private func startDots() {
-        timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
+        timer = Timer.scheduledTimer(withTimeInterval: 0.45, repeats: true) { _ in
             dots = dots.count < 3 ? dots + "." : ""
         }
     }
@@ -96,40 +131,57 @@ struct StartupView: View {
 struct StartupFailedView: View {
     let message: String
     @EnvironmentObject var backend: BackendManager
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 18) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 48))
-                .foregroundColor(.red)
+                .font(.system(size: 44))
+                .foregroundColor(AppTheme.danger)
 
             Text("后端服务启动失败")
                 .font(.title2.weight(.semibold))
+                .foregroundColor(AppTheme.text(scheme))
 
             Text(message)
                 .font(.callout)
-                .foregroundColor(.secondary)
+                .foregroundColor(AppTheme.muted(scheme))
                 .multilineTextAlignment(.center)
-                .frame(maxWidth: 400)
+                .frame(maxWidth: 420)
 
             if !backend.logBuffer.isEmpty {
                 ScrollView {
-                    Text(backend.logBuffer.joined())
+                    Text(backend.logBuffer.suffix(40).joined())
                         .font(.system(size: 10, design: .monospaced))
-                        .foregroundColor(.secondary)
+                        .foregroundColor(AppTheme.muted(scheme))
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(8)
                 }
-                .frame(width: 480, height: 120)
-                .background(Color(NSColor.controlBackgroundColor))
-                .cornerRadius(6)
+                .frame(width: 500, height: 140)
+                .background(AppTheme.surface(scheme))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(AppTheme.border(scheme), lineWidth: 1)
+                )
+                .cornerRadius(8)
             }
 
-            Button("重新启动") {
-                Task { await backend.restart() }
+            HStack(spacing: 12) {
+                Button("复制日志") {
+                    let text = backend.logBuffer.joined()
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(text, forType: .string)
+                }
+                .buttonStyle(.plain)
+                .foregroundColor(AppTheme.muted(scheme))
+
+                Button("重新启动") {
+                    Task { await backend.restart() }
+                }
+                .buttonStyle(ProminentButton())
             }
-            .buttonStyle(ProminentButton())
+            .padding(.top, 4)
         }
-        .frame(width: 560, height: 420)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
