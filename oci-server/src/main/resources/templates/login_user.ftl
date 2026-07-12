@@ -418,9 +418,140 @@
             border-bottom-color:#f87171 !important;
         }
 
+        /* ============================================================
+           登录背景：极光流光 + 左栏节点网
+           ============================================================ */
+        html body{
+            background:transparent!important;
+            background-image:none!important;
+            background-color:transparent!important;
+        }
+        .login-aurora{
+            position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none;
+            background:
+                radial-gradient(1200px 700px at 12% 18%, rgba(91,61,246,.18), transparent 58%),
+                radial-gradient(900px 600px at 88% 78%, rgba(0,180,219,.14), transparent 55%),
+                linear-gradient(165deg, #eef1f6 0%, #e8ecf3 45%, #eef2f8 100%);
+        }
+        .login-aurora__blob{
+            position:absolute;border-radius:50%;filter:blur(64px);opacity:.72;
+            will-change:transform;
+            animation:loginAuroraDrift var(--dur,18s) ease-in-out infinite alternate;
+        }
+        .login-aurora__blob.b1{
+            width:52vw;height:52vw;max-width:720px;max-height:720px;
+            left:-12%;top:-18%;
+            background:radial-gradient(circle at 35% 35%, rgba(99,102,241,.55), rgba(99,102,241,0) 70%);
+            --dur:22s;--dx:8%;--dy:12%;
+        }
+        .login-aurora__blob.b2{
+            width:46vw;height:46vw;max-width:640px;max-height:640px;
+            right:-14%;top:8%;
+            background:radial-gradient(circle at 50% 40%, rgba(14,165,233,.48), rgba(14,165,233,0) 72%);
+            --dur:26s;--dx:-10%;--dy:8%;animation-delay:-4s;
+        }
+        .login-aurora__blob.b3{
+            width:58vw;height:58vw;max-width:780px;max-height:780px;
+            left:18%;bottom:-28%;
+            background:radial-gradient(circle at 45% 40%, rgba(167,139,250,.42), rgba(56,189,248,.12) 55%, transparent 72%);
+            --dur:30s;--dx:6%;--dy:-10%;animation-delay:-9s;
+        }
+        .login-aurora__blob.b4{
+            width:36vw;height:36vw;max-width:480px;max-height:480px;
+            left:42%;top:28%;
+            background:radial-gradient(circle at 50% 50%, rgba(59,130,246,.28), transparent 70%);
+            --dur:18s;--dx:-7%;--dy:9%;animation-delay:-2s;opacity:.55;
+        }
+        .login-aurora__noise{
+            position:absolute;inset:0;opacity:.045;mix-blend-mode:overlay;
+            background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
+            background-size:180px 180px;
+        }
+        .login-aurora__vignette{
+            position:absolute;inset:0;
+            background:radial-gradient(ellipse at center, transparent 40%, rgba(15,23,42,.08) 100%);
+        }
+        @keyframes loginAuroraDrift{
+            0%{transform:translate3d(0,0,0) scale(1)}
+            100%{transform:translate3d(var(--dx,6%),var(--dy,8%),0) scale(1.08)}
+        }
+
+        [data-theme="dark"] .login-aurora{
+            background:
+                radial-gradient(1100px 640px at 15% 20%, rgba(77,158,255,.16), transparent 58%),
+                radial-gradient(900px 560px at 85% 75%, rgba(139,92,246,.14), transparent 55%),
+                linear-gradient(165deg, #12151a 0%, #1a1d21 48%, #151820 100%);
+        }
+        [data-theme="dark"] .login-aurora__blob.b1{
+            background:radial-gradient(circle at 35% 35%, rgba(77,158,255,.42), rgba(77,158,255,0) 70%);
+            opacity:.85;
+        }
+        [data-theme="dark"] .login-aurora__blob.b2{
+            background:radial-gradient(circle at 50% 40%, rgba(139,92,246,.38), rgba(139,92,246,0) 72%);
+            opacity:.8;
+        }
+        [data-theme="dark"] .login-aurora__blob.b3{
+            background:radial-gradient(circle at 45% 40%, rgba(56,189,248,.28), rgba(99,102,241,.16) 50%, transparent 72%);
+            opacity:.75;
+        }
+        [data-theme="dark"] .login-aurora__blob.b4{
+            background:radial-gradient(circle at 50% 50%, rgba(34,211,238,.2), transparent 70%);
+            opacity:.5;
+        }
+        [data-theme="dark"] .login-aurora__noise{opacity:.06}
+        [data-theme="dark"] .login-aurora__vignette{
+            background:radial-gradient(ellipse at center, transparent 35%, rgba(0,0,0,.45) 100%);
+        }
+
+        .page-container{position:relative;z-index:1}
+        .auth-shell{
+            background:rgba(255,255,255,.88)!important;
+            backdrop-filter:saturate(140%) blur(14px);
+            -webkit-backdrop-filter:saturate(140%) blur(14px);
+            border:1px solid rgba(255,255,255,.55);
+        }
+        [data-theme="dark"] .auth-shell{
+            background:rgba(34,38,43,.82)!important;
+            border:1px solid rgba(255,255,255,.06);
+        }
+
+        .hero-panel{
+            position:relative;overflow:hidden;
+            background:
+                radial-gradient(ellipse at 30% 20%, rgba(99,102,241,.12), transparent 55%),
+                radial-gradient(ellipse at 80% 80%, rgba(14,165,233,.1), transparent 50%),
+                var(--panel)!important;
+        }
+        [data-theme="dark"] .hero-panel{
+            background:
+                radial-gradient(ellipse at 30% 20%, rgba(77,158,255,.14), transparent 55%),
+                radial-gradient(ellipse at 80% 80%, rgba(139,92,246,.1), transparent 50%),
+                var(--panel)!important;
+        }
+        .hero-net{
+            position:absolute;inset:0;width:100%;height:100%;
+            pointer-events:none;z-index:0;opacity:.9;
+        }
+        .hero-inner{position:relative;z-index:1}
+        #heroSvg{filter:drop-shadow(0 18px 40px rgba(15,23,42,.12))}
+        [data-theme="dark"] #heroSvg{filter:drop-shadow(0 18px 40px rgba(0,0,0,.35))}
+
+        @media (prefers-reduced-motion: reduce){
+            .login-aurora__blob{animation:none!important}
+            .hero-net{display:none}
+        }
+
     </style>
 </head>
 <body>
+<div class="login-aurora" aria-hidden="true">
+    <div class="login-aurora__blob b1"></div>
+    <div class="login-aurora__blob b2"></div>
+    <div class="login-aurora__blob b3"></div>
+    <div class="login-aurora__blob b4"></div>
+    <div class="login-aurora__noise"></div>
+    <div class="login-aurora__vignette"></div>
+</div>
 <div class="page-container">
     <main class="main-content">
         <div class="auth-shell">
@@ -431,91 +562,165 @@
             </div>
 
             <section class="hero-panel" aria-hidden="true">
+                <canvas id="heroNetCanvas" class="hero-net"></canvas>
                 <div class="hero-inner">
                     <svg id="heroSvg" viewBox="0 0 520 520" xmlns="http://www.w3.org/2000/svg">
-                        <!-- 紫色角色 -->
-                        <g>
-                            <rect x="160" y="130" width="170" height="260" rx="18" fill="#5B3DF6"/>
-                            <circle cx="215" cy="198" r="14" fill="#FFFFFF"/>
-                            <circle cx="275" cy="198" r="14" fill="#FFFFFF"/>
-                            <circle data-pupil="1" data-max="6" cx="215" cy="198" r="5.5" fill="#111827"/>
-                            <circle data-pupil="1" data-max="6" cx="275" cy="198" r="5.5" fill="#111827"/>
-                            <path class="mouth-happy" d="M232 230 C246 240 260 240 274 230" fill="none" stroke="#111827" stroke-width="8" stroke-linecap="round"/>
-                            <path class="mouth-sad" d="M232 244 C246 232 260 232 274 244" fill="none" stroke="#111827" stroke-width="8" stroke-linecap="round"/>
+                        <defs>
+                            <linearGradient id="heroGradMain" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stop-color="#6D8CFF"/>
+                                <stop offset="55%" stop-color="#4D6BFF"/>
+                                <stop offset="100%" stop-color="#3B5BDB"/>
+                            </linearGradient>
+                            <linearGradient id="heroGradEdge" x1="0%" y1="0%" x2="0%" y2="100%">
+                                <stop offset="0%" stop-color="#2A3344"/>
+                                <stop offset="100%" stop-color="#151B26"/>
+                            </linearGradient>
+                            <linearGradient id="heroGradSat" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stop-color="#67E8F9"/>
+                                <stop offset="100%" stop-color="#38BDF8"/>
+                            </linearGradient>
+                            <linearGradient id="heroGradCloud" x1="0%" y1="0%" x2="0%" y2="100%">
+                                <stop offset="0%" stop-color="#A78BFA"/>
+                                <stop offset="100%" stop-color="#7C5CFC"/>
+                            </linearGradient>
+                            <linearGradient id="heroGradGlass" x1="0%" y1="0%" x2="0%" y2="100%">
+                                <stop offset="0%" stop-color="#FFFFFF" stop-opacity=".2"/>
+                                <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+                            </linearGradient>
+                            <filter id="heroSoftShadow" x="-20%" y="-20%" width="140%" height="140%">
+                                <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#0F172A" flood-opacity=".18"/>
+                            </filter>
+                        </defs>
+
+                        <!--
+                          绘制顺序：后 → 前
+                          机柜(后) → 主控 → 卫星 → 云(前) → logo(最前且更靠左)
+                          底边 y=410，脸区互不遮挡
+                        -->
+
+                        <!-- 机柜（后） -->
+                        <g filter="url(#heroSoftShadow)">
+                            <rect x="348" y="178" width="74" height="232" rx="20" fill="url(#heroGradEdge)"/>
+                            <rect x="348" y="178" width="74" height="232" rx="20" fill="url(#heroGradGlass)"/>
+                            <circle cx="385" cy="198" r="3.8" fill="#34D399"/>
+                            <circle cx="368" cy="242" r="11.5" fill="#FFFFFF"/>
+                            <circle cx="402" cy="242" r="11.5" fill="#FFFFFF"/>
+                            <circle data-pupil="1" data-max="5" cx="368" cy="242" r="4.4" fill="#0F172A"/>
+                            <circle data-pupil="1" data-max="5" cx="402" cy="242" r="4.4" fill="#0F172A"/>
+                            <path class="mouth-happy" d="M372 270 L398 270" fill="none" stroke="#E2E8F0" stroke-width="3.8" stroke-linecap="round" opacity=".9"/>
+                            <path class="mouth-sad" d="M372 276 C380 266 390 266 398 276" fill="none" stroke="#E2E8F0" stroke-width="3.8" stroke-linecap="round"/>
                             <g class="tears">
-                                <ellipse class="tear" cx="208" cy="218" rx="3.2" ry="5" fill="#7DD3FC"/>
-                                <ellipse class="tear" cx="282" cy="218" rx="3.2" ry="5" fill="#7DD3FC"/>
+                                <ellipse class="tear" cx="360" cy="258" rx="2.3" ry="3.6" fill="#7DD3FC"/>
+                                <ellipse class="tear" cx="410" cy="258" rx="2.3" ry="3.6" fill="#7DD3FC"/>
+                            </g>
+                            <rect x="364" y="310" width="40" height="5" rx="2.5" fill="#38BDF8" opacity=".5"/>
+                            <rect x="364" y="326" width="40" height="5" rx="2.5" fill="#64748B" opacity=".45"/>
+                            <rect x="364" y="342" width="26" height="5" rx="2.5" fill="#64748B" opacity=".35"/>
+                        </g>
+
+                        <!-- 主控 -->
+                        <g filter="url(#heroSoftShadow)">
+                            <rect x="200" y="112" width="156" height="298" rx="36" fill="url(#heroGradMain)"/>
+                            <rect x="200" y="112" width="156" height="298" rx="36" fill="url(#heroGradGlass)"/>
+                            <ellipse cx="278" cy="112" rx="26" ry="8.5" fill="none" stroke="#C7D2FE" stroke-width="3" opacity=".8"/>
+                            <circle cx="278" cy="102" r="5.5" fill="#E0E7FF"/>
+                            <line x1="278" y1="108" x2="278" y2="120" stroke="#C7D2FE" stroke-width="3" stroke-linecap="round"/>
+                            <rect x="218" y="140" width="10" height="10" rx="2.5" fill="#67E8F9"/>
+                            <rect x="232" y="140" width="10" height="10" rx="2.5" fill="#A5B4FC" opacity=".9"/>
+                            <rect x="246" y="140" width="10" height="10" rx="2.5" fill="#FFFFFF" opacity=".3"/>
+                            <circle cx="248" cy="208" r="16" fill="#FFFFFF"/>
+                            <circle cx="308" cy="208" r="16" fill="#FFFFFF"/>
+                            <circle data-pupil="1" data-max="6.5" cx="248" cy="208" r="6.2" fill="#0F172A"/>
+                            <circle data-pupil="1" data-max="6.5" cx="308" cy="208" r="6.2" fill="#0F172A"/>
+                            <path class="mouth-happy" d="M260 248 C274 266 292 266 306 248" fill="none" stroke="#0F172A" stroke-width="7.5" stroke-linecap="round"/>
+                            <path class="mouth-sad" d="M260 264 C274 246 292 246 306 264" fill="none" stroke="#0F172A" stroke-width="7.5" stroke-linecap="round"/>
+                            <g class="tears">
+                                <ellipse class="tear" cx="236" cy="230" rx="3.2" ry="5" fill="#7DD3FC"/>
+                                <ellipse class="tear" cx="320" cy="230" rx="3.2" ry="5" fill="#7DD3FC"/>
+                            </g>
+                            <rect x="236" y="318" width="80" height="7" rx="3.5" fill="#FFFFFF" opacity=".18"/>
+                            <rect x="250" y="338" width="52" height="6" rx="3" fill="#FFFFFF" opacity=".12"/>
+                        </g>
+
+                        <!-- 卫星 -->
+                        <g filter="url(#heroSoftShadow)">
+                            <circle cx="462" cy="358" r="52" fill="url(#heroGradSat)"/>
+                            <circle cx="462" cy="358" r="52" fill="url(#heroGradGlass)"/>
+                            <ellipse cx="462" cy="358" rx="58" ry="14" fill="none" stroke="#E0F2FE" stroke-width="2.2" opacity=".5" transform="rotate(-14 462 358)"/>
+                            <circle cx="442" cy="344" r="11" fill="#FFFFFF"/>
+                            <circle cx="480" cy="344" r="11" fill="#FFFFFF"/>
+                            <circle data-pupil="1" data-max="4.5" cx="442" cy="344" r="4.2" fill="#0F172A"/>
+                            <circle data-pupil="1" data-max="4.5" cx="480" cy="344" r="4.2" fill="#0F172A"/>
+                            <path class="mouth-happy" d="M448 376 L476 376" fill="none" stroke="#0F172A" stroke-width="5" stroke-linecap="round"/>
+                            <path class="mouth-sad" d="M450 384 C458 372 466 372 474 384" fill="none" stroke="#0F172A" stroke-width="5" stroke-linecap="round"/>
+                            <g class="tears">
+                                <ellipse class="tear" cx="434" cy="360" rx="2.5" ry="3.8" fill="#BAE6FD"/>
+                                <ellipse class="tear" cx="488" cy="360" rx="2.5" ry="3.8" fill="#BAE6FD"/>
                             </g>
                         </g>
 
-                        <!-- 黑色角色 -->
-                        <g>
-                            <rect x="320" y="175" width="70" height="215" rx="16" fill="#111827"/>
-                            <circle cx="342" cy="230" r="10" fill="#FFFFFF"/>
-                            <circle cx="368" cy="230" r="10" fill="#FFFFFF"/>
-                            <circle data-pupil="1" data-max="5" cx="342" cy="230" r="4" fill="#111827"/>
-                            <circle data-pupil="1" data-max="5" cx="368" cy="230" r="4" fill="#111827"/>
-                            <path class="mouth-happy" d="M346 252 L364 252" fill="none" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" opacity=".55"/>
-                            <path class="mouth-sad" d="M346 258 C352 252 358 252 364 258" fill="none" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round"/>
+                        <!-- 云（前）：平滑单路径，GCP/Material 云图标比例 -->
+                        <g filter="url(#heroSoftShadow)">
+                            <!-- 底边 y=410；左瓣→顶瓣→右瓣，圆润连续 -->
+                            <path fill="url(#heroGradCloud)" d="
+                                M 86 410
+                                C 64 410 48 394 48 372
+                                C 48 352 62 336 82 332
+                                C 86 304 110 284 140 284
+                                C 156 260 186 248 216 256
+                                C 236 240 266 244 282 266
+                                C 310 270 330 294 330 322
+                                C 354 328 370 350 370 376
+                                C 370 398 352 410 328 410
+                                Z"/>
+                            <path fill="url(#heroGradGlass)" d="
+                                M 86 410
+                                C 64 410 48 394 48 372
+                                C 48 352 62 336 82 332
+                                C 86 304 110 284 140 284
+                                C 156 260 186 248 216 256
+                                C 236 240 266 244 282 266
+                                C 310 270 330 294 330 322
+                                C 354 328 370 350 370 376
+                                C 370 398 352 410 328 410
+                                Z"/>
+                            <circle cx="148" cy="328" r="15" fill="#FFFFFF"/>
+                            <circle cx="200" cy="328" r="15" fill="#FFFFFF"/>
+                            <circle data-pupil="1" data-max="6" cx="148" cy="328" r="5.8" fill="#0F172A"/>
+                            <circle data-pupil="1" data-max="6" cx="200" cy="328" r="5.8" fill="#0F172A"/>
+                            <path class="mouth-happy" d="M158 362 C172 378 188 378 202 362" fill="none" stroke="#0F172A" stroke-width="7.5" stroke-linecap="round"/>
+                            <path class="mouth-sad" d="M158 374 C172 358 188 358 202 374" fill="none" stroke="#0F172A" stroke-width="7.5" stroke-linecap="round"/>
                             <g class="tears">
-                                <ellipse class="tear" cx="338" cy="245" rx="2.4" ry="4" fill="#7DD3FC"/>
-                                <ellipse class="tear" cx="372" cy="245" rx="2.4" ry="4" fill="#7DD3FC"/>
+                                <ellipse class="tear" cx="136" cy="348" rx="3.2" ry="5" fill="#7DD3FC"/>
+                                <ellipse class="tear" cx="212" cy="348" rx="3.2" ry="5" fill="#7DD3FC"/>
                             </g>
                         </g>
 
-                        <!-- 黄色角色 -->
-                        <g>
-                            <rect x="396" y="220" width="108" height="190" rx="44" fill="#F4C21A"/>
-                            <circle cx="430" cy="268" r="12" fill="#FFFFFF"/>
-                            <circle cx="470" cy="268" r="12" fill="#FFFFFF"/>
-                            <circle data-pupil="1" data-max="5" cx="430" cy="268" r="4.5" fill="#111827"/>
-                            <circle data-pupil="1" data-max="5" cx="470" cy="268" r="4.5" fill="#111827"/>
-                            <path class="mouth-happy" d="M434 298 L486 298" stroke="#111827" stroke-width="8" stroke-linecap="round"/>
-                            <path class="mouth-sad" d="M438 308 C452 296 468 296 482 308" fill="none" stroke="#111827" stroke-width="8" stroke-linecap="round"/>
+                        <!-- logo 角色：更靠左 -->
+                        <g id="ociBuddy" filter="url(#heroSoftShadow)">
+                            <rect x="12" y="356" width="120" height="54" rx="18" fill="#0F172A" opacity=".95"/>
+                            <rect x="12" y="356" width="120" height="54" rx="18" fill="url(#heroGradGlass)"/>
+                            <circle cx="24" cy="368" r="2.8" fill="#34D399"/>
+                            <circle cx="44" cy="378" r="10" fill="#FFFFFF"/>
+                            <circle cx="74" cy="378" r="10" fill="#FFFFFF"/>
+                            <circle data-pupil="1" data-max="6" cx="44" cy="378" r="4.2" fill="#0F172A"/>
+                            <circle data-pupil="1" data-max="6" cx="74" cy="378" r="4.2" fill="#0F172A"/>
+                            <path class="mouth-happy" d="M52 394 C56 398 62 398 66 394" fill="none" stroke="#E2E8F0" stroke-width="2.6" stroke-linecap="round" opacity=".9"/>
+                            <path class="mouth-sad" d="M52 398 C56 394 62 394 66 398" fill="none" stroke="#E2E8F0" stroke-width="2.6" stroke-linecap="round"/>
                             <g class="tears">
-                                <ellipse class="tear" cx="424" cy="286" rx="3" ry="4.5" fill="#38BDF8"/>
-                                <ellipse class="tear" cx="476" cy="286" rx="3" ry="4.5" fill="#38BDF8"/>
+                                <ellipse class="tear" cx="36" cy="390" rx="2" ry="3" fill="#7DD3FC"/>
+                                <ellipse class="tear" cx="82" cy="390" rx="2" ry="3" fill="#7DD3FC"/>
                             </g>
-                        </g>
-
-                        <!-- 橙色角色 -->
-                        <g>
-                            <path d="M70 410 C70 320 140 250 230 250 C320 250 390 320 390 410" fill="#FF7A3B"/>
-                            <circle cx="160" cy="332" r="16" fill="#FFFFFF"/>
-                            <circle cx="220" cy="332" r="16" fill="#FFFFFF"/>
-                            <circle data-pupil="1" data-max="6" cx="160" cy="332" r="6" fill="#111827"/>
-                            <circle data-pupil="1" data-max="6" cx="220" cy="332" r="6" fill="#111827"/>
-                            <path class="mouth-happy" d="M170 368 C186 386 210 386 226 368" fill="none" stroke="#111827" stroke-width="10" stroke-linecap="round"/>
-                            <path class="mouth-sad" d="M170 386 C186 368 210 368 226 386" fill="none" stroke="#111827" stroke-width="10" stroke-linecap="round"/>
-                            <g class="tears">
-                                <ellipse class="tear" cx="152" cy="354" rx="3.5" ry="5.5" fill="#7DD3FC"/>
-                                <ellipse class="tear" cx="228" cy="354" rx="3.5" ry="5.5" fill="#7DD3FC"/>
-                            </g>
-                        </g>
-
-                        <!-- oci-start 小条 -->
-                        <g id="ociBuddy">
-                            <rect x="10" y="350" width="140" height="60" rx="20" fill="#111827" opacity="0.92"/>
-                            <circle cx="62" cy="372" r="12" fill="#FFFFFF"/>
-                            <circle cx="98" cy="372" r="12" fill="#FFFFFF"/>
-                            <circle data-pupil="1" data-max="8" cx="62" cy="372" r="5.5" fill="#111827"/>
-                            <circle data-pupil="1" data-max="8" cx="98" cy="372" r="5.5" fill="#111827"/>
-                            <path class="mouth-happy" d="M70 388 C76 392 84 392 90 388" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" opacity=".7"/>
-                            <path class="mouth-sad" d="M70 392 C76 388 84 388 90 392" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round"/>
-                            <g class="tears">
-                                <ellipse class="tear" cx="58" cy="386" rx="2.2" ry="3.5" fill="#7DD3FC"/>
-                                <ellipse class="tear" cx="102" cy="386" rx="2.2" ry="3.5" fill="#7DD3FC"/>
-                            </g>
-                            <text x="80" y="398" text-anchor="middle"
-                                  font-size="15"
+                            <text x="108" y="382" text-anchor="middle"
+                                  font-size="11"
                                   font-family="system-ui, -apple-system, Segoe UI, Roboto"
-                                  font-weight="900"
-                                  fill="#FFFFFF">oci-start</text>
-                        </g>
-
-                        <g opacity=".22">
-                            <path d="M62 118 L98 94" stroke="#111827" stroke-width="8" stroke-linecap="round"/>
-                            <path d="M92 136 L126 112" stroke="#111827" stroke-width="8" stroke-linecap="round"/>
+                                  font-weight="800"
+                                  fill="#93C5FD">oci</text>
+                            <text x="108" y="398" text-anchor="middle"
+                                  font-size="11"
+                                  font-family="system-ui, -apple-system, Segoe UI, Roboto"
+                                  font-weight="800"
+                                  fill="#E2E8F0">start</text>
                         </g>
                     </svg>
                 </div>
@@ -1019,6 +1224,121 @@
         } else {
             initEyeTrack();
         }
+    })();
+</script>
+<script>
+    /* 左栏节点网络：慢漂移 + 近距连线，不挡角色 SVG */
+    (function () {
+        if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+        var canvas = document.getElementById('heroNetCanvas');
+        if (!canvas) return;
+        var ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        var panel = canvas.parentElement;
+        var nodes = [];
+        var dpr = Math.min(window.devicePixelRatio || 1, 2);
+        var w = 0, h = 0, running = true, raf = 0;
+
+        function isDark() {
+            return document.documentElement.dataset.theme === 'dark';
+        }
+
+        function resize() {
+            var rect = panel.getBoundingClientRect();
+            w = Math.max(1, Math.floor(rect.width));
+            h = Math.max(1, Math.floor(rect.height));
+            canvas.width = Math.floor(w * dpr);
+            canvas.height = Math.floor(h * dpr);
+            canvas.style.width = w + 'px';
+            canvas.style.height = h + 'px';
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            seedNodes();
+        }
+
+        function seedNodes() {
+            var count = Math.max(18, Math.min(36, Math.floor((w * h) / 14000)));
+            nodes = [];
+            for (var i = 0; i < count; i++) {
+                nodes.push({
+                    x: Math.random() * w,
+                    y: Math.random() * h,
+                    vx: (Math.random() - 0.5) * 0.28,
+                    vy: (Math.random() - 0.5) * 0.28,
+                    r: 1.2 + Math.random() * 1.8
+                });
+            }
+        }
+
+        function step() {
+            if (!running) return;
+            var dark = isDark();
+            var lineBase = dark ? '77,158,255' : '99,102,241';
+            var nodeFill = dark ? 'rgba(125, 211, 252, 0.85)' : 'rgba(79, 70, 229, 0.75)';
+            var maxDist = Math.min(140, Math.max(90, w * 0.22));
+
+            ctx.clearRect(0, 0, w, h);
+
+            for (var i = 0; i < nodes.length; i++) {
+                var n = nodes[i];
+                n.x += n.vx;
+                n.y += n.vy;
+                if (n.x < -8) n.x = w + 8;
+                if (n.x > w + 8) n.x = -8;
+                if (n.y < -8) n.y = h + 8;
+                if (n.y > h + 8) n.y = -8;
+            }
+
+            for (var a = 0; a < nodes.length; a++) {
+                for (var b = a + 1; b < nodes.length; b++) {
+                    var dx = nodes[a].x - nodes[b].x;
+                    var dy = nodes[a].y - nodes[b].y;
+                    var dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist > maxDist) continue;
+                    var alpha = (1 - dist / maxDist) * (dark ? 0.28 : 0.22);
+                    ctx.strokeStyle = 'rgba(' + lineBase + ',' + alpha.toFixed(3) + ')';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(nodes[a].x, nodes[a].y);
+                    ctx.lineTo(nodes[b].x, nodes[b].y);
+                    ctx.stroke();
+                }
+            }
+
+            for (var k = 0; k < nodes.length; k++) {
+                var p = nodes[k];
+                ctx.beginPath();
+                ctx.fillStyle = nodeFill;
+                ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.fillStyle = dark ? 'rgba(77,158,255,0.12)' : 'rgba(99,102,241,0.1)';
+                ctx.arc(p.x, p.y, p.r * 3.2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            raf = requestAnimationFrame(step);
+        }
+
+        function onVisibility() {
+            if (document.hidden) {
+                running = false;
+                if (raf) cancelAnimationFrame(raf);
+            } else {
+                running = true;
+                raf = requestAnimationFrame(step);
+            }
+        }
+
+        var ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(function () { resize(); }) : null;
+        if (ro) ro.observe(panel);
+        window.addEventListener('resize', resize, { passive: true });
+        document.addEventListener('visibilitychange', onVisibility);
+
+        // 主题切换后下一帧自动读 isDark
+        resize();
+        raf = requestAnimationFrame(step);
     })();
 </script>
 <script src="/js/login/login_user_v1.js"></script>
