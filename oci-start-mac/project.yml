@@ -16,12 +16,14 @@ targets:
     sources:
       - path: OciStart
         createIntermediateGroups: true
+        excludes:
+          - "**/*.md"
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.doubledimple.ocistart
         MARKETING_VERSION: "1.0.0"
         CURRENT_PROJECT_VERSION: "1"
-        SWIFT_VERSION: "5.9"
+        SWIFT_VERSION: "5.5"
         MACOSX_DEPLOYMENT_TARGET: "11.0"
         ENABLE_HARDENED_RUNTIME: YES
         PRODUCT_NAME: OciStart

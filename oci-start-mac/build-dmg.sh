@@ -342,11 +342,10 @@ STAGED_APP="$BUILD_DIR/$APP_NAME.app"
 rm -rf "$STAGED_APP"
 cp -R "$APP_IN_ARCHIVE" "$STAGED_APP"
 
-PLUGINS_DIR="$STAGED_APP/Contents/PlugIns"
 RESOURCES_DIR="$STAGED_APP/Contents/Resources"
-mkdir -p "$PLUGINS_DIR" "$RESOURCES_DIR"
+mkdir -p "$RESOURCES_DIR"
 
-# 注入 JRE（HOST_ARCH_ONLY=1 时仅打本机架构，减小 DMG）
+# 注入 JRE 到 Resources（不要放 PlugIns：否则 codesign 把 jre 当插件子包，注入后签名必坏）
 HOST_ARCH="$(uname -m)"
 if [ "$HOST_ARCH" = "arm64" ]; then
     HOST_JRE_ARCH="arm64"
@@ -357,26 +356,92 @@ fi
 inject_jre() {
     local arch=$1
     local src="$CACHE_DIR/jre-$arch"
+    local dest="$RESOURCES_DIR/jre-$arch"
     if [ ! -x "$src/bin/java" ]; then
         echo "❌ 缺少 JRE: $src"
         exit 1
     fi
-    cp -R "$src" "$PLUGINS_DIR/jre-$arch"
-    chmod +x "$PLUGINS_DIR/jre-$arch/bin/java"
+    rm -rf "$dest"
+    cp -R "$src" "$dest"
+    # legal/ 等文本目录会干扰 codesign 子组件识别，运行不需要
+    rm -rf "$dest/legal" 2>/dev/null || true
+    chmod +x "$dest/bin/"* 2>/dev/null || true
+    chmod +x "$dest/lib/jspawnhelper" 2>/dev/null || true
 }
 
 if [ "${HOST_ARCH_ONLY:-0}" = "1" ]; then
-    echo "ℹ️  HOST_ARCH_ONLY=1，仅注入 $HOST_JRE_ARCH"
+    echo "ℹ️  HOST_ARCH_ONLY=1，仅注入 $HOST_JRE_ARCH → Resources/"
     inject_jre "$HOST_JRE_ARCH"
 else
     inject_jre "arm64"
     inject_jre "x86_64"
 fi
-echo "✅ JRE 已注入 ($(du -sh "$PLUGINS_DIR" | cut -f1))"
+echo "✅ JRE 已注入 Resources ($(du -sh "$RESOURCES_DIR"/jre-* 2>/dev/null | awk '{s+=$1} END{print s}') )"
 
 # 注入 JAR
 cp "$JAR_PATH" "$RESOURCES_DIR/server.jar"
 echo "✅ server.jar 已注入 ($(du -sh "$RESOURCES_DIR/server.jar" | cut -f1))"
+
+# 注入后必须重签，否则 Finder 会提示「已损坏 / 打不开」
+echo ""
+echo "🔏  注入后重新 ad-hoc 签名…"
+ENTITLEMENTS_FILE="$MAC_DIR/OciStart/OciStart.entitlements"
+RUNTIME_ENTS="$BUILD_DIR/runtime.entitlements"
+cat > "$RUNTIME_ENTS" <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.app-sandbox</key>
+	<false/>
+	<key>com.apple.security.network.client</key>
+	<true/>
+	<key>com.apple.security.network.server</key>
+	<true/>
+	<key>com.apple.security.cs.disable-library-validation</key>
+	<true/>
+	<key>com.apple.security.cs.allow-jit</key>
+	<true/>
+	<key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+	<true/>
+	<key>com.apple.security.cs.allow-dyld-environment-variables</key>
+	<true/>
+</dict>
+</plist>
+EOF
+
+# 清掉 archive 旧签
+rm -rf "$STAGED_APP/Contents/_CodeSignature"
+
+# 嵌套 Mach-O（JRE / Frameworks）先签
+sign_machos() {
+    local root=$1
+    [ -d "$root" ] || return 0
+    find "$root" -type f 2>/dev/null | while read -r f; do
+        case "$(file -b "$f" 2>/dev/null || true)" in
+            *Mach-O*)
+                codesign --force --sign - --options runtime \
+                    --entitlements "$RUNTIME_ENTS" "$f" 2>/dev/null || true
+                ;;
+        esac
+    done
+}
+sign_machos "$RESOURCES_DIR"
+sign_machos "$STAGED_APP/Contents/Frameworks"
+
+codesign --force --sign - --options runtime \
+    --entitlements "$RUNTIME_ENTS" \
+    "$STAGED_APP/Contents/MacOS/$APP_NAME"
+
+codesign --force --sign - --options runtime \
+    --entitlements "$RUNTIME_ENTS" \
+    "$STAGED_APP"
+
+if codesign --verify --verbose=2 "$STAGED_APP" 2>&1; then
+    echo "✅ 签名校验通过"
+else
+    echo "⚠️  签名校验未完全通过（本机 ad-hoc 仍可能可开）；请用 xattr -cr 后 open 试"
+fi
 
 echo "📦 App bundle 总大小: $(du -sh "$STAGED_APP" | cut -f1)"
 
