@@ -51,6 +51,7 @@ import java.util.Map;
 
 import static com.doubledimple.ociserver.utils.oracle.OciComputerUtils.buildSimpleAllNetWork;
 import static com.doubledimple.ociserver.utils.oracle.OciUtils.getProvider;
+import com.doubledimple.ociserver.config.ProxyContext;
 
 /**
  * @version 1.0.0
@@ -96,7 +97,7 @@ public class OciDbUtils {
         Map<String, String> metaData = new HashMap<>();
         metaData.put(ORIGINAL_ADMIN,adminUser);
         metaData.put(ORIGINAL_ADMIN_PASSWORD,adminPass);
-        try(DbSystemClient mysqlClient = DbSystemClient.builder().build(provider)) {
+        try(DbSystemClient mysqlClient = DbSystemClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             UpdateDbSystemRequest request = UpdateDbSystemRequest.builder()
                     .dbSystemId(dbId)
                     .updateDbSystemDetails(UpdateDbSystemDetails.builder()
@@ -125,7 +126,7 @@ public class OciDbUtils {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
         String compartmentId = provider.getTenantId();
 
-        try (DbSystemClient mysqlClient = DbSystemClient.builder().build(provider)) {
+        try (DbSystemClient mysqlClient = DbSystemClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             ListDbSystemsRequest listRequest =
                     com.oracle.bmc.mysql.requests.ListDbSystemsRequest.builder()
                             .compartmentId(compartmentId)
@@ -162,7 +163,7 @@ public class OciDbUtils {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
         String compartmentId = provider.getTenantId();
 
-        try (DbSystemClient mysqlClient = DbSystemClient.builder().build(provider)) {
+        try (DbSystemClient mysqlClient = DbSystemClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             ListDbSystemsRequest listRequest = ListDbSystemsRequest.builder()
                     .compartmentId(compartmentId)
                     .displayName(displayName)
@@ -218,7 +219,7 @@ public class OciDbUtils {
         if (!b) {
             return false;
         }
-        try (DbSystemClient mysqlClient = DbSystemClient.builder().build(provider)) {
+        try (DbSystemClient mysqlClient = DbSystemClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             DeleteDbSystemRequest request = DeleteDbSystemRequest.builder()
                     .dbSystemId(dbSystemId)
                     .build();
@@ -243,7 +244,7 @@ public class OciDbUtils {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
         List<ShapeSummary> shapes = new ArrayList<>();
 
-        try (MysqlaasClient client = MysqlaasClient.builder().build(provider)) {
+        try (MysqlaasClient client = MysqlaasClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             ListShapesRequest.Builder builder = ListShapesRequest.builder();
             builder.compartmentId(provider.getTenantId());
             builder.isSupportedFor(Collections.singletonList(ListShapesRequest.IsSupportedFor.Dbsystem));
@@ -338,7 +339,7 @@ public class OciDbUtils {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
         String compartmentId = provider.getTenantId();
 
-        try (NetworkLoadBalancerClient nlbClient = NetworkLoadBalancerClient.builder().build(provider)) {
+        try (NetworkLoadBalancerClient nlbClient = NetworkLoadBalancerClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
 
             log.info("checking ths same name {} nlb...", displayName);
             ListNetworkLoadBalancersRequest listRequest = ListNetworkLoadBalancersRequest.builder()
@@ -413,7 +414,7 @@ public class OciDbUtils {
             provider = getProvider(tenant);
         }
         String compartmentId = provider.getTenantId();
-        try (NetworkLoadBalancerClient nlbClient = NetworkLoadBalancerClient.builder().build(provider)) {
+        try (NetworkLoadBalancerClient nlbClient = NetworkLoadBalancerClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
 
             ListNetworkLoadBalancersRequest listRequest = ListNetworkLoadBalancersRequest.builder()
                     .compartmentId(compartmentId)
@@ -510,7 +511,7 @@ public class OciDbUtils {
      */
     public static DbConfig getDbSystemDetail(Tenant tenant, DbConfig dbConfig) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
-        try (DbSystemClient mysqlClient = DbSystemClient.builder().build(provider)) {
+        try (DbSystemClient mysqlClient = DbSystemClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             GetDbSystemRequest request = GetDbSystemRequest.builder()
                     .dbSystemId(dbConfig.getDbId())
                     .build();

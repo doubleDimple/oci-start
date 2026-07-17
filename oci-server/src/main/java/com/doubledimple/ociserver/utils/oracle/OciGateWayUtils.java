@@ -18,6 +18,7 @@ import java.util.Optional;
 
 import static com.doubledimple.ociserver.utils.oracle.OciUtils.getProvider;
 import static com.doubledimple.ociserver.utils.oracle.OciUtils.queryRegions;
+import com.doubledimple.ociserver.config.ProxyContext;
 
 /**
  * @version 1.0.0
@@ -42,7 +43,7 @@ public class OciGateWayUtils {
                 .findFirst();
         if (!first.isPresent()) return null;
         RegionSubscription regionSubscription = first.get();
-        try (SubscriptionServiceClient subscriptionServiceClient = SubscriptionServiceClient.builder().build(provider)) {
+        try (SubscriptionServiceClient subscriptionServiceClient = SubscriptionServiceClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             // 首先获取订阅列表
             ListSubscriptionsRequest listRequest = ListSubscriptionsRequest.builder()
                     .compartmentId(provider.getTenantId())

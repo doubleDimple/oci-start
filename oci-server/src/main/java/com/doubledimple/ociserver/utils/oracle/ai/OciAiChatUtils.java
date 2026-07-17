@@ -36,6 +36,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import static com.doubledimple.ociserver.utils.oracle.OciUtils.getProvider;
+import com.doubledimple.ociserver.config.ProxyContext;
 
 /**
  * Oracle Cloud AI 对话工具类
@@ -400,7 +401,7 @@ public class OciAiChatUtils {
     public List<com.oracle.bmc.generativeai.model.ModelSummary> getAllAvailableModels(Tenant tenant) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
         GenerativeAiClient client = GenerativeAiClient.builder()
-                .build(provider);
+                .clientConfigurator(ProxyContext.get()).build(provider);
 
         com.oracle.bmc.generativeai.requests.ListModelsRequest request = com.oracle.bmc.generativeai.requests.ListModelsRequest.builder()
                 .compartmentId(provider.getTenantId())

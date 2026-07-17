@@ -5,6 +5,8 @@ let currentPage = 1;
 let pageSize = 10;
 let totalPages = 0;
 const i18n = window.I18N;
+/** @type {{id:string,name:string}[]} */
+let parentTenants = [];
 
 document.addEventListener('DOMContentLoaded', function() {
 
@@ -27,7 +29,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    loadProxyList(1);
+    loadParentTenants().finally(function() {
+        loadProxyList(1);
+    });
 
     document.querySelectorAll('.view-toggle .btn').forEach(btn => {
         btn.addEventListener('click', function() {
@@ -52,6 +56,46 @@ function switchView(view) {
         gridView.style.display = 'grid';
     }
     localStorage.setItem('preferredView', view);
+}
+
+function loadParentTenants() {
+    return fetch('/tenants/listParentTenants', {
+        method: 'GET',
+        headers: {
+            'Accept': 'application/json',
+            [csrfHeaderName]: csrfToken
+        }
+    })
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            var list = Array.isArray(data) ? data : (data && data.data ? data.data : []);
+            parentTenants = (list || []).map(function(t) {
+                var id = t.id != null ? String(t.id) : '';
+                var name = t.tenancyName || t.userName || t.tenantId || ('#' + id);
+                return { id: id, name: name };
+            });
+            fillTenantSelect('');
+        })
+        .catch(function(err) {
+            console.warn('load parent tenants failed', err);
+            parentTenants = [];
+            fillTenantSelect('');
+        });
+}
+
+function fillTenantSelect(selectedId) {
+    var select = document.getElementById('tenantId');
+    if (!select) return;
+    var html = '<option value="">' + (i18n.vpn_tenant_global || '全局共享') + '</option>';
+    for (var i = 0; i < parentTenants.length; i++) {
+        var t = parentTenants[i];
+        var sel = (selectedId != null && String(selectedId) === String(t.id)) ? ' selected' : '';
+        html += '<option value="' + escapeHtml(t.id) + '"' + sel + '>' + escapeHtml(t.name) + '</option>';
+    }
+    select.innerHTML = html;
+    if (typeof CustomSelect !== 'undefined') {
+        CustomSelect.refresh(select);
+    }
 }
 
 function loadProxyList(pageNum) {
@@ -88,7 +132,6 @@ function loadProxyList(pageNum) {
 }
 
 
-
 function renderGridView(data) {
     const gridView = document.getElementById('gridView');
     if (!data || data.length === 0) {
@@ -105,6 +148,7 @@ function renderGridView(data) {
 
         const username = record.proxyUsername || '-';
         const password = record.proxyPassword || '';
+        const tenantLabel = formatTenantLabel(record);
 
         html += '<div class="instance-card">';
         html += '<div class="instance-card-header">';
@@ -118,10 +162,11 @@ function renderGridView(data) {
         html += '<div class="instance-info-item"><span class="info-label">'+i18n.vpn_port+':</span><span class="info-value">' + record.proxyPort + '</span></div>';
         html += '<div class="instance-info-item"><span class="info-label">'+i18n.vpn_name+':</span><span class="info-value">' + username + '</span></div>';
         html += '<div class="instance-info-item"><span class="info-label">'+i18n.vpn_pass+':</span><span class="info-value"><span class="password-field" data-password="' + password + '" onclick="togglePassword(this)">********</span></span></div>';
+        html += '<div class="instance-info-item"><span class="info-label">'+i18n.vpn_tenant+':</span><span class="info-value">' + tenantLabel + '</span></div>';
         html += '<div class="instance-info-item"><span class="info-label">'+i18n.vpn_status+':</span><span class="info-value">' + statusHtml + '</span></div>';
         html += '</div>';
         html += '<div class="instance-actions">';
-        html += '<button class="btn btn-primary btn-icon" onclick="openEditModal(' + record.id + ', \'' + record.proxyType + '\', \'' + record.proxyHost + '\', ' + record.proxyPort + ', \'' + (record.proxyUsername || '') + '\', \'' + (record.proxyPassword || '') + '\', ' + record.availableStatus + ')"><i class="fas fa-edit"></i></button>';
+        html += '<button class="btn btn-primary btn-icon" onclick="openEditModalFromRecord(' + record.id + ')"><i class="fas fa-edit"></i></button>';
         html += '<button class="btn btn-danger btn-icon" onclick="handleDelete(' + record.id + ')"><i class="fas fa-trash"></i></button>';
         html += '</div>';
         html += '</div>';
@@ -166,6 +211,7 @@ function refreshProxyModalSelects() {
     if (typeof CustomSelect === 'undefined') return;
     CustomSelect.refresh(document.getElementById('proxyType'));
     CustomSelect.refresh(document.getElementById('availableStatus'));
+    CustomSelect.refresh(document.getElementById('tenantId'));
 }
 
 function openAddModal() {
@@ -173,12 +219,16 @@ function openAddModal() {
     document.getElementById('proxyForm').reset();
     document.getElementById('proxyId').value = '';
     document.getElementById('modalTitle').textContent = '新增代理';
+    fillTenantSelect('');
     refreshProxyModalSelects();
     modal.style.display = 'flex';
     setTimeout(() => { modal.style.opacity = '1'; }, 50);
 }
 
-function openEditModal(id, proxyType, proxyHost, proxyPort, proxyUsername, proxyPassword, availableStatus) {
+/** 列表缓存，编辑时取完整字段（含 tenantId） */
+var proxyListCache = {};
+
+function openEditModal(id, proxyType, proxyHost, proxyPort, proxyUsername, proxyPassword, availableStatus, tenantId) {
     const modal = document.getElementById('proxyModal');
     document.getElementById('proxyId').value = id;
     document.getElementById('proxyType').value = proxyType;
@@ -187,10 +237,29 @@ function openEditModal(id, proxyType, proxyHost, proxyPort, proxyUsername, proxy
     document.getElementById('proxyUsername').value = proxyUsername || '';
     document.getElementById('proxyPassword').value = proxyPassword || '';
     document.getElementById('availableStatus').value = availableStatus;
+    fillTenantSelect(tenantId != null && tenantId !== '' ? tenantId : '');
     document.getElementById('modalTitle').textContent = i18n.vpn_edit;
     refreshProxyModalSelects();
     modal.style.display = 'flex';
     setTimeout(() => { modal.style.opacity = '1'; }, 50);
+}
+
+function openEditModalFromRecord(id) {
+    var record = proxyListCache[id];
+    if (!record) {
+        Swal.fire({ title: 'error', text: 'record not found', icon: 'error' });
+        return;
+    }
+    openEditModal(
+        record.id,
+        record.proxyType,
+        record.proxyHost,
+        record.proxyPort,
+        record.proxyUsername || '',
+        record.proxyPassword || '',
+        record.availableStatus,
+        record.tenantId
+    );
 }
 
 function closeProxyModal() {
@@ -209,6 +278,7 @@ function handleSaveProxy(event) {
     const proxyUsername = document.getElementById('proxyUsername').value;
     const proxyPassword = document.getElementById('proxyPassword').value;
     const availableStatus = document.getElementById('availableStatus').value;
+    const tenantIdRaw = document.getElementById('tenantId').value;
 
     if (!proxyType || !proxyHost || !proxyPort) {
         Swal.fire({ title: 'error', text: i18n.common_plzInputGlobalRequired, icon: 'warning', confirmButtonColor: '#ff9800' });
@@ -227,7 +297,8 @@ function handleSaveProxy(event) {
         proxyPort: parseInt(proxyPort),
         proxyUsername: proxyUsername || null,
         proxyPassword: proxyPassword || null,
-        availableStatus: parseInt(availableStatus)
+        availableStatus: parseInt(availableStatus),
+        tenantId: tenantIdRaw ? parseInt(tenantIdRaw) : null
     };
     fetch('/vpnProxy/saveOrUpdate', {
         method: 'POST',
@@ -301,10 +372,29 @@ function togglePassword(element) {
     }
 }
 
+function formatTenantLabel(record) {
+    if (record.tenantId == null || record.tenantId === '') {
+        return '<span style="color: var(--text-secondary);">' + (i18n.vpn_tenant_global || '全局共享') + '</span>';
+    }
+    var name = record.tenantName || ('#' + record.tenantId);
+    return '<span style="color: #28a745;">' + escapeHtml(name) + '</span>';
+}
+
+function escapeHtml(str) {
+    if (str == null) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 function renderTableView(data) {
     const tbody = document.getElementById('tableBody');
+    proxyListCache = {};
     if (!data || data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 30px;">'
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 30px;">'
             + '<i class="fas fa-inbox" style="font-size: 24px; color: var(--text-secondary); margin-right: 10px;"></i>'
             + '<span style="color: var(--text-secondary);">'+i18n.common_noData+'</span></td></tr>';
         return;
@@ -313,34 +403,30 @@ function renderTableView(data) {
     let html = '';
     for (let i = 0; i < data.length; i++) {
         const record = data[i];
+        proxyListCache[record.id] = record;
         const statusHtml = record.availableStatus === 1
             ? '<span class="status-badge status-running"><i class="fas fa-check-circle"></i> '+i18n.common_available+'</span>'
             : '<span class="status-badge status-offline"><i class="fas fa-times-circle"></i> '+i18n.common_noAvailable+'</span>';
 
         const username = record.proxyUsername || '-';
         const password = record.proxyPassword || '';
+        const tenantLabel = formatTenantLabel(record);
 
         html += '<tr>';
         html += '<td>' + record.proxyType + '</td>';
-        html += '<td><span class="truncate" title="' + record.proxyHost + '">' + record.proxyHost + '</span></td>';
+        html += '<td><span class="truncate" title="' + escapeHtml(record.proxyHost) + '">' + escapeHtml(record.proxyHost) + '</span></td>';
         html += '<td>' + record.proxyPort + '</td>';
-        html += '<td><span class="truncate" title="' + username + '">' + username + '</span></td>';
-        html += '<td><span class="password-field" data-password="' + password + '" onclick="togglePassword(this)">********</span></td>';
+        html += '<td><span class="truncate" title="' + escapeHtml(username) + '">' + escapeHtml(username) + '</span></td>';
+        html += '<td><span class="password-field" data-password="' + escapeHtml(password) + '" onclick="togglePassword(this)">********</span></td>';
+        html += '<td>' + tenantLabel + '</td>';
         html += '<td>' + statusHtml + '</td>';
-        const editArgs = record.id + ", '"
-            + record.proxyType + "', '"
-            + record.proxyHost + "', "
-            + record.proxyPort + ", '"
-            + (record.proxyUsername || '') + "', '"
-            + (record.proxyPassword || '') + "', "
-            + record.availableStatus;
         html += '<td>';
         html += '  <div class="dropdown">';
         html += '    <button class="btn btn-primary btn-icon dropdown-toggle" onclick="handleDynamicToggle(this, event)">';
         html += '      <i class="fas fa-ellipsis-h"></i>';
         html += '    </button>';
         html += '    <div class="dropdown-panel">';
-        html += '      <button class="dropdown-item" onclick="openEditModal(' + editArgs + ')">';
+        html += '      <button class="dropdown-item" onclick="openEditModalFromRecord(' + record.id + ')">';
         html += '        <i class="fas fa-edit"></i><span>' + i18n.vpn_edit + '</span>';
         html += '      </button>';
         html += '      <button class="dropdown-item" onclick="handleDelete(' + record.id + ')">';
@@ -353,4 +439,3 @@ function renderTableView(data) {
     }
     tbody.innerHTML = html;
 }
-

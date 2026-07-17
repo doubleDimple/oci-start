@@ -66,6 +66,7 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 
 import static com.doubledimple.ociserver.utils.oracle.OciUtils.getProvider;
+import com.doubledimple.ociserver.config.ProxyContext;
 
 /**
  * @version 1.0.0
@@ -249,7 +250,7 @@ public class OciNetworkUtils {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
         String compartmentId = provider.getTenantId();
 
-        try (VirtualNetworkClient virtualNetworkClient = VirtualNetworkClient.builder().build(provider)) {
+        try (VirtualNetworkClient virtualNetworkClient = VirtualNetworkClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             log.debug("开始创建新的NAT网关，VCN ID: {}, 显示名称: {}", vcnId, displayName);
 
             CreateNatGatewayDetails natGatewayDetails = CreateNatGatewayDetails.builder()
@@ -286,7 +287,7 @@ public class OciNetworkUtils {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
         String compartmentId = provider.getTenantId();
 
-        try (VirtualNetworkClient virtualNetworkClient = VirtualNetworkClient.builder().build(provider)) {
+        try (VirtualNetworkClient virtualNetworkClient = VirtualNetworkClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             ListNatGatewaysRequest request = ListNatGatewaysRequest.builder()
                     .compartmentId(compartmentId)
                     .vcnId(vcnId)
@@ -307,7 +308,7 @@ public class OciNetworkUtils {
     private static NatGateway updateNatGatewayStatus(Tenant tenant, String natGatewayId, boolean isEnabled) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
 
-        try (VirtualNetworkClient virtualNetworkClient = VirtualNetworkClient.builder().build(provider)) {
+        try (VirtualNetworkClient virtualNetworkClient = VirtualNetworkClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             log.debug("更新NAT网关状态: {}, 启用: {}", natGatewayId, isEnabled);
 
             UpdateNatGatewayDetails updateDetails = UpdateNatGatewayDetails.builder()
@@ -392,7 +393,7 @@ public class OciNetworkUtils {
     private static RouteTable updateRouteTableForNat(Tenant tenant, String routeTableId, String natGatewayId) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
 
-        try (VirtualNetworkClient virtualNetworkClient = VirtualNetworkClient.builder().build(provider)) {
+        try (VirtualNetworkClient virtualNetworkClient = VirtualNetworkClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             log.debug("更新路由表以包含NAT路由规则，路由表ID: {}", routeTableId);
 
             // 获取当前路由表
@@ -467,7 +468,7 @@ public class OciNetworkUtils {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
         String compartmentId = provider.getTenantId();
 
-        try (VirtualNetworkClient virtualNetworkClient = VirtualNetworkClient.builder().build(provider)) {
+        try (VirtualNetworkClient virtualNetworkClient = VirtualNetworkClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             log.debug("开始创建新的NAT路由表，VCN ID: {}, NAT网关ID: {}, 显示名称: {}", vcnId, natGatewayId, displayName);
 
             // 创建路由规则：所有流量通过NAT网关
@@ -551,7 +552,7 @@ public class OciNetworkUtils {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
         String compartmentId = provider.getTenantId();
 
-        try (VirtualNetworkClient virtualNetworkClient = VirtualNetworkClient.builder().build(provider)) {
+        try (VirtualNetworkClient virtualNetworkClient = VirtualNetworkClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             ListRouteTablesRequest request = ListRouteTablesRequest.builder()
                     .compartmentId(compartmentId)
                     .vcnId(vcnId)
@@ -572,7 +573,7 @@ public class OciNetworkUtils {
     public static boolean updateInstanceVnicRouteTable(Tenant tenant, String instanceId, String routeTableId) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
 
-        try (VirtualNetworkClient virtualNetworkClient = VirtualNetworkClient.builder().build(provider)) {
+        try (VirtualNetworkClient virtualNetworkClient = VirtualNetworkClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             log.debug("开始更新实例VNIC路由表，实例ID: {}, 路由表ID: {}", instanceId, routeTableId);
 
             // 获取实例的主VNIC
@@ -698,7 +699,7 @@ public class OciNetworkUtils {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
         String compartmentId = provider.getTenantId();
 
-        try (NetworkLoadBalancerClient nlbClient = NetworkLoadBalancerClient.builder().build(provider)) {
+        try (NetworkLoadBalancerClient nlbClient = NetworkLoadBalancerClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             log.debug("开始创建网络负载均衡器，子网ID: {}, 显示名称: {}", subnetId, displayName);
 
             // 构建后端集合
@@ -838,7 +839,7 @@ public class OciNetworkUtils {
     public static List<NetworkLoadBalancer> listNetworkLoadBalancers(Tenant tenant, String compartmentId) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
 
-        try (NetworkLoadBalancerClient nlbClient = NetworkLoadBalancerClient.builder().build(provider)) {
+        try (NetworkLoadBalancerClient nlbClient = NetworkLoadBalancerClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             ListNetworkLoadBalancersRequest request = ListNetworkLoadBalancersRequest.builder()
                     .compartmentId(compartmentId)
                     .build();
@@ -993,7 +994,7 @@ public class OciNetworkUtils {
     public static boolean deleteNatGateway(Tenant tenant, String natGatewayId) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
 
-        try (VirtualNetworkClient virtualNetworkClient = VirtualNetworkClient.builder().build(provider)) {
+        try (VirtualNetworkClient virtualNetworkClient = VirtualNetworkClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             log.debug("开始删除NAT网关，ID: {}", natGatewayId);
 
             DeleteNatGatewayRequest request = DeleteNatGatewayRequest.builder()
@@ -1102,7 +1103,7 @@ public class OciNetworkUtils {
     public static boolean deleteNetworkLoadBalancer(Tenant tenant, String networkLoadBalancerId) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
 
-        try (NetworkLoadBalancerClient nlbClient = NetworkLoadBalancerClient.builder().build(provider)) {
+        try (NetworkLoadBalancerClient nlbClient = NetworkLoadBalancerClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             log.debug("开始删除网络负载均衡器，ID: {}", networkLoadBalancerId);
 
             // 创建删除请求
@@ -1133,7 +1134,7 @@ public class OciNetworkUtils {
     public static boolean deleteRouteTable(Tenant tenant, String routeTableId) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
 
-        try (VirtualNetworkClient virtualNetworkClient = VirtualNetworkClient.builder().build(provider)) {
+        try (VirtualNetworkClient virtualNetworkClient = VirtualNetworkClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             log.debug("开始删除路由表，ID: {}", routeTableId);
 
             // 创建删除请求

@@ -21,6 +21,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
 import java.util.Map;
+import com.doubledimple.ociserver.config.ProxyContext;
 
 /**
  * OCI NoSQL 数据库管理工具类
@@ -40,7 +41,7 @@ public class OciNoSqlUtils {
     public static void createTable(Tenant tenant, String tableName, String ddlStatement) {
         SimpleAuthenticationDetailsProvider provider = OciUtils.getProvider(tenant);
         String compartmentId = provider.getTenantId();
-        try (NosqlClient nosqlClient = NosqlClient.builder().build(provider)) {
+        try (NosqlClient nosqlClient = NosqlClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
 
             // 设定表的容量限制。这里设定为免费额度的标准：50 Read, 50 Write, 50GB
             TableLimits limits = TableLimits.builder()
@@ -75,7 +76,7 @@ public class OciNoSqlUtils {
     public static boolean putRow(Tenant tenant, String tableName, Map<String, Object> rowData) {
         SimpleAuthenticationDetailsProvider provider = OciUtils.getProvider(tenant);
 
-        try (NosqlClient nosqlClient = NosqlClient.builder().build(provider)) {
+        try (NosqlClient nosqlClient = NosqlClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
 
             UpdateRowDetails updateDetails = UpdateRowDetails.builder()
                     .compartmentId(provider.getTenantId()) // 默认使用租户根 compartment
@@ -105,7 +106,7 @@ public class OciNoSqlUtils {
     public static Map<String, Object> getRow(Tenant tenant, String tableName, List<String> keyNames, List<String> keys) {
         SimpleAuthenticationDetailsProvider provider = OciUtils.getProvider(tenant);
 
-        try (NosqlClient nosqlClient = NosqlClient.builder().build(provider)) {
+        try (NosqlClient nosqlClient = NosqlClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
 
             GetRowRequest request = GetRowRequest.builder()
                     .tableNameOrId(tableName)
@@ -132,7 +133,7 @@ public class OciNoSqlUtils {
     public static List<Map<String, Object>> queryData(Tenant tenant, String compartmentId, String statement) {
         SimpleAuthenticationDetailsProvider provider = OciUtils.getProvider(tenant);
 
-        try (NosqlClient nosqlClient = NosqlClient.builder().build(provider)) {
+        try (NosqlClient nosqlClient = NosqlClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
 
             QueryDetails queryDetails = QueryDetails.builder()
                     .compartmentId(compartmentId)
@@ -162,7 +163,7 @@ public class OciNoSqlUtils {
     public static boolean deleteRow(Tenant tenant, String tableName, List<String> keys) {
         SimpleAuthenticationDetailsProvider provider = OciUtils.getProvider(tenant);
 
-        try (NosqlClient nosqlClient = NosqlClient.builder().build(provider)) {
+        try (NosqlClient nosqlClient = NosqlClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
 
             DeleteRowRequest request = DeleteRowRequest.builder()
                     .tableNameOrId(tableName)
@@ -187,7 +188,7 @@ public class OciNoSqlUtils {
     public static void dropTable(Tenant tenant, String tableName) {
         SimpleAuthenticationDetailsProvider provider = OciUtils.getProvider(tenant);
 
-        try (NosqlClient nosqlClient = NosqlClient.builder().build(provider)) {
+        try (NosqlClient nosqlClient = NosqlClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
 
 
             DeleteTableRequest request = DeleteTableRequest.builder()

@@ -57,6 +57,7 @@ import static com.doubledimple.ociserver.utils.oracle.OciCliUtils.addNetworkSecu
 import static com.doubledimple.ociserver.utils.oracle.OciCliUtils.createNetworkSecurityGroup;
 import static com.doubledimple.ociserver.utils.oracle.OciCliUtils.createVcn;
 import static com.doubledimple.ociserver.utils.oracle.OciUtils.checkShapes;
+import com.doubledimple.ociserver.config.ProxyContext;
 
 /**
  * @version 1.0.0
@@ -113,8 +114,8 @@ public class OciComputerUtils {
         SimpleAuthenticationDetailsProvider authenticationDetailsProvider = OciUtils.getProvider(tenant);
         String compartmentId = authenticationDetailsProvider.getTenantId();
         List<OciComputerDto.AvailabilityDomainName> availabilityDomainNames = new ArrayList<>();
-        try(IdentityClient identityClient = IdentityClient.builder().build(authenticationDetailsProvider);
-            VirtualNetworkClient virtualNetworkClient = VirtualNetworkClient.builder().configuration(ClientConfiguration.builder().build()).build(authenticationDetailsProvider)
+        try(IdentityClient identityClient = IdentityClient.builder().clientConfigurator(ProxyContext.get()).build(authenticationDetailsProvider);
+            VirtualNetworkClient virtualNetworkClient = VirtualNetworkClient.builder().clientConfigurator(ProxyContext.get()).configuration(ClientConfiguration.builder().build()).build(authenticationDetailsProvider)
             ) {
             String compartmentIdRoot = findRootCompartment(identityClient, compartmentId);
             List<AvailabilityDomain> availabilityDomains = getAvailabilityDomains(identityClient, compartmentIdRoot);
@@ -154,11 +155,11 @@ public class OciComputerUtils {
         List<OciComputerDto.AvailabilityDomainName> availabilityDomainNameList = new ArrayList<>();
         SimpleAuthenticationDetailsProvider authenticationDetailsProvider = OciUtils.getProvider(tenant);
         String compartmentId = authenticationDetailsProvider.getTenantId();
-        try(IdentityClient identityClient = IdentityClient.builder().build(authenticationDetailsProvider);
-            ComputeClient computeClient = ComputeClient.builder().build(authenticationDetailsProvider);
-            WorkRequestClient workRequestClient = WorkRequestClient.builder().build(authenticationDetailsProvider);
-            VirtualNetworkClient virtualNetworkClient = VirtualNetworkClient.builder().configuration(ClientConfiguration.builder().build()).build(authenticationDetailsProvider);
-            BlockstorageClient blockstorageClient = BlockstorageClient.builder().build(authenticationDetailsProvider)) {
+        try(IdentityClient identityClient = IdentityClient.builder().clientConfigurator(ProxyContext.get()).build(authenticationDetailsProvider);
+            ComputeClient computeClient = ComputeClient.builder().clientConfigurator(ProxyContext.get()).build(authenticationDetailsProvider);
+            WorkRequestClient workRequestClient = WorkRequestClient.builder().clientConfigurator(ProxyContext.get()).build(authenticationDetailsProvider);
+            VirtualNetworkClient virtualNetworkClient = VirtualNetworkClient.builder().clientConfigurator(ProxyContext.get()).configuration(ClientConfiguration.builder().build()).build(authenticationDetailsProvider);
+            BlockstorageClient blockstorageClient = BlockstorageClient.builder().clientConfigurator(ProxyContext.get()).build(authenticationDetailsProvider)) {
 
             identityClient.setRegion(user.getRegion());
             computeClient.setRegion(user.getRegion());

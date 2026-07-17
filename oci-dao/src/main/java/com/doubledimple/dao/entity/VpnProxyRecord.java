@@ -5,12 +5,11 @@ import lombok.extern.slf4j.Slf4j;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
-import javax.persistence.EnumType;
-import javax.persistence.Enumerated;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.Table;
+import javax.persistence.Transient;
 import java.time.LocalDateTime;
 
 /**
@@ -65,6 +64,18 @@ public class VpnProxyRecord {
      */
     @Column(name = "available_status", nullable = false)
     private Integer availableStatus = 1;
+
+    /**
+     * 绑定的父租户 ID（null 表示全局共享代理）
+     */
+    @Column(name = "tenant_id")
+    private Long tenantId;
+
+    /**
+     * 绑定租户展示名（非持久化，列表接口填充）
+     */
+    @Transient
+    private String tenantName;
 
     @Column(name = "update_time")
     private LocalDateTime updateTime;

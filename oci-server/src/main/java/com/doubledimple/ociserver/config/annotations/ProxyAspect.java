@@ -1,99 +1,118 @@
 package com.doubledimple.ociserver.config.annotations;
 
-import com.doubledimple.dao.entity.VpnProxyRecord;
-import com.doubledimple.dao.repository.VpnProxyRecordRepository;
-import com.doubledimple.ociserver.config.ProxyContext;
-import com.doubledimple.ociserver.service.impl.system.SystemConfigService;
-import com.doubledimple.ociserver.utils.SocksProxyUtils;
-import com.oracle.bmc.http.ClientConfigurator;
-import com.oracle.bmc.http.client.jersey.JerseyClientProperty;
+import com.doubledimple.dao.entity.Tenant;
+import com.doubledimple.ociserver.config.TenantProxyBinder;
+import com.doubledimple.ociserver.config.context.RequestContextHolder;
+import com.doubledimple.ociserver.pojo.domain.dto.User;
+import com.doubledimple.ociserver.pojo.request.AuditLogRequest;
+import com.doubledimple.ociserver.pojo.request.RequestContext;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
-import org.glassfish.jersey.client.ClientProperties;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.aspectj.lang.reflect.MethodSignature;
 import org.springframework.stereotype.Component;
 
-import javax.annotation.Resource;
-import java.net.URI;
-import java.net.URISyntaxException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
 
 /**
- * @version 1.0.0
- * @ClassName SocksProxyAspect
- * @Description TODO
- * @Author doubleDimple
- * @Date 2025-11-01 11:50
+ * {@link UseSocksProxy} 切面：解析方法上的租户参数后交给 {@link TenantProxyBinder}。
+ * 静态工具路径不依赖本切面，见 {@code OciUtils.getProvider} 内自动绑定。
  */
 @Slf4j
 @Aspect
 @Component
 public class ProxyAspect {
 
-    @Autowired
-    private SystemConfigService systemConfigService;
-
-    @Resource
-    VpnProxyRecordRepository vpnProxyRecordRepository;
-
     @Around("@annotation(useSocksProxy)")
     public Object around(ProceedingJoinPoint joinPoint, UseSocksProxy useSocksProxy) throws Throwable {
-
-        VpnProxyRecord proxyConfig = vpnProxyRecordRepository.findRandomAvailableRecord(1);
-        if (null == proxyConfig){
-            log.debug("未获取到可用的 VPN 代理，使用直连");
-            return joinPoint.proceed();
-        }
-        boolean proxyApplied = false;
+        Long tenantPk = extractTenantPrimaryKey(joinPoint);
         try {
-            if (proxyConfig.getAvailableStatus() == 1) {
-                boolean available = SocksProxyUtils.isProxyAvailable(proxyConfig);
-                if (available) {
-                    applyProxy(proxyConfig);
-                    proxyApplied = true;
-                    log.info("代理启用成功：{}:{} [{}]", proxyConfig.getProxyHost(), proxyConfig.getProxyPort(), proxyConfig.getProxyType());
-                } else {
-                    log.warn("代理不可用：{}:{}，跳过代理", proxyConfig.getProxyHost(), proxyConfig.getProxyPort());
-                }
-            } else {
-                log.debug("代理已禁用，走直连");
-            }
+            TenantProxyBinder.applyForTenantId(tenantPk);
             return joinPoint.proceed();
         } finally {
-            if (proxyApplied) {
-                clearProxy();
-                log.debug("代理配置已清理");
+            TenantProxyBinder.clear();
+            log.debug("代理配置已清理");
+        }
+    }
+
+    private Long extractTenantPrimaryKey(ProceedingJoinPoint joinPoint) {
+        RequestContext ctx = RequestContextHolder.get();
+        if (ctx != null && ctx.getTenant() != null && ctx.getTenant().getId() != null) {
+            return ctx.getTenant().getId();
+        }
+
+        Object[] args = joinPoint.getArgs();
+        if (args == null || args.length == 0) {
+            return null;
+        }
+
+        MethodSignature signature = (MethodSignature) joinPoint.getSignature();
+        Method method = signature.getMethod();
+        Parameter[] parameters = method.getParameters();
+        String[] paramNames = signature.getParameterNames();
+
+        for (int i = 0; i < args.length; i++) {
+            Object arg = args[i];
+            if (arg == null) {
+                continue;
+            }
+            if (arg instanceof Tenant) {
+                return ((Tenant) arg).getId();
+            }
+            if (arg instanceof User) {
+                long id = ((User) arg).getId();
+                return id > 0 ? id : null;
+            }
+            if (arg instanceof AuditLogRequest) {
+                return parseLong(((AuditLogRequest) arg).getTenantId());
+            }
+            String name = paramNames != null && i < paramNames.length ? paramNames[i] : null;
+            if (name == null && parameters != null && i < parameters.length) {
+                name = parameters[i].getName();
+            }
+            if (name != null && ("tenantId".equalsIgnoreCase(name) || "id".equalsIgnoreCase(name))) {
+                Long parsed = toLong(arg);
+                if (parsed != null) {
+                    return parsed;
+                }
             }
         }
-    }
 
-    private void clearProxy() {
-        ClientConfigurator clientConfigurator = ProxyContext.get();
-        if (clientConfigurator != null){
-            ProxyContext.clear();
-        }
-    }
-
-    private void applyProxy(VpnProxyRecord proxyConfig) {
-        try {
-            String host = proxyConfig.getProxyHost();
-            int port = proxyConfig.getProxyPort();
-            String proxyUsername = proxyConfig.getProxyUsername();
-            String proxyPassword = proxyConfig.getProxyPassword();
-            String proxyType = proxyConfig.getProxyType().toLowerCase();
-            URI proxyUri = new URI(proxyType, null, host, port, null, null, null);
-            String url = proxyUri.toString(); // http://127.0.0.1:10809
-            ClientConfigurator proxyConfigurator = clientBuilder -> {
-                clientBuilder.property(JerseyClientProperty.create(ClientProperties.PROXY_URI), url);
-                if (proxyUsername != null && proxyPassword != null){
-                    clientBuilder.property(JerseyClientProperty.create(ClientProperties.PROXY_USERNAME), proxyUsername);
-                    clientBuilder.property(JerseyClientProperty.create(ClientProperties.PROXY_PASSWORD), proxyPassword);
+        if (args.length == 1) {
+            Long only = toLong(args[0]);
+            if (only != null) {
+                String methodName = method.getName().toLowerCase();
+                if (methodName.contains("tenant") || methodName.contains("account") || methodName.contains("audit")) {
+                    return only;
                 }
-            };
-            ProxyContext.set(proxyConfigurator);
-        } catch (URISyntaxException e) {
-            log.warn("代理配置错误：{}", e.getMessage());
+            }
+        }
+        return null;
+    }
+
+    private static Long toLong(Object arg) {
+        if (arg instanceof Long) {
+            return (Long) arg;
+        }
+        if (arg instanceof Integer) {
+            return ((Integer) arg).longValue();
+        }
+        if (arg instanceof String) {
+            return parseLong((String) arg);
+        }
+        return null;
+    }
+
+    private static Long parseLong(String s) {
+        if (s == null || s.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            return Long.valueOf(s.trim());
+        } catch (NumberFormatException e) {
+            return null;
         }
     }
 }

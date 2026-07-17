@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import com.doubledimple.ociserver.config.ProxyContext;
 
 /**
  * @version 1.0.0
@@ -38,7 +39,7 @@ public class OciImageUtils {
         SimpleAuthenticationDetailsProvider provider = OciUtils.getProvider(tenant);
         List<ImageInfoRes> result = new ArrayList<>();
 
-        try (ComputeClient computeClient = ComputeClient.builder().build(provider)) {
+        try (ComputeClient computeClient = ComputeClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             ListImagesResponse response = computeClient.listImages(
                     ListImagesRequest.builder()
                             .compartmentId(provider.getTenantId())

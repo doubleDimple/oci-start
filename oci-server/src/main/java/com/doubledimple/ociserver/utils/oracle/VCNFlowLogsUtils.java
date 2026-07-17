@@ -70,6 +70,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static com.doubledimple.ociserver.utils.oracle.OciUtils.getProvider;
+import com.doubledimple.ociserver.config.ProxyContext;
 
 /**
  * @version 1.0.0
@@ -315,8 +316,8 @@ public class VCNFlowLogsUtils {
      */
     private static String getInstancePrivateIP(SimpleAuthenticationDetailsProvider provider,
                                                String instanceId, String compartmentId, Tenant tenant) {
-        try (ComputeClient computeClient = ComputeClient.builder().build(provider);
-             VirtualNetworkClient networkClient = VirtualNetworkClient.builder().build(provider)) {
+        try (ComputeClient computeClient = ComputeClient.builder().clientConfigurator(ProxyContext.get()).build(provider);
+             VirtualNetworkClient networkClient = VirtualNetworkClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
 
             // 设置区域
             computeClient.setRegion(RegionEnum.getRegionCode(tenant.getRegion()));
@@ -354,8 +355,8 @@ public class VCNFlowLogsUtils {
      */
     private static String getInstancePublicIP(SimpleAuthenticationDetailsProvider provider,
                                               String instanceId, String compartmentId, Tenant tenant) {
-        try (ComputeClient computeClient = ComputeClient.builder().build(provider);
-             VirtualNetworkClient networkClient = VirtualNetworkClient.builder().build(provider)) {
+        try (ComputeClient computeClient = ComputeClient.builder().clientConfigurator(ProxyContext.get()).build(provider);
+             VirtualNetworkClient networkClient = VirtualNetworkClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
 
             // 设置区域
             computeClient.setRegion(RegionEnum.getRegionCode(tenant.getRegion()));
@@ -395,7 +396,7 @@ public class VCNFlowLogsUtils {
         try {
             final SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
 
-            try (ComputeClient computeClient = ComputeClient.builder().build(provider)) {
+            try (ComputeClient computeClient = ComputeClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
                 // 设置区域
                 computeClient.setRegion(RegionEnum.getRegionCode(tenant.getRegion()));
 
@@ -423,7 +424,7 @@ public class VCNFlowLogsUtils {
                                                              Tenant tenant, String compartmentId,
                                                              String instanceId, String privateIP,
                                                              Instant startTime, Instant endTime) {
-        try (LogSearchClient logSearchClient = LogSearchClient.builder().build(provider)) {
+        try (LogSearchClient logSearchClient = LogSearchClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             // 设置区域
             logSearchClient.setRegion(RegionEnum.getRegionCode(tenant.getRegion()));
 
@@ -524,8 +525,8 @@ public class VCNFlowLogsUtils {
      */
     private static String getInstanceVcnId(SimpleAuthenticationDetailsProvider provider,
                                            String instanceId, String compartmentId, Tenant tenant) {
-        try (ComputeClient computeClient = ComputeClient.builder().build(provider);
-             VirtualNetworkClient networkClient = VirtualNetworkClient.builder().build(provider)) {
+        try (ComputeClient computeClient = ComputeClient.builder().clientConfigurator(ProxyContext.get()).build(provider);
+             VirtualNetworkClient networkClient = VirtualNetworkClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
 
             // 设置区域
             computeClient.setRegion(RegionEnum.getRegionCode(tenant.getRegion()));
@@ -1016,7 +1017,7 @@ public class VCNFlowLogsUtils {
         try {
             final SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
 
-            try (LogSearchClient logSearchClient = LogSearchClient.builder().build(provider)) {
+            try (LogSearchClient logSearchClient = LogSearchClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
                 logSearchClient.setRegion(RegionEnum.getRegionCode(tenant.getRegion()));
 
                 Instant endTime = Instant.now();
@@ -1071,7 +1072,7 @@ public class VCNFlowLogsUtils {
         try {
             final SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
 
-            try (LogSearchClient logSearchClient = LogSearchClient.builder().build(provider)) {
+            try (LogSearchClient logSearchClient = LogSearchClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
                 logSearchClient.setRegion(RegionEnum.getRegionCode(tenant.getRegion()));
 
                 Instant endTime = Instant.now();
@@ -1124,7 +1125,7 @@ public class VCNFlowLogsUtils {
         try {
             final SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
 
-            try (LoggingManagementClient loggingClient = LoggingManagementClient.builder().build(provider)) {
+            try (LoggingManagementClient loggingClient = LoggingManagementClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
                 loggingClient.setRegion(RegionEnum.getRegionCode(tenant.getRegion()));
 
                 // 查询所有Log Groups
@@ -1189,7 +1190,7 @@ public class VCNFlowLogsUtils {
         try {
             final SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
 
-            try (LogSearchClient logSearchClient = LogSearchClient.builder().build(provider)) {
+            try (LogSearchClient logSearchClient = LogSearchClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
                 logSearchClient.setRegion(RegionEnum.getRegionCode(tenant.getRegion()));
 
                 Instant endTime = Instant.now();
@@ -1624,7 +1625,7 @@ public class VCNFlowLogsUtils {
         try {
             final SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
 
-            try (LoggingManagementClient loggingClient = LoggingManagementClient.builder().build(provider)) {
+            try (LoggingManagementClient loggingClient = LoggingManagementClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
                 loggingClient.setRegion(RegionEnum.getRegionCode(tenant.getRegion()));
 
                 // 查询所有Log Groups
@@ -1721,7 +1722,7 @@ public class VCNFlowLogsUtils {
         try {
             final SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
 
-            try (LoggingManagementClient loggingClient = LoggingManagementClient.builder().build(provider)) {
+            try (LoggingManagementClient loggingClient = LoggingManagementClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
                 loggingClient.setRegion(RegionEnum.getRegionCode(tenant.getRegion()));
 
                 ListLogGroupsRequest request = ListLogGroupsRequest.builder()
@@ -1823,7 +1824,7 @@ public class VCNFlowLogsUtils {
         try {
             final SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
 
-            try (LoggingManagementClient loggingClient = LoggingManagementClient.builder().build(provider)) {
+            try (LoggingManagementClient loggingClient = LoggingManagementClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
                 loggingClient.setRegion(RegionEnum.getRegionCode(tenant.getRegion()));
 
                 ListLogGroupsRequest request = ListLogGroupsRequest.builder()

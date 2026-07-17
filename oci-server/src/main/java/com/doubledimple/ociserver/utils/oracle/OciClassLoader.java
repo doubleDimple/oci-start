@@ -51,6 +51,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import static com.doubledimple.ociserver.utils.oracle.OciUtils.getProvider;
 import static com.doubledimple.ociserver.utils.oracle.OciUtils.getProviderInner;
 import static com.doubledimple.ociserver.utils.oracle.OciUtils.queryRegions;
+import com.doubledimple.ociserver.config.ProxyContext;
 
 /**
  * @author doubleDimple
@@ -108,8 +109,8 @@ public class OciClassLoader {
         List<RegionSubscription> nonHomeRegions = new ArrayList<>();
         String tenantId = provider.getTenantId();
         if (null == tenantId) tenantId = tenant.getTenancy();
-        try(Identity identityClient = IdentityClient.builder().build(provider);
-            ComputeClient computeClient = ComputeClient.builder().build(provider)
+        try(Identity identityClient = IdentityClient.builder().clientConfigurator(ProxyContext.get()).build(provider);
+            ComputeClient computeClient = ComputeClient.builder().clientConfigurator(ProxyContext.get()).build(provider)
         ){
 
             // 获取租户详情

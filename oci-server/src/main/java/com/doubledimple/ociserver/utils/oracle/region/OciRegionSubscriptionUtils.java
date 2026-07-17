@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import com.doubledimple.ociserver.config.ProxyContext;
 
 /**
  * OCI区域订阅管理工具类
@@ -52,7 +53,7 @@ public class OciRegionSubscriptionUtils {
      * 获取所有可用区域列表（内部方法）
      */
     private static List<Region> getAllAvailableRegions(SimpleAuthenticationDetailsProvider provider) {
-        try (Identity identityClient = IdentityClient.builder().build(provider)) {
+        try (Identity identityClient = IdentityClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             ListRegionsRequest listRegionsRequest = ListRegionsRequest.builder().build();
             ListRegionsResponse response = identityClient.listRegions(listRegionsRequest);
 
@@ -80,7 +81,7 @@ public class OciRegionSubscriptionUtils {
      * 获取当前已订阅的区域列表（内部方法）
      */
     private static List<RegionSubscription> getSubscribedRegions(SimpleAuthenticationDetailsProvider provider) {
-        try (Identity identityClient = IdentityClient.builder().build(provider)) {
+        try (Identity identityClient = IdentityClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             ListRegionSubscriptionsRequest request = ListRegionSubscriptionsRequest.builder()
                     .tenancyId(provider.getTenantId())
                     .build();
@@ -155,7 +156,7 @@ public class OciRegionSubscriptionUtils {
     private static RegionSubscriptionResult subscribeToRegion(SimpleAuthenticationDetailsProvider provider, String regionKey) {
         log.info("开始订阅区域: {}", regionKey);
 
-        try (Identity identityClient = IdentityClient.builder().build(provider)) {
+        try (Identity identityClient = IdentityClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             // 1. 检查区域是否已经订阅
             List<RegionSubscription> subscribedRegions = getSubscribedRegions(provider);
             boolean alreadySubscribed = subscribedRegions.stream()

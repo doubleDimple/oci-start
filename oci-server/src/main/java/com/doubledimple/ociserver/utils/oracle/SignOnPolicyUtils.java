@@ -80,6 +80,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static com.doubledimple.ociserver.utils.oracle.OciUtils.getProvider;
+import com.doubledimple.ociserver.config.ProxyContext;
 
 /**
  * 登录策略管理工具类
@@ -809,8 +810,8 @@ public class SignOnPolicyUtils {
             SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
             String compartmentId = provider.getTenantId();
 
-            IdentityClient identityClient = IdentityClient.builder().build(provider);
-            IdentityDomainsClient identityDomainsClient = IdentityDomainsClient.builder().build(provider);
+            IdentityClient identityClient = IdentityClient.builder().clientConfigurator(ProxyContext.get()).build(provider);
+            IdentityDomainsClient identityDomainsClient = IdentityDomainsClient.builder().clientConfigurator(ProxyContext.get()).build(provider);
 
             String domainUrl = OciUtils.getDomain(identityClient, compartmentId);
             identityDomainsClient.setEndpoint(domainUrl);
@@ -977,7 +978,7 @@ public class SignOnPolicyUtils {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
         ResetOciPassResponse resetOciPassResponse = new ResetOciPassResponse();
 
-        try(IdentityClient identityClient = IdentityClient.builder().build(provider)){
+        try(IdentityClient identityClient = IdentityClient.builder().clientConfigurator(ProxyContext.get()).build(provider)){
             // 直接尝试重置密码
             CreateOrResetUIPasswordRequest request = CreateOrResetUIPasswordRequest.builder()
                     .userId(userId)
@@ -1023,7 +1024,7 @@ public class SignOnPolicyUtils {
 
     public static void deleteUser(Tenant tenant, String userId) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
-        try(IdentityClient identityClient = IdentityClient.builder().build(provider)){
+        try(IdentityClient identityClient = IdentityClient.builder().clientConfigurator(ProxyContext.get()).build(provider)){
             identityClient.deleteUser(DeleteUserRequest.builder().userId(userId).build());
             log.info("用户:{}删除成功", tenant.getUserName());
         }catch (Exception e){

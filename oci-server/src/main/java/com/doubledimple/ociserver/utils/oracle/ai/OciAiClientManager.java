@@ -13,6 +13,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import com.doubledimple.ociserver.config.ProxyContext;
 
 /**
  * OCI AI客户端管理器
@@ -86,7 +87,7 @@ public class OciAiClientManager {
         try {
             SimpleAuthenticationDetailsProvider provider = OciUtils.getProvider(tenant);
             GenerativeAiInferenceClient client = GenerativeAiInferenceClient.builder()
-                    .build(provider);
+                    .clientConfigurator(ProxyContext.get()).build(provider);
 
             // 从provider获取compartmentId（通常是tenantId）
             String compartmentId = provider.getTenantId();

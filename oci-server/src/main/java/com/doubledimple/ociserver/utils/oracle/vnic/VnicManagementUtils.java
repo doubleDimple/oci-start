@@ -69,6 +69,7 @@ import static com.doubledimple.ociserver.service.oracle.OracleCloudService.findR
 import static com.doubledimple.ociserver.utils.oracle.OciUtils.createOrUpdateSubnet;
 import static com.doubledimple.ociserver.utils.oracle.OciUtils.findCompartmentList;
 import static com.doubledimple.ociserver.utils.oracle.OciUtils.getProvider;
+import com.doubledimple.ociserver.config.ProxyContext;
 
 /**
  * @version 1.0.0
@@ -220,7 +221,7 @@ public class VnicManagementUtils {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
         final String compartmentId = provider.getTenantId();
         Subnet subnet = null;
-        try(VirtualNetworkClient virtualNetworkClient = VirtualNetworkClient.builder().build(provider)){
+        try(VirtualNetworkClient virtualNetworkClient = VirtualNetworkClient.builder().clientConfigurator(ProxyContext.get()).build(provider)){
             //获取vcn
             ListVcnsRequest build = ListVcnsRequest.builder().compartmentId(compartmentId)
                     .build();
@@ -330,7 +331,7 @@ public class VnicManagementUtils {
 
             final SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
 
-            try (VirtualNetworkClient networkClient = VirtualNetworkClient.builder().build(provider)) {
+            try (VirtualNetworkClient networkClient = VirtualNetworkClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
                 networkClient.setRegion(RegionEnum.getRegionCode(tenant.getRegion()));
 
                 for (int i = 0; i < ipv6Count; i++) {
@@ -418,8 +419,8 @@ public class VnicManagementUtils {
             if (StringUtils.isBlank(compartmentId)){
                 compartmentId = provider.getTenantId();
             }
-            try (ComputeClient computeClient = ComputeClient.builder().build(provider);
-                 VirtualNetworkClient networkClient = VirtualNetworkClient.builder().build(provider)) {
+            try (ComputeClient computeClient = ComputeClient.builder().clientConfigurator(ProxyContext.get()).build(provider);
+                 VirtualNetworkClient networkClient = VirtualNetworkClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
                     // 获取实例的所有VNIC附件
                     ListVnicAttachmentsRequest request = ListVnicAttachmentsRequest.builder()
                             .compartmentId(compartmentId)
@@ -504,8 +505,8 @@ public class VnicManagementUtils {
         try {
             log.info("开始创建VNIC: {}", vnicDisplayName);
 
-            try (ComputeClient computeClient = ComputeClient.builder().build(provider);
-                 VirtualNetworkClient networkClient = VirtualNetworkClient.builder().build(provider)) {
+            try (ComputeClient computeClient = ComputeClient.builder().clientConfigurator(ProxyContext.get()).build(provider);
+                 VirtualNetworkClient networkClient = VirtualNetworkClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
 
                 computeClient.setRegion(RegionEnum.getRegionCode(tenant.getRegion()));
                 networkClient.setRegion(RegionEnum.getRegionCode(tenant.getRegion()));
@@ -683,7 +684,7 @@ public class VnicManagementUtils {
      */
     private static Instance getInstance(SimpleAuthenticationDetailsProvider provider, Tenant tenant,
                                         String instanceId) {
-        try (ComputeClient computeClient = ComputeClient.builder().build(provider)) {
+        try (ComputeClient computeClient = ComputeClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             computeClient.setRegion(RegionEnum.getRegionCode(tenant.getRegion()));
 
             GetInstanceRequest request = GetInstanceRequest.builder()
@@ -703,7 +704,7 @@ public class VnicManagementUtils {
      * 检查子网是否支持IPv6
      */
     private static boolean checkSubnetIpv6Support(SimpleAuthenticationDetailsProvider provider, Tenant tenant, String subnetId) {
-        try (VirtualNetworkClient networkClient = VirtualNetworkClient.builder().build(provider)) {
+        try (VirtualNetworkClient networkClient = VirtualNetworkClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             networkClient.setRegion(RegionEnum.getRegionCode(tenant.getRegion()));
 
             GetSubnetRequest request = GetSubnetRequest.builder()
@@ -762,8 +763,8 @@ public class VnicManagementUtils {
 
             final SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
             String compartmentId = provider.getTenantId();
-            try (ComputeClient computeClient = ComputeClient.builder().build(provider);
-                 VirtualNetworkClient networkClient = VirtualNetworkClient.builder().build(provider)) {
+            try (ComputeClient computeClient = ComputeClient.builder().clientConfigurator(ProxyContext.get()).build(provider);
+                 VirtualNetworkClient networkClient = VirtualNetworkClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
 
                 computeClient.setRegion(RegionEnum.getRegionCode(tenant.getRegion()));
                 networkClient.setRegion(RegionEnum.getRegionCode(tenant.getRegion()));
@@ -833,8 +834,8 @@ public class VnicManagementUtils {
 
             final SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
             final String compartmentId = provider.getTenantId();
-            try (ComputeClient computeClient = ComputeClient.builder().build(provider);
-                 VirtualNetworkClient networkClient = VirtualNetworkClient.builder().build(provider)) {
+            try (ComputeClient computeClient = ComputeClient.builder().clientConfigurator(ProxyContext.get()).build(provider);
+                 VirtualNetworkClient networkClient = VirtualNetworkClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
 
                 computeClient.setRegion(RegionEnum.getRegionCode(tenant.getRegion()));
                 networkClient.setRegion(RegionEnum.getRegionCode(tenant.getRegion()));
@@ -944,7 +945,7 @@ public class VnicManagementUtils {
      * 删除VNIC上的所有IPv6地址
      */
     private static boolean deleteAllIpv6FromVnic(SimpleAuthenticationDetailsProvider provider, Tenant tenant, String vnicId) {
-        try (VirtualNetworkClient networkClient = VirtualNetworkClient.builder().build(provider)) {
+        try (VirtualNetworkClient networkClient = VirtualNetworkClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             networkClient.setRegion(RegionEnum.getRegionCode(tenant.getRegion()));
 
             // 获取VNIC的所有IPv6地址
@@ -989,7 +990,7 @@ public class VnicManagementUtils {
     private static boolean detachVnicFromInstance(SimpleAuthenticationDetailsProvider provider, Tenant tenant,
                                                   String instanceId, String vnicId) {
         final String providerTenantId = provider.getTenantId();
-        try (ComputeClient computeClient = ComputeClient.builder().build(provider)) {
+        try (ComputeClient computeClient = ComputeClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             computeClient.setRegion(RegionEnum.getRegionCode(tenant.getRegion()));
 
             // 查找VNIC附件
@@ -1103,7 +1104,7 @@ public class VnicManagementUtils {
 
             final SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
 
-            try (VirtualNetworkClient networkClient = VirtualNetworkClient.builder().build(provider)) {
+            try (VirtualNetworkClient networkClient = VirtualNetworkClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
                 networkClient.setRegion(RegionEnum.getRegionCode(tenant.getRegion()));
 
                 // 首先获取该VNIC的所有IPv6地址，找到对应的IPv6资源ID
@@ -1163,7 +1164,7 @@ public class VnicManagementUtils {
 
             final SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
             final String providerTenantId = provider.getTenantId();
-            try (ComputeClient computeClient = ComputeClient.builder().build(provider)) {
+            try (ComputeClient computeClient = ComputeClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
                 computeClient.setRegion(RegionEnum.getRegionCode(tenant.getRegion()));
 
                 for (VnicCreationResult vnicInfo : vnicInfos) {
@@ -1239,7 +1240,7 @@ public class VnicManagementUtils {
 
             final SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
             final String providerTenantId = provider.getTenantId();
-            try (ComputeClient computeClient = ComputeClient.builder().build(provider)) {
+            try (ComputeClient computeClient = ComputeClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
                 computeClient.setRegion(RegionEnum.getRegionCode(tenant.getRegion()));
 
                 for (VnicCreationResult vnicInfo : vnicInfos) {
@@ -1716,8 +1717,8 @@ public class VnicManagementUtils {
             SimpleAuthenticationDetailsProvider provider = OciUtils.getProvider(tenant);
             String compartmentId = provider.getTenantId();
 
-            try (ComputeClient computeClient = ComputeClient.builder().build(provider);
-                 VirtualNetworkClient vcnClient = VirtualNetworkClient.builder().build(provider)) {
+            try (ComputeClient computeClient = ComputeClient.builder().clientConfigurator(ProxyContext.get()).build(provider);
+                 VirtualNetworkClient vcnClient = VirtualNetworkClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
 
                 // 2. 设置区域
                 computeClient.setRegion(RegionEnum.getRegionCode(tenant.getRegion()));

@@ -22,6 +22,7 @@ import com.oracle.bmc.auth.SimpleAuthenticationDetailsProvider;
 import org.springframework.util.StringUtils;
 
 import static com.doubledimple.ociserver.utils.oracle.OciUtils.getProvider;
+import com.doubledimple.ociserver.config.ProxyContext;
 
 /**
  * @version 1.0.0
@@ -53,7 +54,7 @@ public class OciObjectStorageUtil {
     public static List<BucketSummary> listBuckets(Tenant tenant) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
         String compartmentId = provider.getTenantId();
-        try (ObjectStorageClient client = ObjectStorageClient.builder().build(provider)) {
+        try (ObjectStorageClient client = ObjectStorageClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             final String namespace = getNamespace(provider);
             ListBucketsRequest request = ListBucketsRequest.builder()
                     .namespaceName(namespace)
@@ -81,7 +82,7 @@ public class OciObjectStorageUtil {
                                        String compartmentId,
                                        String publicAccessType) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
-        try (ObjectStorageClient client = ObjectStorageClient.builder().build(provider)) {
+        try (ObjectStorageClient client = ObjectStorageClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             // 设置存储桶的公共访问类型
             CreateBucketDetails.PublicAccessType accessType = CreateBucketDetails.PublicAccessType.NoPublicAccess;
             if ("ObjectRead".equalsIgnoreCase(publicAccessType)) {
@@ -123,7 +124,7 @@ public class OciObjectStorageUtil {
                                        String filePath,
                                        String contentType) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
-        try (ObjectStorageClient client = ObjectStorageClient.builder().build(provider)) {
+        try (ObjectStorageClient client = ObjectStorageClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             File file = new File(filePath);
             if (!file.exists()) {
                 log.error("文件不存在: {}", filePath);
@@ -169,7 +170,7 @@ public class OciObjectStorageUtil {
                                          String objectName,
                                          String saveFilePath) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
-        try (ObjectStorageClient client = ObjectStorageClient.builder().build(provider)) {
+        try (ObjectStorageClient client = ObjectStorageClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             GetObjectRequest request = GetObjectRequest.builder()
                     .namespaceName(getNamespace(provider))
                     .bucketName(BUCKET_NAME)
@@ -207,7 +208,7 @@ public class OciObjectStorageUtil {
                                                   String bucketName,
                                                   String prefix) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
-        try (ObjectStorageClient client = ObjectStorageClient.builder().build(provider)) {
+        try (ObjectStorageClient client = ObjectStorageClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             ListObjectsRequest.Builder requestBuilder = ListObjectsRequest.builder()
                     .namespaceName(namespaceName)
                     .bucketName(bucketName);
@@ -235,7 +236,7 @@ public class OciObjectStorageUtil {
                                        String objectName) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
         final String namespace = getNamespace(provider);
-        try (ObjectStorageClient client = ObjectStorageClient.builder().build(provider)) {
+        try (ObjectStorageClient client = ObjectStorageClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             DeleteObjectRequest request = DeleteObjectRequest.builder()
                     .namespaceName(namespace)
                     .bucketName(BUCKET_NAME)
@@ -258,7 +259,7 @@ public class OciObjectStorageUtil {
      */
     public static String getNamespace(Tenant tenant) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
-        try (ObjectStorageClient client = ObjectStorageClient.builder().build(provider)) {
+        try (ObjectStorageClient client = ObjectStorageClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             GetNamespaceRequest request = GetNamespaceRequest.builder().build();
             String namespace = client.getNamespace(request).getValue();
             log.info("获取到命名空间: {}", namespace);
@@ -280,7 +281,7 @@ public class OciObjectStorageUtil {
                                               String objectName,
                                               long validityInSeconds) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
-        try (ObjectStorageClient client = ObjectStorageClient.builder().build(provider)) {
+        try (ObjectStorageClient client = ObjectStorageClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             CreatePreauthenticatedRequestDetails details = CreatePreauthenticatedRequestDetails.builder()
                     .name("PAR-" + System.currentTimeMillis())
                     .objectName(objectName)
@@ -322,7 +323,7 @@ public class OciObjectStorageUtil {
                                                        String objectName,
                                                        long validityInSeconds) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
-        try (ObjectStorageClient client = ObjectStorageClient.builder().build(provider)) {
+        try (ObjectStorageClient client = ObjectStorageClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             CreatePreauthenticatedRequestDetails details = CreatePreauthenticatedRequestDetails.builder()
                     .name("PAR-" + System.currentTimeMillis())
                     .objectName(objectName)
@@ -360,7 +361,7 @@ public class OciObjectStorageUtil {
                                             String publicAccessType) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
         String compartmentId = provider.getTenantId();
-        try (ObjectStorageClient client = ObjectStorageClient.builder().build(provider)) {
+        try (ObjectStorageClient client = ObjectStorageClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             CreateBucketDetails.PublicAccessType accessType = CreateBucketDetails.PublicAccessType.NoPublicAccess;
             if ("ObjectRead".equalsIgnoreCase(publicAccessType)) {
                 accessType = CreateBucketDetails.PublicAccessType.ObjectRead;
@@ -404,7 +405,7 @@ public class OciObjectStorageUtil {
                                             String bucketName,
                                             String objectName) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
-        try (ObjectStorageClient client = ObjectStorageClient.builder().build(provider)) {
+        try (ObjectStorageClient client = ObjectStorageClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             DeleteObjectRequest request = DeleteObjectRequest.builder()
                     .namespaceName(namespaceName)
                     .bucketName(bucketName)
@@ -443,7 +444,7 @@ public class OciObjectStorageUtil {
                                            String bucketName,
                                            String objectName,
                                            String jsonString) {
-        try (ObjectStorageClient client = ObjectStorageClient.builder().build(provider)) {
+        try (ObjectStorageClient client = ObjectStorageClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             byte[] contentBytes = jsonString.getBytes("UTF-8");
             final String namespace = getNamespace(provider);
             Map<String, String> metadata = new HashMap<>();
@@ -482,7 +483,7 @@ public class OciObjectStorageUtil {
                                            String objectName,
                                            String jsonString) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
-        try (ObjectStorageClient client = ObjectStorageClient.builder().build(provider)) {
+        try (ObjectStorageClient client = ObjectStorageClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             byte[] contentBytes = jsonString.getBytes("UTF-8");
             final String namespace = getNamespace(provider);
             Map<String, String> metadata = new HashMap<>();
@@ -518,7 +519,7 @@ public class OciObjectStorageUtil {
     public static String downloadJsonString(Tenant tenant,
                                             String objectName) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
-        try (ObjectStorageClient client = ObjectStorageClient.builder().build(provider)) {
+        try (ObjectStorageClient client = ObjectStorageClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             GetObjectRequest request = GetObjectRequest.builder()
                     .namespaceName(getNamespace(provider))
                     .bucketName(BUCKET_NAME)
@@ -576,7 +577,7 @@ public class OciObjectStorageUtil {
         }
         String compartmentId = provider.getTenantId();
         final String namespace = getNamespace(provider);
-        try (ObjectStorageClient client = ObjectStorageClient.builder().build(provider)) {
+        try (ObjectStorageClient client = ObjectStorageClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             // 先检查存储桶是否存在
             boolean bucketExists = false;
 
@@ -637,7 +638,7 @@ public class OciObjectStorageUtil {
 
 
     private static String getNamespace(AuthenticationDetailsProvider provider) {
-        try(ObjectStorageClient client = ObjectStorageClient.builder().build(provider)) {
+        try(ObjectStorageClient client = ObjectStorageClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             // 创建获取命名空间的请求
             GetNamespaceRequest request = GetNamespaceRequest.builder().build();
 
@@ -672,7 +673,7 @@ public class OciObjectStorageUtil {
                                             String contentType,
                                             long contentLength) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
-        try (ObjectStorageClient client = ObjectStorageClient.builder().build(provider)) {
+        try (ObjectStorageClient client = ObjectStorageClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             if (contentType == null || contentType.isEmpty()) {
                 contentType = "application/octet-stream";
             }
@@ -708,7 +709,7 @@ public class OciObjectStorageUtil {
                                                         String objectName) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
         try {
-            ObjectStorageClient client = ObjectStorageClient.builder().build(provider);
+            ObjectStorageClient client = ObjectStorageClient.builder().clientConfigurator(ProxyContext.get()).build(provider);
             GetObjectRequest request = GetObjectRequest.builder()
                     .namespaceName(namespace)
                     .bucketName(bucketName)
@@ -734,7 +735,7 @@ public class OciObjectStorageUtil {
                                                   String objectName,
                                                   String contentType) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
-        try (ObjectStorageClient client = ObjectStorageClient.builder().build(provider)) {
+        try (ObjectStorageClient client = ObjectStorageClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             if (contentType == null || contentType.isEmpty()) {
                 contentType = "application/octet-stream";
             }
@@ -769,7 +770,7 @@ public class OciObjectStorageUtil {
                                      InputStream partStream,
                                      long partSize) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
-        try (ObjectStorageClient client = ObjectStorageClient.builder().build(provider)) {
+        try (ObjectStorageClient client = ObjectStorageClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             UploadPartRequest request = UploadPartRequest.builder()
                     .namespaceName(namespace)
                     .bucketName(bucketName)
@@ -799,7 +800,7 @@ public class OciObjectStorageUtil {
                                                  String uploadId,
                                                  List<CommitMultipartUploadPartDetails> parts) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
-        try (ObjectStorageClient client = ObjectStorageClient.builder().build(provider)) {
+        try (ObjectStorageClient client = ObjectStorageClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             CommitMultipartUploadDetails details = CommitMultipartUploadDetails.builder()
                     .partsToCommit(parts)
                     .build();
@@ -828,7 +829,7 @@ public class OciObjectStorageUtil {
                                                 String objectName,
                                                 String uploadId) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
-        try (ObjectStorageClient client = ObjectStorageClient.builder().build(provider)) {
+        try (ObjectStorageClient client = ObjectStorageClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             AbortMultipartUploadRequest request = AbortMultipartUploadRequest.builder()
                     .namespaceName(namespace)
                     .bucketName(bucketName)
@@ -850,7 +851,7 @@ public class OciObjectStorageUtil {
     public static Map<String, Object> listBucketsPaginated(Tenant tenant, int limit, String pageToken) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
         String compartmentId = provider.getTenantId();
-        try (ObjectStorageClient client = ObjectStorageClient.builder().build(provider)) {
+        try (ObjectStorageClient client = ObjectStorageClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             final String namespace = getNamespace(provider);
 
             ListBucketsRequest.Builder requestBuilder = ListBucketsRequest.builder()
@@ -881,7 +882,7 @@ public class OciObjectStorageUtil {
      */
     public static boolean deleteNamedBucket(Tenant tenant, String namespace, String bucketName) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
-        try (ObjectStorageClient client = ObjectStorageClient.builder().build(provider)) {
+        try (ObjectStorageClient client = ObjectStorageClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             DeleteBucketRequest request = DeleteBucketRequest.builder()
                     .namespaceName(namespace)
                     .bucketName(bucketName)
@@ -902,7 +903,7 @@ public class OciObjectStorageUtil {
     public static Map<String, Object> listObjectsPaginated(Tenant tenant, String namespace, String bucketName,
                                                            String prefix, int limit, String startToken) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
-        try (ObjectStorageClient client = ObjectStorageClient.builder().build(provider)) {
+        try (ObjectStorageClient client = ObjectStorageClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
 
             ListObjectsRequest.Builder requestBuilder = ListObjectsRequest.builder()
                     .namespaceName(namespace)

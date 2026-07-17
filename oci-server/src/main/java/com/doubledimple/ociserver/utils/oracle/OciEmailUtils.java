@@ -35,6 +35,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.stream.Collectors;
 
 import static com.doubledimple.ociserver.utils.oracle.OciUtils.getProvider;
+import com.doubledimple.ociserver.config.ProxyContext;
 
 /**
  * Oracle Cloud Email Service 工具类
@@ -67,7 +68,7 @@ public class OciEmailUtils {
         }
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
         String compartmentId = provider.getTenantId();
-        try(EmailClient emailClient = EmailClient.builder().build(provider);) {
+        try(EmailClient emailClient = EmailClient.builder().clientConfigurator(ProxyContext.get()).build(provider);) {
 
             CreateEmailDomainDetails domainDetails = CreateEmailDomainDetails.builder()
                     .compartmentId(compartmentId)
@@ -110,7 +111,7 @@ public class OciEmailUtils {
         }
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
         String compartmentId = provider.getTenantId();
-        try (EmailClient emailClient = EmailClient.builder().build(provider)) {
+        try (EmailClient emailClient = EmailClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             CreateSenderDetails createSenderDetails = CreateSenderDetails.builder()
                     .compartmentId(compartmentId)
                     .emailAddress(emailAddress)
@@ -152,7 +153,7 @@ public class OciEmailUtils {
 
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
 
-        try(EmailClient emailClient = EmailClient.builder().build(provider);) {
+        try(EmailClient emailClient = EmailClient.builder().clientConfigurator(ProxyContext.get()).build(provider);) {
 
             CreateDkimDetails dkimDetails = CreateDkimDetails.builder()
                     .emailDomainId(emailDomainId)
@@ -185,7 +186,7 @@ public class OciEmailUtils {
     public static Dkim findDkimByDomainId(Tenant tenant, String emailDomainId) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
 
-        try(EmailClient emailClient = EmailClient.builder().build(provider);) {
+        try(EmailClient emailClient = EmailClient.builder().clientConfigurator(ProxyContext.get()).build(provider);) {
 
             ListDkimsRequest listRequest = ListDkimsRequest.builder()
                     .emailDomainId(emailDomainId)
@@ -219,7 +220,7 @@ public class OciEmailUtils {
     public ApiResponse listDkims(Tenant tenant, String emailDomainId) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
 
-        try(EmailClient emailClient = EmailClient.builder().build(provider);) {
+        try(EmailClient emailClient = EmailClient.builder().clientConfigurator(ProxyContext.get()).build(provider);) {
             ListDkimsRequest listRequest = ListDkimsRequest.builder()
                     .emailDomainId(emailDomainId)
                     .build();
@@ -259,7 +260,7 @@ public class OciEmailUtils {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
         String userId = provider.getUserId();
         // 使用 IdentityClient 创建SMTP凭据
-        try (IdentityClient identityClient = IdentityClient.builder().build(provider)) {
+        try (IdentityClient identityClient = IdentityClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             CreateSmtpCredentialDetails createDetails = CreateSmtpCredentialDetails.builder()
                     .description(description)
                     .build();
@@ -396,7 +397,7 @@ public class OciEmailUtils {
     public static EmailDomain findEmailDomainByName(Tenant tenant, String domainName) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
         String compartmentId = provider.getTenantId();
-        try(EmailClient emailClient = EmailClient.builder().build(provider);) {
+        try(EmailClient emailClient = EmailClient.builder().clientConfigurator(ProxyContext.get()).build(provider);) {
             ListEmailDomainsRequest listRequest = ListEmailDomainsRequest.builder()
                     .compartmentId(compartmentId)
                     .name(domainName)
@@ -428,7 +429,7 @@ public class OciEmailUtils {
      */
     public static Sender findSenderByEmail(Tenant tenant,String senderEmail) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
-        try(EmailClient emailClient = EmailClient.builder().build(provider);) {
+        try(EmailClient emailClient = EmailClient.builder().clientConfigurator(ProxyContext.get()).build(provider);) {
             ListSendersRequest listRequest = ListSendersRequest.builder()
                     .compartmentId(provider.getTenantId())
                     .emailAddress(senderEmail)
@@ -480,7 +481,7 @@ public class OciEmailUtils {
      */
     public boolean deleteEmailDomain(Tenant tenant,String emailDomainId) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
-        try(EmailClient emailClient = EmailClient.builder().build(provider);) {
+        try(EmailClient emailClient = EmailClient.builder().clientConfigurator(ProxyContext.get()).build(provider);) {
             DeleteEmailDomainRequest deleteRequest = DeleteEmailDomainRequest.builder()
                     .emailDomainId(emailDomainId)
                     .build();
@@ -500,7 +501,7 @@ public class OciEmailUtils {
      */
     public boolean deleteApprovedSender(Tenant tenant,String senderId) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
-        try(EmailClient emailClient = EmailClient.builder().build(provider);) {
+        try(EmailClient emailClient = EmailClient.builder().clientConfigurator(ProxyContext.get()).build(provider);) {
 
             DeleteSenderRequest deleteRequest = DeleteSenderRequest.builder()
                     .senderId(senderId)
@@ -521,7 +522,7 @@ public class OciEmailUtils {
      */
     public boolean deleteDkim(Tenant tenant,String dkimId) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
-        try(EmailClient emailClient = EmailClient.builder().build(provider);) {
+        try(EmailClient emailClient = EmailClient.builder().clientConfigurator(ProxyContext.get()).build(provider);) {
 
             DeleteDkimRequest deleteRequest = DeleteDkimRequest.builder()
                     .dkimId(dkimId)
@@ -543,7 +544,7 @@ public class OciEmailUtils {
     public boolean deleteSmtpCredentials(Tenant tenant,String smtpCredentialId) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
         String userId = provider.getUserId();
-        try(IdentityClient identityClient = IdentityClient.builder().build(provider);) {
+        try(IdentityClient identityClient = IdentityClient.builder().clientConfigurator(ProxyContext.get()).build(provider);) {
 
             DeleteSmtpCredentialRequest deleteRequest = DeleteSmtpCredentialRequest.builder()
                     .userId(userId)

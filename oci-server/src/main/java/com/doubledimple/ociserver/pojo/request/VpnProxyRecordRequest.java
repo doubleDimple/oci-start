@@ -42,4 +42,9 @@ public class VpnProxyRecordRequest extends BaseRequest{
      * 可用状态（1 = 可用，0 = 不可用）
      */
     private Integer availableStatus = 1;
+
+    /**
+     * 绑定的父租户 ID（null / 不传 = 全局共享）
+     */
+    private Long tenantId;
 }

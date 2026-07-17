@@ -23,6 +23,7 @@ import java.util.Map;
 
 import static com.doubledimple.ocicommon.utils.DateTimeUtils.getStartOfToday;
 import static com.doubledimple.ocicommon.utils.DateTimeUtils.getStartOfYesterday;
+import com.doubledimple.ociserver.config.ProxyContext;
 
 /**
  * @version 2.0
@@ -60,7 +61,7 @@ public class CostUtils {
         if (granularity == null) {
             granularity = RequestSummarizedUsagesDetails.Granularity.Daily;
         }
-        try (UsageapiClient client = UsageapiClient.builder().build(provider)) {
+        try (UsageapiClient client = UsageapiClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
 
             RequestSummarizedUsagesDetails details =
                     RequestSummarizedUsagesDetails.builder()

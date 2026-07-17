@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
+import com.doubledimple.ociserver.config.ProxyContext;
 
 /**
  * OCI 容器镜像仓库 (OCIR) 管理工具类
@@ -39,7 +40,7 @@ public class OcirUtils {
         SimpleAuthenticationDetailsProvider provider = OciUtils.getProvider(tenant);
         List<ContainerRepositorySummary> repositories = new ArrayList<>();
 
-        try (ArtifactsClient artifactsClient = ArtifactsClient.builder().build(provider)) {
+        try (ArtifactsClient artifactsClient = ArtifactsClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             ListContainerRepositoriesRequest request = ListContainerRepositoriesRequest.builder()
                     .compartmentId(compartmentId)
                     // 可以设置状态过滤，例如只查 Available 的
@@ -68,7 +69,7 @@ public class OcirUtils {
         SimpleAuthenticationDetailsProvider provider = OciUtils.getProvider(tenant);
         List<ContainerImageSummary> images = new ArrayList<>();
 
-        try (ArtifactsClient artifactsClient = ArtifactsClient.builder().build(provider)) {
+        try (ArtifactsClient artifactsClient = ArtifactsClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             ListContainerImagesRequest request = ListContainerImagesRequest.builder()
                     .compartmentId(compartmentId)
                     .repositoryName(repositoryName)
@@ -95,7 +96,7 @@ public class OcirUtils {
     public static boolean deleteImage(Tenant tenant, String imageId) {
         SimpleAuthenticationDetailsProvider provider = OciUtils.getProvider(tenant);
 
-        try (ArtifactsClient artifactsClient = ArtifactsClient.builder().build(provider)) {
+        try (ArtifactsClient artifactsClient = ArtifactsClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             DeleteContainerImageRequest request = DeleteContainerImageRequest.builder()
                     .imageId(imageId)
                     .build();
@@ -125,7 +126,7 @@ public class OcirUtils {
     public static boolean deleteRepository(Tenant tenant, String repositoryId) {
         SimpleAuthenticationDetailsProvider provider = OciUtils.getProvider(tenant);
 
-        try (ArtifactsClient artifactsClient = ArtifactsClient.builder().build(provider)) {
+        try (ArtifactsClient artifactsClient = ArtifactsClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             DeleteContainerRepositoryRequest request = DeleteContainerRepositoryRequest.builder()
                     .repositoryId(repositoryId)
                     .build();

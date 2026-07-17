@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static com.doubledimple.ociserver.utils.oracle.OciUtils.getProvider;
+import com.doubledimple.ociserver.config.ProxyContext;
 
 /**
  * @version 1.0.0
@@ -54,7 +55,7 @@ public class OciLimitsUtils {
      */
     public static List<com.oracle.bmc.limits.model.ServiceSummary> listServices(Tenant tenant) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
-        try (LimitsClient limitsClient = LimitsClient.builder().build(provider)) {
+        try (LimitsClient limitsClient = LimitsClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             com.oracle.bmc.limits.requests.ListServicesRequest request = com.oracle.bmc.limits.requests.ListServicesRequest.builder()
                     .compartmentId(provider.getTenantId())
                     .build();
@@ -73,7 +74,7 @@ public class OciLimitsUtils {
      */
     public static List<LimitDefinitionSummary> listLimitDefinitions(Tenant tenant, String serviceName) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
-        try (LimitsClient limitsClient = LimitsClient.builder().build(provider)) {
+        try (LimitsClient limitsClient = LimitsClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             ListLimitDefinitionsRequest request = ListLimitDefinitionsRequest.builder()
                     .compartmentId(provider.getTenantId())
                     .serviceName(serviceName)
@@ -93,7 +94,7 @@ public class OciLimitsUtils {
      */
     public static List<LimitValueSummary> getLimitValues(Tenant tenant, String serviceName) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
-        try (LimitsClient limitsClient = LimitsClient.builder().build(provider)) {
+        try (LimitsClient limitsClient = LimitsClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             ListLimitValuesRequest request = ListLimitValuesRequest.builder()
                     .compartmentId(provider.getTenantId())
                     .serviceName(serviceName)
@@ -115,7 +116,7 @@ public class OciLimitsUtils {
      */
     public static ResourceAvailability getResourceAvailability(Tenant tenant, String serviceName, String limitName) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
-        try (LimitsClient limitsClient = LimitsClient.builder().build(provider)) {
+        try (LimitsClient limitsClient = LimitsClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             GetResourceAvailabilityRequest request = GetResourceAvailabilityRequest.builder()
                     .compartmentId(provider.getTenantId())
                     .serviceName(serviceName)
@@ -155,7 +156,7 @@ public class OciLimitsUtils {
     public static void fetchAllResourceLimits(Tenant tenant, String serviceName) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
 
-        try (LimitsClient limitsClient = LimitsClient.builder().build(provider)) {
+        try (LimitsClient limitsClient = LimitsClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             String nextPage = null;
             log.info("--- 开始全量扫描服务 [{}] 的限额 ---", serviceName);
 
@@ -242,8 +243,8 @@ public class OciLimitsUtils {
         List<AvailabilityDomain> validAds = new ArrayList<>();
         SimpleAuthenticationDetailsProvider provider = OciUtils.getProvider(tenant);
         String compartmentId = provider.getTenantId();
-        try (IdentityClient identityClient = IdentityClient.builder().build(provider);
-             LimitsClient limitsClient = LimitsClient.builder().build(provider)) {
+        try (IdentityClient identityClient = IdentityClient.builder().clientConfigurator(ProxyContext.get()).build(provider);
+             LimitsClient limitsClient = LimitsClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
 
             ListAvailabilityDomainsResponse listAdsResponse =
                     identityClient.listAvailabilityDomains(ListAvailabilityDomainsRequest.builder()
@@ -309,8 +310,8 @@ public class OciLimitsUtils {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
         Map<String, List<Map<String, Object>>> result = new LinkedHashMap<>();
 
-        try (LimitsClient limitsClient = LimitsClient.builder().build(provider);
-             IdentityClient identityClient = IdentityClient.builder().build(provider)) {
+        try (LimitsClient limitsClient = LimitsClient.builder().clientConfigurator(ProxyContext.get()).build(provider);
+             IdentityClient identityClient = IdentityClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
 
             String compartmentId = provider.getTenantId();
 
@@ -468,8 +469,8 @@ public class OciLimitsUtils {
         // 只需比当前页末尾多取 1 条，即可判断是否存在下一页
         int needed = (page + 1) * pageSize + 1;
 
-        try (LimitsClient limitsClient = LimitsClient.builder().build(provider);
-             IdentityClient identityClient = IdentityClient.builder().build(provider)) {
+        try (LimitsClient limitsClient = LimitsClient.builder().clientConfigurator(ProxyContext.get()).build(provider);
+             IdentityClient identityClient = IdentityClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
 
             String compartmentId = provider.getTenantId();
 
@@ -599,8 +600,8 @@ public class OciLimitsUtils {
     public static Map<String, Long> getAggregatedAvailability(Tenant tenant, String serviceName, String limitName) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
         long totalUsed = 0L, totalAvailable = 0L;
-        try (IdentityClient identityClient = IdentityClient.builder().build(provider);
-             LimitsClient limitsClient = LimitsClient.builder().build(provider)) {
+        try (IdentityClient identityClient = IdentityClient.builder().clientConfigurator(ProxyContext.get()).build(provider);
+             LimitsClient limitsClient = LimitsClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
 
             List<AvailabilityDomain> ads = identityClient.listAvailabilityDomains(
                     ListAvailabilityDomainsRequest.builder()

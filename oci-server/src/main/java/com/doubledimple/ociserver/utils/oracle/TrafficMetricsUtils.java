@@ -21,6 +21,7 @@ import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import com.doubledimple.ociserver.config.ProxyContext;
 
 /**
  * OCI 实例流量查询工具类
@@ -86,7 +87,7 @@ public class TrafficMetricsUtils {
                 .connectionTimeoutMillis(10_000)
                 .readTimeoutMillis(30_000)
                 .build();
-        return MonitoringClient.builder().configuration(config).build(provider);
+        return MonitoringClient.builder().configuration(config).clientConfigurator(ProxyContext.get()).build(provider);
     }
 
     /**
@@ -159,7 +160,7 @@ public class TrafficMetricsUtils {
                                                                         String compartmentId) {
         SimpleAuthenticationDetailsProvider provider = OciUtils.getProvider(tenant);
         Map<LocalDateTime, Double> totalMap = new LinkedHashMap<>();
-        try (MonitoringClient client = MonitoringClient.builder().build(provider)) {
+        try (MonitoringClient client = MonitoringClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             if (StringUtils.isBlank(compartmentId)){
                 compartmentId = provider.getTenantId();
             }

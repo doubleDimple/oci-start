@@ -35,6 +35,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import com.doubledimple.ociserver.config.ProxyContext;
 
 /**
  * Oracle Cloud Instance Console Connection 工具类
@@ -233,7 +234,7 @@ public class OciConsoleUtils {
         log.info("  - 公钥长度: {}", publicKey.length());
         log.info("  - 公钥前100字符: {}", publicKey.substring(0, Math.min(100, publicKey.length())));
 
-        try (ComputeClient computeClient = ComputeClient.builder().build(provider)) {
+        try (ComputeClient computeClient = ComputeClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
 
             // 1. 验证实例是否存在
             Instance instance = getInstanceIfExists(computeClient, instanceId);
@@ -347,7 +348,7 @@ public class OciConsoleUtils {
     public static InstanceConsoleConnection getConsoleConnectionDetails(Tenant tenant, String connectionId) {
         SimpleAuthenticationDetailsProvider provider = OciUtils.getProvider(tenant);
 
-        try (ComputeClient computeClient = ComputeClient.builder().build(provider)) {
+        try (ComputeClient computeClient = ComputeClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
 
             GetInstanceConsoleConnectionRequest request =
                     GetInstanceConsoleConnectionRequest.builder()
@@ -413,7 +414,7 @@ public class OciConsoleUtils {
     public static List<InstanceConsoleConnection> listConsoleConnections(Tenant tenant, String instanceId) {
         SimpleAuthenticationDetailsProvider provider = OciUtils.getProvider(tenant);
 
-        try (ComputeClient computeClient = ComputeClient.builder().build(provider)) {
+        try (ComputeClient computeClient = ComputeClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
 
             // 获取实例信息以获取compartmentId
             Instance instance = getInstanceIfExists(computeClient, instanceId);
@@ -450,7 +451,7 @@ public class OciConsoleUtils {
     public static boolean deleteConsoleConnection(Tenant tenant, String connectionId) {
         SimpleAuthenticationDetailsProvider provider = OciUtils.getProvider(tenant);
 
-        try (ComputeClient computeClient = ComputeClient.builder().build(provider)) {
+        try (ComputeClient computeClient = ComputeClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
 
             // 检查连接是否存在
             InstanceConsoleConnection connection = getConsoleConnectionDetails(tenant, connectionId);
@@ -525,7 +526,7 @@ public class OciConsoleUtils {
                                                                                   String publicKey, String displayName) {
         SimpleAuthenticationDetailsProvider provider = OciUtils.getProvider(tenant);
 
-        try (ComputeClient computeClient = ComputeClient.builder().build(provider)) {
+        try (ComputeClient computeClient = ComputeClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
 
             Instance instance = getInstanceIfExists(computeClient, instanceId);
             if (instance == null) {
@@ -852,7 +853,7 @@ public class OciConsoleUtils {
         try {
             SimpleAuthenticationDetailsProvider provider = OciUtils.getProvider(tenant);
 
-            try (ComputeClient computeClient = ComputeClient.builder().build(provider)) {
+            try (ComputeClient computeClient = ComputeClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
                 GetInstanceConsoleConnectionRequest request = GetInstanceConsoleConnectionRequest.builder()
                         .instanceConsoleConnectionId(connectionId)
                         .build();

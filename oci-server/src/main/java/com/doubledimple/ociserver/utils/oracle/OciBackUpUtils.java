@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 
 import static com.doubledimple.ociserver.utils.oracle.OciUtils.getProvider;
+import com.doubledimple.ociserver.config.ProxyContext;
 
 /**
  * @version 1.0.0
@@ -57,7 +58,7 @@ public class OciBackUpUtils {
     public static BootVolumeBackup hasBootVolumeBackup(Tenant tenant, String architectureType) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
         String compartmentId = provider.getTenantId();
-        try (BlockstorageClient blockstorageClient = BlockstorageClient.builder().build(provider)) {
+        try (BlockstorageClient blockstorageClient = BlockstorageClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             // 查询引导卷备份列表
             ListBootVolumeBackupsRequest listRequest =
                     ListBootVolumeBackupsRequest.builder()
@@ -101,7 +102,7 @@ public class OciBackUpUtils {
         if (bootVolumeBackup != null){
             return bootVolumeBackup.getId();
         }
-        try (BlockstorageClient blockstorageClient = BlockstorageClient.builder().build(provider)) {
+        try (BlockstorageClient blockstorageClient = BlockstorageClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             String backupDisplayName = architectureType;
             Map<String, String> tagMapByArchitectureType = getTagMapByArchitectureType(architectureType);
             // 创建备份请求
@@ -185,7 +186,7 @@ public class OciBackUpUtils {
         String compartmentId = provider.getTenantId();
         try (BlockstorageClient blockstorageClient = BlockstorageClient.builder()
                 .region(Region.fromRegionId(region))
-                .build(provider)) {
+                .clientConfigurator(ProxyContext.get()).build(provider)) {
 
             // 创建引导卷请求
             CreateBootVolumeDetails createDetails =
@@ -282,7 +283,7 @@ public class OciBackUpUtils {
      */
     public static boolean deleteBootVolumeBackup(Tenant tenant, String bootVolumeBackupId) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
-        try (BlockstorageClient blockstorageClient = BlockstorageClient.builder().build(provider)) {
+        try (BlockstorageClient blockstorageClient = BlockstorageClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             // 首先检查备份是否存在
             GetBootVolumeBackupRequest getRequest =
                     GetBootVolumeBackupRequest.builder()
@@ -380,7 +381,7 @@ public class OciBackUpUtils {
 
         try (BlockstorageClient sourceClient = BlockstorageClient.builder()
                 .region(Region.fromRegionId(sourceRegion))
-                .build(provider)) {
+                .clientConfigurator(ProxyContext.get()).build(provider)) {
 
             tenant.setRegion(targetRegion);
             BootVolumeBackup bootVolumeBackup = hasBootVolumeBackup(tenant, architectureType);
@@ -449,7 +450,7 @@ public class OciBackUpUtils {
         // 在目标区域创建客户端来检查备份状态
         try (BlockstorageClient targetClient = BlockstorageClient.builder()
                 .region(Region.fromRegionId(targetRegion))
-                .build(provider)) {
+                .clientConfigurator(ProxyContext.get()).build(provider)) {
 
             final int MAX_WAIT_ATTEMPTS = 40;  // 跨区域复制可能需要更长时间
             final int WAIT_INTERVAL_SECONDS = 20;

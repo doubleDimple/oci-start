@@ -62,13 +62,14 @@
                     <th>${msg.get("vpn.port")}</th>
                     <th>${msg.get("vpn.name")}</th>
                     <th>${msg.get("vpn.pass")}</th>
+                    <th>${msg.get("vpn.tenant")}</th>
                     <th>${msg.get("vpn.status")}</th>
                     <th>${msg.get("vpn.action")}</th>
                 </tr>
                 </thead>
                 <tbody id="tableBody">
                 <tr>
-                    <td colspan="7" style="text-align: center; padding: 30px;">
+                    <td colspan="8" style="text-align: center; padding: 30px;">
                         <i class="fas fa-spinner fa-spin" style="font-size: 24px; color: var(--accent-blue); margin-right: 10px;"></i>
                         <span style="color: var(--text-secondary);">${msg.get("common.loading")}</span>
                     </td>
@@ -138,6 +139,17 @@
                     </select>
                 </div>
 
+                <div class="form-group">
+                    <label for="tenantId">${msg.get("vpn.tenant")}:</label>
+                    <select id="tenantId" name="tenantId" class="form-input"
+                            data-custom-select data-placeholder="${msg.get('vpn.tenant.select')}">
+                        <option value="">${msg.get("vpn.tenant.global")}</option>
+                    </select>
+                    <div style="margin-top:6px;font-size:12px;color:var(--text-secondary);">
+                        ${msg.get("vpn.tenant.hint")}
+                    </div>
+                </div>
+
                 <div class="modal-actions">
                     <button type="submit" class="btn btn-primary">${msg.get("common.save")}</button>
                     <button type="button" class="btn btn-secondary" onclick="closeProxyModal()">${msg.get("common.cancel")}</button>
@@ -166,7 +178,10 @@
         common_cancel: "${msg.get('common.cancel')?js_string}",
         common_delete: "${msg.get('common.delete')?js_string}",
         common_network_error: "${msg.get('common.network.error')}",
-        vpn_edit: "${msg.get('vpn.edit')?js_string}"
+        vpn_edit: "${msg.get('vpn.edit')?js_string}",
+        vpn_tenant: "${msg.get('vpn.tenant')?js_string}",
+        vpn_tenant_global: "${msg.get('vpn.tenant.global')?js_string}",
+        vpn_tenant_select: "${msg.get('vpn.tenant.select')?js_string}"
 
     }
 </script>

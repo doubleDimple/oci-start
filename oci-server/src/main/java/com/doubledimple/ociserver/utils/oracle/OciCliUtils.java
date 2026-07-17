@@ -101,6 +101,7 @@ import java.util.regex.Pattern;
 import static com.doubledimple.ociserver.config.constant.SystemScriptShell.networkSecurityGroupName;
 import static com.doubledimple.ociserver.config.constant.SystemScriptShell.vcnName;
 import static com.doubledimple.ociserver.utils.oracle.OciUtils.getProvider;
+import com.doubledimple.ociserver.config.ProxyContext;
 
 /**
  * OCI CLI 工具类
@@ -945,7 +946,7 @@ public class OciCliUtils {
         final SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
         String connectionString = null;
 
-        try (ComputeClient computeClient = ComputeClient.builder().build(provider)) {
+        try (ComputeClient computeClient = ComputeClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             // 设置区域
             computeClient.setRegion(RegionEnum.getRegionCode(tenant.getRegion()));
 
@@ -1138,8 +1139,8 @@ public class OciCliUtils {
 
     public static void createVcnAndFlowLogs(Tenant tenant){
          SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
-         try (VirtualNetworkClient virtualNetworkClient = VirtualNetworkClient.builder().build(provider);) {
-             LoggingManagementClient loggingManagementClient = LoggingManagementClient.builder().build(provider);
+         try (VirtualNetworkClient virtualNetworkClient = VirtualNetworkClient.builder().clientConfigurator(ProxyContext.get()).build(provider);) {
+             LoggingManagementClient loggingManagementClient = LoggingManagementClient.builder().clientConfigurator(ProxyContext.get()).build(provider);
              createVcnAndFlowLogs(tenant.getTenantId(),tenant.getRegion(),tenant.getCloudType(),virtualNetworkClient,loggingManagementClient,provider.getTenantId(),2);
          }catch (Exception e){
              log.error("创建vcn和日志组失败:", e);

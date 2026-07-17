@@ -6,6 +6,7 @@ import com.doubledimple.dao.entity.InstanceDetails;
 import com.doubledimple.dao.entity.TemInstance;
 import com.doubledimple.dao.entity.Tenant;
 import com.doubledimple.ocicommon.enums.RegionEnum;
+import com.doubledimple.ociserver.config.TenantProxyBinder;
 import com.doubledimple.ociserver.pojo.domain.dto.User;
 import com.doubledimple.ociserver.pojo.response.BootVolumeRes;
 import com.doubledimple.ociserver.utils.oracle.vnic.VnicCreationResult;
@@ -133,6 +134,7 @@ import static com.oracle.bmc.Region.register;
 import static com.oracle.bmc.core.model.ClusterNetworkSummary.LifecycleState.Running;
 import static com.oracle.bmc.core.model.Instance.LifecycleState.Stopped;
 import static com.oracle.bmc.workrequests.model.WorkRequestSummary.Status.Failed;
+import com.doubledimple.ociserver.config.ProxyContext;
 
 /**
  * @author doubleDimple
@@ -171,7 +173,7 @@ public class OciUtils {
      */
     public static List<RegionSubscription> queryRegions(SimpleAuthenticationDetailsProvider provider) {
         List<RegionSubscription> nonHomeRegions = new ArrayList<>();
-        try (Identity identityClient = IdentityClient.builder().build(provider)) {
+        try (Identity identityClient = IdentityClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             // 获取当前账号订阅的所有区域
             ListRegionSubscriptionsRequest listRegionSubscriptionsRequest =
                     ListRegionSubscriptionsRequest.builder()
@@ -197,7 +199,8 @@ public class OciUtils {
      * @Date: 3/16/25 6:54 AM
      */
     public static SimpleAuthenticationDetailsProvider getProvider(Tenant tenant) {
-
+        // 定时任务 / 静态工具统一入口：按父租户绑定代理到当前线程
+        TenantProxyBinder.applyForTenant(tenant);
         return SimpleAuthenticationDetailsProvider.builder()
                 .userId(tenant.getTenantId())
                 .fingerprint(tenant.getFingerprint())
@@ -214,6 +217,7 @@ public class OciUtils {
     }
 
     public static SimpleAuthenticationDetailsProvider getProviderInner(Tenant tenant) {
+        TenantProxyBinder.applyForTenant(tenant);
         return SimpleAuthenticationDetailsProvider.builder()
                 .userId(tenant.getTenantId())
                 .fingerprint(tenant.getFingerprint())
@@ -230,6 +234,9 @@ public class OciUtils {
     }
 
     public static SimpleAuthenticationDetailsProvider getProvider(User user) {
+        // User.id = tenant 表主键；有则绑父租户代理，无则走全局共享池（并清掉线程上残留代理）
+        Long tenantPk = (user != null && user.getId() > 0) ? user.getId() : null;
+        TenantProxyBinder.applyForTenantId(tenantPk);
         return SimpleAuthenticationDetailsProvider.builder()
                 .userId(user.getUserId())
                 .fingerprint(user.getFingerprint())
@@ -253,9 +260,9 @@ public class OciUtils {
         List<InstanceDetails> allInstances = new ArrayList<>();
         JerseyHttpProvider httpProvider = JerseyHttpProvider.getInstance();
         // 首先获取所有compartments
-        try (IdentityClient identityClient = IdentityClient.builder().httpProvider(httpProvider).build(provider);
-             ComputeClient computeClient = ComputeClient.builder().httpProvider(httpProvider).build(provider);
-             BlockstorageClient blockstorageClient = BlockstorageClient.builder().build(provider)) {
+        try (IdentityClient identityClient = IdentityClient.builder().httpProvider(httpProvider).clientConfigurator(ProxyContext.get()).build(provider);
+             ComputeClient computeClient = ComputeClient.builder().httpProvider(httpProvider).clientConfigurator(ProxyContext.get()).build(provider);
+             BlockstorageClient blockstorageClient = BlockstorageClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
 
             ListCompartmentsRequest listCompartmentsRequest = ListCompartmentsRequest.builder()
                     .compartmentId(provider.getTenantId())
@@ -362,8 +369,8 @@ public class OciUtils {
      */
     public static Vnic getVnicPrimary(SimpleAuthenticationDetailsProvider provider, Instance instance, String compartmentId) {
         Vnic vnic = null;
-        try (ComputeClient computeClient = ComputeClient.builder().build(provider);
-             VirtualNetworkClient vcnClient = VirtualNetworkClient.builder().build(provider)) {
+        try (ComputeClient computeClient = ComputeClient.builder().clientConfigurator(ProxyContext.get()).build(provider);
+             VirtualNetworkClient vcnClient = VirtualNetworkClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             // 获取实例的所有VNIC附件
             ListVnicAttachmentsRequest listVnicRequest = ListVnicAttachmentsRequest.builder()
                     .compartmentId(compartmentId)
@@ -452,7 +459,7 @@ public class OciUtils {
      * 停止实例
      */
     public static void stopInstance(SimpleAuthenticationDetailsProvider provider, String instanceId) {
-        try (ComputeClient computeClient = ComputeClient.builder().build(provider)) {
+        try (ComputeClient computeClient = ComputeClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             // 获取实例详情
             Instance instance = computeClient.getInstance(GetInstanceRequest.builder().instanceId(instanceId).build()).getInstance();
 
@@ -517,7 +524,7 @@ public class OciUtils {
     }
 
     public static void startInstance(SimpleAuthenticationDetailsProvider provider, String instanceId) {
-        try (ComputeClient computeClient = ComputeClient.builder().build(provider)) {
+        try (ComputeClient computeClient = ComputeClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             // 获取实例详情
             Instance instance = computeClient.getInstance(GetInstanceRequest.builder().instanceId(instanceId).build()).getInstance();
 
@@ -586,7 +593,7 @@ public class OciUtils {
      * @Description: 分离引导卷
      */
     public static String detachBootVolume(SimpleAuthenticationDetailsProvider provider, String instanceId) {
-        try (ComputeClient computeClient = ComputeClient.builder().build(provider)) {
+        try (ComputeClient computeClient = ComputeClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             // 1. 获取实例信息
             Instance instance = computeClient.getInstance(GetInstanceRequest.builder().instanceId(instanceId).build()).getInstance();
 
@@ -688,7 +695,7 @@ public class OciUtils {
     public static String tachVolume(SimpleAuthenticationDetailsProvider provider, TemInstance temInstance, String bootVolumeId) {
         log.info("开始处理引导卷, 实例ID: {}, 引导卷ID: {}", temInstance.getInstanceId(), bootVolumeId);
 
-        try (ComputeClient computeClient = ComputeClient.builder().build(provider)) {
+        try (ComputeClient computeClient = ComputeClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             // 获取实例信息
             Instance instance = computeClient.getInstance(GetInstanceRequest.builder()
                     .instanceId(temInstance.getInstanceId())
@@ -806,7 +813,7 @@ public class OciUtils {
     public static boolean isBootVolumeTerminated(SimpleAuthenticationDetailsProvider provider, String bootVolumeId) {
         log.debug("检查引导卷是否已终止, 引导卷ID: {}", bootVolumeId);
         boolean isTerminated = false;
-        try (BlockstorageClient blockstorageClient = BlockstorageClient.builder().build(provider)) {
+        try (BlockstorageClient blockstorageClient = BlockstorageClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             // 获取引导卷信息
             GetBootVolumeRequest request = GetBootVolumeRequest.builder()
                     .bootVolumeId(bootVolumeId)
@@ -837,7 +844,7 @@ public class OciUtils {
      * @Description: 卸载附加的存储卷
      */
     /*public static void detachVolumeAttachment(SimpleAuthenticationDetailsProvider provider, String instanceId) {
-        try (ComputeClient computeClient = ComputeClient.builder().build(provider)) {
+        try (ComputeClient computeClient = ComputeClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             Instance instance = computeClient.getInstance(GetInstanceRequest.builder().instanceId(instanceId).build()).getInstance();
 
             // 1. 获取快存储卷附件列表
@@ -908,8 +915,8 @@ public class OciUtils {
     }*/
 
     public static void detachVolumeAttachment(SimpleAuthenticationDetailsProvider provider, String instanceId) {
-        try (ComputeClient computeClient = ComputeClient.builder().build(provider);
-             BlockstorageClient blockClient = BlockstorageClient.builder().build(provider)) {
+        try (ComputeClient computeClient = ComputeClient.builder().clientConfigurator(ProxyContext.get()).build(provider);
+             BlockstorageClient blockClient = BlockstorageClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
 
             Instance instance = computeClient.getInstance(
                     GetInstanceRequest.builder().instanceId(instanceId).build()
@@ -987,7 +994,7 @@ public class OciUtils {
      * @Description: 挂载引导卷
      */
     public static void attachBootVolume(SimpleAuthenticationDetailsProvider provider, String instanceId, String bootVolumeId) {
-        try (ComputeClient computeClient = ComputeClient.builder().build(provider)) {
+        try (ComputeClient computeClient = ComputeClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             Instance instance = computeClient.getInstance(GetInstanceRequest.builder().instanceId(instanceId).build()).getInstance();
 
             AttachBootVolumeDetails attachDetails = AttachBootVolumeDetails.builder()
@@ -1056,7 +1063,7 @@ public class OciUtils {
      */
     public static void replaceBootVolume(SimpleAuthenticationDetailsProvider provider, String instanceId, String newBootVolumeId) {
         log.info("开始为实例 {} 替换全新的引导卷: {}", instanceId, newBootVolumeId);
-        try (ComputeClient computeClient = ComputeClient.builder().build(provider)) {
+        try (ComputeClient computeClient = ComputeClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
 
             // 1. 构建新的数据源信息
             UpdateInstanceSourceViaBootVolumeDetails sourceDetails = UpdateInstanceSourceViaBootVolumeDetails.builder()
@@ -1113,7 +1120,7 @@ public class OciUtils {
      * @param preserveBootVolume 设置为false表示同时删除引导卷
      */
     public static void terminateInstance(SimpleAuthenticationDetailsProvider provider, String instanceId, boolean preserveBootVolume) {
-        try (ComputeClient computeClient = ComputeClient.builder().build(provider)) {
+        try (ComputeClient computeClient = ComputeClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             // 获取实例详情
             Instance instance = computeClient.getInstance(GetInstanceRequest.builder().instanceId(instanceId).build()).getInstance();
             Instance.LifecycleState lifecycleState = instance.getLifecycleState();
@@ -1493,7 +1500,7 @@ public class OciUtils {
      */
     public static boolean terminateBootVolume(Tenant tenant, String bootVolumeId) {
         final SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
-        try (BlockstorageClient blockstorageClient = BlockstorageClient.builder().build(provider)) {
+        try (BlockstorageClient blockstorageClient = BlockstorageClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             try {
                 GetBootVolumeRequest getRequest = GetBootVolumeRequest.builder()
                         .bootVolumeId(bootVolumeId)
@@ -1600,7 +1607,7 @@ public class OciUtils {
      */
     public static String getAvailabilityDomainByInstanceId(Tenant tenant, String instanceId) {
         final SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
-        try (ComputeClient computeClient = ComputeClient.builder().build(provider)) {
+        try (ComputeClient computeClient = ComputeClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             // 通过实例ID直接获取实例详情
             GetInstanceRequest getInstanceRequest = GetInstanceRequest.builder()
                     .instanceId(instanceId)
@@ -1629,7 +1636,7 @@ public class OciUtils {
 
     public static String getArchitectureByInstanceId(Tenant tenant, String instanceId) {
         String architecture = "NONE";
-        try (ComputeClient computeClient = ComputeClient.builder().build(getProvider(tenant))) {
+        try (ComputeClient computeClient = ComputeClient.builder().clientConfigurator(ProxyContext.get()).build(getProvider(tenant))) {
             Instance instance = computeClient.getInstance(GetInstanceRequest.builder().instanceId(instanceId).build()).getInstance();
             String processorDescription = instance.getShapeConfig().getProcessorDescription();
             if (processorDescription.contains("Ampere") || processorDescription.contains("Altra")) {
@@ -1725,7 +1732,7 @@ public class OciUtils {
      */
     public static Instance getInstanceById(Tenant tenant, String instanceId) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
-        try (ComputeClient computeClient = ComputeClient.builder().build(provider)) {
+        try (ComputeClient computeClient = ComputeClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             // 创建请求对象
             GetInstanceRequest getInstanceRequest = GetInstanceRequest.builder()
                     .instanceId(instanceId)
@@ -1759,7 +1766,7 @@ public class OciUtils {
                                                        String displayName, Long sizeInGBs) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
 
-        try (BlockstorageClient blockstorageClient = BlockstorageClient.builder().build(provider)) {
+        try (BlockstorageClient blockstorageClient = BlockstorageClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
 
             // 1. 获取源引导卷详情
             GetBootVolumeRequest getSourceRequest = GetBootVolumeRequest.builder()
@@ -1879,8 +1886,8 @@ public class OciUtils {
     public static BootVolume getBootVolume(Instance instance, Tenant tenant) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
         String compartmentId = provider.getTenantId();
-        try (BlockstorageClient blockstorageClient = BlockstorageClient.builder().build(provider);
-             ComputeClient computeClient = ComputeClient.builder().build(provider);) {
+        try (BlockstorageClient blockstorageClient = BlockstorageClient.builder().clientConfigurator(ProxyContext.get()).build(provider);
+             ComputeClient computeClient = ComputeClient.builder().clientConfigurator(ProxyContext.get()).build(provider);) {
             return getBootVolume(blockstorageClient, computeClient, instance, compartmentId);
         } catch (Exception e) {
             return null;
@@ -1898,8 +1905,8 @@ public class OciUtils {
     public static boolean checkAllDomainsIsShapeEnabled(Tenant tenant) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
         String compartmentId = provider.getTenantId();
-        try (IdentityClient identityClient = IdentityClient.builder().build(provider);
-             ComputeClient computeClient = ComputeClient.builder().build(provider)) {
+        try (IdentityClient identityClient = IdentityClient.builder().clientConfigurator(ProxyContext.get()).build(provider);
+             ComputeClient computeClient = ComputeClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             ListAvailabilityDomainsResponse listAvailabilityDomainsResponse =
                     identityClient.listAvailabilityDomains(ListAvailabilityDomainsRequest.builder()
                             .compartmentId(compartmentId)
@@ -1996,7 +2003,7 @@ public class OciUtils {
      */
     public static void rebootInstance(Tenant tenant, String instanceId, boolean useSoftReset) {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
-        try (ComputeClient computeClient = ComputeClient.builder().build(provider)) {
+        try (ComputeClient computeClient = ComputeClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             // 获取实例详情
             Instance instance = computeClient.getInstance(GetInstanceRequest.builder().instanceId(instanceId).build()).getInstance();
 
@@ -2075,7 +2082,7 @@ public class OciUtils {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
         List<String> compartmentIds = new ArrayList<>();
 
-        try (IdentityClient identityClient = IdentityClient.builder().build(provider)) {
+        try (IdentityClient identityClient = IdentityClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             // Add the tenant's root compartment ID
             compartmentIds.add(provider.getTenantId());
 
@@ -2164,8 +2171,8 @@ public class OciUtils {
 
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
 
-        try (BlockstorageClient blockstorageClient = BlockstorageClient.builder().build(provider);
-             ComputeClient computeClient = ComputeClient.builder().build(provider)) {
+        try (BlockstorageClient blockstorageClient = BlockstorageClient.builder().clientConfigurator(ProxyContext.get()).build(provider);
+             ComputeClient computeClient = ComputeClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
 
             // 1. 检查引导卷是否存在及其状态
             BootVolume bootVolume;
@@ -2344,7 +2351,7 @@ public class OciUtils {
         boolean flag = Boolean.FALSE;
         SimpleAuthenticationDetailsProvider provider = getProvider(user);
         String compartmentId = provider.getTenantId();
-        try (VirtualNetworkClient virtualNetworkClient = VirtualNetworkClient.builder().build(provider);) {
+        try (VirtualNetworkClient virtualNetworkClient = VirtualNetworkClient.builder().clientConfigurator(ProxyContext.get()).build(provider);) {
             ListVcnsRequest listRequest = ListVcnsRequest.builder()
                     .compartmentId(compartmentId)
                     .build();
@@ -2381,9 +2388,9 @@ public class OciUtils {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
         String compartmentId = provider.getTenantId();
 
-        try (IdentityClient identityClient = IdentityClient.builder().build(provider);
+        try (IdentityClient identityClient = IdentityClient.builder().clientConfigurator(ProxyContext.get()).build(provider);
              IdentityDomainsClient identityDomainsClient = IdentityDomainsClient.builder()
-                     .build(provider)) {
+                     .clientConfigurator(ProxyContext.get()).build(provider)) {
             String domainUrl = getDomain(identityClient, compartmentId);
             if (StringUtils.isEmpty(domainUrl)){
                 log.warn("自动获取Domain URL失败");
@@ -2468,9 +2475,9 @@ public class OciUtils {
 
         int expireDays = expirationDays != null ? expirationDays : 120;
 
-        try (IdentityClient identityClient = IdentityClient.builder().build(provider);
+        try (IdentityClient identityClient = IdentityClient.builder().clientConfigurator(ProxyContext.get()).build(provider);
              IdentityDomainsClient identityDomainsClient = IdentityDomainsClient.builder()
-                     .build(provider)) {
+                     .clientConfigurator(ProxyContext.get()).build(provider)) {
 
             String domainUrl = getDomain(identityClient, compartmentId);
 
@@ -2554,9 +2561,9 @@ public class OciUtils {
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
         String compartmentId = provider.getTenantId();
 
-        try (IdentityClient identityClient = IdentityClient.builder().build(provider);
+        try (IdentityClient identityClient = IdentityClient.builder().clientConfigurator(ProxyContext.get()).build(provider);
              IdentityDomainsClient identityDomainsClient = IdentityDomainsClient.builder()
-                     .build(provider)){
+                     .clientConfigurator(ProxyContext.get()).build(provider)){
 
             String domainUrl = getDomain(identityClient, compartmentId);
             if (StringUtils.isEmpty(domainUrl)){
@@ -2667,7 +2674,7 @@ public class OciUtils {
      * @return: String 生成的明文 Token（请务必保存，后续无法再次获取）
      */
     public static String generateAuthToken(SimpleAuthenticationDetailsProvider provider, String userId, String description) {
-        try (IdentityClient identityClient = IdentityClient.builder().build(provider)) {
+        try (IdentityClient identityClient = IdentityClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
 
             // 1. 构建 Token 描述信息
             CreateAuthTokenDetails tokenDetails = CreateAuthTokenDetails.builder()
