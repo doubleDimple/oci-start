@@ -42,8 +42,17 @@ struct TenantsView: View {
                 // Web 整页：/tenants/regionList → 租户详情
                 TenantDetailView(model: model)
             } else if model.trafficParent != nil {
-                // Web 整页：/m/traffic → 流量查询
+                // Web 整页：/monitor/homePage → 实例流量监控
                 TenantTrafficView(model: model)
+            } else if model.auditParent != nil {
+                // 审计日志：从弹框改为整页（对齐用户管理/流量查询）
+                TenantAuditLogView(model: model)
+            } else if model.costParent != nil {
+                // Web 整页：/cost/costPage → 费用统计
+                TenantCostView(model: model)
+            } else if model.quotaParent != nil {
+                // 账号配额：从弹框改为整页（对齐审计日志/费用统计）
+                TenantQuotaView(model: model)
             } else {
                 listPage
             }
@@ -59,6 +68,12 @@ struct TenantsView: View {
                 Task { await model.reloadDetail() }
             } else if let t = model.trafficParent {
                 Task { await model.queryTraffic(t) }
+            } else if let t = model.auditParent {
+                Task { await model.loadAuditLogs(t, append: false) }
+            } else if let t = model.costParent {
+                Task { await model.queryCost(t) }
+            } else if model.quotaParent != nil {
+                // 账号配额不自动查询，需用户点击「查询」
             } else {
                 Task { await model.reload() }
             }
@@ -672,13 +687,13 @@ enum TenantActionPanel {
                 TenantActionItem(id: "traffic", title: "流量预警", systemImage: "bell", isDanger: false) { model.openTraffic(item) },
                 TenantActionItem(id: "tsearch", title: "流量查询", systemImage: "chart.bar", isDanger: false) { model.openTrafficPage(item) },
                 TenantActionItem(id: "audit", title: "审计日志", systemImage: "doc.text", isDanger: false) { model.openAudit(item) },
-                TenantActionItem(id: "cost", title: "费用", systemImage: "creditcard", isDanger: false) { model.openCost(item) },
-                TenantActionItem(id: "export", title: "导出本租户", systemImage: "square.and.arrow.down", isDanger: false) { model.openExportOne(item) },
+                TenantActionItem(id: "cost", title: "账号费用", systemImage: "creditcard", isDanger: false) {
+                    model.openCost(item)
+                },
+                TenantActionItem(id: "export", title: "导出租户", systemImage: "square.and.arrow.down", isDanger: false) { model.openExportOne(item) },
                 TenantActionItem(id: "email", title: "邮箱服务", systemImage: "envelope", isDanger: false) { model.openEmail(item) },
                 TenantActionItem(id: "social", title: "社媒配置", systemImage: "link", isDanger: false) { model.openSocial(item) },
-                TenantActionItem(id: "quota", title: "查看配额", systemImage: "chart.bar", isDanger: false) { model.openQuota(item) },
-                TenantActionItem(id: "vol", title: "引导卷", systemImage: "externaldrive", isDanger: false) { model.openVolumes(item) },
-                TenantActionItem(id: "sync", title: "同步实例", systemImage: "arrow.2.circlepath", isDanger: false) { model.sync(item) }
+                TenantActionItem(id: "quota", title: "查看配额", systemImage: "chart.bar", isDanger: false) { model.openQuota(item) }
             ])
         } else if item.cloudType == 2 {
             list.append(TenantActionItem(id: "detail", title: "租户详情", systemImage: "info.circle", isDanger: false) {
@@ -717,7 +732,7 @@ enum TenantActionPanel {
                     model.openSecurityRules(item)
                 },
                 TenantActionItem(id: "ins", title: "实例列表", systemImage: "desktopcomputer", isDanger: false) {
-                    ToastCenter.shared.error("请从侧栏打开「实例列表」（即将原生化）")
+                    ToastCenter.shared.success("请从侧栏打开「实例列表」查看该租户实例")
                 },
                 TenantActionItem(id: "mysql", title: "数据库", systemImage: "cylinder", isDanger: false) {
                     model.openMysql(item)

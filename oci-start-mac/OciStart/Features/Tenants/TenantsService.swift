@@ -190,23 +190,49 @@ struct TenantsService {
         }
     }
 
-    func auditLogs(tenantId: Int64, start: String?, end: String?, pageToken: String?) async throws -> [TenantAuditLogEntry] {
+    /// 审计日志分页。后端：`ApiResponse.data` = `OciPageResult{ data, nextPageToken }`。
+    func auditLogs(tenantId: Int64, start: String?, end: String?, pageToken: String?) async throws -> TenantAuditLogPage {
         let url = try client.makeURL(baseURL, path: "/tenants/audit/log")
-        var body: [String: Any] = ["tenantId": "\(tenantId)", "days": 7]
+        var body: [String: Any] = ["tenantId": "\(tenantId)"]
         if let start = start, !start.isEmpty { body["startDate"] = start }
         if let end = end, !end.isEmpty { body["endDate"] = end }
         if let pageToken = pageToken, !pageToken.isEmpty { body["pageToken"] = pageToken }
+        // 无日期时按最近 1 天（与后端默认一致）
+        if body["startDate"] == nil { body["days"] = 1 }
         let raw = try await client.postJSON(url, body: body)
-        if let env = try? JSONDecoder().decode(TenantApiEnvelope.self, from: raw), let data = env.data {
-            let listData = try JSONSerialization.data(withJSONObject: jsonObject(data))
-            if let list = try? JSONDecoder().decode([TenantAuditLogEntry].self, from: listData) { return list }
-            if let dict = try? JSONSerialization.jsonObject(with: listData) as? [String: Any],
-               let items = dict["items"] ?? dict["logs"] ?? dict["content"] {
-                let itemData = try JSONSerialization.data(withJSONObject: items)
-                return (try? JSONDecoder().decode([TenantAuditLogEntry].self, from: itemData)) ?? []
+        if let env = try? JSONDecoder().decode(TenantApiEnvelope.self, from: raw) {
+            if !env.ok, env.success == false {
+                throw APIError.serverMessage(env.text.isEmpty ? "审计日志查询失败" : env.text)
+            }
+            if let data = env.data {
+                let pageObj = jsonObject(data)
+                if let list = tryDecodeAuditList(pageObj) {
+                    return TenantAuditLogPage(items: list, nextPageToken: extractNextPageToken(pageObj))
+                }
+                if let dict = pageObj as? [String: Any] {
+                    // OciPageResult: { data: [...], nextPageToken }
+                    let nested = dict["data"] ?? dict["items"] ?? dict["logs"] ?? dict["content"]
+                    if let nested = nested, let list = tryDecodeAuditList(nested) {
+                        return TenantAuditLogPage(items: list, nextPageToken: extractNextPageToken(dict))
+                    }
+                }
             }
         }
-        return (try? JSONDecoder().decode([TenantAuditLogEntry].self, from: raw)) ?? []
+        if let list = try? JSONDecoder().decode([TenantAuditLogEntry].self, from: raw) {
+            return TenantAuditLogPage(items: list, nextPageToken: nil)
+        }
+        return TenantAuditLogPage()
+    }
+
+    private func tryDecodeAuditList(_ any: Any) -> [TenantAuditLogEntry]? {
+        guard let data = try? JSONSerialization.data(withJSONObject: any) else { return nil }
+        return try? JSONDecoder().decode([TenantAuditLogEntry].self, from: data)
+    }
+
+    private func extractNextPageToken(_ any: Any) -> String? {
+        guard let dict = any as? [String: Any] else { return nil }
+        if let s = dict["nextPageToken"] as? String, !s.isEmpty { return s }
+        return nil
     }
 
     func bootVolumes(tenantId: Int64) async throws -> [TenantBootVolume] {
@@ -466,19 +492,33 @@ struct TenantsService {
         try throwIfApiFailed(data)
     }
 
-    func queryCost(tenantId: Int64, start: String, end: String) async throws -> AnyCodableJSON? {
+    /// Web: `POST /cost/query` → `ApiResponse.data` = `[CloudCostItem]`
+    func queryCost(tenantId: Int64, start: String, end: String) async throws -> [TenantCostItem] {
         let url = try client.makeURL(baseURL, path: "/cost/query")
         let raw = try await client.postJSON(url, body: [
             "tenantId": "\(tenantId)",
             "startDate": start,
             "endDate": end
         ])
-        let env = try JSONDecoder().decode(TenantApiEnvelope.self, from: raw)
-        if !env.ok { throw APIError.serverMessage(env.text) }
-        return env.data
+        if let env = try? JSONDecoder().decode(TenantApiEnvelope.self, from: raw) {
+            if !env.ok, env.success == false {
+                throw APIError.serverMessage(env.text.isEmpty ? "费用查询失败" : env.text)
+            }
+            if let data = env.data {
+                let obj = jsonObject(data)
+                if let list = tryDecodeCostList(obj) { return list }
+            }
+        }
+        return (try? JSONDecoder().decode([TenantCostItem].self, from: raw)) ?? []
     }
 
-    func instanceTraffic(tenantIds: [Int64], start: String, end: String, period: String) async throws -> [TenantTrafficRow] {
+    private func tryDecodeCostList(_ any: Any) -> [TenantCostItem]? {
+        guard let data = try? JSONSerialization.data(withJSONObject: any) else { return nil }
+        return try? JSONDecoder().decode([TenantCostItem].self, from: data)
+    }
+
+    /// Web: `POST /monitor/api/instances/traffic` — tenantIds are string IDs (same as web checkboxes).
+    func instanceTraffic(tenantIds: [String], start: String, end: String, period: String) async throws -> [TenantTrafficRow] {
         let url = try client.makeURL(baseURL, path: "/monitor/api/instances/traffic")
         let raw = try await client.postJSON(url, body: [
             "tenantIds": tenantIds,
@@ -487,6 +527,20 @@ struct TenantsService {
             "period": period
         ])
         return (try? JSONDecoder().decode([TenantTrafficRow].self, from: raw)) ?? []
+    }
+
+    /// Web: `GET /monitor/api/traffic/alert?tenantId=` — returns threshold in GB (default 10240 = 10 TB).
+    func monitorTrafficThreshold(tenantId: Int64) async throws -> Double {
+        let url = try client.makeURL(baseURL, path: "/monitor/api/traffic/alert", query: ["tenantId": "\(tenantId)"])
+        let raw = try await client.getJSON(url)
+        let obj = (try? JSONSerialization.jsonObject(with: raw) as? [String: Any]) ?? [:]
+        // ApiResponse: { success, data: { threshold, ... } }
+        if let data = obj["data"] as? [String: Any] {
+            if let t = data["threshold"] as? Double { return t }
+            if let n = data["threshold"] as? NSNumber { return n.doubleValue }
+            if let i = data["threshold"] as? Int { return Double(i) }
+        }
+        return 10240
     }
 
     func aiModels(tenantId: Int64) async throws -> [TenantAiModel] {

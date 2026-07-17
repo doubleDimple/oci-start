@@ -26,14 +26,10 @@ struct TenantSheetHost: View {
                 usersSheet(t)
             case .traffic(let t):
                 trafficSheet(t)
-            case .audit(let t):
-                auditSheet(t)
             case .email(let t):
                 emailSheet(t)
             case .social(let t):
                 socialSheet(t)
-            case .quota(let t):
-                quotaSheet(t)
             case .bootVolumes(let t):
                 volumesSheet(t)
             case .accountCheck:
@@ -50,8 +46,6 @@ struct TenantSheetHost: View {
                 bootCreateSheet(t)
             case .regionSub(let t):
                 regionSubSheet(t)
-            case .cost(let t):
-                costSheet(t)
             case .trafficQuery:
                 EmptyView()
             case .aiChat(let t):
@@ -437,7 +431,7 @@ struct TenantSheetHost: View {
         }
     }
 
-    // MARK: - Traffic / Audit / Email / Social / Quota / Volumes（对齐 Web 弹层）
+    // MARK: - Traffic / Email / Social / Volumes（对齐 Web 弹层；审计/配额/费用已改整页）
 
     /// Web: `trafficAlertModal`
     private func trafficSheet(_ t: TenantItem) -> some View {
@@ -461,51 +455,6 @@ struct TenantSheetHost: View {
                     Toggle("超限自动关机", isOn: $model.trafficAutoShutdown)
                         .foregroundColor(primaryText)
                     hint("达到阈值后自动停止相关实例")
-                }
-            }
-        }
-    }
-
-    /// Web: `auditLogModal` — 日期筛选 + 表格
-    private func auditSheet(_ t: TenantItem) -> some View {
-        chrome(title: "审计日志", systemImage: "doc.text", width: 900, height: 560, footer: {
-            AppButton(title: "关闭", kind: .secondary) { presentationMode.wrappedValue.dismiss() }
-        }) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 8) {
-                    Text("开始：").font(.system(size: 12)).foregroundColor(mutedText)
-                    AppTextField(text: $model.auditStart, placeholder: "yyyy-MM-dd")
-                        .frame(width: 150)
-                    Text("结束：").font(.system(size: 12)).foregroundColor(mutedText)
-                    AppTextField(text: $model.auditEnd, placeholder: "yyyy-MM-dd")
-                        .frame(width: 150)
-                    AppButton(title: "查询", kind: .primary) { model.searchAudit(t) }
-                }
-                AppSheetTableBox {
-                    AppSheetTableHeader(columns: [
-                        ("#", 40), ("用户", 100), ("来源 IP", 110),
-                        ("事件", nil), ("时间", 140), ("说明", 160)
-                    ])
-                    if model.auditLogs.isEmpty {
-                        Text("暂无日志")
-                            .font(.system(size: 13))
-                            .foregroundColor(mutedText)
-                            .frame(maxWidth: .infinity)
-                            .padding(28)
-                    } else {
-                        ForEach(Array(model.auditLogs.enumerated()), id: \.element.id) { idx, log in
-                            AppSheetTableRow(striped: idx % 2 == 1) {
-                                HStack(spacing: 0) {
-                                    tableCell("\(idx + 1)", width: 40, muted: true)
-                                    tableCell(log.principalName.isEmpty ? "—" : log.principalName, width: 100)
-                                    tableCell(log.sourceIP.isEmpty ? "—" : log.sourceIP, width: 110, muted: true)
-                                    tableCell(log.eventName, width: nil, bold: true)
-                                    tableCell(log.eventTime.isEmpty ? "—" : log.eventTime, width: 140, muted: true)
-                                    tableCell(log.message.isEmpty ? "—" : log.message, width: 160, muted: true)
-                                }
-                            }
-                        }
-                    }
                 }
             }
         }
@@ -632,135 +581,6 @@ struct TenantSheetHost: View {
         }
     }
 
-    /// Web: `quotaModal` — 图标标题 + 筛选条 + 结果区
-    private func quotaSheet(_ t: TenantItem) -> some View {
-        chrome(title: "账号配额", systemImage: "chart.bar.fill", width: 860, height: 600, footer: {
-            HStack(spacing: 8) {
-                AppButton(title: "上一页", kind: .secondary, enabled: model.quotaPage > 0) {
-                    model.queryQuota(page: model.quotaPage - 1)
-                }
-                AppButton(title: "下一页", kind: .secondary, enabled: model.quotaHasNext) {
-                    model.queryQuota(page: model.quotaPage + 1)
-                }
-                AppButton(title: "关闭", kind: .secondary) { presentationMode.wrappedValue.dismiss() }
-            }
-        }) {
-            VStack(alignment: .leading, spacing: 0) {
-                Text(model.quotaRegionLabel.isEmpty
-                     ? "选择租户和服务后点击查询"
-                     : "\(model.quotaRegionLabel) · 第 \(model.quotaPage + 1) 页 · \(model.quotaItems.count) 条")
-                    .font(.system(size: 11))
-                    .foregroundColor(mutedText)
-                    .padding(.bottom, 12)
-
-                // Filter bar (Web surface-2 strip)
-                HStack(alignment: .bottom, spacing: 12) {
-                    if !model.quotaRegions.isEmpty {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("租户")
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundColor(mutedText)
-                            SelectMenu(
-                                options: model.quotaRegions.map { SelectOption(id: $0.id, title: $0.label) },
-                                selection: Binding(get: { model.quotaTenantId }, set: { model.quotaTenantId = $0 ?? "" }),
-                                placeholder: "选择租户…",
-                                width: 220,
-                                allowClear: false
-                            )
-                        }
-                    }
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("服务类型")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundColor(mutedText)
-                        SelectMenu(
-                            options: [
-                                SelectOption(id: "compute", title: "计算 (Compute)"),
-                                SelectOption(id: "block-storage", title: "块存储"),
-                                SelectOption(id: "object-storage", title: "对象存储"),
-                                SelectOption(id: "mysql", title: "MySQL HeatWave"),
-                                SelectOption(id: "database", title: "Oracle Database"),
-                                SelectOption(id: "autonomous-database", title: "自治数据库"),
-                                SelectOption(id: "nosql", title: "NoSQL")
-                            ],
-                            selection: Binding(get: { model.quotaService }, set: { model.quotaService = $0 ?? "compute" }),
-                            placeholder: "服务",
-                            width: 200,
-                            allowClear: false
-                        )
-                    }
-                    SelectMenu(
-                        options: [10, 20, 50].map { SelectOption(id: "\($0)", title: "\($0)/页") },
-                        selection: Binding(
-                            get: { "\(model.quotaPageSize)" },
-                            set: {
-                                if let v = Int($0 ?? "20") {
-                                    model.quotaPageSize = v
-                                    model.queryQuota(page: 0)
-                                }
-                            }
-                        ),
-                        placeholder: "每页",
-                        width: 90,
-                        allowClear: false
-                    )
-                    AppButton(title: "查询", systemImage: "magnifyingglass", kind: .primary) {
-                        model.queryQuota(page: 0)
-                    }
-                }
-                .padding(14)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(AppSheetSurface.surface2(dark))
-                .overlay(Rectangle().fill(border).frame(height: 1), alignment: .bottom)
-                .padding(.bottom, 14)
-
-                if !model.quotaError.isEmpty {
-                    errorBanner(model.quotaError).padding(.bottom, 10)
-                }
-
-                if model.quotaItems.isEmpty && model.quotaError.isEmpty {
-                    VStack(spacing: 12) {
-                        Image(systemName: "chart.bar")
-                            .font(.system(size: 36))
-                            .foregroundColor(mutedText.opacity(0.35))
-                        Text("选择租户和服务类型，点击查询")
-                            .font(.system(size: 13))
-                            .foregroundColor(mutedText)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 48)
-                } else {
-                    AppSheetTableBox {
-                        AppSheetTableHeader(columns: [
-                            ("资源", nil), ("类型", 90), ("可用", 70), ("已用", 70), ("限额", 70)
-                        ])
-                        ForEach(Array(model.quotaItems.enumerated()), id: \.element.id) { idx, row in
-                            AppSheetTableRow(striped: idx % 2 == 1) {
-                                HStack(spacing: 0) {
-                                    VStack(alignment: .leading, spacing: 1) {
-                                        Text(row.name)
-                                            .font(.system(size: 12, weight: .medium))
-                                            .foregroundColor(primaryText)
-                                            .lineLimit(2)
-                                        if !row.scope.isEmpty {
-                                            Text(row.scope).font(.system(size: 10)).foregroundColor(mutedText)
-                                        }
-                                    }
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(.horizontal, 10)
-                                    tableCell(row.instanceType, width: 90)
-                                    tableCell(row.available, width: 70)
-                                    tableCell(row.used, width: 70)
-                                    tableCell(row.limit, width: 70)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     /// Web: `bootVolumesModal` — 表格：实例 / 卷名 / 大小 / VPUs / 操作
     private func volumesSheet(_ t: TenantItem) -> some View {
         chrome(title: "引导卷管理", systemImage: "externaldrive", width: 720, height: 520, footer: {
@@ -859,21 +679,46 @@ struct TenantSheetHost: View {
         }
     }
 
+    /// Web `handleSecureExport`：打开即发码 → 输入 6 位 → 确认导出 JSON。
     private func exportSheet(title: String, onExport: @escaping () -> Void) -> some View {
-        chrome(title: title, width: 420, height: 280, footer: {
+        chrome(title: title, systemImage: "square.and.arrow.down", width: 440, height: 340, footer: {
             HStack(spacing: 8) {
                 AppButton(title: "取消", kind: .secondary) { presentationMode.wrappedValue.dismiss() }
-                AppButton(title: "导出", kind: .primary, action: onExport)
+                AppButton(title: "确认导出", kind: .primary, action: onExport)
             }
         }) {
             VStack(alignment: .leading, spacing: 14) {
                 formPanel {
-                    hint("导出需邮箱验证码（与 Web 一致）")
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("导出安全验证")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(primaryText)
+                        Text("验证码已发送至您的通知终端，请输入 6 位验证码以确认导出。导出文件含 API 私钥，请妥善保管。")
+                            .font(.system(size: 12))
+                            .foregroundColor(mutedText)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
-                AppButton(title: model.exportSent ? "重新发送验证码" : "发送验证码", kind: .secondary) {
-                    model.sendExportCode()
+                HStack(spacing: 10) {
+                    AppButton(
+                        title: model.exportSending
+                            ? "发送中…"
+                            : (model.exportSent ? "重新发送验证码" : "发送验证码"),
+                        kind: .secondary
+                    ) {
+                        model.sendExportCode()
+                    }
+                    if model.exportSending {
+                        ProgressView().scaleEffect(0.7)
+                    } else if model.exportSent {
+                        Text("已发送")
+                            .font(.system(size: 12))
+                            .foregroundColor(AppTheme.sidebarActive)
+                    }
+                    Spacer(minLength: 0)
                 }
                 field("验证码", text: $model.exportCode)
+                hint("请输入通知中的 6 位数字验证码")
             }
         }
     }
@@ -1244,65 +1089,6 @@ struct TenantSheetHost: View {
                 }
             }
         }
-    }
-
-    /// Web: `oci_cost.ftl` — 时间预设 + 查询
-    private func costSheet(_ t: TenantItem) -> some View {
-        chrome(title: "费用统计", systemImage: "dollarsign.circle", width: 600, height: 520, footer: {
-            HStack(spacing: 10) {
-                AppButton(title: "查询", kind: .primary) { model.queryCost(t) }
-                AppButton(title: "关闭", kind: .secondary) { presentationMode.wrappedValue.dismiss() }
-            }
-        }) {
-            VStack(alignment: .leading, spacing: 14) {
-                sectionLabel("时间范围")
-                HStack(spacing: 8) {
-                    costPresetBtn("今天") {
-                        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
-                        let s = f.string(from: Date())
-                        model.costStart = s; model.costEnd = s
-                    }
-                    costPresetBtn("本月") {
-                        let cal = Calendar.current
-                        let now = Date()
-                        let comps = cal.dateComponents([.year, .month], from: now)
-                        let start = cal.date(from: comps) ?? now
-                        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
-                        model.costStart = f.string(from: start)
-                        model.costEnd = f.string(from: now)
-                    }
-                    costPresetBtn("自定义") {}
-                }
-                HStack(spacing: 10) {
-                    field("开始日期", text: $model.costStart)
-                    field("结束日期", text: $model.costEnd)
-                }
-                sectionTitle("查询结果")
-                Text(model.costResultText.isEmpty ? "选择时间范围后点击查询" : model.costResultText)
-                    .font(.system(size: 12, design: .monospaced))
-                    .foregroundColor(primaryText)
-                    .frame(maxWidth: .infinity, minHeight: 160, alignment: .topLeading)
-                    .padding(14)
-                    .background(AppSheetSurface.surface2(dark))
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(border, lineWidth: 1))
-                    .cornerRadius(8)
-            }
-        }
-    }
-
-    private func costPresetBtn(_ title: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(primaryText)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 7)
-                .background(
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke(border, lineWidth: 1)
-                )
-        }
-        .buttonStyle(PlainButtonStyle())
     }
 
     private func aiChatSheet(_ t: TenantItem) -> some View {

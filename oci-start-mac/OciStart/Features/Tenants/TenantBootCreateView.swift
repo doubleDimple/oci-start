@@ -38,10 +38,15 @@ struct TenantBootCreateView: View {
     private var dark: Bool { appearance.isDarkEffective }
     private var tenant: TenantItem? { model.bootPageParent }
 
-    private var primaryText: Color { dark ? Color.white.opacity(0.9) : Color.primary }
-    private var mutedText: Color { AppTheme.sidebarText(dark) }
-    private var panelBg: Color { dark ? Color.white.opacity(0.04) : Color.black.opacity(0.03) }
-    private var border: Color { AppTheme.border(dark) }
+    // Tokens
+    private var accent: Color { AppTheme.sidebarActive }
+    private var primaryText: Color { dark ? Color(hex: "e8eef4") : Color(hex: "1a202c") }
+    private var mutedText: Color { dark ? Color(hex: "8892a4") : Color(hex: "64748b") }
+    private var surface: Color { dark ? Color(hex: "22262b") : Color.white }
+    private var surface2: Color { dark ? Color(hex: "292d32") : Color(hex: "f8fafc") }
+    private var border: Color { dark ? Color(hex: "31363d") : Color(hex: "dde3ec") }
+    private var freeTag: Color { Color(hex: "3fb950") }
+    private var paidTag: Color { Color(hex: "f78166") }
 
     @State private var selectedTemplateId: String = "arm-base"
 
@@ -49,25 +54,32 @@ struct TenantBootCreateView: View {
         bootTemplates.filter { $0.arch == model.bootArchitecture }
     }
 
+    private let templateColumns = [
+        GridItem(.adaptive(minimum: 168, maximum: 220), spacing: 12)
+    ]
+
     var body: some View {
         PageScaffold(
             title: "创建开机任务",
             subtitle: tenant.map { "\($0.displayName) · \($0.region.isEmpty ? "—" : $0.region)" },
-            systemImage: "plus.circle",
+            systemImage: "play.circle.fill",
             toolbar: { toolbar },
             content: {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 20) {
+                    VStack(alignment: .leading, spacing: 16) {
                         archSection
-                            .zIndex(2)
+                            .zIndex(3)
                         templateSection
-                            .zIndex(1)
-                        HStack(alignment: .top, spacing: 20) {
+                            .zIndex(2)
+                        HStack(alignment: .top, spacing: 16) {
                             configSection
                             imageSection
                         }
+                        .zIndex(1)
                     }
                     .padding(20)
+                    .frame(maxWidth: 1080, alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: .center)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -89,84 +101,101 @@ struct TenantBootCreateView: View {
         }
     }
 
-    // MARK: - Architecture section
+    // MARK: - 1. Architecture + Region
 
     private var archSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            sectionHeader("架构选择")
-            HStack(spacing: 10) {
-                ForEach(["ARM", "AMD", "X86"], id: \.self) { arch in
-                    archCard(arch)
+        formSection(title: "架构与区域", icon: "cpu") {
+            VStack(alignment: .leading, spacing: 16) {
+                // Architecture segmented control
+                HStack(spacing: 0) {
+                    ForEach(["ARM", "AMD", "X86"], id: \.self) { arch in
+                        archSegment(arch)
+                    }
                 }
+                .padding(3)
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(surface2)
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(border, lineWidth: 1))
+                )
+                .frame(maxWidth: 360)
+
                 if !model.bootRegionOptions.isEmpty {
-                    Divider().frame(height: 44)
-                    regionPicker
+                    VStack(alignment: .leading, spacing: 6) {
+                        fieldLabel("部署区域")
+                        SelectMenu(
+                            options: model.bootRegionOptions.map { SelectOption(id: $0.id, title: $0.label) },
+                            selection: Binding(
+                                get: { model.bootSelectedRegionTenantId },
+                                set: {
+                                    model.bootSelectedRegionTenantId = $0 ?? "\(tenant?.id ?? 0)"
+                                    Task {
+                                        let tid = Int64(model.bootSelectedRegionTenantId) ?? (tenant?.id ?? 0)
+                                        await model.loadBootImages(tenantId: tid)
+                                    }
+                                }
+                            ),
+                            placeholder: "选择区域租户",
+                            width: 320,
+                            allowClear: false
+                        )
+                    }
                 }
             }
         }
     }
 
-    private func archCard(_ arch: String) -> some View {
+    private func archSegment(_ arch: String) -> some View {
         let active = model.bootArchitecture == arch
+        let subtitle: String = {
+            switch arch {
+            case "ARM": return "AArch64"
+            case "AMD": return "x86-64"
+            default: return "x86-64"
+            }
+        }()
         return Button(action: {
             guard model.bootArchitecture != arch else { return }
             model.bootArchitecture = arch
-            let first = bootTemplates.first(where: { $0.arch == arch })
-            if let t = first { applyTemplate(t) }
+            if let first = bootTemplates.first(where: { $0.arch == arch }) {
+                applyTemplate(first)
+            }
             Task {
                 let tid = Int64(model.bootSelectedRegionTenantId) ?? (tenant?.id ?? 0)
                 await model.loadBootImages(tenantId: tid)
             }
         }) {
-            VStack(spacing: 4) {
+            VStack(spacing: 2) {
                 Text(arch)
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(active ? .white : primaryText)
-                Text(arch == "ARM" ? "AArch64" : (arch == "X86" ? "x86-64" : "x86-64"))
-                    .font(.system(size: 10))
-                    .foregroundColor(active ? .white.opacity(0.8) : mutedText)
+                    .font(.system(size: 13, weight: .bold))
+                Text(subtitle)
+                    .font(.system(size: 10, weight: .medium))
+                    .opacity(0.75)
             }
-            .padding(.horizontal, 20)
+            .foregroundColor(active ? .white : mutedText)
+            .frame(maxWidth: .infinity)
             .padding(.vertical, 10)
-            .background(active ? AppTheme.sidebarActive : (dark ? Color.white.opacity(0.07) : Color.black.opacity(0.05)))
-            .cornerRadius(8)
-            .overlay(RoundedRectangle(cornerRadius: 8).stroke(active ? AppTheme.sidebarActive : border.opacity(0.5), lineWidth: 1))
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(active ? accent : Color.clear)
+            )
+            .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())
+        .animation(.easeOut(duration: 0.15), value: active)
     }
 
-    private var regionPicker: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("区域租户").font(.system(size: 11, weight: .semibold)).foregroundColor(mutedText)
-            SelectMenu(
-                options: model.bootRegionOptions.map { SelectOption(id: $0.id, title: $0.label) },
-                selection: Binding(
-                    get: { model.bootSelectedRegionTenantId },
-                    set: {
-                        model.bootSelectedRegionTenantId = $0 ?? "\(tenant?.id ?? 0)"
-                        Task {
-                            let tid = Int64(model.bootSelectedRegionTenantId) ?? (tenant?.id ?? 0)
-                            await model.loadBootImages(tenantId: tid)
-                        }
-                    }
-                ),
-                placeholder: "区域",
-                width: 260,
-                allowClear: false
-            )
-        }
-    }
-
-    // MARK: - Template cards
+    // MARK: - 2. Templates
 
     private var templateSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            sectionHeader("规格模板")
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    ForEach(visibleTemplates) { tpl in
-                        templateCard(tpl)
-                    }
+        formSection(title: "规格模板", icon: "square.grid.2x2", trailing: {
+            Text("点击卡片快速填充规格")
+                .font(.system(size: 11))
+                .foregroundColor(mutedText)
+        }) {
+            LazyVGrid(columns: templateColumns, spacing: 12) {
+                ForEach(visibleTemplates) { tpl in
+                    templateCard(tpl)
                 }
             }
         }
@@ -174,89 +203,116 @@ struct TenantBootCreateView: View {
 
     private func templateCard(_ tpl: BootTemplate) -> some View {
         let active = selectedTemplateId == tpl.id
+        let tagColor = tpl.tagDanger ? paidTag : freeTag
         return Button(action: { applyTemplate(tpl) }) {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .top, spacing: 8) {
                     Text(tpl.label)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(active ? AppTheme.sidebarActive : primaryText)
-                    Spacer()
-                    Text(tpl.tag)
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundColor(tpl.tagDanger ? Color(hex: "f85149") : Color(hex: "3fb950"))
-                        .padding(.horizontal, 6).padding(.vertical, 2)
-                        .background((tpl.tagDanger ? Color(hex: "f85149") : Color(hex: "3fb950")).opacity(0.12))
-                        .cornerRadius(4)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(active ? accent : primaryText)
+                        .lineLimit(1)
+                    Spacer(minLength: 4)
+                    if active {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 14))
+                            .foregroundColor(accent)
+                    }
                 }
-                specLine("OCPU", tpl.ocpu)
-                specLine("内存", "\(tpl.memory) GB")
-                specLine("磁盘", "\(tpl.disk) GB")
+
+                VStack(alignment: .leading, spacing: 5) {
+                    specRow(icon: "cpu", text: "\(tpl.ocpu) OCPU")
+                    specRow(icon: "rectangle.stack", text: "\(tpl.memory) GB 内存")
+                    specRow(icon: "externaldrive", text: "\(tpl.disk) GB 磁盘")
+                }
+
+                Text(tpl.tag)
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(tagColor)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(tagColor.opacity(0.14))
+                    .cornerRadius(4)
             }
-            .padding(12)
-            .frame(width: 148)
-            .background(active
-                ? AppTheme.sidebarActive.opacity(0.08)
-                : (dark ? Color.white.opacity(0.05) : Color.black.opacity(0.03)))
-            .cornerRadius(8)
-            .overlay(RoundedRectangle(cornerRadius: 8).stroke(
-                active ? AppTheme.sidebarActive.opacity(0.6) : border.opacity(0.4), lineWidth: active ? 1.5 : 1))
+            .padding(14)
+            .frame(maxWidth: .infinity, minHeight: 132, alignment: .topLeading)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(active ? accent.opacity(dark ? 0.10 : 0.06) : surface)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(active ? accent : border, lineWidth: active ? 1.5 : 1)
+            )
+            .shadow(color: active ? accent.opacity(0.18) : Color.black.opacity(dark ? 0.2 : 0.04),
+                    radius: active ? 8 : 2, y: active ? 2 : 1)
         }
         .buttonStyle(PlainButtonStyle())
+        .animation(.easeOut(duration: 0.15), value: active)
     }
 
-    private func specLine(_ label: String, _ value: String) -> some View {
-        HStack {
-            Text(label).font(.system(size: 11)).foregroundColor(mutedText)
-            Spacer()
-            Text(value).font(.system(size: 11, weight: .medium)).foregroundColor(primaryText)
+    private func specRow(icon: String, text: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundColor(accent.opacity(0.85))
+                .frame(width: 12)
+            Text(text)
+                .font(.system(size: 12))
+                .foregroundColor(mutedText)
         }
     }
 
-    // MARK: - Config section
+    // MARK: - 3. Deploy config
 
     private var configSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            sectionHeader("部署配置")
-
-            // Specs
-            card {
-                VStack(alignment: .leading, spacing: 10) {
-                    rowLabel("规格")
-                    HStack(spacing: 12) {
-                        numField("OCPU", text: $model.bootOcpu, width: 80)
-                        numField("内存 (GB)", text: $model.bootMemory, width: 80)
-                        numField("磁盘 (GB)", text: $model.bootDisk, width: 80)
+        formSection(title: "部署配置", icon: "slider.horizontal.3") {
+            VStack(alignment: .leading, spacing: 18) {
+                // Specs row
+                VStack(alignment: .leading, spacing: 8) {
+                    fieldLabel("计算规格")
+                    HStack(spacing: 10) {
+                        numField("OCPU", text: $model.bootOcpu)
+                        numField("内存 (GB)", text: $model.bootMemory)
+                        numField("磁盘 (GB)", text: $model.bootDisk)
                     }
                 }
-            }
 
-            // Loop interval
-            card {
-                VStack(alignment: .leading, spacing: 10) {
-                    rowLabel("循环间隔 (秒)")
+                Divider().background(border.opacity(0.6))
+
+                // Interval
+                VStack(alignment: .leading, spacing: 8) {
+                    fieldLabel("循环间隔")
                     HStack(spacing: 6) {
                         ForEach(intervalPresets, id: \.0) { label, val in
-                            presetButton(label: label, value: val, binding: $model.bootLoopTime)
+                            presetChip(label: label, value: val, binding: $model.bootLoopTime)
                         }
                     }
-                    AppTextField(text: $model.bootLoopTime, placeholder: "自定义秒数")
-                        .frame(width: 160)
+                    HStack(spacing: 8) {
+                        AppTextField(text: $model.bootLoopTime, placeholder: "自定义秒数")
+                            .frame(width: 140)
+                        Text("秒")
+                            .font(.system(size: 12))
+                            .foregroundColor(mutedText)
+                    }
                 }
-            }
 
-            // Instance count + dayGap
-            card {
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(spacing: 20) {
-                        numField("实例数量", text: $model.bootCount, width: 100)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("时段限制 dayGap").font(.system(size: 11, weight: .semibold)).foregroundColor(mutedText)
-                            AppTextField(text: $model.bootDayGap, placeholder: "如 0-8（可选）")
-                                .frame(width: 160)
-                            Text("格式：起始小时-结束小时，如 0-8 表示凌晨 0 点到 8 点运行")
-                                .font(.system(size: 10))
-                                .foregroundColor(mutedText)
-                        }
+                Divider().background(border.opacity(0.6))
+
+                // Count + dayGap
+                HStack(alignment: .top, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        fieldLabel("实例数量")
+                        AppTextField(text: $model.bootCount, placeholder: "1")
+                            .frame(width: 100)
+                    }
+                    VStack(alignment: .leading, spacing: 8) {
+                        fieldLabel("时段限制 (可选)")
+                        AppTextField(text: $model.bootDayGap, placeholder: "如 0-8")
+                            .frame(maxWidth: .infinity)
+                        Text("起始小时-结束小时，仅在该时段内抢机")
+                            .font(.system(size: 10))
+                            .foregroundColor(mutedText)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
             }
@@ -264,42 +320,58 @@ struct TenantBootCreateView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    // MARK: - Image section
+    // MARK: - 4. Image & access
 
     private var imageSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            sectionHeader("镜像与访问")
-
-            card {
-                VStack(alignment: .leading, spacing: 10) {
-                    rowLabel("Root 密码")
+        formSection(title: "镜像与访问", icon: "desktopcomputer") {
+            VStack(alignment: .leading, spacing: 18) {
+                // Root password
+                VStack(alignment: .leading, spacing: 8) {
+                    fieldLabel("Root 密码")
                     HStack(spacing: 8) {
-                        AppTextField(text: $model.bootRootPassword, placeholder: "root 密码")
+                        AppTextField(text: $model.bootRootPassword, placeholder: "root 登录密码")
                             .frame(maxWidth: .infinity)
                         Button(action: { model.bootRootPassword = randomPassword() }) {
                             Image(systemName: "arrow.clockwise")
-                                .font(.system(size: 12))
+                                .font(.system(size: 12, weight: .semibold))
                                 .foregroundColor(mutedText)
+                                .frame(width: 36, height: 36)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .fill(surface2)
+                                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(border, lineWidth: 1))
+                                )
                         }
                         .buttonStyle(PlainButtonStyle())
                         .help("重新生成随机密码")
                     }
                 }
-            }
 
-            card {
-                VStack(alignment: .leading, spacing: 10) {
-                    rowLabel("操作系统")
+                Divider().background(border.opacity(0.6))
+
+                // OS
+                VStack(alignment: .leading, spacing: 8) {
+                    fieldLabel("操作系统")
                     if model.bootOSList.isEmpty {
-                        HStack(spacing: 6) {
+                        HStack(spacing: 8) {
                             if model.bootImages.isEmpty {
                                 ProgressView().scaleEffect(0.65)
+                            } else {
+                                Image(systemName: "exclamationmark.circle")
+                                    .foregroundColor(mutedText)
                             }
                             Text(model.bootImages.isEmpty ? "加载镜像中…" : "暂无可用镜像")
                                 .font(.system(size: 12))
                                 .foregroundColor(mutedText)
                         }
-                        .frame(height: 32)
+                        .frame(height: 36)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(surface2)
+                                .overlay(RoundedRectangle(cornerRadius: 10).stroke(border, lineWidth: 1))
+                        )
                     } else {
                         SelectMenu(
                             options: model.bootOSList.map { SelectOption(id: $0, title: $0) },
@@ -312,8 +384,12 @@ struct TenantBootCreateView: View {
                             allowClear: false
                         )
                     }
-                    if !model.bootVersions.isEmpty {
-                        rowLabel("系统版本")
+                }
+
+                // Version
+                if !model.bootVersions.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        fieldLabel("系统版本")
                         SelectMenu(
                             options: model.bootVersions.map {
                                 SelectOption(id: $0.operatingSystemVersion, title: $0.operatingSystemVersion)
@@ -328,22 +404,105 @@ struct TenantBootCreateView: View {
                         )
                     }
                 }
-            }
-            .zIndex(1)
 
-            // Image ID display
-            card {
-                VStack(alignment: .leading, spacing: 6) {
-                    rowLabel("Image ID")
-                    Text(model.bootImageId.isEmpty ? "— 请先选择操作系统和版本" : model.bootImageId)
+                Divider().background(border.opacity(0.6))
+
+                // Image ID
+                VStack(alignment: .leading, spacing: 8) {
+                    fieldLabel("Image ID")
+                    Text(model.bootImageId.isEmpty ? "请先选择操作系统和版本" : model.bootImageId)
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundColor(model.bootImageId.isEmpty ? mutedText : primaryText)
-                        .lineLimit(3)
+                        .lineLimit(4)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(surface2)
+                                .overlay(RoundedRectangle(cornerRadius: 10).stroke(border, lineWidth: 1))
+                        )
                 }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    // MARK: - Shared chrome
+
+    private func formSection<Content: View>(
+        title: String,
+        icon: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        formSection(title: title, icon: icon, trailing: { EmptyView() }, content: content)
+    }
+
+    private func formSection<Content: View, Trailing: View>(
+        title: String,
+        icon: String,
+        @ViewBuilder trailing: () -> Trailing,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(accent)
+                    .frame(width: 22, height: 22)
+                    .background(accent.opacity(0.12))
+                    .cornerRadius(6)
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(primaryText)
+                Spacer()
+                trailing()
+            }
+            content()
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(surface)
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(border, lineWidth: 1))
+                .shadow(color: Color.black.opacity(dark ? 0.25 : 0.05), radius: 6, y: 2)
+        )
+    }
+
+    private func fieldLabel(_ title: String) -> some View {
+        Text(title)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundColor(mutedText)
+    }
+
+    private func numField(_ label: String, text: Binding<String>) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(label)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundColor(mutedText)
+            AppTextField(text: text, placeholder: "0")
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func presetChip(label: String, value: String, binding: Binding<String>) -> some View {
+        let active = binding.wrappedValue == value
+        return Button(action: { binding.wrappedValue = value }) {
+            Text(label)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(active ? .white : mutedText)
+                .padding(.horizontal, 11)
+                .padding(.vertical, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 7)
+                        .fill(active ? accent : surface2)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 7)
+                        .stroke(active ? accent : border, lineWidth: 1)
+                )
+        }
+        .buttonStyle(PlainButtonStyle())
     }
 
     // MARK: - Helpers
@@ -358,50 +517,5 @@ struct TenantBootCreateView: View {
     private func randomPassword() -> String {
         let chars = Array("abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#")
         return String((0..<16).map { _ in chars[Int.random(in: 0..<chars.count)] })
-    }
-
-    private func sectionHeader(_ title: String) -> some View {
-        Text(title)
-            .font(.system(size: 13, weight: .semibold))
-            .foregroundColor(primaryText)
-    }
-
-    private func rowLabel(_ title: String) -> some View {
-        Text(title)
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundColor(mutedText)
-    }
-
-    private func numField(_ label: String, text: Binding<String>, width: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(label).font(.system(size: 11, weight: .semibold)).foregroundColor(mutedText)
-            AppTextField(text: text, placeholder: label).frame(width: width)
-        }
-    }
-
-    private func presetButton(label: String, value: String, binding: Binding<String>) -> some View {
-        let active = binding.wrappedValue == value
-        return Button(action: { binding.wrappedValue = value }) {
-            Text(label)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(active ? AppTheme.sidebarActive : mutedText)
-                .padding(.horizontal, 10).padding(.vertical, 5)
-                .background(active ? AppTheme.sidebarActive.opacity(0.12) : panelBg)
-                .cornerRadius(6)
-                .overlay(RoundedRectangle(cornerRadius: 6).stroke(
-                    active ? AppTheme.sidebarActive.opacity(0.5) : border.opacity(0.4), lineWidth: 1))
-        }
-        .buttonStyle(PlainButtonStyle())
-    }
-
-    @ViewBuilder
-    private func card<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-        content()
-            .padding(14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 8).fill(panelBg)
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(border.opacity(0.4), lineWidth: 1))
-            )
     }
 }

@@ -5,8 +5,12 @@
 ```
 AppKit 壳 → NSHostingController → TenantsView
   ├── 列表 / 搜索 / 分页 / 窗内操作菜单
-  ├── 业务弹层（用户/流量/审计/邮箱/社媒/配额/引导卷/安全规则/MySQL…）
-  └── 租户详情整页 TenantDetailView（对齐 Web /tenants/regionList）
+  ├── 业务弹层（流量预警/邮箱/社媒/配额/引导卷/安全规则/MySQL…）
+  ├── 租户详情整页 TenantDetailView
+  ├── 用户管理整页 TenantUserManageView
+  ├── 流量查询整页 TenantTrafficView
+  ├── 审计日志整页 TenantAuditLogView
+  └── 费用统计整页 TenantCostView
 ```
 
 ## 操作栏 → 原生对应
@@ -20,8 +24,8 @@ AppKit 壳 → NSHostingController → TenantsView
 | 用户管理 | 三 Tab + 密码策略 |
 | 流量预警 | 原生读写 |
 | 流量查询 | `monitor/api/instances/traffic` |
-| 审计日志 | 原生 |
-| 费用 | `/cost/query` |
+| **审计日志** | **整页** `TenantAuditLogView`（非弹框） |
+| **费用** | **整页** `TenantCostView` ← Web `oci_cost.ftl` |
 | 导出 / 邮箱 / 社媒 / 配额 / 引导卷 / 同步 / 删除 | 原生 |
 | AI | 模型列表 + `/ws/aiChat` WebSocket 对话 |
 

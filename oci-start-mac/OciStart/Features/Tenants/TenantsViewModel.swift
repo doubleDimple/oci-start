@@ -58,10 +58,15 @@ final class TenantsViewModel: ObservableObject {
     @Published var trafficAutoShutdown = false
     @Published var trafficStats = true
 
-    // Audit
+    // Audit (full page, not sheet)
+    @Published var auditParent: TenantItem?
     @Published var auditLogs: [TenantAuditLogEntry] = []
     @Published var auditStart = ""
     @Published var auditEnd = ""
+    @Published var auditLoading = false
+    @Published var auditLoadingMore = false
+    @Published var auditNextPageToken: String?
+    @Published var auditError: String?
 
     // Email
     @Published var emailDomain = ""
@@ -75,7 +80,8 @@ final class TenantsViewModel: ObservableObject {
     @Published var socialTypes: [String] = []
     @Published var socialDraft = TenantSocialItem()
 
-    // Quota
+    // Quota page（从弹框改为整页）
+    @Published var quotaParent: TenantItem?
     @Published var quotaRegions: [TenantRegionOption] = []
     @Published var quotaTenantId = ""
     @Published var quotaService = "compute"
@@ -85,6 +91,7 @@ final class TenantsViewModel: ObservableObject {
     @Published var quotaHasNext = false
     @Published var quotaRegionLabel = ""
     @Published var quotaError = ""
+    @Published var quotaLoading = false
 
     // Boot volumes
     @Published var volumes: [TenantBootVolume] = []
@@ -97,9 +104,10 @@ final class TenantsViewModel: ObservableObject {
     @Published var checkResult: TenantAccountCheckResult?
     @Published var checkPercent: Int = 0
 
-    // Export
+    // Export（Web `handleSecureExport`：发码 → 输入 6 位 → 下载 JSON）
     @Published var exportCode = ""
     @Published var exportSent = false
+    @Published var exportSending = false
 
     // Update SSE
     @Published var updateLines: [String] = []
@@ -156,17 +164,32 @@ final class TenantsViewModel: ObservableObject {
     @Published var bootRegionOptions: [TenantRegionOption] = []
     @Published var bootSelectedRegionTenantId = ""
 
-    // Cost
+    // Cost page (Web `/cost/costPage` → oci_cost.ftl)
+    @Published var costParent: TenantItem?
     @Published var costStart = ""
     @Published var costEnd = ""
-    @Published var costResultText = ""
+    @Published var costTimePreset = "month" // today | month | custom
+    @Published var costItems: [TenantCostItem] = []
+    @Published var costLoading = false
+    @Published var costError: String?
+    @Published var costFilterPositiveOnly = false
+    @Published var costChartType = "all" // all | compute | storage | network | other
+    /// 费用明细客户端分页（与租户列表共用 `PaginationBar` / `PageState`）
+    @Published var costPageState = PageState(page: 0, size: 20)
 
-    // Traffic query page
+    // Traffic query page (Web `/monitor/homePage` → oci_monitor.ftl)
     @Published var trafficParent: TenantItem?
     @Published var tqStart = ""
     @Published var tqEnd = ""
     @Published var tqPeriod = "1d"
     @Published var tqRows: [TenantTrafficRow] = []
+    /// Child region tenants for multi-select (Web region dropdown).
+    @Published var tqRegions: [TenantRegionOption] = []
+    @Published var tqSelectedRegionIds: Set<String> = []
+    /// `today` | `month` | `custom` — matches Web time presets.
+    @Published var tqTimePreset = "month"
+    /// Alert threshold in GB (Web default 10240 = 10 TB).
+    @Published var tqThresholdGB: Double = 10240
 
     // AI chat
     @Published var aiModels: [TenantAiModel] = []
@@ -738,29 +761,86 @@ final class TenantsViewModel: ObservableObject {
     }
 
     func openAudit(_ item: TenantItem) {
-        activeSheet = .audit(item)
+        let today = Self.todayDateString()
+        auditParent = item
         auditLogs = []
-        Task {
-            await LoadingHUD.shared.during {
-                do {
-                    auditLogs = try await service.auditLogs(tenantId: item.id, start: auditStart, end: auditEnd, pageToken: nil)
-                } catch {
-                    ToastCenter.shared.error(error.localizedDescription)
-                }
+        auditNextPageToken = nil
+        auditError = nil
+        auditStart = today
+        auditEnd = today
+        Task { await loadAuditLogs(item, append: false) }
+    }
+
+    func closeAudit() {
+        auditParent = nil
+        auditLogs = []
+        auditNextPageToken = nil
+        auditError = nil
+        auditLoading = false
+        auditLoadingMore = false
+    }
+
+    func searchAudit(_ item: TenantItem) {
+        let start = auditStart.trimmingCharacters(in: .whitespacesAndNewlines)
+        let endRaw = auditEnd.trimmingCharacters(in: .whitespacesAndNewlines)
+        let end = endRaw.isEmpty ? start : endRaw
+        guard !start.isEmpty else {
+            ToastCenter.shared.error("请选择开始日期")
+            return
+        }
+        if start > end {
+            ToastCenter.shared.error("开始日期不能晚于结束日期")
+            return
+        }
+        auditEnd = end
+        Task { await loadAuditLogs(item, append: false) }
+    }
+
+    func loadMoreAudit(_ item: TenantItem) {
+        guard auditNextPageToken != nil, !auditLoadingMore, !auditLoading else { return }
+        Task { await loadAuditLogs(item, append: true) }
+    }
+
+    func loadAuditLogs(_ item: TenantItem, append: Bool) async {
+        if append {
+            guard let token = auditNextPageToken, !token.isEmpty else { return }
+            auditLoadingMore = true
+        } else {
+            auditLoading = true
+            auditNextPageToken = nil
+            auditError = nil
+            auditLogs = []
+        }
+        defer {
+            auditLoading = false
+            auditLoadingMore = false
+        }
+        do {
+            let page = try await service.auditLogs(
+                tenantId: item.id,
+                start: auditStart.isEmpty ? nil : auditStart,
+                end: auditEnd.isEmpty ? nil : auditEnd,
+                pageToken: append ? auditNextPageToken : nil
+            )
+            if append {
+                auditLogs.append(contentsOf: page.items)
+            } else {
+                auditLogs = page.items
+            }
+            auditNextPageToken = page.nextPageToken
+        } catch {
+            auditError = error.localizedDescription
+            if !append {
+                ToastCenter.shared.error(error.localizedDescription)
             }
         }
     }
 
-    func searchAudit(_ item: TenantItem) {
-        Task {
-            await LoadingHUD.shared.during {
-                do {
-                    auditLogs = try await service.auditLogs(tenantId: item.id, start: auditStart, end: auditEnd, pageToken: nil)
-                } catch {
-                    ToastCenter.shared.error(error.localizedDescription)
-                }
-            }
-        }
+    private static func todayDateString() -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd"
+        return f.string(from: Date())
     }
 
     func openEmail(_ item: TenantItem) {
@@ -915,14 +995,17 @@ final class TenantsViewModel: ObservableObject {
     }
 
     func openQuota(_ item: TenantItem) {
-        activeSheet = .quota(item)
+        quotaParent = item
         quotaPage = 0
         quotaPageSize = 20
         quotaService = "compute"
         quotaItems = []
         quotaError = ""
         quotaRegionLabel = ""
+        quotaHasNext = false
+        quotaLoading = false
         quotaTenantId = "\(item.id)"
+        quotaRegions = []
         Task {
             do {
                 let regs = try await service.listRegions(parentId: item.id)
@@ -936,40 +1019,52 @@ final class TenantsViewModel: ObservableObject {
             } catch {
                 quotaRegions = []
             }
+            // 不自动查询，需用户点击「查询」按钮
         }
     }
 
-    func queryQuota(page: Int? = nil) {
+    func closeQuota() {
+        quotaParent = nil
+        quotaRegions = []
+        quotaItems = []
+        quotaError = ""
+        quotaRegionLabel = ""
+        quotaHasNext = false
+        quotaLoading = false
+        quotaPage = 0
+        quotaTenantId = ""
+    }
+
+    func queryQuota(page: Int? = nil) async {
         if let page = page { quotaPage = page }
         guard let tid = Int64(quotaTenantId) else {
             ToastCenter.shared.error("请选择租户")
             return
         }
-        Task {
-            await LoadingHUD.shared.during {
-                do {
-                    let r = try await service.quota(
-                        tenantId: tid,
-                        service: quotaService,
-                        page: quotaPage,
-                        pageSize: quotaPageSize
-                    )
-                    if let err = r["error"] as? String {
-                        quotaError = err
-                        quotaItems = []
-                        return
-                    }
-                    quotaError = ""
-                    let parsed = TenantQuotaItem.parseList(from: r)
-                    quotaItems = parsed.items
-                    quotaPage = parsed.page
-                    quotaHasNext = parsed.hasNext
-                    quotaRegionLabel = parsed.region
-                } catch {
-                    quotaError = error.localizedDescription
-                    ToastCenter.shared.error(error.localizedDescription)
-                }
+        quotaLoading = true
+        quotaError = ""
+        defer { quotaLoading = false }
+        do {
+            let r = try await service.quota(
+                tenantId: tid,
+                service: quotaService,
+                page: quotaPage,
+                pageSize: quotaPageSize
+            )
+            if let err = r["error"] as? String {
+                quotaError = err
+                quotaItems = []
+                return
             }
+            let parsed = TenantQuotaItem.parseList(from: r)
+            quotaItems = parsed.items
+            quotaPage = parsed.page
+            quotaHasNext = parsed.hasNext
+            quotaRegionLabel = parsed.region
+        } catch {
+            quotaError = error.localizedDescription
+            quotaItems = []
+            ToastCenter.shared.error(error.localizedDescription)
         }
     }
 
@@ -1074,67 +1169,85 @@ final class TenantsViewModel: ObservableObject {
     }
 
     func openExportAll() {
-        exportCode = ""
-        exportSent = false
+        resetExportForm()
         activeSheet = .exportAll
+        // Web: 打开导出即自动 POST sendExportCode
+        sendExportCode(silentIfAlready: false)
     }
 
     func openExportOne(_ item: TenantItem) {
-        exportCode = ""
-        exportSent = false
+        resetExportForm()
         activeSheet = .exportOne(item)
+        sendExportCode(silentIfAlready: false)
     }
 
-    func sendExportCode() {
-        Task {
-            await LoadingHUD.shared.during {
-                do {
-                    try await service.sendExportCode()
-                    exportSent = true
-                    AppAlert.info(title: "验证码已发送", message: "请查收邮箱/通知中的导出验证码")
-                } catch {
-                    ToastCenter.shared.error(error.localizedDescription)
-                }
+    private func resetExportForm() {
+        exportCode = ""
+        exportSent = false
+        exportSending = false
+    }
+
+    /// 发送导出验证码（Telegram/通知终端，非邮箱）。
+    /// - Parameter silentIfAlready: 预留；当前每次调用都会请求后端。
+    func sendExportCode(silentIfAlready: Bool = false) {
+        if exportSending { return }
+        if silentIfAlready, exportSent { return }
+        exportSending = true
+        Task { @MainActor in
+            do {
+                try await service.sendExportCode()
+                exportSent = true
+                ToastCenter.shared.success("验证码已发送至通知终端")
+            } catch {
+                ToastCenter.shared.error(error.localizedDescription)
             }
+            exportSending = false
         }
     }
 
     func doExportAll() {
-        let code = exportCode.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !code.isEmpty else {
-            ToastCenter.shared.error("请输入验证码")
-            return
-        }
-        Task {
-            await LoadingHUD.shared.during {
-                do {
-                    let (data, name) = try await service.exportAll(code: code)
-                    saveData(data, suggested: name ?? "all_tenants_data.json")
-                    activeSheet = nil
-                } catch {
-                    ToastCenter.shared.error(error.localizedDescription)
-                }
-            }
+        runExport(defaultName: "all_tenants_data.json") {
+            try await self.service.exportAll(code: $0)
         }
     }
 
     func doExportOne(_ item: TenantItem) {
+        runExport(defaultName: "tenant_\(item.id)_data.json") {
+            try await self.service.exportTenant(id: item.id, code: $0)
+        }
+    }
+
+    /// 校验验证码 → 拉 JSON → 关 sheet → 系统保存面板（避免 sheet 与 NSSavePanel 叠层冲突）。
+    private func runExport(defaultName: String, fetch: @escaping (String) async throws -> (Data, String?)) {
         let code = exportCode.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !code.isEmpty else {
-            ToastCenter.shared.error("请输入验证码")
+            ToastCenter.shared.error("请输入 6 位验证码")
             return
         }
-        Task {
-            await LoadingHUD.shared.during {
-                do {
-                    let (data, name) = try await service.exportTenant(id: item.id, code: code)
-                    saveData(data, suggested: name ?? "tenant_\(item.id)_data.json")
-                    activeSheet = nil
-                } catch {
-                    ToastCenter.shared.error(error.localizedDescription)
+        Task { @MainActor in
+            do {
+                let (data, name) = try await LoadingHUD.shared.during {
+                    try await fetch(code)
                 }
+                let out = Self.prettyJSONData(data) ?? data
+                let fileName = name ?? defaultName
+                activeSheet = nil
+                exportCode = ""
+                // 等 sheet 收起后再弹保存面板
+                try? await Task.sleep(nanoseconds: 180_000_000)
+                saveData(out, suggested: fileName)
+            } catch {
+                ToastCenter.shared.error(error.localizedDescription)
             }
         }
+    }
+
+    /// Web 侧 `JSON.stringify(code, null, 2)` 对齐：导出可读 JSON。
+    private static func prettyJSONData(_ data: Data) -> Data? {
+        guard let obj = try? JSONSerialization.jsonObject(with: data),
+              let pretty = try? JSONSerialization.data(withJSONObject: obj, options: [.prettyPrinted])
+        else { return nil }
+        return pretty
     }
 
     func importJSON() {
@@ -1472,12 +1585,32 @@ final class TenantsViewModel: ObservableObject {
             let s = try await sum
             subscribedRegions = try await sub
             unsubscribedRegions = try await unsub
-            regionTotalCount = Int((s["totalRegions"] as? String) ?? "0") ?? 0
-            regionSubscribedCount = Int((s["subscribedRegions"] as? String) ?? "0") ?? 0
-            regionUnsubscribedCount = Int((s["unsubscribedRegions"] as? String) ?? "0") ?? 0
+            // Backend puts Integer sizes into JSON; JSONSerialization yields NSNumber, not String.
+            regionTotalCount = Self.jsonInt(s["totalRegions"])
+            regionSubscribedCount = Self.jsonInt(s["subscribedRegions"])
+            regionUnsubscribedCount = Self.jsonInt(s["unsubscribedRegions"])
+            // Fallback from list lengths if summary keys missing / zeroed incorrectly
+            if regionSubscribedCount == 0, !subscribedRegions.isEmpty {
+                regionSubscribedCount = subscribedRegions.count
+            }
+            if regionUnsubscribedCount == 0, !unsubscribedRegions.isEmpty {
+                regionUnsubscribedCount = unsubscribedRegions.count
+            }
+            if regionTotalCount == 0 {
+                regionTotalCount = regionSubscribedCount + regionUnsubscribedCount
+            }
         } catch {
             ToastCenter.shared.error(error.localizedDescription)
         }
+    }
+
+    /// Parse JSON number/string values from `JSONSerialization` dictionaries.
+    private static func jsonInt(_ any: Any?) -> Int {
+        if let n = any as? Int { return n }
+        if let n = any as? Int64 { return Int(n) }
+        if let n = any as? NSNumber { return n.intValue }
+        if let s = any as? String { return Int(s.trimmingCharacters(in: .whitespaces)) ?? 0 }
+        return 0
     }
 
     func toggleUnsubKey(_ key: String) {
@@ -1506,64 +1639,258 @@ final class TenantsViewModel: ObservableObject {
     }
 
     func openCost(_ item: TenantItem) {
-        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
-        let end = Date()
-        let start = Calendar.current.date(byAdding: .day, value: -30, to: end) ?? end
-        costStart = f.string(from: start)
-        costEnd = f.string(from: end)
-        costResultText = ""
-        activeSheet = .cost(item)
+        costParent = item
+        costItems = []
+        costError = nil
+        costFilterPositiveOnly = false
+        costChartType = "all"
+        costPageState = PageState(page: 0, size: costPageState.size)
+        applyCostPreset("month")
+        // Web: 进入页后默认本月，需手动点查询（也可自动查一次）
+        Task { await queryCost(item) }
     }
 
-    func queryCost(_ item: TenantItem) {
-        Task {
-            await LoadingHUD.shared.during {
-                do {
-                    let data = try await service.queryCost(tenantId: item.id, start: costStart, end: costEnd)
-                    costResultText = prettyJSONValue(data)
-                } catch {
-                    ToastCenter.shared.error(error.localizedDescription)
-                }
+    func closeCost() {
+        costParent = nil
+        costItems = []
+        costError = nil
+        costLoading = false
+        costPageState = PageState(page: 0, size: costPageState.size)
+    }
+
+    /// Web `selectCostTimePreset`: today / month / custom
+    func applyCostPreset(_ preset: String) {
+        costTimePreset = preset
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd"
+        let now = Date()
+        costEnd = f.string(from: now)
+        switch preset {
+        case "today":
+            costStart = f.string(from: now)
+        case "custom":
+            // 保留当前起止，仅展示日期输入
+            if costStart.isEmpty {
+                let lastMonth = Calendar.current.date(byAdding: .month, value: -1, to: now) ?? now
+                costStart = f.string(from: lastMonth)
             }
+        default: // month
+            let comps = Calendar.current.dateComponents([.year, .month], from: now)
+            costStart = f.string(from: Calendar.current.date(from: comps) ?? now)
+            costTimePreset = "month"
         }
     }
 
+    func queryCost(_ item: TenantItem) async {
+        let start = costStart.trimmingCharacters(in: .whitespacesAndNewlines)
+        let end = costEnd.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !start.isEmpty, !end.isEmpty else {
+            ToastCenter.shared.error("请选择时间范围")
+            return
+        }
+        if start > end {
+            ToastCenter.shared.error("开始日期不能晚于结束日期")
+            return
+        }
+        costLoading = true
+        costError = nil
+        defer { costLoading = false }
+        do {
+            costItems = try await service.queryCost(tenantId: item.id, start: start, end: end)
+            costPageState.page = 0
+            syncCostPagination()
+        } catch {
+            costError = error.localizedDescription
+            costItems = []
+            syncCostPagination()
+            ToastCenter.shared.error(error.localizedDescription)
+        }
+    }
+
+    func toggleCostPositiveFilter() {
+        costFilterPositiveOnly.toggle()
+        costPageState.page = 0
+        syncCostPagination()
+    }
+
+    /// 按筛选结果回填 `PageState` 总数（客户端分页，无服务端请求）。
+    func syncCostPagination() {
+        costPageState.apply(totalElements: Int64(filteredCostItems.count))
+    }
+
+    /// 筛选后的明细（Web toggleCostFilter）。
+    var filteredCostItems: [TenantCostItem] {
+        if costFilterPositiveOnly {
+            return costItems.filter { $0.cost > 0 }
+        }
+        return costItems
+    }
+
+    var costPageItems: [TenantCostItem] {
+        let all = filteredCostItems
+        let start = costPageState.page * costPageState.size
+        guard start < all.count else { return [] }
+        let end = min(start + costPageState.size, all.count)
+        return Array(all[start..<end])
+    }
+
+    // MARK: - Cost aggregations (mirror oci_cost.js)
+
+    var costTotal: Double { costItems.reduce(0) { $0 + $1.cost } }
+    var costCompute: Double { costItems.filter { $0.category == .compute }.reduce(0) { $0 + $1.cost } }
+    var costStorage: Double { costItems.filter { $0.category == .storage }.reduce(0) { $0 + $1.cost } }
+    var costNetwork: Double { costItems.filter { $0.category == .network }.reduce(0) { $0 + $1.cost } }
+    var costOther: Double { costItems.filter { $0.category == .other }.reduce(0) { $0 + $1.cost } }
+
+    /// 按日分系列（折线图）。
+    var costTrendSeries: (days: [String], compute: [Double], storage: [Double], network: [Double], other: [Double]) {
+        var map: [String: (c: Double, s: Double, n: Double, o: Double)] = [:]
+        for item in costItems {
+            let d = item.day.isEmpty ? "—" : item.day
+            var cur = map[d] ?? (0, 0, 0, 0)
+            switch item.category {
+            case .compute: cur.c += item.cost
+            case .storage: cur.s += item.cost
+            case .network: cur.n += item.cost
+            case .other: cur.o += item.cost
+            }
+            map[d] = cur
+        }
+        let days = map.keys.sorted()
+        return (
+            days,
+            days.map { map[$0]?.c ?? 0 },
+            days.map { map[$0]?.s ?? 0 },
+            days.map { map[$0]?.n ?? 0 },
+            days.map { map[$0]?.o ?? 0 }
+        )
+    }
+
     func openTrafficPage(_ item: TenantItem) {
-        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
-        let end = Date()
-        let start = Calendar.current.date(byAdding: .day, value: -7, to: end) ?? end
-        tqStart = f.string(from: start)
-        tqEnd = f.string(from: end)
-        tqPeriod = "1d"
         tqRows = []
+        tqRegions = []
+        tqSelectedRegionIds = []
+        tqPeriod = "1d"
+        tqThresholdGB = 10240
         trafficParent = item
-        Task { await queryTraffic(item) }
+        applyTrafficPreset("month")
+        Task { await prepareTrafficPage(item) }
     }
 
     func closeTrafficPage() {
         trafficParent = nil
         tqRows = []
+        tqRegions = []
+        tqSelectedRegionIds = []
+    }
+
+    /// Web `selectTimePreset`: today / month / custom.
+    func applyTrafficPreset(_ preset: String) {
+        tqTimePreset = preset
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
+        let now = Date()
+        tqEnd = f.string(from: now)
+        switch preset {
+        case "today":
+            tqStart = f.string(from: now)
+        case "custom":
+            let lastMonth = Calendar.current.date(byAdding: .month, value: -1, to: now) ?? now
+            tqStart = f.string(from: lastMonth)
+        default: // month
+            let comps = Calendar.current.dateComponents([.year, .month], from: now)
+            tqStart = f.string(from: Calendar.current.date(from: comps) ?? now)
+            tqTimePreset = "month"
+        }
+    }
+
+    func toggleTrafficRegion(_ id: String) {
+        if tqSelectedRegionIds.contains(id) {
+            tqSelectedRegionIds.remove(id)
+        } else {
+            tqSelectedRegionIds.insert(id)
+        }
+    }
+
+    func selectAllTrafficRegions() {
+        tqSelectedRegionIds = Set(tqRegions.map(\.id).filter { !$0.isEmpty })
+        if tqSelectedRegionIds.isEmpty, let t = trafficParent {
+            tqSelectedRegionIds = ["\(t.id)"]
+        }
+    }
+
+    func clearTrafficRegions() {
+        tqSelectedRegionIds = []
+    }
+
+    private func prepareTrafficPage(_ item: TenantItem) async {
+        await LoadingHUD.shared.during {
+            do {
+                // Load regions (Web loadRegionsData) — do not auto query; wait for manual 查询
+                let regions = try await service.listRegions(parentId: item.id)
+                tqRegions = regions
+                tqSelectedRegionIds = []
+                tqRows = []
+
+                // Threshold (Web fetchTrafficAlertThreshold)
+                if let th = try? await service.monitorTrafficThreshold(tenantId: item.id) {
+                    tqThresholdGB = th > 0 ? th : 10240
+                }
+            } catch {
+                tqRegions = []
+                tqSelectedRegionIds = []
+                tqRows = []
+                ToastCenter.shared.error(error.localizedDescription)
+            }
+        }
     }
 
     func queryTraffic(_ item: TenantItem) async {
+        // Resolve date range from preset (Web getStartDate / getEndDate)
+        resolveTrafficDates()
+
+        var ids = Array(tqSelectedRegionIds)
+        if ids.isEmpty {
+            // Prefer child regions; fall back to parent
+            if !tqRegions.isEmpty {
+                ToastCenter.shared.error("请选择区域")
+                return
+            }
+            ids = ["\(item.id)"]
+        }
+
         await LoadingHUD.shared.during {
             do {
-                // Include children region tenant ids when available
-                var ids = [item.id]
-                if let children = try? await service.listRegions(parentId: item.id) {
-                    for c in children {
-                        if let id = Int64(c.id) { ids.append(id) }
-                    }
+                if let th = try? await service.monitorTrafficThreshold(tenantId: item.id) {
+                    tqThresholdGB = th > 0 ? th : 10240
                 }
                 tqRows = try await service.instanceTraffic(
-                    tenantIds: Array(Set(ids)),
+                    tenantIds: ids,
                     start: tqStart,
                     end: tqEnd,
                     period: tqPeriod
                 )
             } catch {
+                tqRows = []
                 ToastCenter.shared.error(error.localizedDescription)
             }
+        }
+    }
+
+    private func resolveTrafficDates() {
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
+        let now = Date()
+        switch tqTimePreset {
+        case "today":
+            tqStart = f.string(from: now)
+            tqEnd = f.string(from: now)
+        case "custom":
+            // keep tqStart / tqEnd as user-edited
+            break
+        default: // month
+            let comps = Calendar.current.dateComponents([.year, .month], from: now)
+            tqStart = f.string(from: Calendar.current.date(from: comps) ?? now)
+            tqEnd = f.string(from: now)
         }
     }
 
@@ -1733,9 +2060,15 @@ final class TenantsViewModel: ObservableObject {
         let panel = NSSavePanel()
         panel.nameFieldStringValue = suggested
         panel.canCreateDirectories = true
+        panel.allowedFileTypes = ["json"]
+        panel.message = "导出租户 JSON（含 API 私钥内容，请妥善保管）"
         if panel.runModal() == .OK, let dest = panel.url {
-            do { try data.write(to: dest, options: .atomic) }
-            catch { ToastCenter.shared.error(error.localizedDescription) }
+            do {
+                try data.write(to: dest, options: .atomic)
+                ToastCenter.shared.success("已保存 \(dest.lastPathComponent)")
+            } catch {
+                ToastCenter.shared.error(error.localizedDescription)
+            }
         }
     }
 

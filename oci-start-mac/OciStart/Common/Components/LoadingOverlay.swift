@@ -103,31 +103,21 @@ struct PageLoadingView: View {
 
 struct LoadingOverlay: ViewModifier {
     let isLoading: Bool
-    /// Empty string = spinner only (native style).
+    /// 保留参数兼容调用方；页内 loading 仅展示原生转圈，不画文案/边框。
     var message: String = ""
 
     func body(content: Content) -> some View {
         ZStack {
             content
             if isLoading {
-                Color.black.opacity(0.12)
+                // 轻微遮罩拦截点击，不出现卡片边框
+                Color.black.opacity(0.08)
                     .edgesIgnoringSafeArea(.all)
-                VStack(spacing: 10) {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle())
-                    if !message.isEmpty {
-                        Text(message)
-                            .font(.system(size: 12))
-                            .foregroundColor(.secondary)
-                    }
-                }
-                .padding(20)
-                .background(
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(Color(NSColor.controlBackgroundColor))
-                        .shadow(radius: 8)
-                )
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle())
+                    .scaleEffect(1.1)
             }
         }
+        .animation(.easeInOut(duration: 0.12), value: isLoading)
     }
 }

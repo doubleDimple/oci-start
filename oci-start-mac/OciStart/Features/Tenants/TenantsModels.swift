@@ -559,18 +559,32 @@ struct TenantAccountCheckResult: Decodable, Equatable {
     }
 }
 
-/// One row from `/tenants/quota` items[].
+/// One row from `/tenants/quota` items[]（对齐 Web `renderQuotaContent`）。
 struct TenantQuotaItem: Identifiable, Equatable {
-    var id: String { "\(name)-\(scope)-\(available)-\(used)" }
+    var id: String { "\(name)-\(scope)-\(available)-\(used)-\(limit)" }
     var name: String
     var scope: String
+    /// 展示用字符串
     var available: String
     var used: String
     var limit: String
+    /// 数值（进度条 / 染色），解析失败为 0
+    var totalValue: Double
+    var usedValue: Double
+    var availableValue: Double
+    /// 推断的实例类型；空字符串表示无可识别类型（对齐 Web `null`）
     var instanceType: String
 
+    /// used/total，0…100
+    var usagePercent: Int {
+        guard totalValue > 0 else { return 0 }
+        return min(100, Int(round(usedValue / totalValue * 100)))
+    }
+
+    var hasInstanceType: Bool { !instanceType.isEmpty }
+
     static func parseList(from root: [String: Any]) -> (items: [TenantQuotaItem], page: Int, hasNext: Bool, region: String) {
-        let page = (root["page"] as? Int) ?? 0
+        let page = (root["page"] as? Int) ?? Int("\(root["page"] ?? "")") ?? 0
         let hasNext = (root["hasNextPage"] as? Bool) ?? false
         let region = (root["region"] as? String) ?? (root["regionEn"] as? String) ?? ""
         var items: [TenantQuotaItem] = []
@@ -578,22 +592,51 @@ struct TenantQuotaItem: Identifiable, Equatable {
         for it in rawItems {
             let name = "\(it["name"] ?? it["limitName"] ?? it["resourceName"] ?? "—")"
             let scope = "\(it["scope"] ?? it["availabilityDomain"] ?? "")"
-            let available = "\(it["available"] ?? it["availableQuota"] ?? it["remaining"] ?? "—")"
-            let used = "\(it["used"] ?? it["usedQuota"] ?? "—")"
-            let limit = "\(it["limit"] ?? it["value"] ?? it["total"] ?? "—")"
+            let totalV = number(it["total"] ?? it["limit"] ?? it["value"])
+            let usedV = number(it["used"] ?? it["usedQuota"])
+            let availV = number(it["available"] ?? it["availableQuota"] ?? it["remaining"])
+            let available = formatNum(it["available"] ?? it["availableQuota"] ?? it["remaining"], fallback: availV)
+            let used = formatNum(it["used"] ?? it["usedQuota"], fallback: usedV)
+            let limit = formatNum(it["total"] ?? it["limit"] ?? it["value"], fallback: totalV)
             items.append(TenantQuotaItem(
                 name: name,
                 scope: scope,
                 available: available,
                 used: used,
                 limit: limit,
-                instanceType: Self.inferType(name)
+                totalValue: totalV,
+                usedValue: usedV,
+                availableValue: availV,
+                instanceType: Self.inferType(name) ?? ""
             ))
         }
         return (items, page, hasNext, region)
     }
 
-    private static func inferType(_ limitName: String) -> String {
+    private static func number(_ raw: Any?) -> Double {
+        if let d = raw as? Double { return d }
+        if let i = raw as? Int { return Double(i) }
+        if let n = raw as? NSNumber { return n.doubleValue }
+        if let s = raw as? String, let d = Double(s.trimmingCharacters(in: .whitespaces)) { return d }
+        if let raw = raw {
+            let s = "\(raw)".trimmingCharacters(in: .whitespaces)
+            return Double(s) ?? 0
+        }
+        return 0
+    }
+
+    private static func formatNum(_ raw: Any?, fallback: Double) -> String {
+        if let raw = raw {
+            let s = "\(raw)".trimmingCharacters(in: .whitespaces)
+            if !s.isEmpty && s != "<null>" { return s }
+        }
+        if fallback == 0 { return "0" }
+        if fallback.rounded() == fallback { return String(Int(fallback)) }
+        return String(format: "%g", fallback)
+    }
+
+    /// 对齐 Web `quotaInstanceType`；无法识别返回 nil
+    private static func inferType(_ limitName: String) -> String? {
         let n = limitName.lowercased()
         let bm = n.hasPrefix("bm-") || n.contains("-bm-")
         var arch: String?
@@ -601,16 +644,23 @@ struct TenantQuotaItem: Identifiable, Equatable {
         else if n.contains("-e5-") { arch = "AMD E5" }
         else if n.contains("-e4-") { arch = "AMD E4" }
         else if n.contains("-e3-") { arch = "AMD E3" }
-        else if n.contains("-e2-") { arch = "AMD E2" }
+        else if n.contains("-e2-") || n.contains("e2-1-micro") { arch = "AMD E2" }
         else if n.contains("gpu") { arch = "GPU" }
         else if n.contains("hpc") { arch = "HPC" }
-        else if n.contains("x9") { arch = "Intel X9" }
+        else if n.contains("optimized3") { arch = "Intel 高频" }
+        else if n.contains("-x9-") || n.hasPrefix("x9-") || n.contains("x9-") { arch = "Intel X9" }
+        else if n.contains("-x8-") { arch = "Intel X8" }
+        else if n.contains("-x7-") { arch = "Intel X7" }
         else if n.contains("standard3") { arch = "Intel" }
         else if n.contains("standard2") { arch = "Intel 旧款" }
+        else if n.contains("dense-a4-ax") { arch = "DenseIO A4 AX" }
+        else if n.contains("dense-io") || n.contains("denseio") { arch = "DenseIO" }
+        else if n.contains("autonomous-") || n.contains("-adb-") || n.hasPrefix("adb-") { arch = "ADB" }
         else if n.contains("mysql") { arch = "MySQL" }
         else if n.contains("nosql") { arch = "NoSQL" }
-        else if n.contains("autonomous") || n.contains("adb") { arch = "ADB" }
-        guard let arch = arch else { return bm ? "裸金属" : "—" }
+        else if n.contains("exadata") { arch = "Exadata" }
+        else if n.contains("db-system") || n.contains("db-vcpu") || n.contains("db-node") { arch = "DBCS" }
+        guard let arch = arch else { return bm ? "裸金属" : nil }
         return bm ? "裸金属·\(arch)" : arch
     }
 }
@@ -627,38 +677,65 @@ enum TenantUserTab: String, CaseIterable, Identifiable {
     }
 }
 
+/// 对齐后端 `OciAuditEventDto`（Web 审计日志表列）。
 struct TenantAuditLogEntry: Decodable, Identifiable, Equatable {
-    var id: String { "\(eventName)-\(eventTime)-\(principalName)" }
-    var eventName: String = ""
+    var id: String { "\(eventType)-\(eventTime)-\(userName)-\(ipAddress)-\(responseStatus)" }
+    var eventType: String = ""
+    var userName: String = ""
+    var userType: String = ""
+    var ipAddress: String = ""
+    var clientEnv: String = ""
     var eventTime: String = ""
-    var principalName: String = ""
-    var sourceIP: String = ""
-    var status: String = ""
-    var message: String = ""
+    var responseStatus: String = ""
+
+    /// 非 200 时高亮错误行（对齐 Web `audit-error-row`）。
+    var isError: Bool {
+        !responseStatus.isEmpty && responseStatus != "200"
+    }
 
     enum CodingKeys: String, CodingKey {
-        case eventName, eventTime, principalName, sourceIP, sourceIp, status, message
-        case type, time, user, ip
+        case eventType, eventName, type
+        case userName, principalName, user
+        case userType
+        case ipAddress, sourceIP, sourceIp, ip
+        case clientEnv
+        case eventTime, time
+        case responseStatus, status
+        case message
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        eventName = (try? c.decode(String.self, forKey: .eventName))
+        eventType = (try? c.decode(String.self, forKey: .eventType))
+            ?? (try? c.decode(String.self, forKey: .eventName))
             ?? (try? c.decode(String.self, forKey: .type))
+            ?? ""
+        userName = (try? c.decode(String.self, forKey: .userName))
+            ?? (try? c.decode(String.self, forKey: .principalName))
+            ?? (try? c.decode(String.self, forKey: .user))
+            ?? ""
+        userType = (try? c.decode(String.self, forKey: .userType)) ?? ""
+        ipAddress = (try? c.decode(String.self, forKey: .ipAddress))
+            ?? (try? c.decode(String.self, forKey: .sourceIP))
+            ?? (try? c.decode(String.self, forKey: .sourceIp))
+            ?? (try? c.decode(String.self, forKey: .ip))
+            ?? ""
+        clientEnv = (try? c.decode(String.self, forKey: .clientEnv))
+            ?? (try? c.decode(String.self, forKey: .message))
             ?? ""
         eventTime = (try? c.decode(String.self, forKey: .eventTime))
             ?? (try? c.decode(String.self, forKey: .time))
             ?? ""
-        principalName = (try? c.decode(String.self, forKey: .principalName))
-            ?? (try? c.decode(String.self, forKey: .user))
+        responseStatus = (try? c.decode(String.self, forKey: .responseStatus))
+            ?? (try? c.decode(String.self, forKey: .status))
             ?? ""
-        sourceIP = (try? c.decode(String.self, forKey: .sourceIP))
-            ?? (try? c.decode(String.self, forKey: .sourceIp))
-            ?? (try? c.decode(String.self, forKey: .ip))
-            ?? ""
-        status = (try? c.decode(String.self, forKey: .status)) ?? ""
-        message = (try? c.decode(String.self, forKey: .message)) ?? ""
     }
+}
+
+/// `POST /tenants/audit/log` 分页结果（`OciPageResult`）。
+struct TenantAuditLogPage: Equatable {
+    var items: [TenantAuditLogEntry] = []
+    var nextPageToken: String?
 }
 
 // MARK: - Generic API helpers
@@ -746,10 +823,8 @@ enum TenantSheet: Identifiable, Equatable {
     case accountDetail(TenantItem)
     case users(TenantItem)
     case traffic(TenantItem)
-    case audit(TenantItem)
     case email(TenantItem)
     case social(TenantItem)
-    case quota(TenantItem)
     case bootVolumes(TenantItem)
     case accountCheck
     case exportAll
@@ -759,7 +834,6 @@ enum TenantSheet: Identifiable, Equatable {
     /// 原生二级弹层
     case bootCreate(TenantItem)
     case regionSub(TenantItem)
-    case cost(TenantItem)
     case trafficQuery(TenantItem)
     case aiChat(TenantItem)
     case passwordResult(title: String, username: String, password: String)
@@ -774,10 +848,8 @@ enum TenantSheet: Identifiable, Equatable {
         case .accountDetail(let t): return "detail-\(t.id)"
         case .users(let t): return "users-\(t.id)"
         case .traffic(let t): return "traffic-\(t.id)"
-        case .audit(let t): return "audit-\(t.id)"
         case .email(let t): return "email-\(t.id)"
         case .social(let t): return "social-\(t.id)"
-        case .quota(let t): return "quota-\(t.id)"
         case .bootVolumes(let t): return "vol-\(t.id)"
         case .accountCheck: return "check"
         case .exportAll: return "export-all"
@@ -786,7 +858,6 @@ enum TenantSheet: Identifiable, Equatable {
         case .updateProgress(let id, _): return "upd-\(id)"
         case .bootCreate(let t): return "boot-\(t.id)"
         case .regionSub(let t): return "regs-\(t.id)"
-        case .cost(let t): return "costp-\(t.id)"
         case .trafficQuery(let t): return "tq-\(t.id)"
         case .aiChat(let t): return "ai-\(t.id)"
         case .passwordResult: return "pwd-result"
@@ -797,6 +868,64 @@ enum TenantSheet: Identifiable, Equatable {
 }
 
 // MARK: - Subpage models
+
+/// 对齐后端 `CloudCostItem`（Web 费用明细行）。
+struct TenantCostItem: Decodable, Identifiable, Equatable {
+    var id: String { "\(day)|\(resourceType)|\(resourceId)|\(skuName)|\(cost)" }
+    var cloudType: Int = 1
+    var resourceId: String = ""
+    var resourceType: String = ""
+    var skuName: String = ""
+    var day: String = ""
+    var cost: Double = 0
+
+    enum CodingKeys: String, CodingKey {
+        case cloudType, resourceId, resourceType, skuName, day, cost
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        if let i = try? c.decode(Int.self, forKey: .cloudType) {
+            cloudType = i
+        } else if let s = try? c.decode(String.self, forKey: .cloudType), let i = Int(s) {
+            cloudType = i
+        }
+        resourceId = (try? c.decode(String.self, forKey: .resourceId)) ?? ""
+        resourceType = (try? c.decode(String.self, forKey: .resourceType)) ?? ""
+        skuName = (try? c.decode(String.self, forKey: .skuName)) ?? ""
+        day = (try? c.decode(String.self, forKey: .day)) ?? ""
+        if let d = try? c.decode(Double.self, forKey: .cost) {
+            cost = d
+        } else if let s = try? c.decode(String.self, forKey: .cost), let d = Double(s) {
+            cost = d
+        } else if let n = try? c.decode(Decimal.self, forKey: .cost) {
+            cost = NSDecimalNumber(decimal: n).doubleValue
+        }
+    }
+
+    /// Web 归类：instance→计算 / boot-volume|block-volume→存储 / vnic→网络 / else→其他
+    var category: TenantCostCategory {
+        switch resourceType.lowercased() {
+        case "instance": return .compute
+        case "boot-volume", "block-volume": return .storage
+        case "vnic": return .network
+        default: return .other
+        }
+    }
+}
+
+enum TenantCostCategory: String, CaseIterable, Identifiable {
+    case compute, storage, network, other
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .compute: return "计算"
+        case .storage: return "存储"
+        case .network: return "网络"
+        case .other: return "其他"
+        }
+    }
+}
 
 struct TenantImageInfo: Decodable, Equatable, Identifiable {
     var id: String { imageId + operatingSystem + operatingSystemVersion }
@@ -837,20 +966,49 @@ struct TenantUnsubscribedRegion: Decodable, Identifiable, Equatable {
 }
 
 struct TenantTrafficRow: Decodable, Identifiable, Equatable {
-    var id: String { instanceId + (displayName) }
+    /// Unique per time-series sample (instance + timePoint).
+    var id: String { "\(instanceId)|\(timePoint)|\(displayName)" }
     var instanceId: String = ""
     var displayName: String = ""
     var instanceName: String = ""
     var region: String = ""
     var publicIp: String = ""
+    var publicIps: String = ""
     var state: String = ""
+    var timePoint: String = ""
     var ingressBytes: Double = 0
     var egressBytes: Double = 0
     var totalBytes: Double = 0
 
     enum CodingKeys: String, CodingKey {
-        case instanceId, displayName, instanceName, region, publicIp, state
-        case ingressBytes, egressBytes, totalBytes
+        case instanceId, displayName, instanceName, region, publicIp, publicIps, state
+        case timePoint, ingressBytes, egressBytes, totalBytes
+    }
+
+    init(
+        instanceId: String = "",
+        displayName: String = "",
+        instanceName: String = "",
+        region: String = "",
+        publicIp: String = "",
+        publicIps: String = "",
+        state: String = "",
+        timePoint: String = "",
+        ingressBytes: Double = 0,
+        egressBytes: Double = 0,
+        totalBytes: Double = 0
+    ) {
+        self.instanceId = instanceId
+        self.displayName = displayName
+        self.instanceName = instanceName
+        self.region = region
+        self.publicIp = publicIp
+        self.publicIps = publicIps
+        self.state = state
+        self.timePoint = timePoint
+        self.ingressBytes = ingressBytes
+        self.egressBytes = egressBytes
+        self.totalBytes = totalBytes
     }
 
     init(from decoder: Decoder) throws {
@@ -860,16 +1018,32 @@ struct TenantTrafficRow: Decodable, Identifiable, Equatable {
         instanceName = (try? c.decode(String.self, forKey: .instanceName)) ?? ""
         region = (try? c.decode(String.self, forKey: .region)) ?? ""
         publicIp = (try? c.decode(String.self, forKey: .publicIp)) ?? ""
+        publicIps = (try? c.decode(String.self, forKey: .publicIps)) ?? ""
         state = (try? c.decode(String.self, forKey: .state)) ?? ""
+        // LocalDateTime may arrive as "yyyy-MM-dd'T'HH:mm:ss" or "yyyy-MM-dd HH:mm:ss"
+        if let s = try? c.decode(String.self, forKey: .timePoint) {
+            timePoint = s
+        } else {
+            timePoint = ""
+        }
         ingressBytes = (try? c.decode(Double.self, forKey: .ingressBytes)) ?? 0
         egressBytes = (try? c.decode(Double.self, forKey: .egressBytes)) ?? 0
         totalBytes = (try? c.decode(Double.self, forKey: .totalBytes)) ?? 0
+        if totalBytes == 0 {
+            totalBytes = ingressBytes + egressBytes
+        }
     }
 
     var title: String {
         if !displayName.isEmpty { return displayName }
         if !instanceName.isEmpty { return instanceName }
         return instanceId
+    }
+
+    var ipText: String {
+        if !publicIp.isEmpty { return publicIp }
+        if !publicIps.isEmpty { return publicIps }
+        return ""
     }
 
     var totalGB: String {

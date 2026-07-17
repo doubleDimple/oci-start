@@ -46,6 +46,46 @@ enum FeatureRouter {
                     .environmentObject(AppearanceController.shared)
                     .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
             )
+        case .instances:
+            root = AnyView(
+                InstancesView()
+                    .environmentObject(session)
+                    .environmentObject(navigation)
+                    .environmentObject(AppearanceController.shared)
+                    .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+            )
+        case .email:
+            root = AnyView(
+                EmailView()
+                    .environmentObject(session)
+                    .environmentObject(navigation)
+                    .environmentObject(AppearanceController.shared)
+                    .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+            )
+        case .storage:
+            root = AnyView(
+                StorageView()
+                    .environmentObject(session)
+                    .environmentObject(navigation)
+                    .environmentObject(AppearanceController.shared)
+                    .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+            )
+        case .boot:
+            root = AnyView(
+                BootView()
+                    .environmentObject(session)
+                    .environmentObject(navigation)
+                    .environmentObject(AppearanceController.shared)
+                    .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+            )
+        case .openLogs:
+            root = AnyView(
+                OpenLogsView()
+                    .environmentObject(session)
+                    .environmentObject(navigation)
+                    .environmentObject(AppearanceController.shared)
+                    .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+            )
         default:
             root = AnyView(
                 PlaceholderView(

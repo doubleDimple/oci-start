@@ -88,6 +88,37 @@ public class OpenBootController  extends BaseController{
     }
 
     /**
+     * 开机任务列表 JSON（Mac / AJAX 分页，对齐 /tenants/list/json 形态）
+     */
+    @GetMapping("/fullBootList/json")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> bootListJson(
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(required = false) String tenantId) {
+        if (size <= 0) size = 20;
+        if (page < 0) page = 0;
+        Page<BootInstanceRes> bootPage;
+        try {
+            if (StringUtils.isNotBlank(tenantId)) {
+                bootPage = bootInstanceService.getBootsByTenantId(tenantId, page, size);
+            } else {
+                bootPage = bootInstanceService.getAllBoots(page, size);
+            }
+        } catch (Exception e) {
+            log.error("获取开机列表JSON失败", e);
+            bootPage = Page.empty(org.springframework.data.domain.PageRequest.of(page, size));
+        }
+        Map<String, Object> result = new HashMap<>();
+        result.put("content", bootPage.getContent());
+        result.put("currentPage", page);
+        result.put("totalPages", bootPage.getTotalPages());
+        result.put("totalElements", bootPage.getTotalElements());
+        result.put("size", size);
+        return ResponseEntity.ok(result);
+    }
+
+    /**
      * 执行开机操作
      */
     @RequestMapping("/startBoot")
