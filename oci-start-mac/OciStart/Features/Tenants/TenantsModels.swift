@@ -883,6 +883,8 @@ enum TenantSheet: Identifiable, Equatable {
     case passwordResult(title: String, username: String, password: String)
     case securityRules(TenantItem)
     case mysql(TenantItem)
+    /// 租户护盾：快速绑定代理
+    case proxyQuick(TenantItem)
 
     var id: String {
         switch self {
@@ -908,6 +910,7 @@ enum TenantSheet: Identifiable, Equatable {
         case .passwordResult: return "pwd-result"
         case .securityRules(let t): return "rules-\(t.id)"
         case .mysql(let t): return "mysql-\(t.id)"
+        case .proxyQuick(let t): return "proxy-\(t.id)"
         }
     }
 }

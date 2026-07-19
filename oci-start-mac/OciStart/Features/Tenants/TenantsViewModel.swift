@@ -78,6 +78,17 @@ final class TenantsViewModel: ObservableObject {
     // Social
     @Published var socialItems: [TenantSocialItem] = []
     @Published var socialTypes: [String] = []
+
+    // 护盾快捷代理配置
+    @Published var proxyQuickLoading = false
+    @Published var proxyQuickSaving = false
+    @Published var proxyQuickItems: [VpnProxyItem] = []
+    /// nil = 不使用专属代理（bind 模式）
+    @Published var proxyQuickSelectedId: Int64? = nil
+    @Published var proxyQuickTenant: TenantItem? = nil
+    /// true = 新建并绑定；false = 选择已有
+    @Published var proxyQuickCreateMode = false
+    @Published var proxyQuickForm = ProxyFormState.empty()
     @Published var socialDraft = TenantSocialItem()
 
     // Quota page（从弹框改为整页）
@@ -320,6 +331,89 @@ final class TenantsViewModel: ObservableObject {
     }
 
     // MARK: - Edit name / cost
+
+    func openProxyQuick(_ item: TenantItem) {
+        proxyQuickTenant = item
+        proxyQuickItems = []
+        proxyQuickSelectedId = nil
+        proxyQuickCreateMode = false
+        proxyQuickForm = ProxyFormState.empty()
+        proxyQuickForm.tenantIds = [item.id]
+        proxyQuickLoading = true
+        activeSheet = .proxyQuick(item)
+        Task { await loadProxyQuick(for: item) }
+    }
+
+    private func loadProxyQuick(for item: TenantItem) async {
+        proxyQuickLoading = true
+        defer { proxyQuickLoading = false }
+        let proxyService = ProxyConfigService(baseURL: session.serverURL)
+        do {
+            async let boundTask = proxyService.findByTenant(tenantId: item.id)
+            async let listTask = proxyService.pageList(pageNum: 1, pageSize: 200)
+            let bound = try await boundTask
+            let list = try await listTask
+            proxyQuickItems = list.items
+            proxyQuickSelectedId = bound?.id
+        } catch {
+            proxyQuickItems = []
+            ToastCenter.shared.error((error as? APIError)?.errorDescription ?? error.localizedDescription)
+        }
+    }
+
+    func saveProxyQuick() {
+        guard let tenant = proxyQuickTenant else { return }
+        if proxyQuickCreateMode {
+            Task { await performCreateAndBindProxy(tenantId: tenant.id) }
+        } else {
+            Task { await performSaveProxyQuick(tenantId: tenant.id) }
+        }
+    }
+
+    private func performSaveProxyQuick(tenantId: Int64) async {
+        proxyQuickSaving = true
+        defer { proxyQuickSaving = false }
+        let proxyService = ProxyConfigService(baseURL: session.serverURL)
+        do {
+            try await LoadingHUD.shared.during {
+                try await proxyService.bindTenant(tenantId: tenantId, proxyId: proxyQuickSelectedId)
+            }
+            activeSheet = nil
+            proxyQuickTenant = nil
+            await reload()
+            ToastCenter.shared.success(proxyQuickSelectedId == nil ? "已解绑专属代理" : "代理绑定已保存")
+        } catch {
+            ToastCenter.shared.error((error as? APIError)?.errorDescription ?? error.localizedDescription)
+        }
+    }
+
+    private func performCreateAndBindProxy(tenantId: Int64) async {
+        var form = proxyQuickForm
+        form.proxyHost = form.proxyHost.trimmingCharacters(in: .whitespacesAndNewlines)
+        form.tenantIds = [tenantId]
+        guard !form.proxyType.isEmpty, !form.proxyHost.isEmpty else {
+            ToastCenter.shared.error("请填写代理类型与地址")
+            return
+        }
+        guard let port = Int(form.proxyPort), (1...65535).contains(port) else {
+            ToastCenter.shared.error("端口范围应为 1–65535")
+            return
+        }
+        proxyQuickSaving = true
+        defer { proxyQuickSaving = false }
+        let proxyService = ProxyConfigService(baseURL: session.serverURL)
+        do {
+            try await LoadingHUD.shared.during {
+                try await proxyService.saveOrUpdate(form)
+            }
+            activeSheet = nil
+            proxyQuickTenant = nil
+            await reload()
+            ToastCenter.shared.success("代理已创建并绑定")
+        } catch {
+            ToastCenter.shared.error((error as? APIError)?.errorDescription ?? error.localizedDescription)
+        }
+    }
 
     func openEditName(_ item: TenantItem) {
         editText = item.defName
@@ -1379,17 +1473,22 @@ final class TenantsViewModel: ObservableObject {
 
     /// 进入 Web「租户详情」整页（`/tenants/regionList`），非弹框
     func openRegionList(_ item: TenantItem) {
+        // 先收起浮层菜单，避免与详情页切换叠在同一窗口 contentView 时布局冲突
+        FloatingMenuDismiss.all()
         detailParent = item
         detailRows = []
         detailError = nil
         detailNamesHidden = namesHidden
+        detailLoading = true
         Task { await reloadDetail() }
     }
 
     func closeDetail() {
+        FloatingMenuDismiss.all()
         detailParent = nil
         detailRows = []
         detailError = nil
+        detailLoading = false
         regionChildren = []
     }
 
@@ -1402,8 +1501,8 @@ final class TenantsViewModel: ObservableObject {
             // 优先全量接口（含 openBootFlag / apiSynced / supportAI / createdAt）
             let full = try await service.regionListDetail(tenantId: parent.id)
             if !full.isEmpty {
-                detailRows = full
-                regionChildren = full.map {
+                detailRows = Self.uniqueDetailRows(full)
+                regionChildren = detailRows.map {
                     TenantRegionOption(
                         id: "\($0.id)",
                         tenancyName: $0.displayName,
@@ -1419,16 +1518,32 @@ final class TenantsViewModel: ObservableObject {
             // 空结果时兜底 listRegions
             let regs = try await service.listRegions(parentId: parent.id)
             regionChildren = regs
-            detailRows = detailRowsFallback(parent: parent, regs: regs)
+            detailRows = Self.uniqueDetailRows(detailRowsFallback(parent: parent, regs: regs))
         } catch {
             detailError = error.localizedDescription
-            // 兜底：列表上的 children
+            // 兜底：列表上的 children（按 id 去重，避免 SwiftUI ForEach 崩溃）
             if !parent.children.isEmpty {
-                detailRows = [parent] + parent.children
+                detailRows = Self.uniqueDetailRows([parent] + parent.children)
             } else {
                 detailRows = [parent]
             }
         }
+    }
+
+    /// 保留首次出现顺序，去掉重复 id（regionList 父+子、兜底 children 偶发重复）
+    private static func uniqueDetailRows(_ rows: [TenantItem]) -> [TenantItem] {
+        var seen = Set<Int64>()
+        var out: [TenantItem] = []
+        out.reserveCapacity(rows.count)
+        for row in rows {
+            // id==0 多为解码失败占位，仍展示但后面用 offset identity 保证安全
+            if row.id != 0 {
+                if seen.contains(row.id) { continue }
+                seen.insert(row.id)
+            }
+            out.append(row)
+        }
+        return out
     }
 
     private func detailRowsFallback(parent: TenantItem, regs: [TenantRegionOption]) -> [TenantItem] {

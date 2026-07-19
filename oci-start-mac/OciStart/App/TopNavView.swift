@@ -44,11 +44,13 @@ struct TopNavView: View {
                 .environmentObject(appearance)
         }
         .sheet(isPresented: $header.showAbout) {
-            AboutSheet(
-                version: header.version.currentVersion.isEmpty ? "1.0.0" : header.version.currentVersion,
-                dark: dark
-            )
-            .environmentObject(appearance)
+            AboutSheet(header: header, dark: dark)
+                .environmentObject(appearance)
+                .environmentObject(session)
+        }
+        .sheet(isPresented: $header.showUpdateProgress) {
+            VersionUpdateProgressSheet(header: header, dark: dark)
+                .environmentObject(appearance)
         }
     }
 
@@ -130,11 +132,13 @@ struct TopNavView: View {
     private var updateButton: some View {
         Button(action: {
             chrome.close()
-            Task { await header.executeUpdate() }
+            header.requestUpdate()
         }) {
             HStack(spacing: 5) {
-                Image(systemName: "arrow.up.circle.fill")
-                Text("发现新版本 (\(header.version.latestVersion))")
+                Image(systemName: header.updatePhase.isActive ? "arrow.triangle.2.circlepath" : "arrow.up.circle.fill")
+                Text(header.updatePhase.isActive
+                     ? "升级中…"
+                     : "发现新版本 (\(header.version.latestVersion))")
                     .font(.system(size: 12, weight: .bold))
             }
             .foregroundColor(dark ? Color.white : Color(hex: "dc2626"))
@@ -149,7 +153,8 @@ struct TopNavView: View {
             )
         }
         .buttonStyle(PlainButtonStyle())
-        .help("执行系统更新")
+        .disabled(header.updatePhase.isActive)
+        .help("下载新版 macOS 安装包（DMG）")
     }
 
     private var languageButton: some View {
@@ -501,31 +506,485 @@ private struct AssetAnalysisSheet: View {
     }
 }
 
-// MARK: - About
+// MARK: - About（对齐 Web `version_info.ftl`）
 
 private struct AboutSheet: View {
-    let version: String
+    @ObservedObject var header: HeaderViewModel
     var dark: Bool
+    @EnvironmentObject private var session: AppSession
     @Environment(\.presentationMode) private var presentationMode
 
+    @State private var copied = false
+    @State private var zoomImage: NSImage?
+
+    private let trc20 = "TMHTdWVm6ThvhihWqM1ViSDKMMsGcCBHtT"
+    private let githubURL = "https://github.com/doubleDimple/oci-start"
+    private let telegramURL = "https://t.me/+M7XhteVCMMU5ZDhh"
+    private let releasesURL = "https://github.com/doubleDimple/oci-start/releases"
+
+    private var currentVersion: String {
+        header.version.currentVersion.isEmpty ? "v1.0.0" : header.version.currentVersion
+    }
+
+    private var latestVersion: String {
+        let lat = header.version.latestVersion
+        return lat.isEmpty ? currentVersion : lat
+    }
+
+    private var surface: Color { dark ? Color(hex: "1e2430") : Color.white }
+    private var surface2: Color { dark ? Color(hex: "252d3d") : Color(hex: "f8fafc") }
+    private var border: Color { dark ? Color(hex: "2e3a4e") : Color(hex: "edf2f7") }
+    private var textPrimary: Color { dark ? Color(hex: "e2e8f0") : Color(hex: "0f172a") }
+    private var textMuted: Color { dark ? Color(hex: "6b7fa3") : Color(hex: "94a3b8") }
+    private var textSecondary: Color { dark ? Color(hex: "94a3b8") : Color(hex: "475569") }
+    private var donateBg: Color { dark ? Color(hex: "161e2e") : Color(hex: "f1f5f9") }
+    private var cardBg: Color { dark ? Color(hex: "252d3d") : Color.white }
+    private var pillBg: Color { dark ? Color(hex: "2e3a4e") : Color(hex: "f1f5f9") }
+
     var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "cloud.fill")
-                .font(.system(size: 40))
-                .foregroundColor(AppTheme.brand(dark))
-            Text("OCI Start")
-                .font(.system(size: 20, weight: .bold))
-            Text("版本 \(version)")
-                .foregroundColor(AppTheme.sidebarText(dark))
-            Text("桌面端 Hybrid AppKit + SwiftUI")
-                .font(.system(size: 12))
-                .foregroundColor(AppTheme.sidebarText(dark))
-            Button("关闭") { presentationMode.wrappedValue.dismiss() }
+        ZStack {
+            VStack(spacing: 0) {
+                topSection
+                linksRow
+                donateSection
+            }
+            .background(surface)
+            .clipShape(RoundedRectangle(cornerRadius: 22))
+            .overlay(
+                RoundedRectangle(cornerRadius: 22)
+                    .stroke(border.opacity(0.9), lineWidth: 1)
+            )
+
+            // close button (top-right)
+            VStack {
+                HStack {
+                    Spacer()
+                    Button(action: { presentationMode.wrappedValue.dismiss() }) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(textSecondary)
+                            .frame(width: 32, height: 32)
+                            .background(Circle().fill(dark ? Color(hex: "2a3144") : Color(hex: "f1f5f9")))
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .help("关闭")
+                    .padding(16)
+                }
+                Spacer()
+            }
+
+            if let img = zoomImage {
+                Color.black.opacity(0.88)
+                    .edgesIgnoringSafeArea(.all)
+                    .onTapGesture { zoomImage = nil }
+                Image(nsImage: img)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(maxWidth: 420, maxHeight: 420)
+                    .cornerRadius(12)
+                    .onTapGesture { zoomImage = nil }
+                    .help("点击关闭预览")
+            }
+        }
+        .frame(width: 720, height: 460)
+        .background(surface)
+        .onAppear {
+            Task { await header.checkVersion() }
+        }
+    }
+
+    // MARK: Top — brand + version
+
+    private var topSection: some View {
+        HStack(alignment: .center, spacing: 28) {
+            HStack(spacing: 16) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(
+                            LinearGradient(
+                                gradient: Gradient(colors: [
+                                    Color(hex: "e0f2fe"),
+                                    Color(hex: "bae6fd")
+                                ]),
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                    Image(systemName: "paperplane.fill")
+                        .font(.system(size: 26, weight: .semibold))
+                        .foregroundColor(Color(hex: "0ea5e9"))
+                }
+                .frame(width: 64, height: 64)
+                .shadow(color: Color(hex: "0ea5e9").opacity(0.25), radius: 8, x: 0, y: 4)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Oci-Start")
+                        .font(.system(size: 22, weight: .heavy))
+                        .foregroundColor(textPrimary)
+                    Text("Created by doubleDimple")
+                        .font(.system(size: 12))
+                        .foregroundColor(textMuted)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            HStack(spacing: 0) {
+                versionItem(label: "Current", value: currentVersion, showTag: true)
+                Rectangle()
+                    .fill(dark ? Color(hex: "2e3a4e") : Color(hex: "e2e8f0"))
+                    .frame(width: 1, height: 36)
+                    .padding(.horizontal, 18)
+                versionItem(label: "Latest", value: latestVersion, showTag: false)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(surface2)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14)
+                            .stroke(border, lineWidth: 1)
+                    )
+            )
+        }
+        .padding(.horizontal, 36)
+        .padding(.top, 36)
+        .padding(.bottom, 22)
+    }
+
+    private func versionItem(label: String, value: String, showTag: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label.uppercased())
+                .font(.system(size: 10, weight: .bold))
+                .foregroundColor(textMuted)
+            HStack(spacing: 6) {
+                Text(value)
+                    .font(.system(size: 15, weight: .heavy, design: .monospaced))
+                    .foregroundColor(textPrimary)
+                if showTag {
+                    Text(header.version.needUpdate ? "UPDATE" : "LATEST")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundColor(header.version.needUpdate
+                            ? (dark ? Color(hex: "fbbf24") : Color(hex: "854d0e"))
+                            : (dark ? Color(hex: "4ade80") : Color(hex: "166534")))
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(header.version.needUpdate
+                                    ? (dark ? Color(hex: "eab308").opacity(0.15) : Color(hex: "fef9c3"))
+                                    : (dark ? Color(hex: "22c55e").opacity(0.15) : Color(hex: "dcfce7")))
+                        )
+                }
+            }
+        }
+    }
+
+    // MARK: Links
+
+    private var linksRow: some View {
+        HStack(spacing: 12) {
+            linkButton(icon: "chevron.left.slash.chevron.right", title: "开源仓库", url: githubURL)
+            linkButton(icon: "paperplane", title: "Telegram", url: telegramURL)
+            linkButton(icon: "doc.text", title: "更新日志", url: releasesURL)
+        }
+        .padding(.horizontal, 36)
+        .padding(.bottom, 24)
+    }
+
+    private func linkButton(icon: String, title: String, url: String) -> some View {
+        Button(action: {
+            if let u = URL(string: url) { NSWorkspace.shared.open(u) }
+        }) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 12, weight: .semibold))
+                Text(title)
+                    .font(.system(size: 12, weight: .medium))
+            }
+            .foregroundColor(textSecondary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 11)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(dark ? surface2 : Color.white)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(dark ? border : Color(hex: "e2e8f0"), lineWidth: 1)
+                    )
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+
+    // MARK: Donate
+
+    private var donateSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                HStack(spacing: 6) {
+                    Text("请作者喝杯咖啡")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(dark ? Color(hex: "cbd5e1") : Color(hex: "334155"))
+                    Image(systemName: "heart.fill")
+                        .font(.system(size: 12))
+                        .foregroundColor(Color(hex: "f43f5e"))
+                }
+                Spacer()
+                Text("点击二维码可放大预览")
+                    .font(.system(size: 11))
+                    .foregroundColor(textMuted)
+            }
+
+            HStack(spacing: 16) {
+                donateCard(
+                    path: "/images/weixin.JPG",
+                    title: "微信支付",
+                    titleIcon: "message.fill",
+                    titleColor: Color(hex: "07C160"),
+                    subtitle: "扫码赞赏支持",
+                    showCopy: false
+                )
+                donateCard(
+                    path: "/images/binance_qr.jpg",
+                    title: "币安/USDT",
+                    titleIcon: "dollarsign.circle.fill",
+                    titleColor: Color(hex: "F3BA2F"),
+                    subtitle: nil,
+                    showCopy: true
+                )
+            }
+        }
+        .padding(.horizontal, 36)
+        .padding(.top, 22)
+        .padding(.bottom, 28)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            LinearGradient(
+                gradient: Gradient(colors: [
+                    dark ? Color(hex: "1a2133") : Color(hex: "f8fafc"),
+                    donateBg
+                ]),
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
+    }
+
+    private func donateCard(
+        path: String,
+        title: String,
+        titleIcon: String,
+        titleColor: Color,
+        subtitle: String?,
+        showCopy: Bool
+    ) -> some View {
+        HStack(spacing: 16) {
+            AboutRemoteQR(url: imageURL(path), dark: dark) { img in
+                zoomImage = img
+            }
+            .frame(width: 96, height: 96)
+
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 6) {
+                    Image(systemName: titleIcon)
+                        .foregroundColor(titleColor)
+                    Text(title)
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(textPrimary)
+                }
+                if let subtitle = subtitle {
+                    Text(subtitle)
+                        .font(.system(size: 11))
+                        .foregroundColor(textMuted)
+                }
+                if showCopy {
+                    Button(action: copyTRC20) {
+                        HStack(spacing: 5) {
+                            Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                                .font(.system(size: 10, weight: .semibold))
+                            Text(copied ? "已复制" : "TRC20 复制地址")
+                                .font(.system(size: 11, weight: .medium))
+                        }
+                        .foregroundColor(copied ? Color(hex: "10b981") : textSecondary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(
+                            RoundedRectangle(cornerRadius: 7)
+                                .fill(pillBg)
+                        )
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .help(trc20)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(cardBg)
+                .shadow(color: Color.black.opacity(dark ? 0.25 : 0.06), radius: 6, x: 0, y: 2)
+        )
+    }
+
+    private func imageURL(_ path: String) -> URL? {
+        try? APIClient.shared.makeURL(session.serverURL, path: path)
+    }
+
+    private func copyTRC20() {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(trc20, forType: .string)
+        copied = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            copied = false
+        }
+    }
+}
+
+// MARK: - Remote QR (macOS 11: no AsyncImage)
+
+private struct AboutRemoteQR: View {
+    let url: URL?
+    var dark: Bool
+    var onZoom: (NSImage) -> Void
+
+    @State private var image: NSImage?
+    @State private var loading = true
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 10)
+                .fill(dark ? Color(hex: "1e2430") : Color(hex: "f8fafc"))
+            if let image = image {
+                Image(nsImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .padding(5)
+                    .cornerRadius(10)
+            } else if loading {
+                ProgressView()
+                    .scaleEffect(0.7)
+            } else {
+                Image(systemName: "qrcode")
+                    .font(.system(size: 28))
+                    .foregroundColor(dark ? Color.white.opacity(0.25) : Color.black.opacity(0.2))
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if let image = image { onZoom(image) }
+        }
+        .onAppear { load() }
+        .onChange(of: url?.absoluteString) { _ in load() }
+    }
+
+    private func load() {
+        guard let url = url else {
+            loading = false
+            image = nil
+            return
+        }
+        loading = true
+        DispatchQueue.global(qos: .userInitiated).async {
+            let img = NSImage(contentsOf: url)
+            DispatchQueue.main.async {
+                self.image = img
+                self.loading = false
+            }
+        }
+    }
+}
+
+// MARK: - Version update progress（下载 DMG）
+
+private struct VersionUpdateProgressSheet: View {
+    @ObservedObject var header: HeaderViewModel
+    var dark: Bool
+
+    private var title: String {
+        switch header.updatePhase {
+        case .downloading: return "正在下载安装包"
+        case .opening: return "正在打开 DMG"
+        case .completed: return "下载完成"
+        case .failed: return "升级失败"
+        case .idle: return "升级"
+        }
+    }
+
+    private var detail: String {
+        switch header.updatePhase {
+        case .downloading(let p):
+            let pct = Int((p * 100).rounded())
+            return "从 GitHub 下载 OciStart.dmg… \(pct)%"
+        case .opening:
+            return "即将在 Finder 中打开安装镜像…"
+        case .completed(let path):
+            return "已保存到：\n\(path)\n\n请将 OciStart 拖入「应用程序」，然后重新打开。"
+        case .failed(let msg):
+            return msg
+        case .idle:
+            return ""
+        }
+    }
+
+    private var finished: Bool {
+        switch header.updatePhase {
+        case .failed, .completed: return true
+        default: return false
+        }
+    }
+
+    private var failed: Bool {
+        if case .failed = header.updatePhase { return true }
+        return false
+    }
+
+    var body: some View {
+        VStack(spacing: 18) {
+            Image(systemName: failed
+                  ? "exclamationmark.triangle.fill"
+                  : (finished ? "checkmark.circle.fill" : "arrow.down.circle.fill"))
+                .font(.system(size: 32, weight: .medium))
+                .foregroundColor(failed
+                                 ? Color(hex: "f59e0b")
+                                 : (finished ? Color(hex: "10b981") : Color(hex: "1890ff")))
+
+            Text(title)
+                .font(.system(size: 16, weight: .bold))
+                .foregroundColor(dark ? Color.white.opacity(0.92) : Color(hex: "0f172a"))
+
+            Text(detail)
+                .font(.system(size: 13))
+                .multilineTextAlignment(.center)
+                .foregroundColor(dark ? Color.white.opacity(0.55) : Color(hex: "64748b"))
+                .fixedSize(horizontal: false, vertical: true)
+
+            if case .downloading(let p) = header.updatePhase {
+                ProgressView(value: min(max(p, 0), 1))
+                    .progressViewStyle(LinearProgressViewStyle())
+                    .frame(width: 260)
+            } else if !finished {
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle())
+                    .scaleEffect(1.0)
+            }
+
+            if finished {
+                Button("完成") {
+                    header.dismissUpdateProgress()
+                }
                 .buttonStyle(PlainButtonStyle())
-                .padding(.top, 8)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 8)
+                .background(RoundedRectangle(cornerRadius: 8).fill(AppTheme.sidebarActive))
+                .foregroundColor(.white)
+            }
         }
         .padding(28)
-        .frame(width: 320, height: 260)
-        .background(dark ? Color(hex: "22262b") : Color.white)
+        .frame(width: 400, height: 300)
+        .background(dark ? Color(hex: "1e2430") : Color.white)
     }
 }

@@ -58,6 +58,8 @@ struct TenantSheetHost: View {
                 securityRulesSheet(t)
             case .mysql(let t):
                 mysqlSheet(t)
+            case .proxyQuick(let t):
+                proxyQuickSheet(t)
             }
         }
         .onDisappear {
@@ -1547,6 +1549,261 @@ struct TenantSheetHost: View {
         .padding(12)
         .background(panelBg)
         .cornerRadius(4)
+    }
+
+    // MARK: - 护盾快捷配置代理
+
+    private func proxyQuickSheet(_ t: TenantItem) -> some View {
+        chrome(
+            title: "快速配置代理 · \(t.displayName)",
+            systemImage: "shield.fill",
+            width: 540,
+            height: 520,
+            footer: {
+                HStack {
+                    Spacer()
+                    AppButton(title: "取消", kind: .secondary) {
+                        presentationMode.wrappedValue.dismiss()
+                    }
+                    AppButton(
+                        title: model.proxyQuickCreateMode ? "新建并绑定" : "保存绑定",
+                        systemImage: "square.and.arrow.down",
+                        kind: .primary,
+                        isLoading: model.proxyQuickSaving
+                    ) {
+                        model.saveProxyQuick()
+                    }
+                }
+            }
+        ) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("选择已有代理，或直接新建并绑定到该租户（其它租户也可共用）。")
+                    .font(.system(size: 12))
+                    .foregroundColor(mutedText)
+
+                // 模式切换
+                HStack(spacing: 8) {
+                    proxyModeChip(title: "选择已有", active: !model.proxyQuickCreateMode) {
+                        model.proxyQuickCreateMode = false
+                    }
+                    proxyModeChip(title: "新建并绑定", active: model.proxyQuickCreateMode) {
+                        model.proxyQuickCreateMode = true
+                        if model.proxyQuickForm.tenantIds.isEmpty {
+                            model.proxyQuickForm.tenantIds = [t.id]
+                        }
+                    }
+                }
+
+                if model.proxyQuickCreateMode {
+                    proxyQuickCreateForm
+                } else if model.proxyQuickLoading {
+                    HStack {
+                        Spacer()
+                        ProgressView().scaleEffect(0.85)
+                        Text("加载中…")
+                            .font(.system(size: 12))
+                            .foregroundColor(mutedText)
+                        Spacer()
+                    }
+                    .padding(.vertical, 40)
+                } else {
+                    ScrollView {
+                        VStack(spacing: 4) {
+                            proxyQuickRow(
+                                title: "不使用专属代理（走全局池）",
+                                meta: "全局共享",
+                                selected: model.proxyQuickSelectedId == nil
+                            ) {
+                                model.proxyQuickSelectedId = nil
+                            }
+                            if model.proxyQuickItems.isEmpty {
+                                Text("暂无代理，可切换到「新建并绑定」")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(mutedText)
+                                    .padding(.vertical, 20)
+                                    .frame(maxWidth: .infinity)
+                            } else {
+                                ForEach(model.proxyQuickItems) { p in
+                                    proxyQuickRow(
+                                        title: p.displayName,
+                                        meta: proxyQuickMeta(p),
+                                        selected: model.proxyQuickSelectedId == p.id
+                                    ) {
+                                        model.proxyQuickSelectedId = p.id
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(panelBg)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(border, lineWidth: 1)
+                    )
+                }
+            }
+        }
+    }
+
+    private func proxyModeChip(title: String, active: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(active ? Color.white : primaryText)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .frame(maxWidth: .infinity)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(active ? AppTheme.sidebarActive : panelBg)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(active ? AppTheme.sidebarActive : border, lineWidth: 1)
+                )
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+
+    private var proxyQuickCreateForm: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 10) {
+                FormFieldRow(label: "自定义名称") {
+                    AppTextField(
+                        text: Binding(
+                            get: { model.proxyQuickForm.customName },
+                            set: { model.proxyQuickForm.customName = $0 }
+                        ),
+                        placeholder: "可选，仅展示",
+                        leadingSystemImage: "tag"
+                    )
+                }
+                HStack(spacing: 10) {
+                    FormFieldRow(label: "代理类型", required: true) {
+                        SelectMenu(
+                            options: [
+                                SelectOption(id: "HTTP", title: "HTTP"),
+                                SelectOption(id: "HTTPS", title: "HTTPS")
+                            ],
+                            selection: Binding(
+                                get: { model.proxyQuickForm.proxyType as String? },
+                                set: { model.proxyQuickForm.proxyType = $0 ?? "HTTP" }
+                            ),
+                            placeholder: "类型",
+                            width: 140,
+                            allowClear: false,
+                            searchable: false
+                        )
+                    }
+                    FormFieldRow(label: "强制代理") {
+                        SelectMenu(
+                            options: [
+                                SelectOption(id: "0", title: "非强制"),
+                                SelectOption(id: "1", title: "强制")
+                            ],
+                            selection: Binding(
+                                get: { "\(model.proxyQuickForm.forceProxy)" as String? },
+                                set: { model.proxyQuickForm.forceProxy = ($0 == "1") ? 1 : 0 }
+                            ),
+                            placeholder: "强制",
+                            width: 140,
+                            allowClear: false,
+                            searchable: false
+                        )
+                    }
+                }
+                HStack(spacing: 10) {
+                    FormFieldRow(label: "代理地址", required: true) {
+                        AppTextField(
+                            text: Binding(
+                                get: { model.proxyQuickForm.proxyHost },
+                                set: { model.proxyQuickForm.proxyHost = $0 }
+                            ),
+                            placeholder: "127.0.0.1",
+                            leadingSystemImage: "globe"
+                        )
+                    }
+                    FormFieldRow(label: "端口", required: true) {
+                        AppTextField(
+                            text: Binding(
+                                get: { model.proxyQuickForm.proxyPort },
+                                set: { model.proxyQuickForm.proxyPort = $0.filter { $0.isNumber } }
+                            ),
+                            placeholder: "8080",
+                            leadingSystemImage: "number"
+                        )
+                    }
+                }
+                HStack(spacing: 10) {
+                    FormFieldRow(label: "用户名") {
+                        AppTextField(
+                            text: Binding(
+                                get: { model.proxyQuickForm.proxyUsername },
+                                set: { model.proxyQuickForm.proxyUsername = $0 }
+                            ),
+                            placeholder: "可选",
+                            leadingSystemImage: "person"
+                        )
+                    }
+                    FormFieldRow(label: "密码") {
+                        AppTextField(
+                            text: Binding(
+                                get: { model.proxyQuickForm.proxyPassword },
+                                set: { model.proxyQuickForm.proxyPassword = $0 }
+                            ),
+                            placeholder: "可选",
+                            secure: true,
+                            leadingSystemImage: "key"
+                        )
+                    }
+                }
+            }
+            .padding(4)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func proxyQuickRow(title: String, meta: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Circle()
+                    .strokeBorder(selected ? AppTheme.sidebarActive : border, lineWidth: 1.5)
+                    .background(Circle().fill(selected ? AppTheme.sidebarActive : Color.clear))
+                    .frame(width: 12, height: 12)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(primaryText)
+                        .lineLimit(1)
+                    Text(meta)
+                        .font(.system(size: 11))
+                        .foregroundColor(mutedText)
+                        .lineLimit(2)
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(selected ? AppTheme.sidebarActive.opacity(0.12) : Color.clear)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+
+    private func proxyQuickMeta(_ p: VpnProxyItem) -> String {
+        [
+            "\(p.proxyType) · \(p.proxyHost):\(p.proxyPort)",
+            p.isForce ? "强制" : "非强制",
+            p.isEnabled ? "通畅" : "不通",
+            p.tenantLabel
+        ].joined(separator: " · ")
     }
 }
 

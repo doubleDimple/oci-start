@@ -12,6 +12,7 @@ import com.doubledimple.dao.entity.RegisterDetail;
 import com.doubledimple.dao.entity.Tenant;
 import com.doubledimple.dao.entity.TenantEmailConfig;
 import com.doubledimple.dao.entity.VpnProxyRecord;
+import com.doubledimple.dao.entity.VpnProxyTenantBind;
 import com.doubledimple.dao.repository.BootInstanceRepository;
 import com.doubledimple.dao.repository.CloudTenancyRepository;
 import com.doubledimple.dao.repository.OciComputerInfoRepository;
@@ -21,6 +22,7 @@ import com.doubledimple.dao.repository.OtherBootInstanceRepository;
 import com.doubledimple.dao.repository.RegisterDetailRepository;
 import com.doubledimple.dao.repository.TenantRepository;
 import com.doubledimple.dao.repository.VpnProxyRecordRepository;
+import com.doubledimple.dao.repository.VpnProxyTenantBindRepository;
 import com.doubledimple.ociai.chat.ChatAiService;
 import com.doubledimple.ocicommon.enums.CloudTypeEnum;
 import com.doubledimple.ocicommon.enums.RegionEnum;
@@ -35,7 +37,6 @@ import com.doubledimple.ociserver.pojo.dto.OciPageResult;
 import com.doubledimple.ociserver.pojo.dto.TenantTransferRequest;
 import com.doubledimple.ociserver.pojo.enums.AccountTypeEnum;
 import com.doubledimple.ociserver.pojo.enums.MessageEnum;
-import com.doubledimple.ociserver.pojo.gcp.InstanceInfo;
 import com.doubledimple.ociserver.pojo.request.AuditLogRequest;
 import com.doubledimple.ociserver.pojo.request.DeleteOciUserRequest;
 import com.doubledimple.ociserver.pojo.request.ResetOciPassRequest;
@@ -43,7 +44,7 @@ import com.doubledimple.ociserver.pojo.response.PasswordPolicyDetail;
 import com.doubledimple.ociserver.pojo.response.ResetOciPassResponse;
 import com.doubledimple.ociserver.service.DbConfigService;
 import com.doubledimple.ociserver.service.EmailService;
-import com.doubledimple.ociserver.utils.google.GcpApiUtil;
+import com.doubledimple.ociserver.service.cloud.CloudInstanceServiceFactory;
 import com.doubledimple.ociserver.utils.oracle.AuditLogUtils;
 import com.doubledimple.ociserver.utils.oracle.OciClassLoader;
 import com.doubledimple.ociserver.service.message.factory.MessageFactory;
@@ -129,9 +130,7 @@ import static com.doubledimple.ocicommon.template.MessageTemplate.MESSAGE_CONFIG
 import static com.doubledimple.ocicommon.template.MessageTemplate.MESSAGE_CONSOLE_PASSWORD_RESET_WITH_PASSWORD_TEMPLATE;
 import static com.doubledimple.ocicommon.utils.DateTimeUtils.calculateDaysFromNow;
 import static com.doubledimple.ocicommon.utils.FileUtils.deleteFile;
-import static com.doubledimple.ociserver.service.otherCloud.OtherBootService.generateBootId;
 import static com.doubledimple.ociserver.utils.oracle.OciCliUtils.createVcnAndFlowLogs;
-import static com.doubledimple.ociserver.utils.oracle.OciUtils.getAllInstancesByTenant;
 import static com.doubledimple.ociserver.utils.oracle.OciUtils.getProvider;
 
 /**
@@ -150,6 +149,9 @@ public class TenantServiceImpl implements TenantService {
 
     @Resource
     private VpnProxyRecordRepository vpnProxyRecordRepository;
+
+    @Resource
+    private VpnProxyTenantBindRepository vpnProxyTenantBindRepository;
 
     @Resource
     private BootInstanceRepository bootInstanceRepository;
@@ -194,7 +196,7 @@ public class TenantServiceImpl implements TenantService {
     CloudTenancyRepository cloudTenancyRepository;
 
     @Resource
-    GcpApiUtil gcpApiUtil;
+    CloudInstanceServiceFactory cloudInstanceServiceFactory;
 
     @Resource
     EmailService emailService;
@@ -335,15 +337,50 @@ public class TenantServiceImpl implements TenantService {
             return;
         }
         try {
-            List<VpnProxyRecord> boundRecords = vpnProxyRecordRepository.findAllBoundRecords();
+            // 租户 → 是否强制（true=强制，false=已绑非强制）
             java.util.Map<Long, Boolean> forceByTenant = new java.util.HashMap<>();
+
+            // 1) 新绑定表
+            try {
+                List<VpnProxyTenantBind> binds = vpnProxyTenantBindRepository.findAll();
+                if (binds != null && !binds.isEmpty()) {
+                    java.util.Set<Long> proxyIds = new java.util.HashSet<>();
+                    for (VpnProxyTenantBind b : binds) {
+                        if (b != null && b.getProxyId() != null) {
+                            proxyIds.add(b.getProxyId());
+                        }
+                    }
+                    java.util.Map<Long, VpnProxyRecord> proxyMap = new java.util.HashMap<>();
+                    if (!proxyIds.isEmpty()) {
+                        for (VpnProxyRecord r : vpnProxyRecordRepository.findAllById(proxyIds)) {
+                            if (r != null && r.getId() != null) {
+                                proxyMap.put(r.getId(), r);
+                            }
+                        }
+                    }
+                    for (VpnProxyTenantBind b : binds) {
+                        if (b == null || b.getTenantId() == null || b.getProxyId() == null) {
+                            continue;
+                        }
+                        VpnProxyRecord r = proxyMap.get(b.getProxyId());
+                        boolean force = r != null && r.getForceProxy() != null && r.getForceProxy() == 1;
+                        Boolean prev = forceByTenant.get(b.getTenantId());
+                        forceByTenant.put(b.getTenantId(), (prev != null && prev) || force);
+                    }
+                }
+            } catch (Exception ignore) {
+                // bind 表尚未创建时忽略，走旧列
+            }
+
+            // 2) 兼容旧 tenant_id 列
+            List<VpnProxyRecord> boundRecords = vpnProxyRecordRepository.findAllBoundRecords();
             if (boundRecords != null) {
                 for (VpnProxyRecord r : boundRecords) {
                     if (r == null || r.getTenantId() == null) {
                         continue;
                     }
+                    // 若已从 bind 表写入则合并强制标记
                     boolean force = r.getForceProxy() != null && r.getForceProxy() == 1;
-                    // 同一租户多条时，任一强制即视为强制
                     Boolean prev = forceByTenant.get(r.getTenantId());
                     forceByTenant.put(r.getTenantId(), (prev != null && prev) || force);
                 }
@@ -1231,51 +1268,80 @@ public class TenantServiceImpl implements TenantService {
     @Transactional
     public synchronized void syncOci(Long tenantId) {
         Optional<Tenant> byId = tenantRepository.findById(tenantId);
+        if (!byId.isPresent()) {
+            log.warn("同步失败，租户不存在: {}", tenantId);
+            return;
+        }
         Tenant tenant = byId.get();
-        int cloudType = tenant.getCloudType();
-        if (cloudType == CloudTypeEnum.ORACLE_CLOUD.getType()){
-            oracleInstanceDetailRepository.deleteByTenantId(tenantId);
-            List<InstanceDetails> instanceDetails = getAllInstancesByTenant(tenant);
-            instanceDetails = instanceDetails.stream()
-                    .filter(instance -> instance.getInstanceId() != null)
-                    .collect(Collectors.toList());
-            if (instanceDetails.size() > 0){
-                oracleInstanceDetailRepository.saveAllAndFlush(instanceDetails);
-                tenant.setApiSynced(true);
-                tenantRepository.save(tenant);
-            }
-        }else if (cloudType == CloudTypeEnum.GOOGLE_CLOUD.getType()){
-            String projectId = tenant.getTenancy();
-            String credentialsPath = tenant.getKeyFile();
-            List<OtherBootInstance> byTenantIdAndCloudType = otherBootInstanceRepository.findByTenantIdAndCloudType(tenantId, cloudType);
-            Map<String, String> passwordMap = new HashMap<>();
-            if (!CollectionUtils.isEmpty(byTenantIdAndCloudType)){
-                 passwordMap = byTenantIdAndCloudType.stream()
-                        .collect(Collectors.toMap(
-                                OtherBootInstance::getInstanceName,
-                                OtherBootInstance::getRootPassword,
-                                (existing, replacement) -> existing
-                        ));
-            }
-            otherBootInstanceRepository.deleteByTenantId(tenantId);
+        // 统一走多云工厂：OCI / GCP 均写入 instance_detail（merge 本地字段）
+        if (!cloudInstanceServiceFactory.supports(tenant.getCloudType())) {
+            log.warn("租户[{}] cloudType={} 暂无实例同步实现", tenantId, tenant.getCloudType());
+            return;
+        }
+        cloudInstanceServiceFactory.get(tenant.getCloudType()).syncToLocal(tenant);
+
+        // GCP 兼容：同步后刷新 OTHER_BOOT_INSTANCE（旧 UI 仍可读）
+        if (tenant.getCloudType() == CloudTypeEnum.GOOGLE_CLOUD.getType()) {
             try {
-                List<InstanceInfo> instanceInfos = gcpApiUtil.getAllInstance(projectId, credentialsPath);
-                if (!CollectionUtils.isEmpty(instanceInfos)){
-                    List<OtherBootInstance> instanceList = new ArrayList<>();
-                    for (InstanceInfo instanceInfo : instanceInfos) {
-                        OtherBootInstance otherBootInstance = InstanceInfo.convertToOtherBootInstance(instanceInfo, tenantId, generateBootId(), "UNKNOW");
-                        otherBootInstance.setRootPassword(passwordMap.getOrDefault(otherBootInstance.getInstanceName(), "UNKNOW"));
-                        instanceList.add(otherBootInstance);
-                    }
-                    otherBootInstanceRepository.saveAll(instanceList);
-                    tenant.setApiSynced(true);
-                    tenantRepository.save(tenant);
-                }
-            } catch (IOException e) {
-                log.error("同步实例出现异常");
+                refreshOtherBootFromInstanceDetail(tenant);
+            } catch (Exception e) {
+                log.warn("刷新 OTHER_BOOT_INSTANCE 兼容表失败: {}", tenantId, e);
             }
         }
+    }
 
+    /**
+     * 将 instance_detail 中的 GCP 实例回写 OTHER 表，兼容旧列表页。
+     */
+    private void refreshOtherBootFromInstanceDetail(Tenant tenant) {
+        List<InstanceDetails> details = oracleInstanceDetailRepository.findByTenantId(tenant.getId());
+        Map<String, String> passwordMap = new HashMap<String, String>();
+        List<OtherBootInstance> oldList = otherBootInstanceRepository.findByTenantIdAndCloudType(
+                tenant.getId(), CloudTypeEnum.GOOGLE_CLOUD.getType());
+        if (!CollectionUtils.isEmpty(oldList)) {
+            for (OtherBootInstance o : oldList) {
+                if (o.getInstanceName() != null && o.getRootPassword() != null) {
+                    passwordMap.put(o.getInstanceName(), o.getRootPassword());
+                }
+            }
+        }
+        otherBootInstanceRepository.deleteByTenantId(tenant.getId());
+        if (CollectionUtils.isEmpty(details)) {
+            return;
+        }
+        List<OtherBootInstance> toSave = new ArrayList<OtherBootInstance>();
+        for (InstanceDetails d : details) {
+            if (d.getCloudType() != CloudTypeEnum.GOOGLE_CLOUD.getType()) {
+                continue;
+            }
+            OtherBootInstance o = new OtherBootInstance();
+            o.setBootId("gcp-" + (d.getInstanceId() == null ? UUID.randomUUID().toString().substring(0, 8) : d.getInstanceId()).replace("/", "-"));
+            o.setTenantId(tenant.getId());
+            o.setInstanceName(d.getDisplayName());
+            o.setZone(d.getAvailabilityDomain());
+            o.setOcpu(d.getOcpus() == null ? 1 : d.getOcpus());
+            o.setMemory(d.getMemoryInGBs() == null ? 1 : d.getMemoryInGBs());
+            o.setDisk(d.getBootVolumeSizeInGBs() == null ? 20 : d.getBootVolumeSizeInGBs().intValue());
+            o.setInstanceCount(1);
+            o.setPublicIp(StringUtils.defaultIfBlank(d.getPublicIps(), "0.0.0.0"));
+            o.setArchitecture(StringUtils.defaultIfBlank(d.getArchitecture(), "X86_64"));
+            o.setCloudType(CloudTypeEnum.GOOGLE_CLOUD.getType());
+            String pwd = StringUtils.isNotBlank(d.getPassword()) ? d.getPassword()
+                    : passwordMap.getOrDefault(d.getDisplayName(), "UNKNOW");
+            o.setRootPassword(pwd);
+            if ("RUNNING".equalsIgnoreCase(d.getState())) {
+                o.setStatus(2);
+            } else if ("PROVISIONING".equalsIgnoreCase(d.getState()) || "STAGING".equalsIgnoreCase(d.getState())) {
+                o.setStatus(1);
+            } else {
+                o.setStatus(0);
+            }
+            o.setRemark(d.getRemark());
+            toSave.add(o);
+        }
+        if (!toSave.isEmpty()) {
+            otherBootInstanceRepository.saveAll(toSave);
+        }
     }
 
     @Override

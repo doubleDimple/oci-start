@@ -150,14 +150,23 @@
                     <tr class="parent-row" data-id="${tenant.id?c}">
                         <td class="col-center col-proxy-shield">
                             <#if (tenant.proxyForce!false)>
-                                <i class="fas fa-shield-alt tenant-proxy-shield is-force"
-                                   title="${msg.get('vpn.tenant.force')!'强制代理已开启'}"></i>
+                                <button type="button" class="tenant-proxy-shield-btn"
+                                        onclick="openTenantProxyQuick(${tenant.id?c})"
+                                        title="${msg.get('vpn.quick.title')!'快速配置代理'}">
+                                    <i class="fas fa-shield-alt tenant-proxy-shield is-force"></i>
+                                </button>
                             <#elseif tenant.proxyBound!false>
-                                <i class="fas fa-shield-alt tenant-proxy-shield is-bound"
-                                   title="${msg.get('vpn.tenant.bound')!'已绑定专属代理'}"></i>
+                                <button type="button" class="tenant-proxy-shield-btn"
+                                        onclick="openTenantProxyQuick(${tenant.id?c})"
+                                        title="${msg.get('vpn.quick.title')!'快速配置代理'}">
+                                    <i class="fas fa-shield-alt tenant-proxy-shield is-bound"></i>
+                                </button>
                             <#else>
-                                <i class="fas fa-shield-alt tenant-proxy-shield is-unbound"
-                                   title="${msg.get('vpn.tenant.unbound')!'未绑定专属代理'}"></i>
+                                <button type="button" class="tenant-proxy-shield-btn"
+                                        onclick="openTenantProxyQuick(${tenant.id?c})"
+                                        title="${msg.get('vpn.quick.title')!'快速配置代理'}">
+                                    <i class="fas fa-shield-alt tenant-proxy-shield is-unbound"></i>
+                                </button>
                             </#if>
                         </td>
                         <#--<td class="col-center">
@@ -1114,6 +1123,103 @@
     </div>
 </div>
 
+<!-- 租户护盾：快速配置代理（选已有 / 新建） -->
+<div id="tenantProxyQuickModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeTenantProxyQuick()">
+    <div class="modal-container" style="max-width:560px;width:94%;">
+        <div class="modal-header" style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--card-border);">
+            <h2 class="modal-title" style="margin:0;font-size:15px;display:flex;align-items:center;gap:8px;">
+                <i class="fas fa-shield-alt" style="color:var(--accent-green,#1abc9c);"></i>
+                <span id="tenantProxyQuickTitle">${msg.get("vpn.quick.title")!'快速配置代理'}</span>
+            </h2>
+            <button type="button" class="close-btn" onclick="closeTenantProxyQuick()" aria-label="close"
+                    style="background:none;border:none;cursor:pointer;color:var(--text-secondary);font-size:18px;">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div style="padding:16px 20px;">
+            <div style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;" id="tenantProxyQuickHint">
+                ${msg.get("vpn.quick.hint")!''}
+            </div>
+
+            <!-- 模式切换：绑定已有 / 新建 -->
+            <div class="tpq-mode-tabs" style="display:flex;gap:6px;margin-bottom:14px;">
+                <button type="button" class="btn btn-secondary tpq-mode-btn is-active" id="tpqModeBindBtn" onclick="setTenantProxyQuickMode('bind')">
+                    <i class="fas fa-link"></i> ${msg.get("vpn.quick.select")!'选择已有代理'}
+                </button>
+                <button type="button" class="btn btn-secondary tpq-mode-btn" id="tpqModeCreateBtn" onclick="setTenantProxyQuickMode('create')">
+                    <i class="fas fa-plus"></i> ${msg.get("vpn.quick.create")!'新建并绑定'}
+                </button>
+            </div>
+
+            <!-- 绑定已有 -->
+            <div id="tpqBindPane">
+                <div id="tenantProxyQuickList" style="max-height:280px;overflow-y:auto;border:1px solid var(--card-border);border-radius:8px;background:var(--surface-2,var(--surface));">
+                    <div style="padding:24px;text-align:center;color:var(--text-secondary);">
+                        <i class="fas fa-spinner fa-spin"></i> ${msg.get("common.loading")!'加载中…'}
+                    </div>
+                </div>
+            </div>
+
+            <!-- 新建代理 -->
+            <div id="tpqCreatePane" style="display:none;">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                    <div class="form-group" style="margin:0;grid-column:1 / -1;">
+                        <label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:4px;">${msg.get("vpn.customName")!'自定义名称'}</label>
+                        <input type="text" id="tpqCustomName" class="form-input" placeholder="${msg.get('vpn.customName.placeholder')!'可选，仅展示'}" maxlength="128"
+                               style="width:100%;padding:8px 10px;border:1px solid var(--input-border,var(--card-border));border-radius:6px;background:var(--input-bg,var(--surface));color:var(--text-primary);">
+                    </div>
+                    <div class="form-group" style="margin:0;">
+                        <label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:4px;">${msg.get("vpn.type")!'代理类型'} *</label>
+                        <select id="tpqProxyType" class="form-input"
+                                style="width:100%;padding:8px 10px;border:1px solid var(--input-border,var(--card-border));border-radius:6px;background:var(--input-bg,var(--surface));color:var(--text-primary);">
+                            <option value="HTTP">HTTP</option>
+                            <option value="HTTPS">HTTPS</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin:0;">
+                        <label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:4px;">${msg.get("vpn.force")!'强制代理'}</label>
+                        <select id="tpqForceProxy" class="form-input"
+                                style="width:100%;padding:8px 10px;border:1px solid var(--input-border,var(--card-border));border-radius:6px;background:var(--input-bg,var(--surface));color:var(--text-primary);">
+                            <option value="0">${msg.get("vpn.force.off")!'非强制'}</option>
+                            <option value="1">${msg.get("vpn.force.on")!'强制'}</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin:0;">
+                        <label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:4px;">${msg.get("vpn.url")!'代理地址'} *</label>
+                        <input type="text" id="tpqProxyHost" class="form-input" placeholder="127.0.0.1"
+                               style="width:100%;padding:8px 10px;border:1px solid var(--input-border,var(--card-border));border-radius:6px;background:var(--input-bg,var(--surface));color:var(--text-primary);">
+                    </div>
+                    <div class="form-group" style="margin:0;">
+                        <label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:4px;">${msg.get("vpn.port")!'端口'} *</label>
+                        <input type="number" id="tpqProxyPort" class="form-input" placeholder="8080" min="1" max="65535"
+                               style="width:100%;padding:8px 10px;border:1px solid var(--input-border,var(--card-border));border-radius:6px;background:var(--input-bg,var(--surface));color:var(--text-primary);">
+                    </div>
+                    <div class="form-group" style="margin:0;">
+                        <label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:4px;">${msg.get("vpn.name")!'用户名'}</label>
+                        <input type="text" id="tpqProxyUser" class="form-input" placeholder="${msg.get('vpn.noVerify')!'可选'}"
+                               style="width:100%;padding:8px 10px;border:1px solid var(--input-border,var(--card-border));border-radius:6px;background:var(--input-bg,var(--surface));color:var(--text-primary);">
+                    </div>
+                    <div class="form-group" style="margin:0;">
+                        <label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:4px;">${msg.get("vpn.pass")!'密码'}</label>
+                        <input type="text" id="tpqProxyPass" class="form-input" placeholder="${msg.get('vpn.noVerify')!'可选'}"
+                               style="width:100%;padding:8px 10px;border:1px solid var(--input-border,var(--card-border));border-radius:6px;background:var(--input-bg,var(--surface));color:var(--text-primary);">
+                    </div>
+                </div>
+                <div style="margin-top:10px;font-size:11px;color:var(--text-secondary);">
+                    <i class="fas fa-info-circle"></i> 将自动绑定当前租户；其它租户也可在代理配置中多选共用此代理。
+                </div>
+            </div>
+
+            <div style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end;">
+                <button type="button" class="btn btn-secondary" onclick="closeTenantProxyQuick()">${msg.get("common.cancel")!'取消'}</button>
+                <button type="button" class="btn btn-primary" id="tenantProxyQuickSaveBtn" onclick="saveTenantProxyQuick()">
+                    <i class="fas fa-save"></i> <span id="tenantProxyQuickSaveLabel">${msg.get("vpn.quick.save")!'保存绑定'}</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- 在body结束前引入版本信息模块 -->
 <#--<#include "common/version_info.ftl">-->
 <script>
@@ -1256,7 +1362,16 @@
         tenant_unsupported: "—",
         vpn_tenant_bound: "${msg.get('vpn.tenant.bound')?js_string}",
         vpn_tenant_unbound: "${msg.get('vpn.tenant.unbound')?js_string}",
-        vpn_tenant_force: "${msg.get('vpn.tenant.force')?js_string}"
+        vpn_tenant_force: "${msg.get('vpn.tenant.force')?js_string}",
+        vpn_quick_title: "${msg.get('vpn.quick.title')?js_string}",
+        vpn_quick_unbind: "${msg.get('vpn.quick.unbind')?js_string}",
+        vpn_quick_select: "${msg.get('vpn.quick.select')?js_string}",
+        vpn_quick_save: "${msg.get('vpn.quick.save')?js_string}",
+        vpn_quick_create: "${msg.get('vpn.quick.create')?js_string}",
+        vpn_tenant_global: "${msg.get('vpn.tenant.global')?js_string}",
+        vpn_customName: "${msg.get('vpn.customName')?js_string}",
+        vpn_force_on: "${msg.get('vpn.force.on')?js_string}",
+        vpn_force_off: "${msg.get('vpn.force.off')?js_string}"
     }
 
     /* ═══════════════════════════════════════════════
@@ -1334,8 +1449,10 @@
                 shieldTitle = i18n.vpn_tenant_unbound || '未绑定专属代理';
                 shieldClass = 'fas fa-shield-alt tenant-proxy-shield is-unbound';
             }
-            var shieldCell = '<td class="col-center col-proxy-shield"><i class="' + shieldClass
-                + '" title="' + tlEsc(shieldTitle) + '"></i></td>';
+            var shieldCell = '<td class="col-center col-proxy-shield">'
+                + '<button type="button" class="tenant-proxy-shield-btn" onclick="openTenantProxyQuick(' + id + ')"'
+                + ' title="' + tlEsc(i18n.vpn_quick_title || shieldTitle || '快速配置代理') + '">'
+                + '<i class="' + shieldClass + '"></i></button></td>';
 
             // Status badge (openBootFlag)
             var openBootBadge = openBootFlag

@@ -212,9 +212,12 @@ struct TenantDetailView: View {
                 VStack(spacing: 0) {
                     headerRow(wName: wName, wDef: wDef, width: totalW)
                     ScrollView {
+                        // 必须用 offset 做 identity：regionList 在异常/兜底数据下可能出现重复 id，
+                        // macOS 11 SwiftUI 会 fatalError「each layout item may only occur once」直接退出。
                         LazyVStack(spacing: 0) {
-                            ForEach(Array(model.detailRows.enumerated()), id: \.element.id) { idx, row in
+                            ForEach(Array(model.detailRows.enumerated()), id: \.offset) { idx, row in
                                 dataRow(index: idx, item: row, wName: wName, wDef: wDef, width: totalW)
+                                    .id("detail-row-\(idx)-\(row.id)")
                             }
                         }
                     }

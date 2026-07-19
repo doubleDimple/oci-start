@@ -4476,3 +4476,315 @@ function renderQuotaContent(items) {
         + '<tbody>' + rows + '</tbody>'
         + '</table></div>';
 }
+
+/* ========== 租户护盾：快速配置代理 ========== */
+var _tpqTenantId = null;
+var _tpqSelectedProxyId = null; // null = 解绑（bind 模式）
+var _tpqProxyList = [];
+/** 'bind' | 'create' */
+var _tpqMode = 'bind';
+
+function openTenantProxyQuick(tenantId) {
+    _tpqTenantId = tenantId != null ? parseInt(tenantId, 10) : null;
+    if (!_tpqTenantId || isNaN(_tpqTenantId)) {
+        return;
+    }
+    _tpqSelectedProxyId = null;
+    _tpqProxyList = [];
+    _tpqMode = 'bind';
+
+    var modal = document.getElementById('tenantProxyQuickModal');
+    if (!modal) {
+        console.warn('tenantProxyQuickModal missing');
+        return;
+    }
+    var titleEl = document.getElementById('tenantProxyQuickTitle');
+    var i18n = window.I18N || {};
+    var tName = '';
+    try {
+        var td = (window.tenantsData && (window.tenantsData[String(tenantId)] || window.tenantsData[tenantId])) || null;
+        if (td) {
+            tName = td.defName || td.tenancyName || td.userName || '';
+        }
+    } catch (e) { /* ignore */ }
+    if (titleEl) {
+        titleEl.textContent = (i18n.vpn_quick_title || '快速配置代理') + (tName ? ' · ' + tName : '');
+    }
+
+    // 重置新建表单
+    var setVal = function(id, v) {
+        var el = document.getElementById(id);
+        if (el) el.value = v;
+    };
+    setVal('tpqCustomName', '');
+    setVal('tpqProxyType', 'HTTP');
+    setVal('tpqForceProxy', '0');
+    setVal('tpqProxyHost', '');
+    setVal('tpqProxyPort', '');
+    setVal('tpqProxyUser', '');
+    setVal('tpqProxyPass', '');
+
+    setTenantProxyQuickMode('bind');
+
+    var listEl = document.getElementById('tenantProxyQuickList');
+    if (listEl) {
+        listEl.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-secondary);">'
+            + '<i class="fas fa-spinner fa-spin"></i> 加载中…</div>';
+    }
+    modal.style.display = 'flex';
+    modal.style.alignItems = 'center';
+    modal.style.justifyContent = 'center';
+
+    var csrfToken = (document.querySelector('meta[name="_csrf"]') || {}).content || '';
+    var csrfHeader = (document.querySelector('meta[name="_csrf_header"]') || {}).content || 'X-CSRF-TOKEN';
+
+    Promise.all([
+        fetch('/vpnProxy/findByTenant', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', [csrfHeader]: csrfToken },
+            body: JSON.stringify({ tenantId: _tpqTenantId })
+        }).then(function(r) { return r.json(); }).catch(function() { return {}; }),
+        fetch('/vpnProxy/pageList', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', [csrfHeader]: csrfToken },
+            body: JSON.stringify({ pageNum: 1, pageSize: 200 })
+        }).then(function(r) { return r.json(); }).catch(function() { return {}; })
+    ]).then(function(results) {
+        var bound = results[0] && results[0].success ? results[0].data : null;
+        var page = results[1] && results[1].success ? results[1].data : null;
+        _tpqProxyList = (page && page.content) ? page.content : [];
+        if (bound && bound.id) {
+            _tpqSelectedProxyId = bound.id;
+        } else {
+            _tpqSelectedProxyId = null;
+        }
+        renderTenantProxyQuickList();
+    }).catch(function(err) {
+        console.error(err);
+        if (listEl) {
+            listEl.innerHTML = '<div style="padding:24px;text-align:center;color:var(--accent-red,#ff6b6b);">加载失败</div>';
+        }
+    });
+}
+
+function setTenantProxyQuickMode(mode) {
+    _tpqMode = mode === 'create' ? 'create' : 'bind';
+    var bindPane = document.getElementById('tpqBindPane');
+    var createPane = document.getElementById('tpqCreatePane');
+    var bindBtn = document.getElementById('tpqModeBindBtn');
+    var createBtn = document.getElementById('tpqModeCreateBtn');
+    var label = document.getElementById('tenantProxyQuickSaveLabel');
+    var i18n = window.I18N || {};
+    if (bindPane) bindPane.style.display = _tpqMode === 'bind' ? '' : 'none';
+    if (createPane) createPane.style.display = _tpqMode === 'create' ? '' : 'none';
+    if (bindBtn) bindBtn.classList.toggle('is-active', _tpqMode === 'bind');
+    if (createBtn) createBtn.classList.toggle('is-active', _tpqMode === 'create');
+    if (label) {
+        label.textContent = _tpqMode === 'create'
+            ? (i18n.vpn_quick_create || '新建并绑定')
+            : (i18n.vpn_quick_save || '保存绑定');
+    }
+}
+
+function renderTenantProxyQuickList() {
+    var listEl = document.getElementById('tenantProxyQuickList');
+    if (!listEl) return;
+    var i18n = window.I18N || {};
+    var html = '';
+
+    var unbindActive = _tpqSelectedProxyId == null ? ' is-active' : '';
+    html += '<button type="button" class="proxy-quick-item' + unbindActive + '" onclick="selectTenantProxyQuick(null)">'
+        + '<span class="pq-radio"></span>'
+        + '<span class="pq-body">'
+        + '<div class="pq-title">' + tpqEsc(i18n.vpn_quick_unbind || '不使用专属代理（走全局池）') + '</div>'
+        + '<div class="pq-meta">' + tpqEsc(i18n.vpn_tenant_global || '全局共享') + '</div>'
+        + '</span></button>';
+
+    if (!_tpqProxyList.length) {
+        html += '<div style="padding:16px;text-align:center;color:var(--text-secondary);font-size:12px;">'
+            + '暂无代理，可切换到「新建并绑定」直接创建</div>';
+    } else {
+        for (var i = 0; i < _tpqProxyList.length; i++) {
+            var p = _tpqProxyList[i];
+            var active = (_tpqSelectedProxyId != null && Number(_tpqSelectedProxyId) === Number(p.id)) ? ' is-active' : '';
+            var custom = (p.customName || '').trim();
+            var title = custom || (p.proxyType + ' ' + p.proxyHost + ':' + p.proxyPort);
+            var force = (p.forceProxy === 1 || p.forceProxy === true || p.forceProxy === '1');
+            var statusOk = p.availableStatus === 1;
+            var metaParts = [];
+            metaParts.push(p.proxyType + ' · ' + p.proxyHost + ':' + p.proxyPort);
+            metaParts.push(force ? (i18n.vpn_force_on || '强制') : (i18n.vpn_force_off || '非强制'));
+            metaParts.push(statusOk ? '通畅' : '不通');
+            if (p.tenantName) metaParts.push(p.tenantName);
+            html += '<button type="button" class="proxy-quick-item' + active + '" onclick="selectTenantProxyQuick(' + p.id + ')">'
+                + '<span class="pq-radio"></span>'
+                + '<span class="pq-body">'
+                + '<div class="pq-title" title="' + tpqEsc(title) + '">' + tpqEsc(title) + '</div>'
+                + '<div class="pq-meta">' + tpqEsc(metaParts.join(' · ')) + '</div>'
+                + '</span></button>';
+        }
+    }
+    listEl.innerHTML = html;
+}
+
+function selectTenantProxyQuick(proxyId) {
+    _tpqSelectedProxyId = proxyId == null ? null : Number(proxyId);
+    renderTenantProxyQuickList();
+}
+
+function closeTenantProxyQuick() {
+    var modal = document.getElementById('tenantProxyQuickModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+    _tpqTenantId = null;
+    _tpqSelectedProxyId = null;
+    _tpqMode = 'bind';
+}
+
+function saveTenantProxyQuick() {
+    if (!_tpqTenantId) return;
+    if (_tpqMode === 'create') {
+        saveTenantProxyQuickCreate();
+    } else {
+        saveTenantProxyQuickBind();
+    }
+}
+
+function tpqCsrf() {
+    return {
+        token: (document.querySelector('meta[name="_csrf"]') || {}).content || '',
+        header: (document.querySelector('meta[name="_csrf_header"]') || {}).content || 'X-CSRF-TOKEN'
+    };
+}
+
+function tpqSetSaving(saving) {
+    var btn = document.getElementById('tenantProxyQuickSaveBtn');
+    var i18n = window.I18N || {};
+    if (!btn) return;
+    if (saving) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> …';
+    } else {
+        btn.disabled = false;
+        var label = _tpqMode === 'create'
+            ? (i18n.vpn_quick_create || '新建并绑定')
+            : (i18n.vpn_quick_save || '保存绑定');
+        btn.innerHTML = '<i class="fas fa-save"></i> <span id="tenantProxyQuickSaveLabel">' + label + '</span>';
+    }
+}
+
+function saveTenantProxyQuickBind() {
+    var csrf = tpqCsrf();
+    tpqSetSaving(true);
+    fetch('/vpnProxy/bindTenant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', [csrf.header]: csrf.token },
+        body: JSON.stringify({
+            tenantId: _tpqTenantId,
+            id: _tpqSelectedProxyId
+        })
+    })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (!data.success) throw new Error(data.message || '绑定失败');
+            closeTenantProxyQuick();
+            tpqReloadTenantList();
+        })
+        .catch(function(err) {
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({ title: 'error', text: err.message || '绑定失败', icon: 'error' });
+            } else {
+                alert(err.message || '绑定失败');
+            }
+        })
+        .finally(function() { tpqSetSaving(false); });
+}
+
+function saveTenantProxyQuickCreate() {
+    var type = (document.getElementById('tpqProxyType') || {}).value || 'HTTP';
+    var host = ((document.getElementById('tpqProxyHost') || {}).value || '').trim();
+    var portRaw = (document.getElementById('tpqProxyPort') || {}).value;
+    var port = parseInt(portRaw, 10);
+    var user = ((document.getElementById('tpqProxyUser') || {}).value || '').trim();
+    var pass = ((document.getElementById('tpqProxyPass') || {}).value || '').trim();
+    var force = parseInt((document.getElementById('tpqForceProxy') || {}).value || '0', 10) === 1 ? 1 : 0;
+    var customName = ((document.getElementById('tpqCustomName') || {}).value || '').trim();
+
+    if (!host || !port || isNaN(port)) {
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({ title: '提示', text: '请填写代理地址与端口', icon: 'warning' });
+        } else {
+            alert('请填写代理地址与端口');
+        }
+        return;
+    }
+    if (port < 1 || port > 65535) {
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({ title: '提示', text: '端口范围 1–65535', icon: 'warning' });
+        } else {
+            alert('端口范围 1–65535');
+        }
+        return;
+    }
+
+    var csrf = tpqCsrf();
+    tpqSetSaving(true);
+    var body = {
+        proxyType: type,
+        proxyHost: host,
+        proxyPort: port,
+        proxyUsername: user || null,
+        proxyPassword: pass || null,
+        availableStatus: 1,
+        forceProxy: force,
+        customName: customName,
+        tenantIds: [_tpqTenantId],
+        tenantId: _tpqTenantId
+    };
+    fetch('/vpnProxy/saveOrUpdate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', [csrf.header]: csrf.token },
+        body: JSON.stringify(body)
+    })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (!data.success) throw new Error(data.message || '创建失败');
+            closeTenantProxyQuick();
+            tpqReloadTenantList();
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({ title: '成功', text: '代理已创建并绑定', icon: 'success', timer: 1600, showConfirmButton: false });
+            }
+        })
+        .catch(function(err) {
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({ title: 'error', text: err.message || '创建失败', icon: 'error' });
+            } else {
+                alert(err.message || '创建失败');
+            }
+        })
+        .finally(function() { tpqSetSaving(false); });
+}
+
+function tpqReloadTenantList() {
+    if (typeof tlLoadPage === 'function') {
+        tlLoadPage(
+            typeof _tlCurrentPage === 'number' ? _tlCurrentPage : 0,
+            typeof _tlCurrentSize === 'number' ? _tlCurrentSize : 10,
+            typeof _tlCurrentKeyword === 'string' ? _tlCurrentKeyword : '',
+            typeof _tlCurrentCloudType !== 'undefined' ? _tlCurrentCloudType : 1
+        );
+    } else {
+        window.location.reload();
+    }
+}
+
+function tpqEsc(str) {
+    if (str == null) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}

@@ -298,25 +298,29 @@ struct TenantsView: View {
 
     // MARK: - Cells
 
-    /// 代理绑定护盾：橙=强制代理，绿=已绑定，灰=未绑定
+    /// 代理绑定护盾：橙=强制代理，绿=已绑定，灰=未绑定；点击快捷配置
     private func proxyShieldCell(_ item: TenantItem, width: CGFloat) -> some View {
         let color: Color
         let tip: String
         if item.proxyForce {
             color = Color(hex: dark ? "e67e22" : "d35400")
-            tip = "强制代理已开启"
+            tip = "强制代理已开启 · 点击配置"
         } else if item.proxyBound {
             color = Color(hex: dark ? "1abc9c" : "16a085")
-            tip = "已绑定专属代理"
+            tip = "已绑定专属代理 · 点击配置"
         } else {
             color = Color(hex: dark ? "8b949e" : "95a5a6").opacity(dark ? 0.55 : 0.65)
-            tip = "未绑定专属代理"
+            tip = "未绑定专属代理 · 点击配置"
         }
-        return Image(systemName: "shield.fill")
-            .font(.system(size: 13))
-            .foregroundColor(color)
-            .frame(width: width, alignment: .center)
-            .help(tip)
+        return Button(action: { model.openProxyQuick(item) }) {
+            Image(systemName: "shield.fill")
+                .font(.system(size: 13))
+                .foregroundColor(color)
+                .frame(width: width, height: 28, alignment: .center)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(PlainButtonStyle())
+        .help(tip)
     }
 
     private func nameCell(_ item: TenantItem, width: CGFloat) -> some View {
