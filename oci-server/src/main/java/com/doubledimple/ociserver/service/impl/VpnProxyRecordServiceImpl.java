@@ -7,6 +7,7 @@ import com.doubledimple.dao.repository.VpnProxyRecordRepository;
 import com.doubledimple.ociserver.pojo.request.VpnProxyRecordRequest;
 import com.doubledimple.ociserver.service.VpnProxyRecordService;
 import com.doubledimple.ociserver.utils.PageUtils;
+import com.doubledimple.ociserver.utils.SocksProxyUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.data.domain.Page;
@@ -18,7 +19,10 @@ import javax.annotation.Resource;
 import javax.persistence.criteria.Predicate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -71,10 +75,21 @@ public class VpnProxyRecordServiceImpl implements VpnProxyRecordService {
         record.setProxyType(request.getProxyType());
         record.setProxyHost(request.getProxyHost());
         record.setProxyPort(request.getProxyPort());
-        record.setProxyUsername(request.getProxyUsername());
-        record.setProxyPassword(request.getProxyPassword());
+        // 用户名：请求显式带了才更新（null 表示未传，保留原值，避免切换强制代理时清空）
+        if (request.getProxyUsername() != null) {
+            record.setProxyUsername(request.getProxyUsername());
+        }
+        // 密码：null 未传则保留原密码；空串表示清空
+        if (request.getProxyPassword() != null) {
+            record.setProxyPassword(request.getProxyPassword());
+        }
         if (request.getAvailableStatus() != null) {
             record.setAvailableStatus(request.getAvailableStatus());
+        }
+        if (request.getForceProxy() != null) {
+            record.setForceProxy(request.getForceProxy() == 1 ? 1 : 0);
+        } else if (record.getForceProxy() == null) {
+            record.setForceProxy(0);
         }
         // null = 全局共享
         record.setTenantId(normalizeTenantId(request.getTenantId()));
@@ -97,6 +112,64 @@ public class VpnProxyRecordServiceImpl implements VpnProxyRecordService {
         vpnProxyRecordRepository.deleteById(vpnProxyRecordRequest.getId());
     }
 
+    @Override
+    public Map<String, Object> testConnection(Long id) {
+        if (id == null) {
+            throw new IllegalArgumentException("代理 id 不能为空");
+        }
+        VpnProxyRecord record = vpnProxyRecordRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("代理不存在: " + id));
+        return probeAndPersist(record);
+    }
+
+    @Override
+    public Map<String, Object> testAll() {
+        List<VpnProxyRecord> all = vpnProxyRecordRepository.findAll();
+        List<Map<String, Object>> results = new ArrayList<>();
+        int successCount = 0;
+        int failCount = 0;
+        for (VpnProxyRecord record : all) {
+            Map<String, Object> one = probeAndPersist(record);
+            results.add(one);
+            if (Boolean.TRUE.equals(one.get("connected"))) {
+                successCount++;
+            } else {
+                failCount++;
+            }
+        }
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("total", all.size());
+        summary.put("successCount", successCount);
+        summary.put("failCount", failCount);
+        summary.put("results", results);
+        return summary;
+    }
+
+    /**
+     * 探测连通性并落库 availableStatus：1=通，0=不通
+     */
+    private Map<String, Object> probeAndPersist(VpnProxyRecord record) {
+        boolean connected = false;
+        try {
+            connected = SocksProxyUtils.isProxyAvailable(record);
+        } catch (Exception e) {
+            log.warn("代理连通测试异常 id={} {}:{} -> {}",
+                    record.getId(), record.getProxyHost(), record.getProxyPort(), e.getMessage());
+        }
+        record.setAvailableStatus(connected ? 1 : 0);
+        record.setUpdateTime(LocalDateTime.now());
+        vpnProxyRecordRepository.save(record);
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("id", record.getId());
+        data.put("connected", connected);
+        data.put("availableStatus", record.getAvailableStatus());
+        data.put("proxyHost", record.getProxyHost());
+        data.put("proxyPort", record.getProxyPort());
+        data.put("proxyType", record.getProxyType());
+        return data;
+    }
+
     private void fillTenantName(VpnProxyRecord record) {
         if (record.getTenantId() == null) {
             record.setTenantName(null);
@@ -115,20 +188,26 @@ public class VpnProxyRecordServiceImpl implements VpnProxyRecordService {
         record.setTenantName(name);
     }
 
+    /**
+     * 配置绑定时只存「根父租户」id，子区域统一向上归一。
+     */
     private Long normalizeTenantId(Long tenantId) {
         if (tenantId == null || tenantId <= 0) {
             return null;
         }
-        // 若误传子区域 ID，归一到父租户
-        Optional<Tenant> opt = tenantRepository.findById(tenantId);
-        if (!opt.isPresent()) {
-            return tenantId;
+        Long current = tenantId;
+        for (int i = 0; i < 8; i++) {
+            Optional<Tenant> opt = tenantRepository.findById(current);
+            if (!opt.isPresent()) {
+                return current;
+            }
+            Tenant t = opt.get();
+            Long parenId = t.getParenId();
+            if (parenId == null || parenId == 0L || parenId.equals(current)) {
+                return t.getId();
+            }
+            current = parenId;
         }
-        Tenant t = opt.get();
-        Long parenId = t.getParenId();
-        if (parenId == null || parenId == 0L) {
-            return t.getId();
-        }
-        return parenId;
+        return current;
     }
 }

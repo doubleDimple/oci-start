@@ -39,10 +39,34 @@ public interface VpnProxyRecordRepository
     VpnProxyRecord findAvailableByTenantId(@Param("tenantId") Long tenantId, @Param("status") Integer status);
 
     /**
+     * 指定父租户绑定的代理（不限可用状态，用于强制代理判断）
+     */
+    @Query(value = "SELECT * FROM vpn_proxy_record WHERE tenant_id = :tenantId ORDER BY id DESC LIMIT 1", nativeQuery = true)
+    VpnProxyRecord findTopByTenantId(@Param("tenantId") Long tenantId);
+
+    /**
+     * 全局强制代理（任意一条）
+     */
+    @Query(value = "SELECT * FROM vpn_proxy_record WHERE tenant_id IS NULL AND force_proxy = 1 ORDER BY id DESC LIMIT 1", nativeQuery = true)
+    VpnProxyRecord findForceGlobal();
+
+    /**
      * 一个父租户只保留一条绑定：解绑其余
      */
     @Modifying
     @Transactional
     @Query("UPDATE VpnProxyRecord v SET v.tenantId = null WHERE v.tenantId = :tenantId AND v.id <> :excludeId")
     int clearTenantBindingExcept(@Param("tenantId") Long tenantId, @Param("excludeId") Long excludeId);
+
+    /**
+     * 已绑定代理的父租户 ID（用于列表护盾标识）
+     */
+    @Query("SELECT DISTINCT v.tenantId FROM VpnProxyRecord v WHERE v.tenantId IS NOT NULL")
+    List<Long> findBoundTenantIds();
+
+    /**
+     * 所有已绑定租户的代理（列表护盾：区分强制/普通）
+     */
+    @Query("SELECT v FROM VpnProxyRecord v WHERE v.tenantId IS NOT NULL")
+    List<VpnProxyRecord> findAllBoundRecords();
 }

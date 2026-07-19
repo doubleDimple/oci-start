@@ -66,6 +66,12 @@ public class VpnProxyRecord {
     private Integer availableStatus = 1;
 
     /**
+     * 是否强制代理（1 = 强制：探测失败则拒绝请求；0 = 非强制：失败可直连）
+     */
+    @Column(name = "force_proxy", nullable = false)
+    private Integer forceProxy = 0;
+
+    /**
      * 绑定的父租户 ID（null 表示全局共享代理）
      */
     @Column(name = "tenant_id")

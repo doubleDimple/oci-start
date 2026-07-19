@@ -90,4 +90,42 @@ public class VpnProxyRecordController extends BaseController{
             return ApiResponse.error("查询vpn代理配置列表失败: " + e.getMessage());
         }
     }
+
+    /**
+     * 测试单条代理连通性，结果写入 availableStatus
+     */
+    @PostMapping("/testConnection")
+    @ResponseBody
+    public ApiResponse testConnection(@RequestBody VpnProxyRecordRequest request) {
+        try {
+            if (request == null || request.getId() == null) {
+                return ApiResponse.error("代理 id 不能为空");
+            }
+            java.util.Map<String, Object> data = vpnProxyRecordService.testConnection(request.getId());
+            boolean connected = Boolean.TRUE.equals(data.get("connected"));
+            return ApiResponse.success(connected ? "代理连通" : "代理不通", data);
+        } catch (Exception e) {
+            log.error("测试代理连通失败", e);
+            return ApiResponse.error("测试代理连通失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 一键测试全部代理连通性，结果逐条落库
+     */
+    @PostMapping("/testAll")
+    @ResponseBody
+    public ApiResponse testAll() {
+        try {
+            java.util.Map<String, Object> data = vpnProxyRecordService.testAll();
+            int total = data.get("total") instanceof Number ? ((Number) data.get("total")).intValue() : 0;
+            int ok = data.get("successCount") instanceof Number ? ((Number) data.get("successCount")).intValue() : 0;
+            int fail = data.get("failCount") instanceof Number ? ((Number) data.get("failCount")).intValue() : 0;
+            String msg = "全部测试完成：共 " + total + " 条，通 " + ok + "，不通 " + fail;
+            return ApiResponse.success(msg, data);
+        } catch (Exception e) {
+            log.error("一键测试代理失败", e);
+            return ApiResponse.error("一键测试代理失败: " + e.getMessage());
+        }
+    }
 }

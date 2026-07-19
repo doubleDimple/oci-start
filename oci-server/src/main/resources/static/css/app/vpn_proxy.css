@@ -181,53 +181,422 @@ body {
 
 .status-offline { background-color: rgba(255,107,107,0.1); color: var(--accent-red); }
 .status-running { background-color: rgba(26,188,156,0.1);  color: var(--accent-green); }
+.status-pending { background-color: rgba(245,158,11,0.12); color: #f59e0b; }
+
+/* 强制代理护盾徽章 */
+.proxy-force-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+    white-space: nowrap;
+}
+.proxy-force-badge.is-force {
+    color: #e67e22;
+    background: rgba(230, 126, 34, 0.14);
+}
+.proxy-force-badge.is-force i {
+    filter: drop-shadow(0 0 4px rgba(230, 126, 34, 0.45));
+}
+.proxy-force-badge.is-optional {
+    color: #1abc9c;
+    background: rgba(26, 188, 156, 0.12);
+}
+.proxy-force-badge.is-optional i {
+    filter: drop-shadow(0 0 4px rgba(26, 188, 156, 0.4));
+}
+[data-theme="light"] .proxy-force-badge.is-force { color: #d35400; }
+[data-theme="light"] .proxy-force-badge.is-optional { color: #16a085; }
 
 /* Modal */
 .modal-overlay {
     position: fixed; inset: 0;
-    background-color: rgba(0,0,0,0.5);
+    background-color: rgba(0,0,0,0.55);
     display: none; justify-content: center; align-items: center;
-    z-index: 1050; opacity: 0; transition: opacity 0.3s;
+    z-index: 1050; opacity: 0; transition: opacity 0.25s;
+    padding: 16px;
 }
 
 .modal-container {
-    background: var(--surface); padding: 20px; border-radius: 3px;
-    width: 90%; max-width: 600px; max-height: 80vh; overflow-y: auto;
-    box-shadow: 0 4px 6px var(--shadow-color); border: 1px solid var(--card-border);
+    background: var(--surface); padding: 0;
+    border-radius: 12px;
+    width: 90%; max-width: 600px; max-height: 88vh;
+    box-shadow: 0 12px 40px var(--shadow-color);
+    border: 1px solid var(--card-border);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+}
+
+.modal-container-wide {
+    max-width: 920px;
+    width: min(920px, 96vw);
+    /* 保证右侧能放下：选中区 + 搜索 + 8 行列表 + 分页 */
+    min-height: min(640px, 90vh);
+    max-height: 92vh;
 }
 
 .modal-header {
-    margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;
+    padding: 16px 20px;
+    display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid var(--card-border);
+    flex-shrink: 0;
 }
 
-.modal-title { font-size: 16px; font-weight: 500; color: var(--text-primary); }
+.modal-title {
+    font-size: 16px; font-weight: 600; color: var(--text-primary);
+    display: flex; align-items: center; gap: 8px;
+}
 
 .close-btn {
-    background: none; border: none; font-size: 20px; cursor: pointer;
+    background: var(--surface-2); border: 1px solid var(--card-border);
+    border-radius: 8px;
+    font-size: 14px; cursor: pointer;
     color: var(--text-secondary); padding: 0;
-    width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+    transition: color 0.15s, border-color 0.15s;
 }
 
-.close-btn:hover { color: var(--text-primary); }
+.close-btn:hover { color: var(--text-primary); border-color: var(--accent-blue); }
+
+/* Split form */
+.proxy-form {
+    display: flex; flex-direction: column;
+    min-height: 0; flex: 1;
+    overflow: hidden;
+}
+
+.proxy-modal-split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+    /* 给右侧列表 + 分页留足纵向空间 */
+    min-height: 420px;
+}
+
+.proxy-pane {
+    padding: 18px 20px;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.proxy-pane-left {
+    border-right: 1px solid var(--card-border);
+    overflow-y: auto;
+}
+
+.proxy-pane-right {
+    background: var(--surface-2);
+    /* 关键：分页条始终贴在右侧底部，不被列表高度挤出视口 */
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.pane-head { margin-bottom: 14px; flex-shrink: 0; }
+
+.pane-title {
+    font-size: 13px; font-weight: 600; color: var(--text-primary);
+    display: flex; align-items: center; gap: 8px; margin-bottom: 4px;
+}
+
+.pane-title i { color: var(--accent-green); font-size: 13px; }
+
+.pane-desc {
+    font-size: 11px; color: var(--text-secondary); line-height: 1.45;
+    margin: 0;
+}
+
+.form-row-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
 
 /* Form in Modal */
-.form-group { margin-bottom: 15px; }
-.form-group label { display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 12px; }
-
-.form-input {
-    width: 100%; padding: 8px;
-    border: 1px solid var(--input-border); border-radius: 2px;
-    font-size: 14px;
-    background-color: var(--input-bg); color: var(--text-primary);
+.form-group { margin-bottom: 14px; }
+.form-group label {
+    display: block; margin-bottom: 6px;
+    color: var(--text-secondary); font-size: 12px; font-weight: 500;
 }
 
-.form-input:focus { border-color: var(--accent-blue); outline: none; }
+.form-input {
+    width: 100%; padding: 9px 11px;
+    border: 1px solid var(--input-border); border-radius: 8px;
+    font-size: 13px;
+    background-color: var(--input-bg); color: var(--text-primary);
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.form-input:focus {
+    border-color: var(--accent-blue);
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.15);
+}
 
 select.form-input {
     background-color: var(--input-bg); color: var(--text-primary);
 }
 
-.modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+/* Tenant picker (right pane) */
+.tenant-selected-bar {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: var(--surface);
+    border: 1px solid var(--card-border);
+    margin-bottom: 12px;
+    flex-shrink: 0;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.tenant-selected-bar.has-tenant {
+    border-color: rgba(26, 188, 156, 0.45);
+    box-shadow: 0 0 0 3px rgba(26, 188, 156, 0.08);
+}
+
+.tenant-selected-icon {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(136, 146, 164, 0.12);
+    color: var(--text-secondary);
+    font-size: 13px;
+    flex-shrink: 0;
+}
+
+.tenant-selected-bar.has-tenant .tenant-selected-icon {
+    background: rgba(26, 188, 156, 0.15);
+    color: var(--accent-green);
+}
+
+.tenant-selected-text {
+    min-width: 0; flex: 1;
+    display: flex; flex-direction: column; gap: 2px;
+}
+
+.tenant-selected-label {
+    font-size: 11px; color: var(--text-secondary);
+}
+
+.tenant-selected-value {
+    font-size: 13px; font-weight: 600; color: var(--accent-green);
+    min-width: 0;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.tenant-selected-value.is-global {
+    color: var(--text-secondary); font-weight: 500;
+}
+
+.tenant-search-wrap {
+    position: relative;
+    margin-bottom: 10px;
+    flex-shrink: 0;
+}
+
+.tenant-search-wrap > i {
+    position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+    color: var(--text-secondary); font-size: 12px; pointer-events: none;
+}
+
+.tenant-search {
+    padding-left: 34px !important;
+}
+
+/*
+ * 列表：全局 1 行 + 每页最多 7 行（JS 控制条数）
+ * 用 flex 占满中间剩余高度，把分页条留在下方可见区
+ */
+.tenant-list {
+    flex: 1 1 auto;
+    min-height: 200px;
+    max-height: 340px;
+    overflow: hidden;
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    background: var(--surface);
+    padding: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.tenant-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    text-align: left;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--text-primary);
+    border-radius: 8px;
+    padding: 7px 10px;
+    min-height: 40px;
+    max-height: 42px;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s, transform 0.12s;
+    font-size: 12px;
+    flex: 0 0 auto;
+}
+
+.tenant-item:hover {
+    background: var(--hover-bg);
+}
+
+.tenant-item.is-active {
+    background: rgba(26, 188, 156, 0.12);
+    border-color: rgba(26, 188, 156, 0.5);
+}
+
+.tenant-item-radio {
+    width: 16px; height: 16px; border-radius: 50%;
+    border: 2px solid var(--text-secondary);
+    flex-shrink: 0;
+    position: relative;
+    opacity: 0.85;
+}
+
+.tenant-item.is-active .tenant-item-radio {
+    border-color: var(--accent-green);
+    opacity: 1;
+}
+
+.tenant-item.is-active .tenant-item-radio::after {
+    content: '';
+    position: absolute;
+    inset: 3px;
+    border-radius: 50%;
+    background: var(--accent-green);
+}
+
+.tenant-item-body {
+    min-width: 0; flex: 1;
+}
+
+.tenant-item-name {
+    font-weight: 500;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.tenant-item-meta {
+    font-size: 11px; color: var(--text-secondary);
+    margin-top: 2px;
+}
+
+.tenant-item.is-global {
+    border-bottom: 1px dashed var(--card-border);
+    border-radius: 9px 9px 4px 4px;
+    margin-bottom: 2px;
+}
+
+.tenant-item.is-global .tenant-item-name {
+    color: var(--text-secondary);
+}
+
+.tenant-list-empty {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px 12px;
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
+/* 租户分页条 —— 始终可见 */
+.tenant-pager {
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 10px;
+    flex: 0 0 auto;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: var(--surface);
+    border: 1px solid var(--card-border);
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.tenant-pager-btn {
+    width: 34px; height: 34px;
+    border-radius: 8px;
+    border: 1px solid var(--card-border);
+    background: var(--surface-2);
+    color: var(--text-primary);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.12s, border-color 0.12s, opacity 0.12s;
+    flex-shrink: 0;
+}
+
+.tenant-pager-btn:hover:not(:disabled) {
+    border-color: var(--accent-green);
+    color: var(--accent-green);
+    background: rgba(26, 188, 156, 0.1);
+}
+
+.tenant-pager-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+.tenant-pager-info {
+    font-size: 12px;
+    color: var(--text-primary);
+    flex: 1;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+}
+
+.modal-actions {
+    display: flex; justify-content: flex-end; gap: 10px;
+    padding: 14px 20px;
+    border-top: 1px solid var(--card-border);
+    background: var(--surface);
+    flex-shrink: 0;
+}
+
+.modal-actions .btn {
+    border-radius: 8px;
+    padding: 8px 16px;
+    min-height: 36px;
+}
+
+@media (max-width: 720px) {
+    .proxy-modal-split {
+        grid-template-columns: 1fr;
+        overflow-y: auto;
+    }
+    .proxy-pane-left {
+        border-right: none;
+        border-bottom: 1px solid var(--card-border);
+        overflow: visible;
+    }
+    .proxy-pane-right {
+        overflow: visible;
+    }
+    .tenant-list {
+        height: 320px;
+    }
+    .form-row-2 {
+        grid-template-columns: 1fr;
+    }
+}
 
 /* Utilities */
 .truncate { max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

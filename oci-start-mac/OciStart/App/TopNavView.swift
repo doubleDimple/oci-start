@@ -38,14 +38,7 @@ struct TopNavView: View {
         )
         .onAppear { header.start() }
         .onDisappear { header.stop() }
-        .sheet(isPresented: $header.showMessages) {
-            MessageCenterSheet(header: header, dark: dark)
-                .environmentObject(appearance)
-        }
-        .sheet(item: $header.messageDetail) { msg in
-            MessageDetailSheet(message: msg, dark: dark)
-                .environmentObject(appearance)
-        }
+        // 消息中心改为右侧滑出抽屉（见 TopNavDropdownOverlay），不再用居中 sheet
         .sheet(isPresented: $header.showAsset) {
             AssetAnalysisSheet(header: header, dark: dark)
                 .environmentObject(appearance)
@@ -160,7 +153,10 @@ struct TopNavView: View {
     }
 
     private var languageButton: some View {
-        Button(action: { chrome.toggle(.language) }) {
+        Button(action: {
+            header.closeMessages()
+            chrome.toggle(.language)
+        }) {
             Image(systemName: "globe")
                 .font(.system(size: 14, weight: .medium))
                 .foregroundColor(AppTheme.navIcon(dark))
@@ -174,14 +170,14 @@ struct TopNavView: View {
     private var messageButton: some View {
         Button(action: {
             chrome.close()
-            header.openMessages()
+            header.toggleMessages()
         }) {
             ZStack(alignment: .topTrailing) {
                 Image(systemName: "bell.fill")
                     .font(.system(size: 14, weight: .medium))
                     .foregroundColor(AppTheme.navIcon(dark))
                     .frame(width: 36, height: 36)
-                    .background(circleBg(highlight: false))
+                    .background(circleBg(highlight: header.showMessages))
                 if header.unreadCount > 0 {
                     Text(header.unreadCount > 99 ? "99+" : "\(header.unreadCount)")
                         .font(.system(size: 9, weight: .bold))
@@ -198,7 +194,10 @@ struct TopNavView: View {
     }
 
     private var userButton: some View {
-        Button(action: { chrome.toggle(.user) }) {
+        Button(action: {
+            header.closeMessages()
+            chrome.toggle(.user)
+        }) {
             HStack(spacing: 8) {
                 ZStack {
                     Circle()
@@ -396,158 +395,6 @@ struct UserDropdownPanel: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())
-    }
-}
-
-// MARK: - Message center sheet
-
-private struct MessageCenterSheet: View {
-    @ObservedObject var header: HeaderViewModel
-    var dark: Bool
-    @Environment(\.presentationMode) private var presentationMode
-
-    var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Text("消息中心")
-                    .font(.system(size: 16, weight: .bold))
-                Spacer()
-                Button("全部已读") {
-                    Task { await header.markAllRead() }
-                }
-                .buttonStyle(PlainButtonStyle())
-                .foregroundColor(AppTheme.sidebarActive)
-                Button(action: { presentationMode.wrappedValue.dismiss() }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(AppTheme.sidebarText(dark))
-                }
-                .buttonStyle(PlainButtonStyle())
-            }
-            .padding(16)
-
-            Divider()
-
-            if header.messagesLoading && header.messagePage.content.isEmpty {
-                Spacer()
-                ProgressView("加载中…")
-                Spacer()
-            } else if header.messagePage.content.isEmpty {
-                Spacer()
-                Text("暂无消息")
-                    .foregroundColor(AppTheme.sidebarText(dark))
-                Spacer()
-            } else {
-                List {
-                    ForEach(header.messagePage.content) { msg in
-                        HStack(alignment: .top, spacing: 10) {
-                            Circle()
-                                .fill(msg.isUnread ? Color(hex: "ff4d4f") : Color.clear)
-                                .frame(width: 8, height: 8)
-                                .padding(.top, 6)
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(msg.subject.isEmpty ? "(无标题)" : msg.subject)
-                                    .font(.system(size: 13, weight: msg.isUnread ? .bold : .medium))
-                                    .lineLimit(2)
-                                Text(msg.createTime)
-                                    .font(.system(size: 11))
-                                    .foregroundColor(AppTheme.sidebarText(dark))
-                            }
-                            Spacer()
-                            Button(action: {
-                                Task { await header.deleteMessage(msg.businessId) }
-                            }) {
-                                Image(systemName: "trash")
-                                    .foregroundColor(Color(hex: "f85149"))
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                        }
-                        .padding(.vertical, 4)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            Task { await header.openMessageDetail(msg) }
-                        }
-                    }
-                }
-            }
-
-            Divider()
-            HStack {
-                Button("上一页") {
-                    let p = max(1, header.messagePage.pageNum - 1)
-                    Task { await header.loadMessages(page: p) }
-                }
-                .disabled(header.messagePage.pageNum <= 1)
-                Spacer()
-                Text("\(header.messagePage.pageNum) / \(max(header.messagePage.totalPages, 1))")
-                    .font(.system(size: 12))
-                    .foregroundColor(AppTheme.sidebarText(dark))
-                Spacer()
-                Button("下一页") {
-                    let p = header.messagePage.pageNum + 1
-                    Task { await header.loadMessages(page: p) }
-                }
-                .disabled(header.messagePage.pageNum >= max(header.messagePage.totalPages, 1))
-            }
-            .padding(12)
-            .buttonStyle(PlainButtonStyle())
-        }
-        .frame(width: 420, height: 480)
-        .background(dark ? Color(hex: "22262b") : Color.white)
-    }
-}
-
-// MARK: - Message detail
-
-private struct MessageDetailSheet: View {
-    let message: SysMessageItem
-    var dark: Bool
-    @Environment(\.presentationMode) private var presentationMode
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Text(message.subject.isEmpty ? "消息详情" : message.subject)
-                    .font(.system(size: 16, weight: .bold))
-                    .lineLimit(2)
-                Spacer()
-                Button(action: { presentationMode.wrappedValue.dismiss() }) {
-                    Image(systemName: "xmark.circle.fill")
-                }
-                .buttonStyle(PlainButtonStyle())
-            }
-            .padding(16)
-            HStack(spacing: 12) {
-                Label(message.createTime, systemImage: "clock")
-                Text(message.messageType)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 2)
-                    .background(Capsule().fill(AppTheme.sidebarActive.opacity(0.2)))
-            }
-            .font(.system(size: 12))
-            .foregroundColor(AppTheme.sidebarText(dark))
-            .padding(.horizontal, 16)
-            .padding(.bottom, 12)
-            Divider()
-            ScrollView {
-                Text(message.content.isEmpty ? "（无内容）" : message.content)
-                    .font(.system(size: 13))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(16)
-            }
-            Divider()
-            HStack {
-                Spacer()
-                Button("关闭") { presentationMode.wrappedValue.dismiss() }
-                    .buttonStyle(PlainButtonStyle())
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .background(RoundedRectangle(cornerRadius: 8).fill(AppTheme.sidebarActive))
-                    .foregroundColor(.white)
-            }
-            .padding(12)
-        }
-        .frame(width: 520, height: 420)
-        .background(dark ? Color(hex: "22262b") : Color.white)
     }
 }
 

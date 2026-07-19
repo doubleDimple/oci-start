@@ -44,6 +44,11 @@ public class VpnProxyRecordRequest extends BaseRequest{
     private Integer availableStatus = 1;
 
     /**
+     * 是否强制代理（1 = 强制，0 = 非强制）
+     */
+    private Integer forceProxy = 0;
+
+    /**
      * 绑定的父租户 ID（null / 不传 = 全局共享）
      */
     private Long tenantId;
