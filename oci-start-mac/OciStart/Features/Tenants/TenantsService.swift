@@ -31,9 +31,17 @@ struct TenantsService {
         }
     }
 
+    /// OCI 同步：后端可能较慢（区域/资源拉取），使用长超时（约 200s，对齐 Web 3 分钟进度窗）
     func syncOci(tenantId: Int64) async throws {
         let url = try client.makeURL(baseURL, path: "/tenants/syncOci", query: ["tenantId": "\(tenantId)"])
-        _ = try await client.getJSON(url)
+        let raw = try await client.getJSON(url, longTimeout: true)
+        if let obj = try? JSONSerialization.jsonObject(with: raw) as? [String: Any] {
+            let status = (obj["status"] as? String ?? "").lowercased()
+            if status == "error" {
+                let msg = (obj["message"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                throw APIError.serverMessage(msg.isEmpty ? "同步失败" : msg)
+            }
+        }
     }
 
     func saveTenant(fields: [String: String], keyFileURL: URL) async throws {
@@ -345,6 +353,13 @@ struct TenantsService {
         return (try? JSONDecoder().decode([TenantRegionOption].self, from: raw)) ?? []
     }
 
+    /// 租户详情区域行（对齐 Web `/tenants/regionList`，含 openBootFlag / apiSynced / supportAI）
+    func regionListDetail(tenantId: Int64) async throws -> [TenantItem] {
+        let url = try client.makeURL(baseURL, path: "/tenants/regionList/json", query: ["tenantId": "\(tenantId)"])
+        let raw = try await client.getJSON(url)
+        return (try? JSONDecoder().decode([TenantItem].self, from: raw)) ?? []
+    }
+
     // MARK: - Security rules / MySQL（租户详情页）
 
     func securityRules(tenantId: Int64, type: String) async throws -> [TenantSecurityRule] {
@@ -394,6 +409,72 @@ struct TenantsService {
         let url = try client.makeURL(baseURL, path: "/tenants/sync-mysql", query: ["tenantId": "\(tenantId)"])
         let raw = try await client.postJSON(url, body: [:])
         try throwIfApiFailed(raw)
+    }
+
+    /// Web: `POST /tenants/mysql-create` (form)
+    func createMysql(tenantId: Int64) async throws {
+        let url = try client.makeURL(baseURL, path: "/tenants/mysql-create")
+        let (data, http) = try await client.postForm(url, fields: ["tenantId": "\(tenantId)"])
+        guard (200..<300).contains(http.statusCode) else {
+            throw APIError.serverMessage(String(data: data, encoding: .utf8) ?? "创建失败")
+        }
+        try throwIfMysqlApiFailed(data)
+    }
+
+    /// Web: `POST /tenants/sync-single-mysql?id=`
+    func syncSingleMysql(id: String) async throws {
+        let url = try client.makeURL(baseURL, path: "/tenants/sync-single-mysql", query: ["id": id])
+        let raw = try await client.postJSON(url, body: [:])
+        try throwIfMysqlApiFailed(raw)
+    }
+
+    /// Web: `POST /tenants/bind-public-ip?id=`
+    func bindMysqlPublicIp(id: String) async throws {
+        let url = try client.makeURL(baseURL, path: "/tenants/bind-public-ip", query: ["id": id])
+        let raw = try await client.postJSON(url, body: [:])
+        try throwIfMysqlApiFailed(raw)
+    }
+
+    /// Web: `POST /tenants/mysql-action` JSON `{ tenantId, id, action }`
+    func mysqlAction(tenantId: Int64, id: String, action: String) async throws {
+        let url = try client.makeURL(baseURL, path: "/tenants/mysql-action")
+        let raw = try await client.postJSON(url, body: [
+            "tenantId": "\(tenantId)",
+            "id": id,
+            "action": action
+        ])
+        try throwIfMysqlApiFailed(raw)
+    }
+
+    /// Web: `POST /tenants/mysql-reset-auth` form
+    func resetMysqlAuth(id: String, tenantId: Int64) async throws {
+        let url = try client.makeURL(baseURL, path: "/tenants/mysql-reset-auth")
+        let (data, http) = try await client.postForm(url, fields: [
+            "id": id,
+            "tenantId": "\(tenantId)"
+        ])
+        guard (200..<300).contains(http.statusCode) else {
+            throw APIError.serverMessage(String(data: data, encoding: .utf8) ?? "重置密码失败")
+        }
+        try throwIfMysqlApiFailed(data)
+    }
+
+    /// MySQL APIs often return `{ success, message, code }` without always failing HTTP.
+    private func throwIfMysqlApiFailed(_ data: Data) throws {
+        if let env = try? JSONDecoder().decode(TenantApiEnvelope.self, from: data) {
+            if env.success != nil || env.code != nil, !env.ok {
+                throw APIError.serverMessage(env.text.isEmpty ? "操作失败" : env.text)
+            }
+            return
+        }
+        if let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            if let ok = obj["success"] as? Bool, !ok {
+                throw APIError.serverMessage((obj["message"] as? String) ?? "操作失败")
+            }
+            if let code = obj["code"] as? Int, code != 200, code != 0 {
+                throw APIError.serverMessage((obj["message"] as? String) ?? "操作失败")
+            }
+        }
     }
 
     func quota(tenantId: Int64, service: String, page: Int, pageSize: Int) async throws -> [String: Any] {

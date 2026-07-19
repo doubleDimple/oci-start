@@ -42,6 +42,8 @@ struct TenantSheetHost: View {
                 EmptyView()
             case .updateProgress(_, let lines):
                 progressSheet(title: "更新租户信息", lines: lines)
+            case .syncProgress(_, let name):
+                syncProgressSheet(name: name)
             case .bootCreate(let t):
                 bootCreateSheet(t)
             case .regionSub(let t):
@@ -584,51 +586,72 @@ struct TenantSheetHost: View {
     /// Web: `bootVolumesModal` — 表格：实例 / 卷名 / 大小 / VPUs / 操作
     private func volumesSheet(_ t: TenantItem) -> some View {
         chrome(title: "引导卷管理", systemImage: "externaldrive", width: 720, height: 520, footer: {
-            AppButton(title: "关闭", kind: .secondary) { presentationMode.wrappedValue.dismiss() }
+            HStack(spacing: 8) {
+                AppButton(
+                    title: "刷新",
+                    systemImage: "arrow.clockwise",
+                    kind: .secondary,
+                    isLoading: model.volumesLoading
+                ) {
+                    Task { await model.reloadVolumes(t) }
+                }
+                AppButton(title: "关闭", kind: .secondary) { presentationMode.wrappedValue.dismiss() }
+            }
         }) {
-            VStack(alignment: .leading, spacing: 12) {
-                AppSheetTableBox {
-                    AppSheetTableHeader(columns: [
-                        ("实例", 140), ("卷名称", nil), ("大小(GB)", 80), ("VPUs", 60), ("操作", 140)
-                    ])
-                    if model.volumes.isEmpty {
-                        Text("暂无引导卷")
-                            .font(.system(size: 13))
-                            .foregroundColor(mutedText)
-                            .frame(maxWidth: .infinity)
-                            .padding(28)
-                    } else {
-                        ForEach(Array(model.volumes.enumerated()), id: \.element.id) { idx, v in
-                            AppSheetTableRow(striped: idx % 2 == 1) {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    HStack(spacing: 0) {
-                                        tableCell(v.instanceName.isEmpty ? "—" : v.instanceName, width: 140)
-                                        tableCell(v.displayName, width: nil, bold: true)
-                                        tableCell("\(v.sizeInGBs)", width: 80)
-                                        tableCell("\(v.vpusPerGB)", width: 60)
-                                        HStack(spacing: 4) {
-                                            AppButton(title: "编辑", kind: .secondary) { model.beginEditVolume(v) }
-                                            AppButton(title: "删除", kind: .danger) { model.deleteVolume(for: t, volume: v) }
-                                        }
-                                        .frame(width: 140, alignment: .leading)
-                                        .padding(.horizontal, 4)
-                                    }
-                                    if model.editingVolumeId == v.id {
-                                        formPanel {
-                                            VStack(alignment: .leading, spacing: 8) {
-                                                field("卷名称", text: $model.editVolumeName)
-                                                Text("VPUs: \(Int(model.editVolumeVpus)) (10–120)")
-                                                    .font(.system(size: 12, weight: .medium))
-                                                    .foregroundColor(primaryText)
-                                                Slider(value: $model.editVolumeVpus, in: 10...120, step: 10)
-                                                HStack(spacing: 8) {
-                                                    AppButton(title: "保存", kind: .primary) { model.saveVolumeEdit(for: t) }
-                                                    AppButton(title: "取消", kind: .secondary) { model.editingVolumeId = nil }
+            sheetCenteredLoading(isLoading: model.volumesLoading || model.volumesBusy) {
+                VStack(alignment: .leading, spacing: 12) {
+                    AppSheetTableBox {
+                        AppSheetTableHeader(columns: [
+                            ("实例", 140), ("卷名称", nil), ("大小(GB)", 80), ("VPUs", 60), ("操作", 140)
+                        ])
+                        if model.volumes.isEmpty && !model.volumesLoading {
+                            Text("暂无引导卷")
+                                .font(.system(size: 13))
+                                .foregroundColor(mutedText)
+                                .frame(maxWidth: .infinity)
+                                .padding(28)
+                        } else {
+                            ForEach(Array(model.volumes.enumerated()), id: \.element.id) { idx, v in
+                                AppSheetTableRow(striped: idx % 2 == 1) {
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        HStack(spacing: 0) {
+                                            tableCell(
+                                                v.instanceName.isEmpty ? "未关联实例" : v.instanceName,
+                                                width: 140,
+                                                muted: v.instanceName.isEmpty
+                                            )
+                                            tableCell(v.displayName, width: nil, bold: true)
+                                            tableCell("\(v.sizeInGBs)", width: 80)
+                                            tableCell("\(v.vpusPerGB)", width: 60)
+                                            HStack(spacing: 4) {
+                                                AppButton(title: "编辑", kind: .secondary) { model.beginEditVolume(v) }
+                                                // Web：仅无关联实例的卷可删
+                                                if v.instanceName.isEmpty {
+                                                    AppButton(title: "删除", kind: .danger) {
+                                                        model.deleteVolume(for: t, volume: v)
+                                                    }
                                                 }
                                             }
+                                            .frame(width: 140, alignment: .leading)
+                                            .padding(.horizontal, 4)
                                         }
-                                        .padding(.horizontal, 10)
-                                        .padding(.bottom, 6)
+                                        if model.editingVolumeId == v.id {
+                                            formPanel {
+                                                VStack(alignment: .leading, spacing: 8) {
+                                                    field("卷名称", text: $model.editVolumeName)
+                                                    Text("VPUs: \(Int(model.editVolumeVpus)) (10–120)")
+                                                        .font(.system(size: 12, weight: .medium))
+                                                        .foregroundColor(primaryText)
+                                                    Slider(value: $model.editVolumeVpus, in: 10...120, step: 10)
+                                                    HStack(spacing: 8) {
+                                                        AppButton(title: "保存", kind: .primary) { model.saveVolumeEdit(for: t) }
+                                                        AppButton(title: "取消", kind: .secondary) { model.editingVolumeId = nil }
+                                                    }
+                                                }
+                                            }
+                                            .padding(.horizontal, 10)
+                                            .padding(.bottom, 6)
+                                        }
                                     }
                                 }
                             }
@@ -744,6 +767,123 @@ struct TenantSheetHost: View {
                     }
                 }
             }
+        }
+    }
+
+    /// 对齐 Web `syncModal`：标题 + 进度条 + 状态文案
+    private func syncProgressSheet(name: String) -> some View {
+        let phase = model.syncPhase
+        let canClose = phase == .success || phase == .error
+        return chrome(
+            title: "OCI 资源同步",
+            systemImage: "arrow.2.circlepath",
+            width: 440,
+            height: 280,
+            fixedSize: true,
+            footer: {
+                if canClose {
+                    AppButton(title: "关闭", kind: .secondary) {
+                        model.dismissSyncProgress()
+                    }
+                } else {
+                    Text("同步期间请保持窗口打开")
+                        .font(.system(size: 11))
+                        .foregroundColor(mutedText)
+                }
+            }
+        ) {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(spacing: 10) {
+                    ZStack {
+                        Circle()
+                            .fill(syncPhaseColor(phase).opacity(0.15))
+                            .frame(width: 40, height: 40)
+                        if phase == .running || phase == .waitingLong {
+                            ProgressView()
+                                .scaleEffect(0.75)
+                        } else {
+                            Image(systemName: phase == .success ? "checkmark" : "xmark")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundColor(syncPhaseColor(phase))
+                        }
+                    }
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(name.isEmpty ? model.syncTenantName : name)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(primaryText)
+                            .lineLimit(1)
+                        Text(model.syncStatusText)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(syncPhaseColor(phase))
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 0)
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            Capsule()
+                                .fill(dark ? Color.white.opacity(0.08) : Color.black.opacity(0.06))
+                            Capsule()
+                                .fill(syncPhaseColor(phase))
+                                .frame(width: max(8, geo.size.width * CGFloat(model.syncPercent / 100)))
+                                .animation(.easeInOut(duration: 0.25), value: model.syncPercent)
+                        }
+                    }
+                    .frame(height: 10)
+
+                    HStack {
+                        Text(syncPhaseLabel(phase))
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(mutedText)
+                        Spacer()
+                        Text("\(Int(model.syncPercent.rounded()))%")
+                            .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                            .foregroundColor(primaryText)
+                    }
+                }
+
+                formPanel {
+                    Text(syncPhaseHint(phase))
+                        .font(.system(size: 11))
+                        .foregroundColor(mutedText)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        }
+    }
+
+    private func syncPhaseColor(_ phase: TenantSyncPhase) -> Color {
+        switch phase {
+        case .running: return AppTheme.sidebarActive
+        case .waitingLong: return Color(hex: "d29922")
+        case .success: return Color(hex: "3fb950")
+        case .error: return Color(hex: "f85149")
+        }
+    }
+
+    private func syncPhaseLabel(_ phase: TenantSyncPhase) -> String {
+        switch phase {
+        case .running: return "同步进行中"
+        case .waitingLong: return "仍在等待服务端"
+        case .success: return "已完成"
+        case .error: return "同步失败"
+        }
+    }
+
+    private func syncPhaseHint(_ phase: TenantSyncPhase) -> String {
+        switch phase {
+        case .running:
+            return "正在从 OCI 拉取区域与资源信息，通常需要数十秒到数分钟，请耐心等待。"
+        case .waitingLong:
+            return "已超过预估时间，请求仍在进行。请不要关闭应用；若最终超时可稍后重试。"
+        case .success:
+            return "同步完成，列表即将刷新。"
+        case .error:
+            return "请检查租户 API 配置与网络后重试。错误信息见上方状态。"
         }
     }
 
@@ -890,74 +1030,78 @@ struct TenantSheetHost: View {
         chrome(title: "安全规则配置", systemImage: "shield", width: 640, height: 520, footer: {
             AppButton(title: "关闭", kind: .secondary) { presentationMode.wrappedValue.dismiss() }
         }) {
-            VStack(alignment: .leading, spacing: 12) {
-                AppSheetTabBar(
-                    titles: ["入站规则", "出站规则"],
-                    selectedIndex: model.rulesTab == "egress" ? 1 : 0,
-                    onSelect: { idx in
-                        model.switchRulesTab(idx == 1 ? "egress" : "ingress", item: t)
+            sheetCenteredLoading(isLoading: model.rulesLoading || model.rulesBusy) {
+                VStack(alignment: .leading, spacing: 12) {
+                    AppSheetTabBar(
+                        titles: ["入站规则", "出站规则"],
+                        selectedIndex: model.rulesTab == "egress" ? 1 : 0,
+                        onSelect: { idx in
+                            model.switchRulesTab(idx == 1 ? "egress" : "ingress", item: t)
+                        }
+                    )
+                    HStack {
+                        AppButton(title: "添加规则", systemImage: "plus", kind: .primary) {
+                            model.showAddRule.toggle()
+                        }
+                        .disabled(model.rulesLoading || model.rulesBusy)
+                        Spacer()
                     }
-                )
-                HStack {
-                    AppButton(title: "添加规则", systemImage: "plus", kind: .primary) {
-                        model.showAddRule.toggle()
-                    }
-                    if model.rulesLoading {
-                        ProgressView().scaleEffect(0.7)
-                    }
-                    Spacer()
-                }
-                if model.showAddRule {
-                    formPanel {
-                        VStack(alignment: .leading, spacing: 10) {
-                            sectionLabel("协议")
-                            SelectMenu(
-                                options: [
-                                    SelectOption(id: "all", title: "全部协议"),
-                                    SelectOption(id: "tcp", title: "TCP"),
-                                    SelectOption(id: "udp", title: "UDP"),
-                                    SelectOption(id: "icmp", title: "ICMP")
-                                ],
-                                selection: Binding(
-                                    get: { model.ruleProtocol },
-                                    set: { model.ruleProtocol = $0 ?? "tcp" }
-                                ),
-                                placeholder: "协议", width: 160, allowClear: false
-                            )
-                            field("源地址 *", text: $model.ruleSource)
-                            field("端口范围", text: $model.rulePorts)
-                            hint("示例：80,443 或 80-443；ICMP 可留空")
-                            HStack(spacing: 8) {
-                                AppButton(title: "保存", kind: .primary) { model.saveSecurityRule(t) }
-                                AppButton(title: "取消", kind: .danger) { model.showAddRule = false }
+                    if model.showAddRule {
+                        formPanel {
+                            VStack(alignment: .leading, spacing: 10) {
+                                sectionLabel("协议")
+                                SelectMenu(
+                                    options: [
+                                        SelectOption(id: "all", title: "全部协议"),
+                                        SelectOption(id: "tcp", title: "TCP"),
+                                        SelectOption(id: "udp", title: "UDP"),
+                                        SelectOption(id: "icmp", title: "ICMP")
+                                    ],
+                                    selection: Binding(
+                                        get: { model.ruleProtocol },
+                                        set: { model.ruleProtocol = $0 ?? "tcp" }
+                                    ),
+                                    placeholder: "协议", width: 160, allowClear: false
+                                )
+                                field("源地址 *", text: $model.ruleSource)
+                                field("端口范围", text: $model.rulePorts)
+                                hint("示例：80,443 或 80-443；ICMP 可留空")
+                                HStack(spacing: 8) {
+                                    AppButton(
+                                        title: "保存",
+                                        kind: .primary,
+                                        isLoading: model.rulesBusy
+                                    ) { model.saveSecurityRule(t) }
+                                    AppButton(title: "取消", kind: .danger) { model.showAddRule = false }
+                                }
                             }
                         }
                     }
-                }
-                AppSheetTableBox {
-                    AppSheetTableHeader(columns: [
-                        ("#", 40), ("类型", 70), ("协议", 70), ("源", nil), ("端口", 90), ("操作", 70)
-                    ])
-                    if model.securityRules.isEmpty {
-                        Text(model.rulesLoading ? "加载中…" : "暂无规则")
-                            .font(.system(size: 13))
-                            .foregroundColor(mutedText)
-                            .frame(maxWidth: .infinity)
-                            .padding(24)
-                    } else {
-                        ForEach(Array(model.securityRules.enumerated()), id: \.offset) { idx, rule in
-                            AppSheetTableRow(striped: idx % 2 == 1) {
-                                HStack(spacing: 0) {
-                                    tableCell("\(idx + 1)", width: 40, muted: true)
-                                    tableCell(rule.type.isEmpty ? model.rulesTab : rule.type, width: 70)
-                                    tableCell(rule.protocolDisplay, width: 70)
-                                    tableCell(rule.source.isEmpty ? "—" : rule.source, width: nil)
-                                    tableCell(rule.portsDisplay, width: 90)
-                                    AppButton(title: "删除", kind: .danger) {
-                                        model.deleteSecurityRule(at: idx, item: t)
+                    AppSheetTableBox {
+                        AppSheetTableHeader(columns: [
+                            ("#", 40), ("类型", 70), ("协议", 70), ("源", nil), ("端口", 90), ("操作", 70)
+                        ])
+                        if model.securityRules.isEmpty && !model.rulesLoading {
+                            Text("暂无规则")
+                                .font(.system(size: 13))
+                                .foregroundColor(mutedText)
+                                .frame(maxWidth: .infinity)
+                                .padding(24)
+                        } else if !model.rulesLoading {
+                            ForEach(Array(model.securityRules.enumerated()), id: \.offset) { idx, rule in
+                                AppSheetTableRow(striped: idx % 2 == 1) {
+                                    HStack(spacing: 0) {
+                                        tableCell("\(idx + 1)", width: 40, muted: true)
+                                        tableCell(rule.type.isEmpty ? model.rulesTab : rule.type, width: 70)
+                                        tableCell(rule.protocolDisplay, width: 70)
+                                        tableCell(rule.source.isEmpty ? "—" : rule.source, width: nil)
+                                        tableCell(rule.portsDisplay, width: 90)
+                                        AppButton(title: "删除", kind: .danger) {
+                                            model.deleteSecurityRule(at: idx, item: t)
+                                        }
+                                        .frame(width: 70, alignment: .leading)
+                                        .padding(.horizontal, 4)
                                     }
-                                    .frame(width: 70, alignment: .leading)
-                                    .padding(.horizontal, 4)
                                 }
                             }
                         }
@@ -967,42 +1111,107 @@ struct TenantSheetHost: View {
         }
     }
 
-    /// Web: `mysqlManagementModal`
+    /// Web: `mysqlManagementModal` — 列表 + 创建/同步/重置密码/绑定公网/终止
     private func mysqlSheet(_ t: TenantItem) -> some View {
-        chrome(title: "数据库管理", systemImage: "cylinder", width: 720, height: 480, footer: {
+        chrome(title: "数据库管理", systemImage: "cylinder", width: 900, height: 540, footer: {
             HStack(spacing: 8) {
-                AppButton(title: "从云同步", kind: .secondary) { model.syncMysqlCloud(t) }
-                AppButton(title: "刷新", kind: .secondary) { model.loadMysql(t) }
+                AppButton(title: "创建 MySQL", systemImage: "plus", kind: .primary) {
+                    model.createMysql(t)
+                }
+                .disabled(model.mysqlLoading || model.mysqlBusy)
+                AppButton(title: "从云同步", systemImage: "arrow.triangle.2.circlepath", kind: .secondary) {
+                    model.syncMysqlCloud(t)
+                }
+                .disabled(model.mysqlLoading || model.mysqlBusy)
+                AppButton(
+                    title: "刷新",
+                    systemImage: "arrow.clockwise",
+                    kind: .secondary,
+                    isLoading: model.mysqlLoading
+                ) {
+                    model.loadMysql(t)
+                }
                 AppButton(title: "关闭", kind: .secondary) { presentationMode.wrappedValue.dismiss() }
             }
         }) {
-            VStack(alignment: .leading, spacing: 12) {
-                if model.mysqlLoading {
-                    HStack { ProgressView(); Text("加载 MySQL 实例…").foregroundColor(mutedText) }
-                }
-                AppSheetTableBox {
-                    AppSheetTableHeader(columns: [
-                        ("名称", nil), ("版本", 80), ("状态", 80), ("连接", 160), ("规格", 90), ("存储", 70)
-                    ])
-                    if model.mysqlRows.isEmpty && !model.mysqlLoading {
-                        Text("暂无数据库实例")
-                            .font(.system(size: 13))
-                            .foregroundColor(mutedText)
-                            .frame(maxWidth: .infinity)
-                            .padding(28)
-                    } else {
-                        ForEach(Array(model.mysqlRows.enumerated()), id: \.element.id) { idx, row in
-                            AppSheetTableRow(striped: idx % 2 == 1) {
-                                HStack(spacing: 0) {
-                                    tableCell(row.displayName.isEmpty ? "未命名" : row.displayName, width: nil, bold: true)
-                                    tableCell(row.dbVersion.isEmpty ? "—" : row.dbVersion, width: 80)
-                                    tableCell(row.dbStatus.isEmpty ? "—" : row.dbStatus, width: 80)
-                                    tableCell(
-                                        "\(row.dbPublicUrl.isEmpty ? "—" : row.dbPublicUrl)/\(row.dbPort.isEmpty ? "3306" : row.dbPort)",
-                                        width: 160, muted: true
-                                    )
-                                    tableCell(row.shape.isEmpty ? "—" : row.shape, width: 90)
-                                    tableCell(row.dataStorageSizeInGBs.isEmpty ? "—" : row.dataStorageSizeInGBs, width: 70)
+            sheetCenteredLoading(isLoading: model.mysqlLoading || model.mysqlBusy) {
+                VStack(alignment: .leading, spacing: 12) {
+                    AppSheetTableBox {
+                        AppSheetTableHeader(columns: [
+                            ("名称", 120), ("版本", 64), ("状态", 72), ("连接", 130),
+                            ("用户/密码", 120), ("规格", 90), ("存储", 56), ("操作", 168)
+                        ])
+                        if model.mysqlRows.isEmpty && !model.mysqlLoading {
+                            Text("暂无数据库实例")
+                                .font(.system(size: 13))
+                                .foregroundColor(mutedText)
+                                .frame(maxWidth: .infinity)
+                                .padding(28)
+                        } else if !model.mysqlLoading {
+                            ForEach(Array(model.mysqlRows.enumerated()), id: \.element.id) { idx, row in
+                                AppSheetTableRow(striped: idx % 2 == 1) {
+                                    HStack(spacing: 0) {
+                                        Button(action: { model.copyMysqlOcid(row) }) {
+                                            Text(row.displayName.isEmpty ? "未命名" : row.displayName)
+                                                .font(.system(size: 12, weight: .semibold))
+                                                .foregroundColor(AppTheme.sidebarActive)
+                                                .lineLimit(1)
+                                                .help("点击复制 OCID")
+                                        }
+                                        .buttonStyle(PlainButtonStyle())
+                                        .frame(width: 120, alignment: .leading)
+                                        .padding(.horizontal, 10)
+
+                                        tableCell(row.dbVersion.isEmpty ? "—" : row.dbVersion, width: 64)
+                                        tableCell(row.dbStatus.isEmpty ? "—" : row.dbStatus, width: 72)
+                                        tableCell(row.connectDisplay, width: 130, muted: true)
+
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(row.loginUserDisplay)
+                                                .font(.system(size: 11, weight: .medium))
+                                                .foregroundColor(primaryText)
+                                                .lineLimit(1)
+                                            Button(action: { model.toggleMysqlPasswordReveal(row.id) }) {
+                                                Text(mysqlPasswordLabel(row))
+                                                    .font(.system(size: 11, design: .monospaced))
+                                                    .foregroundColor(mutedText)
+                                                    .lineLimit(1)
+                                            }
+                                            .buttonStyle(PlainButtonStyle())
+                                            .help("点击显示/隐藏密码")
+                                        }
+                                        .frame(width: 120, alignment: .leading)
+                                        .padding(.horizontal, 10)
+
+                                        tableCell(row.shape.isEmpty ? "—" : row.shape, width: 90)
+                                        tableCell(
+                                            row.dataStorageSizeInGBs.isEmpty ? "—" : row.dataStorageSizeInGBs,
+                                            width: 56
+                                        )
+
+                                        HStack(spacing: 4) {
+                                            AppButton(title: "同步", kind: .secondary) {
+                                                model.syncSingleMysql(row, tenant: t)
+                                            }
+                                            Menu {
+                                                Button("重置密码") { model.resetMysqlAuth(row, tenant: t) }
+                                                Button("绑定公网 IP") { model.bindMysqlPublicIp(row, tenant: t) }
+                                                Divider()
+                                                Button("终止删除") { model.deleteMysql(row, tenant: t) }
+                                            } label: {
+                                                Text("更多")
+                                                    .font(.system(size: 11, weight: .semibold))
+                                                    .foregroundColor(primaryText)
+                                                    .padding(.horizontal, 8)
+                                                    .padding(.vertical, 4)
+                                                    .background(panelBg)
+                                                    .cornerRadius(6)
+                                            }
+                                            .menuStyle(BorderlessButtonMenuStyle())
+                                        }
+                                        .frame(width: 168, alignment: .leading)
+                                        .padding(.horizontal, 4)
+                                    }
                                 }
                             }
                         }
@@ -1010,6 +1219,38 @@ struct TenantSheetHost: View {
                 }
             }
         }
+    }
+
+    private func mysqlPasswordLabel(_ row: TenantMysqlInstance) -> String {
+        let pwd = row.dbPassword
+        if pwd.isEmpty { return "—" }
+        if model.mysqlRevealedPasswordIds.contains(row.id) { return pwd }
+        return String(repeating: "•", count: min(8, max(4, pwd.count)))
+    }
+
+    /// 弹层内容区居中原生 ProgressView（Web modal 内 loading 对齐；不依赖窗口级 LoadingHUD）。
+    @ViewBuilder
+    private func sheetCenteredLoading<Content: View>(
+        isLoading: Bool,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        ZStack {
+            content()
+                .opacity(isLoading ? 0.28 : 1)
+                .allowsHitTesting(!isLoading)
+                .animation(.easeOut(duration: 0.15), value: isLoading)
+
+            if isLoading {
+                VStack(spacing: 0) {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle())
+                        .scaleEffect(1.25)
+                }
+                .frame(maxWidth: .infinity, minHeight: 240)
+                .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.15), value: isLoading)
     }
 
     /// Web: `region_sub.ftl` — 摘要 + 已订阅 / 未订阅

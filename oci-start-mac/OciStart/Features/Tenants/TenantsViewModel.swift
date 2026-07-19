@@ -95,6 +95,8 @@ final class TenantsViewModel: ObservableObject {
 
     // Boot volumes
     @Published var volumes: [TenantBootVolume] = []
+    @Published var volumesLoading = false
+    @Published var volumesBusy = false
     @Published var editingVolumeId: String?
     @Published var editVolumeName = ""
     @Published var editVolumeVpus: Double = 10
@@ -111,6 +113,13 @@ final class TenantsViewModel: ObservableObject {
 
     // Update SSE
     @Published var updateLines: [String] = []
+
+    // OCI 同步进度（Web syncModal）
+    @Published var syncPercent: Double = 0
+    @Published var syncStatusText: String = ""
+    @Published var syncPhase: TenantSyncPhase = .running
+    @Published var syncTenantName: String = ""
+    private var syncTickerTask: Task<Void, Never>?
 
     // Region sub (full page)
     @Published var regionSubParent: TenantItem?
@@ -136,6 +145,7 @@ final class TenantsViewModel: ObservableObject {
     @Published var rulesTab = "ingress"
     @Published var securityRules: [TenantSecurityRule] = []
     @Published var rulesLoading = false
+    @Published var rulesBusy = false
     @Published var ruleProtocol = "tcp"
     @Published var ruleSource = "0.0.0.0/0"
     @Published var rulePorts = ""
@@ -144,6 +154,8 @@ final class TenantsViewModel: ObservableObject {
     // MySQL sheet
     @Published var mysqlRows: [TenantMysqlInstance] = []
     @Published var mysqlLoading = false
+    @Published var mysqlBusy = false
+    @Published var mysqlRevealedPasswordIds: Set<String> = []
 
     // Boot create (full page)
     @Published var bootPageParent: TenantItem?
@@ -276,16 +288,9 @@ final class TenantsViewModel: ObservableObject {
     }
 
     func sync(_ item: TenantItem) {
-        Task {
-            await LoadingHUD.shared.during {
-                do {
-                    try await service.syncOci(tenantId: item.id)
-                    await reload()
-                } catch {
-                    ToastCenter.shared.error(error.localizedDescription)
-                }
-            }
-        }
+        startOciSync(item, afterSuccess: { [weak self] in
+            await self?.reload()
+        })
     }
 
     func updateTenantSSE(_ item: TenantItem) {
@@ -1072,14 +1077,20 @@ final class TenantsViewModel: ObservableObject {
         activeSheet = .bootVolumes(item)
         volumes = []
         editingVolumeId = nil
-        Task {
-            await LoadingHUD.shared.during {
-                do {
-                    volumes = try await service.bootVolumes(tenantId: item.id)
-                } catch {
-                    ToastCenter.shared.error(error.localizedDescription)
-                }
-            }
+        volumesLoading = true
+        volumesBusy = false
+        Task { await reloadVolumes(item) }
+    }
+
+    /// - Parameter quiet: 保存/删除后刷新时为 true，仅用 volumesBusy 遮罩，避免闪两次 loading。
+    func reloadVolumes(_ item: TenantItem, quiet: Bool = false) async {
+        if !quiet { volumesLoading = true }
+        defer { if !quiet { volumesLoading = false } }
+        do {
+            volumes = try await service.bootVolumes(tenantId: item.id)
+        } catch {
+            volumes = []
+            ToastCenter.shared.error(error.localizedDescription)
         }
     }
 
@@ -1097,14 +1108,10 @@ final class TenantsViewModel: ObservableObject {
         let vpus = max(10 as Int64, min(120 as Int64, (raw / 10) * 10))
         let tenantId = item.id
         Task {
-            await LoadingHUD.shared.during {
-                do {
-                    try await service.updateBootVolume(tenantId: tenantId, volumeId: vid, name: name, vpus: vpus)
-                    editingVolumeId = nil
-                    volumes = try await service.bootVolumes(tenantId: tenantId)
-                } catch {
-                    ToastCenter.shared.error(error.localizedDescription)
-                }
+            await self.runSheetBusy(flag: \.volumesBusy) {
+                try await self.service.updateBootVolume(tenantId: tenantId, volumeId: vid, name: name, vpus: vpus)
+                self.editingVolumeId = nil
+                await self.reloadVolumes(item, quiet: true)
             }
         }
     }
@@ -1112,13 +1119,9 @@ final class TenantsViewModel: ObservableObject {
     func deleteVolume(for item: TenantItem, volume: TenantBootVolume) {
         guard AppAlert.confirm(title: "删除引导卷", message: "确定删除 \(volume.displayName)？") else { return }
         Task {
-            await LoadingHUD.shared.during {
-                do {
-                    try await service.deleteBootVolume(tenantId: item.id, volumeId: volume.id)
-                    volumes = try await service.bootVolumes(tenantId: item.id)
-                } catch {
-                    ToastCenter.shared.error(error.localizedDescription)
-                }
+            await self.runSheetBusy(flag: \.volumesBusy) {
+                try await self.service.deleteBootVolume(tenantId: item.id, volumeId: volume.id)
+                await self.reloadVolumes(item, quiet: true)
             }
         }
     }
@@ -1396,25 +1399,27 @@ final class TenantsViewModel: ObservableObject {
         detailError = nil
         defer { detailLoading = false }
         do {
+            // 优先全量接口（含 openBootFlag / apiSynced / supportAI / createdAt）
+            let full = try await service.regionListDetail(tenantId: parent.id)
+            if !full.isEmpty {
+                detailRows = full
+                regionChildren = full.map {
+                    TenantRegionOption(
+                        id: "\($0.id)",
+                        tenancyName: $0.displayName,
+                        userName: $0.userName,
+                        region: $0.region,
+                        tenantId: $0.tenantId,
+                        isHomeRegion: $0.isHomeRegion,
+                        hasChildren: $0.hasChildren
+                    )
+                }
+                return
+            }
+            // 空结果时兜底 listRegions
             let regs = try await service.listRegions(parentId: parent.id)
             regionChildren = regs
-            var known: [Int64: TenantItem] = [:]
-            for t in [parent] + parent.children { known[t.id] = t }
-            if regs.isEmpty {
-                // 无子区域时页面仍展示当前租户一行
-                detailRows = [parent]
-            } else {
-                detailRows = regs.map { r in
-                    if let id = Int64(r.id), let full = known[id] {
-                        var merged = full
-                        if merged.region.isEmpty { merged.region = r.region }
-                        if merged.defName.isEmpty { merged.defName = parent.defName }
-                        merged.isHomeRegion = r.isHomeRegion || full.isHomeRegion
-                        return merged
-                    }
-                    return r.toTenantItem(fallback: parent)
-                }
-            }
+            detailRows = detailRowsFallback(parent: parent, regs: regs)
         } catch {
             detailError = error.localizedDescription
             // 兜底：列表上的 children
@@ -1426,24 +1431,129 @@ final class TenantsViewModel: ObservableObject {
         }
     }
 
+    private func detailRowsFallback(parent: TenantItem, regs: [TenantRegionOption]) -> [TenantItem] {
+        var known: [Int64: TenantItem] = [:]
+        for t in [parent] + parent.children { known[t.id] = t }
+        if regs.isEmpty { return [parent] }
+        return regs.map { r in
+            if let id = Int64(r.id), let full = known[id] {
+                var merged = full
+                if merged.region.isEmpty { merged.region = r.region }
+                if merged.defName.isEmpty { merged.defName = parent.defName }
+                merged.isHomeRegion = r.isHomeRegion || full.isHomeRegion
+                return merged
+            }
+            return r.toTenantItem(fallback: parent)
+        }
+    }
+
     func syncDetailRow(_ item: TenantItem) {
-        Task {
-            await LoadingHUD.shared.during {
-                do {
-                    try await service.syncOci(tenantId: item.id)
-                    AppAlert.info(title: "成功", message: "已同步 \(item.displayName)")
-                    await reloadDetail()
-                } catch {
-                    ToastCenter.shared.error(error.localizedDescription)
+        startOciSync(item, afterSuccess: { [weak self] in
+            await self?.reloadDetail()
+        })
+    }
+
+    /// 对齐 Web `handleSync`：进度条 + 长超时请求，避免 60s 误超时。
+    private func startOciSync(_ item: TenantItem, afterSuccess: @escaping () async -> Void) {
+        syncTickerTask?.cancel()
+        syncPercent = 0
+        syncPhase = .running
+        syncTenantName = item.displayName
+        syncStatusText = "正在同步 OCI 资源…"
+        activeSheet = .syncProgress(tenantId: item.id, name: item.displayName)
+
+        // 假进度：约 180s 爬到 98%（与 Web 一致）；真实完成再拉到 100%
+        syncTickerTask = Task { @MainActor [weak self] in
+            guard let self = self else { return }
+            let totalSeconds: Double = 180
+            var elapsed: Double = 0
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 250_000_000) // 0.25s 更丝滑
+                guard !Task.isCancelled else { return }
+                switch self.syncPhase {
+                case .success, .error:
+                    return
+                case .running, .waitingLong:
+                    break
+                }
+                elapsed += 0.25
+                if elapsed >= totalSeconds {
+                    if self.syncPhase == .running {
+                        self.syncPhase = .waitingLong
+                        self.syncPercent = 98
+                        self.syncStatusText = "同步时间较长，仍在等待服务端完成…"
+                    }
+                    continue
+                }
+                let p = min(98, (elapsed / totalSeconds) * 100)
+                if p > self.syncPercent { self.syncPercent = p }
+            }
+        }
+
+        let tenantId = item.id
+        Task { [weak self] in
+            guard let self = self else { return }
+            do {
+                try await self.service.syncOci(tenantId: tenantId)
+                await MainActor.run {
+                    self.syncTickerTask?.cancel()
+                    self.syncPercent = 100
+                    self.syncPhase = .success
+                    self.syncStatusText = "同步成功"
+                }
+                try? await Task.sleep(nanoseconds: 1_200_000_000)
+                await MainActor.run {
+                    if case .syncProgress(let id, _) = self.activeSheet, id == tenantId {
+                        self.activeSheet = nil
+                    }
+                }
+                await afterSuccess()
+            } catch {
+                let msg = error.localizedDescription
+                let friendly: String = {
+                    let lower = msg.lowercased()
+                    if lower.contains("timed out") || lower.contains("timeout") || lower.contains("超时") {
+                        return "同步超时，请稍后重试或检查网络"
+                    }
+                    return msg.isEmpty ? "同步失败" : msg
+                }()
+                await MainActor.run {
+                    self.syncTickerTask?.cancel()
+                    self.syncPhase = .error
+                    self.syncStatusText = friendly
+                    if self.syncPercent < 20 { self.syncPercent = 20 }
                 }
             }
         }
+    }
+
+    func dismissSyncProgress() {
+        syncTickerTask?.cancel()
+        syncTickerTask = nil
+        if case .syncProgress = activeSheet {
+            activeSheet = nil
+        }
+    }
+
+    /// 详情页 → 实例列表（Web `/oci/list?tenantId=`）
+    func openInstancesList(_ item: TenantItem) {
+        let parentId = detailParent.map { "\($0.id)" } ?? "\(item.id)"
+        let regionId = "\(item.id)"
+        NavigationState.shared.openInstances(parentId: parentId, regionId: regionId)
+    }
+
+    /// 详情页 → 抢机/开机任务（Web `/boot/fullBootList?tenantId=`）
+    func openBootTaskList(_ item: TenantItem) {
+        let parentId = detailParent.map { "\($0.id)" } ?? "\(item.id)"
+        let regionId = "\(item.id)"
+        NavigationState.shared.openBootTasks(parentId: parentId, regionId: regionId)
     }
 
     func openSecurityRules(_ item: TenantItem) {
         rulesTab = "ingress"
         securityRules = []
         showAddRule = false
+        rulesBusy = false
         activeSheet = .securityRules(item)
         loadSecurityRules(item)
     }
@@ -1471,6 +1581,7 @@ final class TenantsViewModel: ObservableObject {
 
     func switchRulesTab(_ tab: String, item: TenantItem) {
         rulesTab = tab
+        securityRules = []
         loadSecurityRules(item)
     }
 
@@ -1482,21 +1593,17 @@ final class TenantsViewModel: ObservableObject {
             return
         }
         Task {
-            await LoadingHUD.shared.during {
-                do {
-                    try await service.addSecurityRule(
-                        tenantId: item.id,
-                        type: rulesTab,
-                        protocolValue: ruleProtocol,
-                        source: source,
-                        ports: ports
-                    )
-                    showAddRule = false
-                    rulePorts = ""
-                    loadSecurityRules(item)
-                } catch {
-                    ToastCenter.shared.error(error.localizedDescription)
-                }
+            await self.runSheetBusy(flag: \.rulesBusy) {
+                try await self.service.addSecurityRule(
+                    tenantId: item.id,
+                    type: self.rulesTab,
+                    protocolValue: self.ruleProtocol,
+                    source: source,
+                    ports: ports
+                )
+                self.showAddRule = false
+                self.rulePorts = ""
+                self.loadSecurityRules(item)
             }
         }
     }
@@ -1505,19 +1612,17 @@ final class TenantsViewModel: ObservableObject {
         let composite = "\(item.id)_\(index)_\(rulesTab)"
         guard AppAlert.confirm(title: "删除规则", message: "确定删除该安全规则？") else { return }
         Task {
-            await LoadingHUD.shared.during {
-                do {
-                    try await service.deleteSecurityRule(compositeId: composite)
-                    loadSecurityRules(item)
-                } catch {
-                    ToastCenter.shared.error(error.localizedDescription)
-                }
+            await self.runSheetBusy(flag: \.rulesBusy) {
+                try await self.service.deleteSecurityRule(compositeId: composite)
+                self.loadSecurityRules(item)
             }
         }
     }
 
     func openMysql(_ item: TenantItem) {
         mysqlRows = []
+        mysqlBusy = false
+        mysqlRevealedPasswordIds = []
         activeSheet = .mysql(item)
         loadMysql(item)
     }
@@ -1544,15 +1649,101 @@ final class TenantsViewModel: ObservableObject {
 
     func syncMysqlCloud(_ item: TenantItem) {
         Task {
-            await LoadingHUD.shared.during {
-                do {
-                    try await service.syncMysql(tenantId: item.id)
-                    loadMysql(item)
-                } catch {
-                    ToastCenter.shared.error(error.localizedDescription)
-                }
+            await self.runSheetBusy(flag: \.mysqlBusy) {
+                try await self.service.syncMysql(tenantId: item.id)
+                self.loadMysql(item)
             }
         }
+    }
+
+    func createMysql(_ item: TenantItem) {
+        guard AppAlert.confirm(
+            title: "创建 MySQL",
+            message: "将按免费额度创建 HeatWave MySQL 实例，确认继续？"
+        ) else { return }
+        Task {
+            await self.runSheetBusy(flag: \.mysqlBusy) {
+                try await self.service.createMysql(tenantId: item.id)
+                AppAlert.info(title: "已提交", message: "创建任务已发送，请稍后刷新列表")
+                self.loadMysql(item)
+            }
+        }
+    }
+
+    func syncSingleMysql(_ row: TenantMysqlInstance, tenant: TenantItem) {
+        Task {
+            await self.runSheetBusy(flag: \.mysqlBusy) {
+                try await self.service.syncSingleMysql(id: row.id)
+                self.loadMysql(tenant)
+            }
+        }
+    }
+
+    func bindMysqlPublicIp(_ row: TenantMysqlInstance, tenant: TenantItem) {
+        guard AppAlert.confirm(title: "绑定公网 IP", message: "确认为该数据库绑定公网 IP？") else { return }
+        Task {
+            await self.runSheetBusy(flag: \.mysqlBusy) {
+                try await self.service.bindMysqlPublicIp(id: row.id)
+                self.loadMysql(tenant)
+            }
+        }
+    }
+
+    func resetMysqlAuth(_ row: TenantMysqlInstance, tenant: TenantItem) {
+        guard AppAlert.confirm(
+            title: "重置数据库密码",
+            message: "将重置 \(row.displayName.isEmpty ? "该实例" : row.displayName) 的登录密码，确认？"
+        ) else { return }
+        Task {
+            await self.runSheetBusy(flag: \.mysqlBusy) {
+                try await self.service.resetMysqlAuth(id: row.id, tenantId: tenant.id)
+                AppAlert.info(title: "成功", message: "密码已重置，请刷新后查看")
+                self.loadMysql(tenant)
+            }
+        }
+    }
+
+    func deleteMysql(_ row: TenantMysqlInstance, tenant: TenantItem) {
+        guard AppAlert.confirm(
+            title: "终止数据库",
+            message: "确定终止并删除 \(row.displayName.isEmpty ? "该实例" : row.displayName)？此操作不可恢复。"
+        ) else { return }
+        Task {
+            await self.runSheetBusy(flag: \.mysqlBusy) {
+                try await self.service.mysqlAction(tenantId: tenant.id, id: row.id, action: "delete")
+                self.loadMysql(tenant)
+            }
+        }
+    }
+
+    func toggleMysqlPasswordReveal(_ id: String) {
+        if mysqlRevealedPasswordIds.contains(id) {
+            mysqlRevealedPasswordIds.remove(id)
+        } else {
+            mysqlRevealedPasswordIds.insert(id)
+        }
+    }
+
+    func copyMysqlOcid(_ row: TenantMysqlInstance) {
+        let text = row.dbId.isEmpty ? row.id : row.dbId
+        guard !text.isEmpty else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+        ToastCenter.shared.success("OCID 已复制")
+    }
+
+    /// Sheet 内操作 loading（MainActor 安全；避免 Task 内 defer 触发 isolation 错误）。
+    private func runSheetBusy(
+        flag: ReferenceWritableKeyPath<TenantsViewModel, Bool>,
+        _ work: () async throws -> Void
+    ) async {
+        self[keyPath: flag] = true
+        do {
+            try await work()
+        } catch {
+            ToastCenter.shared.error(error.localizedDescription)
+        }
+        self[keyPath: flag] = false
     }
 
     func openRegionSub(_ item: TenantItem) {
@@ -1894,31 +2085,11 @@ final class TenantsViewModel: ObservableObject {
         }
     }
 
+    /// 跳转「我的工具 → AI 对话」整页，并预选当前租户（不再用 sheet）。
     func openAI(_ item: TenantItem) {
         closeAIChat()
-        aiModels = []
-        aiSelectedModelId = ""
-        aiLines = []
-        aiInput = ""
-        aiConnected = false
-        aiStatus = "加载模型…"
-        aiTenantId = item.id
-        activeSheet = .aiChat(item)
-        Task {
-            do {
-                let models = try await service.aiModels(tenantId: item.id)
-                aiModels = models
-                aiSelectedModelId = models.first?.id ?? ""
-                if models.isEmpty {
-                    aiStatus = "暂无可用模型"
-                } else {
-                    connectAIChat(tenantId: item.id)
-                }
-            } catch {
-                aiStatus = error.localizedDescription
-                ToastCenter.shared.error(error.localizedDescription)
-            }
-        }
+        FloatingMenuDismiss.all()
+        NavigationState.shared.openAiChat(tenantId: item.id)
     }
 
     func connectAIChat(tenantId: Int64) {

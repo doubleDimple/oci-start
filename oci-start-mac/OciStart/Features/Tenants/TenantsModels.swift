@@ -59,7 +59,13 @@ struct TenantItem: Decodable, Identifiable, Equatable {
     var isHomeRegion: Bool = true
     var hasChildren: Bool = false
     var openBootFlag: Bool = false
+    /// 是否已绑定专属代理（列表护盾，非持久化字段，由后端填充）
+    var proxyBound: Bool = false
+    /// 是否强制代理（橙色护盾）
+    var proxyForce: Bool = false
     var isActive: Bool = true
+    /// OCI API 是否已同步（租户详情「同步」列，对齐 Web apiSynced）
+    var apiSynced: Bool = false
     var supportAI: Int = 0
     var createdAt: String = ""
     var children: [TenantItem] = []
@@ -72,8 +78,8 @@ struct TenantItem: Decodable, Identifiable, Equatable {
         case emailAddress, emailEnable, cloudType
         case transferStatus, transferAmount
         case isHomeRegion, homeRegion
-        case hasChildren, openBootFlag
-        case isActive, active
+        case hasChildren, openBootFlag, proxyBound, proxyForce
+        case isActive, active, apiSynced
         case supportAI, createdAt, createdAtStr
         case children, registerDetail
     }
@@ -104,7 +110,10 @@ struct TenantItem: Decodable, Identifiable, Equatable {
         isHomeRegion = Self.bool(c, .isHomeRegion) ?? Self.bool(c, .homeRegion) ?? true
         hasChildren = Self.bool(c, .hasChildren) ?? false
         openBootFlag = Self.bool(c, .openBootFlag) ?? false
+        proxyBound = Self.bool(c, .proxyBound) ?? false
+        proxyForce = Self.bool(c, .proxyForce) ?? false
         isActive = Self.bool(c, .isActive) ?? Self.bool(c, .active) ?? true
+        apiSynced = Self.bool(c, .apiSynced) ?? false
         supportAI = Self.int(c, .supportAI) ?? 0
         createdAt = Self.str(c, .createdAtStr)
         if createdAt.isEmpty { createdAt = Self.time(c, .createdAt) ?? "" }
@@ -133,6 +142,7 @@ struct TenantItem: Decodable, Identifiable, Equatable {
 
     var isTransferred: Bool { transferStatus == 1 }
     var openTaskText: String { openBootFlag ? "有任务" : "无任务" }
+    var syncStatusText: String { apiSynced ? "已同步" : "未同步" }
     var multiRegionText: String { isMultiRegion ? "是" : "否" }
     var typeText: String {
         if !accountTypeName.isEmpty, accountTypeName != "未知" { return accountTypeName }
@@ -439,6 +449,7 @@ struct TenantRegionOption: Decodable, Identifiable, Equatable {
         t.openBootFlag = false
         t.createdAt = ""
         t.isActive = true
+        t.apiSynced = false
         return t
     }
 }
@@ -498,11 +509,15 @@ struct TenantMysqlInstance: Decodable, Identifiable, Equatable {
     var dbPublicUrl: String = ""
     var dbPort: String = ""
     var dbUsername: String = ""
+    /// Web 字段 `dbName`（登录用户名展示）
+    var dbName: String = ""
+    var dbPassword: String = ""
     var shape: String = ""
     var dataStorageSizeInGBs: String = ""
 
     enum CodingKeys: String, CodingKey {
-        case id, dbId, displayName, dbVersion, dbStatus, dbPublicUrl, dbPort, dbUsername, shape
+        case id, dbId, displayName, dbVersion, dbStatus, dbPublicUrl, dbPort
+        case dbUsername, dbName, dbPassword, shape, shapeName
         case dataStorageSizeInGBs, storageSize, dataStorageSize
     }
 
@@ -518,12 +533,31 @@ struct TenantMysqlInstance: Decodable, Identifiable, Equatable {
         if let s = try? c.decode(String.self, forKey: .dbPort) { dbPort = s }
         else if let n = try? c.decode(Int.self, forKey: .dbPort) { dbPort = String(n) }
         dbUsername = (try? c.decode(String.self, forKey: .dbUsername)) ?? ""
-        shape = (try? c.decode(String.self, forKey: .shape)) ?? ""
+        dbName = (try? c.decode(String.self, forKey: .dbName)) ?? dbUsername
+        dbPassword = (try? c.decode(String.self, forKey: .dbPassword)) ?? ""
+        // Web 用 shapeName
+        if let s = try? c.decode(String.self, forKey: .shapeName), !s.isEmpty {
+            shape = s
+        } else {
+            shape = (try? c.decode(String.self, forKey: .shape)) ?? ""
+        }
         if let s = try? c.decode(String.self, forKey: .dataStorageSizeInGBs) { dataStorageSizeInGBs = s }
         else if let n = try? c.decode(Int.self, forKey: .dataStorageSizeInGBs) { dataStorageSizeInGBs = String(n) }
         else if let s = try? c.decode(String.self, forKey: .storageSize) { dataStorageSizeInGBs = s }
         else if let n = try? c.decode(Int.self, forKey: .dataStorageSize) { dataStorageSizeInGBs = String(n) }
         if id.isEmpty { id = dbId.isEmpty ? displayName : dbId }
+    }
+
+    var loginUserDisplay: String {
+        if !dbName.isEmpty { return dbName }
+        if !dbUsername.isEmpty { return dbUsername }
+        return "—"
+    }
+
+    var connectDisplay: String {
+        let host = dbPublicUrl.isEmpty ? "—" : dbPublicUrl
+        let port = dbPort.isEmpty ? "3306" : dbPort
+        return "\(host)/\(port)"
     }
 }
 
@@ -816,6 +850,14 @@ enum AnyCodableJSON: Decodable, Equatable {
 
 // MARK: - Sheet routing
 
+/// 租户 OCI 同步进度态（对齐 Web syncModal）
+enum TenantSyncPhase: Equatable {
+    case running
+    case success
+    case error
+    case waitingLong  // 超过预估时间仍在等服务端
+}
+
 enum TenantSheet: Identifiable, Equatable {
     case add
     case editName(TenantItem)
@@ -831,6 +873,8 @@ enum TenantSheet: Identifiable, Equatable {
     case exportOne(TenantItem)
     case importJSON
     case updateProgress(tenantId: Int64, lines: [String])
+    /// OCI 同步进度（Web syncModal）
+    case syncProgress(tenantId: Int64, name: String)
     /// 原生二级弹层
     case bootCreate(TenantItem)
     case regionSub(TenantItem)
@@ -856,6 +900,7 @@ enum TenantSheet: Identifiable, Equatable {
         case .exportOne(let t): return "export-\(t.id)"
         case .importJSON: return "import"
         case .updateProgress(let id, _): return "upd-\(id)"
+        case .syncProgress(let id, _): return "sync-\(id)"
         case .bootCreate(let t): return "boot-\(t.id)"
         case .regionSub(let t): return "regs-\(t.id)"
         case .trafficQuery(let t): return "tq-\(t.id)"

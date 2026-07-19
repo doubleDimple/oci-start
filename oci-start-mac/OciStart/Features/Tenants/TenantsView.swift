@@ -10,7 +10,8 @@ struct TenantsView: View {
     private var dark: Bool { appearance.isDarkEffective }
 
     // 固定列（合计外的剩余宽度分给名称/自定义名/主区域）
-    private let wIndex: CGFloat = 40
+    /// 代理绑定护盾列（对齐 Web：替换原 # 序号列）
+    private let wProxy: CGFloat = 40
     private let wCost: CGFloat = 56
     private let wDays: CGFloat = 56
     private let wTask: CGFloat = 72
@@ -26,7 +27,7 @@ struct TenantsView: View {
     private let minRegion: CGFloat = 88
 
     private var fixedColsWidth: CGFloat {
-        wIndex + wCost + wDays + wTask + wMulti + wType + wCreate + wTime + wStatus + wAction
+        wProxy + wCost + wDays + wTask + wMulti + wType + wCreate + wTime + wStatus + wAction
             + minName + minDef + minRegion + hPad * 2
     }
 
@@ -202,7 +203,7 @@ struct TenantsView: View {
                 let wDef = minDef + flexPool * 0.35
                 let wRegion = minRegion + flexPool * 0.25
                 let cols = TenantColWidths(
-                    index: wIndex, name: wName, def: wDef, cost: wCost, days: wDays,
+                    proxy: wProxy, name: wName, def: wDef, cost: wCost, days: wDays,
                     task: wTask, region: wRegion, multi: wMulti, type: wType,
                     create: wCreate, time: wTime, status: wStatus, action: wAction, hPad: hPad
                 )
@@ -226,7 +227,12 @@ struct TenantsView: View {
     private func headerRow(cols: TenantColWidths, width: CGFloat) -> some View {
         HStack(spacing: 0) {
             HStack(spacing: 0) {
-                colHeader("#", cols.index)
+                // 对齐 Web：盾牌图标表头（绑定代理）
+                Image(systemName: "shield.fill")
+                    .font(.system(size: 11))
+                    .foregroundColor(AppTheme.sidebarText(dark).opacity(0.55))
+                    .frame(width: cols.proxy, alignment: .center)
+                    .help("绑定代理")
                 colHeader("名称", cols.name)
                 colHeader("自定义名", cols.def)
                 colHeader("费用", cols.cost)
@@ -256,7 +262,7 @@ struct TenantsView: View {
     private func tenantRow(index: Int, item: TenantItem, cols: TenantColWidths, width: CGFloat) -> some View {
         HStack(spacing: 0) {
             HStack(spacing: 0) {
-                cell("\(model.pageState.page * model.pageState.size + index + 1)", cols.index, muted: true)
+                proxyShieldCell(item, width: cols.proxy)
                 nameCell(item, width: cols.name)
                 defNameCell(item, width: cols.def)
                 costCell(item, width: cols.cost)
@@ -291,6 +297,27 @@ struct TenantsView: View {
     }
 
     // MARK: - Cells
+
+    /// 代理绑定护盾：橙=强制代理，绿=已绑定，灰=未绑定
+    private func proxyShieldCell(_ item: TenantItem, width: CGFloat) -> some View {
+        let color: Color
+        let tip: String
+        if item.proxyForce {
+            color = Color(hex: dark ? "e67e22" : "d35400")
+            tip = "强制代理已开启"
+        } else if item.proxyBound {
+            color = Color(hex: dark ? "1abc9c" : "16a085")
+            tip = "已绑定专属代理"
+        } else {
+            color = Color(hex: dark ? "8b949e" : "95a5a6").opacity(dark ? 0.55 : 0.65)
+            tip = "未绑定专属代理"
+        }
+        return Image(systemName: "shield.fill")
+            .font(.system(size: 13))
+            .foregroundColor(color)
+            .frame(width: width, alignment: .center)
+            .help(tip)
+    }
 
     private func nameCell(_ item: TenantItem, width: CGFloat) -> some View {
         Button(action: { model.namesHidden.toggle() }) {
@@ -386,7 +413,7 @@ struct TenantsView: View {
 // MARK: - Column widths
 
 private struct TenantColWidths {
-    let index, name, def, cost, days, task, region, multi, type, create, time, status, action, hPad: CGFloat
+    let proxy, name, def, cost, days, task, region, multi, type, create, time, status, action, hPad: CGFloat
 }
 
 // MARK: - AppKit ellipsis + 窗内浮层（绝不使用 NSPopover，保证在应用窗口内）
@@ -464,40 +491,31 @@ private enum TenantActionMenuLayout {
     }
 }
 
-/// 全窗透明点击捕获层，用于关闭菜单。
-private final class TenantActionClickCatcher: NSView {
-    var onClick: (() -> Void)?
-
-    override func mouseDown(with event: NSEvent) {
-        onClick?()
-    }
-
-    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
-
-    override var mouseDownCanMoveWindow: Bool { false }
-}
-
-/// 全局单例：窗内操作菜单（列表页 / 租户详情页共用），保证不越出应用窗口。
+/// 全局单例：窗内操作菜单（列表页 / 租户详情页共用）。
+/// 禁止全窗 ClickCatcher——若 dismiss 失败会整窗假死（控制台/侧栏全点不动）。
 @MainActor
 final class TenantActionMenuPresenter {
     static let shared = TenantActionMenuPresenter()
 
-    private weak var catcher: TenantActionClickCatcher?
-    private weak var panelHost: NSView?
-    private var localMonitor: Any?
+    /// 强引用直到 dismiss，避免 weak 丢失后浮层残留
+    private var panelHost: NSView?
+    private var keyMonitor: Any?
+    private var mouseMonitor: Any?
 
     private init() {}
 
     var isPresented: Bool { panelHost != nil }
 
     func dismiss() {
-        if let monitor = localMonitor {
+        if let monitor = keyMonitor {
             NSEvent.removeMonitor(monitor)
-            localMonitor = nil
+            keyMonitor = nil
         }
-        catcher?.removeFromSuperview()
+        if let monitor = mouseMonitor {
+            NSEvent.removeMonitor(monitor)
+            mouseMonitor = nil
+        }
         panelHost?.removeFromSuperview()
-        catcher = nil
         panelHost = nil
     }
 
@@ -547,6 +565,7 @@ final class TenantActionMenuPresenter {
             return
         }
         guard let window = button.window, let content = window.contentView else { return }
+        dismiss()
 
         let frame = TenantActionMenuLayout.panelFrame(
             button: button,
@@ -579,19 +598,24 @@ final class TenantActionMenuPresenter {
             layer.shadowOffset = CGSize(width: 0, height: -3)
         }
 
-        let catcher = TenantActionClickCatcher(frame: content.bounds)
-        catcher.autoresizingMask = [.width, .height]
-        catcher.onClick = { [weak self] in self?.dismiss() }
-
-        content.addSubview(catcher)
         content.addSubview(host)
-        self.catcher = catcher
-        self.panelHost = host
+        panelHost = host
 
-        localMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             if event.keyCode == 53 {
                 self?.dismiss()
                 return nil
+            }
+            return event
+        }
+
+        // 只监视、不吞事件，避免挡死顶栏/侧栏/返回
+        mouseMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+            guard let self = self, let host = self.panelHost else { return event }
+            let loc = event.locationInWindow
+            let frameInWindow = host.convert(host.bounds, to: nil)
+            if !frameInWindow.contains(loc) {
+                DispatchQueue.main.async { self.dismiss() }
             }
             return event
         }
@@ -722,8 +746,8 @@ enum TenantActionPanel {
                 TenantActionItem(id: "boot", title: "创建开机", systemImage: "plus.circle", isDanger: false) {
                     model.openBoot(item)
                 },
-                TenantActionItem(id: "findboot", title: "抢机任务", systemImage: "server.rack", isDanger: false) {
-                    ToastCenter.shared.error("开机管理页尚未原生化，请稍后在侧栏进入")
+                TenantActionItem(id: "findboot", title: "抢机任务", systemImage: "play.circle", isDanger: false) {
+                    model.openBootTaskList(item)
                 },
                 TenantActionItem(id: "vol", title: "磁盘管理", systemImage: "externaldrive", isDanger: false) {
                     model.openVolumes(item)
@@ -732,7 +756,7 @@ enum TenantActionPanel {
                     model.openSecurityRules(item)
                 },
                 TenantActionItem(id: "ins", title: "实例列表", systemImage: "desktopcomputer", isDanger: false) {
-                    ToastCenter.shared.success("请从侧栏打开「实例列表」查看该租户实例")
+                    model.openInstancesList(item)
                 },
                 TenantActionItem(id: "mysql", title: "数据库", systemImage: "cylinder", isDanger: false) {
                     model.openMysql(item)

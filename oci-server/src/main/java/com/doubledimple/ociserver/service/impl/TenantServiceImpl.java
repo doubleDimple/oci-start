@@ -11,6 +11,7 @@ import com.doubledimple.dao.entity.OtherBootInstance;
 import com.doubledimple.dao.entity.RegisterDetail;
 import com.doubledimple.dao.entity.Tenant;
 import com.doubledimple.dao.entity.TenantEmailConfig;
+import com.doubledimple.dao.entity.VpnProxyRecord;
 import com.doubledimple.dao.repository.BootInstanceRepository;
 import com.doubledimple.dao.repository.CloudTenancyRepository;
 import com.doubledimple.dao.repository.OciComputerInfoRepository;
@@ -19,6 +20,7 @@ import com.doubledimple.dao.repository.OracleInstanceDetailRepository;
 import com.doubledimple.dao.repository.OtherBootInstanceRepository;
 import com.doubledimple.dao.repository.RegisterDetailRepository;
 import com.doubledimple.dao.repository.TenantRepository;
+import com.doubledimple.dao.repository.VpnProxyRecordRepository;
 import com.doubledimple.ociai.chat.ChatAiService;
 import com.doubledimple.ocicommon.enums.CloudTypeEnum;
 import com.doubledimple.ocicommon.enums.RegionEnum;
@@ -26,6 +28,7 @@ import com.doubledimple.ocicommon.enums.oci.AccountTypeSubEnum;
 import com.doubledimple.ocicommon.enums.oci.PlanTypeSubEnum;
 import com.doubledimple.ocicommon.param.OpenRegionNotify;
 import com.doubledimple.ocicommon.utils.FileUtils;
+import com.doubledimple.ociserver.config.ProxyContext;
 import com.doubledimple.ociserver.config.annotations.UseSocksProxy;
 import com.doubledimple.ociserver.pojo.dto.OciAuditEventDto;
 import com.doubledimple.ociserver.pojo.dto.OciPageResult;
@@ -144,6 +147,9 @@ public class TenantServiceImpl implements TenantService {
 
     @Resource
     private TenantRepository tenantRepository;
+
+    @Resource
+    private VpnProxyRecordRepository vpnProxyRecordRepository;
 
     @Resource
     private BootInstanceRepository bootInstanceRepository;
@@ -308,10 +314,61 @@ public class TenantServiceImpl implements TenantService {
                 modifiedContent.add(parent);
             }
 
+            fillProxyBoundFlags(modifiedContent);
             return new PageImpl<>(modifiedContent, parentTenants.getPageable(), parentTenants.getTotalElements());
         }
 
         return parentTenants;
+    }
+
+    /**
+     * 批量标记是否已绑定专属代理 / 是否强制代理（列表护盾）。
+     * 绑定记在父租户上时，子区域也算已绑定（继承）。
+     * <ul>
+     *   <li>绿：已绑定且非强制</li>
+     *   <li>橙：已绑定且强制代理</li>
+     *   <li>灰：未绑定</li>
+     * </ul>
+     */
+    private void fillProxyBoundFlags(List<Tenant> tenants) {
+        if (tenants == null || tenants.isEmpty()) {
+            return;
+        }
+        try {
+            List<VpnProxyRecord> boundRecords = vpnProxyRecordRepository.findAllBoundRecords();
+            java.util.Map<Long, Boolean> forceByTenant = new java.util.HashMap<>();
+            if (boundRecords != null) {
+                for (VpnProxyRecord r : boundRecords) {
+                    if (r == null || r.getTenantId() == null) {
+                        continue;
+                    }
+                    boolean force = r.getForceProxy() != null && r.getForceProxy() == 1;
+                    // 同一租户多条时，任一强制即视为强制
+                    Boolean prev = forceByTenant.get(r.getTenantId());
+                    forceByTenant.put(r.getTenantId(), (prev != null && prev) || force);
+                }
+            }
+            for (Tenant t : tenants) {
+                if (t == null || t.getId() == null) {
+                    continue;
+                }
+                Long bindKey = t.getId();
+                boolean bound = forceByTenant.containsKey(bindKey);
+                boolean force = bound && Boolean.TRUE.equals(forceByTenant.get(bindKey));
+                if (!bound) {
+                    Long parenId = t.getParenId();
+                    if (parenId != null && parenId > 0L && forceByTenant.containsKey(parenId)) {
+                        bindKey = parenId;
+                        bound = true;
+                        force = Boolean.TRUE.equals(forceByTenant.get(parenId));
+                    }
+                }
+                t.setProxyBound(bound);
+                t.setProxyForce(bound && force);
+            }
+        } catch (Exception e) {
+            log.debug("填充代理绑定标识失败: {}", e.getMessage());
+        }
     }
 
     @Override
@@ -1239,7 +1296,7 @@ public class TenantServiceImpl implements TenantService {
         Tenant tenant = byId.get();
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
         String compartmentId = provider.getTenantId();
-        try(IdentityClient identityClient = IdentityClient.builder().build(provider)) {
+        try(IdentityClient identityClient = IdentityClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             ListUsersRequest request = ListUsersRequest.builder()
                     .compartmentId(compartmentId)
                     .build();
@@ -1777,6 +1834,7 @@ public class TenantServiceImpl implements TenantService {
                 modifiedContent.add(parent);
             }
 
+            fillProxyBoundFlags(modifiedContent);
             return new PageImpl<>(modifiedContent, searchResults.getPageable(), searchResults.getTotalElements());
         }
 

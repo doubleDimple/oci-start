@@ -233,6 +233,28 @@ public class TenantController extends BaseController{
     }
 
     /**
+     * 租户详情区域列表 JSON（Mac 原生 / AJAX，对齐 regionList 页面数据）
+     * <p>扁平行列表；清空嵌套 children，避免 {@code @JsonIdentityInfo} 把后续行序列化为 id 引用。
+     */
+    @GetMapping("/regionList/json")
+    @ResponseBody
+    public ResponseEntity<List<Tenant>> regionListJson(@RequestParam long tenantId) {
+        try {
+            List<Tenant> tenants = tenantService.regionList(tenantId);
+            if (tenants == null || tenants.isEmpty()) {
+                return ResponseEntity.ok(Collections.emptyList());
+            }
+            for (Tenant t : tenants) {
+                t.setChildren(null);
+            }
+            return ResponseEntity.ok(tenants);
+        } catch (Exception e) {
+            log.error("获取租户详情区域列表失败 tenantId={}", tenantId, e);
+            return ResponseEntity.ok(Collections.emptyList());
+        }
+    }
+
+    /**
      * 区域订阅
      */
     @GetMapping("/regionSubList")

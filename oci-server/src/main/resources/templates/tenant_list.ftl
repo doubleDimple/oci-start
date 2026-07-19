@@ -112,7 +112,7 @@
         <div class="table-view">
             <table class="table" style="table-layout: fixed;">
                 <colgroup>
-                    <col style="width: 42px;">   <!-- # -->
+                    <col style="width: 44px;">   <!-- 代理护盾 -->
                     <col style="width: 80px;">   <!-- 租户名 -->
                     <col style="width: 140px;">  <!-- 自定义名称 -->
                     <col style="width: 80px;">   <!-- 账号成本 -->
@@ -128,7 +128,9 @@
                 </colgroup>
                 <thead>
                 <tr>
-                    <th style="text-align: center;">#</th>
+                    <th style="text-align: center;" title="${msg.get('vpn.tenant')!'绑定代理'}">
+                        <i class="fas fa-shield-alt" style="opacity:0.55;"></i>
+                    </th>
                     <th>${msg.get("tenant.name")}</th>
                     <th>${msg.get("tenant.defName")}</th>
                     <th>${msg.get("tenant.accountCost")}</th>
@@ -145,9 +147,19 @@
                 </thead>
                 <tbody id="tenant-table-body">
                 <#list tenants as tenant>
-                    <#assign rowIndex = currentPage * size + tenant?index + 1>
                     <tr class="parent-row" data-id="${tenant.id?c}">
-                        <td class="col-center" style="color: var(--text-secondary); font-size: 12px;">${rowIndex}</td>
+                        <td class="col-center col-proxy-shield">
+                            <#if (tenant.proxyForce!false)>
+                                <i class="fas fa-shield-alt tenant-proxy-shield is-force"
+                                   title="${msg.get('vpn.tenant.force')!'强制代理已开启'}"></i>
+                            <#elseif tenant.proxyBound!false>
+                                <i class="fas fa-shield-alt tenant-proxy-shield is-bound"
+                                   title="${msg.get('vpn.tenant.bound')!'已绑定专属代理'}"></i>
+                            <#else>
+                                <i class="fas fa-shield-alt tenant-proxy-shield is-unbound"
+                                   title="${msg.get('vpn.tenant.unbound')!'未绑定专属代理'}"></i>
+                            </#if>
+                        </td>
                         <#--<td class="col-center">
                             <#if tenant.emailEnable?? && tenant.emailEnable == 1>
                                 <i class="fas fa-envelope email-icon-on" title="${msg.get('tenant.enabledEmail')!''}"></i>
@@ -1241,7 +1253,10 @@
         tenant_socialLogin: "${msg.get('tenant.socialLogin')?js_string}",
         tenant_deleteTenant: "${msg.get('tenant.deleteTenant')?js_string}",
         tenant_detailAccount: "${msg.get('tenant.detailAccount')?js_string}",
-        tenant_unsupported: "—"
+        tenant_unsupported: "—",
+        vpn_tenant_bound: "${msg.get('vpn.tenant.bound')?js_string}",
+        vpn_tenant_unbound: "${msg.get('vpn.tenant.unbound')?js_string}",
+        vpn_tenant_force: "${msg.get('vpn.tenant.force')?js_string}"
     }
 
     /* ═══════════════════════════════════════════════
@@ -1288,13 +1303,14 @@
         }
         var html = '';
         tenants.forEach(function(t, idx) {
-            var seqNo = currentPage * pageSize + idx + 1;
             var tn = t.tenancyName || '';
             var maskedTn = tlMaskName(tn);
             var dn = t.defName || '';
             var isActive = t.active !== false && t.isActive !== false;
             var hasChildren = t.hasChildren === true;
             var openBootFlag = t.openBootFlag === true;
+            var proxyBound = t.proxyBound === true;
+            var proxyForce = t.proxyForce === true;
             var cloudType = t.cloudType || 1;
             var transferred = (t.transferStatus || 0) === 1;
             var supportAI = (t.supportAI || 0) === 1;
@@ -1306,6 +1322,20 @@
             var accountCost = t.accountCost || '';
             var region = t.region || '';
             var id = t.idStr || String(t.id);
+            var shieldTitle;
+            var shieldClass;
+            if (proxyForce) {
+                shieldTitle = i18n.vpn_tenant_force || '强制代理已开启';
+                shieldClass = 'fas fa-shield-alt tenant-proxy-shield is-force';
+            } else if (proxyBound) {
+                shieldTitle = i18n.vpn_tenant_bound || '已绑定专属代理';
+                shieldClass = 'fas fa-shield-alt tenant-proxy-shield is-bound';
+            } else {
+                shieldTitle = i18n.vpn_tenant_unbound || '未绑定专属代理';
+                shieldClass = 'fas fa-shield-alt tenant-proxy-shield is-unbound';
+            }
+            var shieldCell = '<td class="col-center col-proxy-shield"><i class="' + shieldClass
+                + '" title="' + tlEsc(shieldTitle) + '"></i></td>';
 
             // Status badge (openBootFlag)
             var openBootBadge = openBootFlag
@@ -1364,7 +1394,7 @@
             }
 
             html += '<tr class="parent-row" data-id="' + id + '">' +
-                '<td class="col-center" style="color:var(--text-secondary);font-size:12px;">' + seqNo + '</td>' +
+                shieldCell +
                 '<td class="col-name"><span class="name-spoiler is-hidden" onclick="toggleSpoiler(this)" title="' + tlEsc(tn) + '"><span class="name-masked">' + tlEsc(maskedTn) + '</span><span class="name-full">' + tlEsc(tn) + '</span></span></td>' +
                 '<td><a class="cell-edit-link defname-cell" href="javascript:void(0);" onclick="editCustomName(\'' + id + '\',\'' + tlEsc(dn).replace(/'/g,"\\'") + '\')" id="defName-' + id + '" data-fullname="' + tlEsc(dn) + '" title="' + tlEsc(dn) + '">' + tlEsc(tlTruncateName(dn, 14)) + '</a></td>' +
                 '<td><a class="cell-edit-link" href="javascript:void(0);" onclick="editAccountCost(\'' + id + '\',\'' + tlEsc(accountCost).replace(/'/g,"\\'") + '\')" id="cost-' + id + '" title="' + tlEsc(i18n.tenant_editCost) + '">' + tlEsc(accountCost) + '</a></td>' +
