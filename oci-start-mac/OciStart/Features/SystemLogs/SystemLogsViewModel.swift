@@ -79,6 +79,10 @@ final class SystemLogsViewModel: ObservableObject {
                 built = Array(built.suffix(Self.maxLines))
             }
             entries = built
+            if built.isEmpty && errorText == nil {
+                // 接口成功但无行：常见于远程部署 logs/application.log 路径为空
+                errorText = "暂无历史日志。若为远程服务器，请确认服务端工作目录下存在 logs/application.log。"
+            }
             if autoScroll { scrollToken += 1 }
         } catch {
             errorText = (error as? APIError)?.errorDescription ?? error.localizedDescription

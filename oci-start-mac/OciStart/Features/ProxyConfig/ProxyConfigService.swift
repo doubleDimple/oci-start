@@ -30,7 +30,8 @@ struct ProxyConfigService {
             "proxyPort": port,
             "availableStatus": form.availableStatus,
             // 强制代理：1=强制（不通拒绝请求），0=非强制
-            "forceProxy": form.forceProxy == 1 ? 1 : 0
+            "forceProxy": form.forceProxy == 1 ? 1 : 0,
+            "customName": form.customName.trimmingCharacters(in: .whitespacesAndNewlines)
         ]
         if let id = form.id { body["id"] = id }
         // 用户名始终提交（可空），避免更新时被误判为未传
@@ -40,14 +41,48 @@ struct ProxyConfigService {
         if !pass.isEmpty {
             body["proxyPassword"] = pass
         }
-        if let tid = form.tenantId, tid > 0 {
-            body["tenantId"] = tid
+        let tids = form.tenantIds.filter { $0 > 0 }
+        body["tenantIds"] = tids
+        if let first = tids.first {
+            body["tenantId"] = first
         } else {
             body["tenantId"] = NSNull()
         }
         let url = try client.makeURL(baseURL, path: "/vpnProxy/saveOrUpdate")
         let raw = try await client.postJSON(url, body: body)
         try ProxyConfigJSON.ensureSuccess(raw, fallback: "保存代理失败")
+    }
+
+    /// POST `/vpnProxy/bindTenant` · proxyId nil = 解绑
+    func bindTenant(tenantId: Int64, proxyId: Int64?) async throws {
+        var body: [String: Any] = ["tenantId": tenantId]
+        if let pid = proxyId, pid > 0 {
+            body["id"] = pid
+        } else {
+            body["id"] = NSNull()
+        }
+        let url = try client.makeURL(baseURL, path: "/vpnProxy/bindTenant")
+        let raw = try await client.postJSON(url, body: body)
+        try ProxyConfigJSON.ensureSuccess(raw, fallback: "绑定代理失败")
+    }
+
+    /// POST `/vpnProxy/findByTenant`
+    func findByTenant(tenantId: Int64) async throws -> VpnProxyItem? {
+        let url = try client.makeURL(baseURL, path: "/vpnProxy/findByTenant")
+        let raw = try await client.postJSON(url, body: ["tenantId": tenantId])
+        guard let root = ProxyConfigJSON.obj(raw) else { return nil }
+        if let success = root["success"] as? Bool, success == false {
+            throw APIError.serverMessage((root["message"] as? String) ?? "查询绑定失败")
+        }
+        guard let data = root["data"] as? [String: Any], !data.isEmpty else {
+            return nil
+        }
+        // data 可能是 null
+        if data["id"] == nil && data["proxyHost"] == nil {
+            return nil
+        }
+        let item = ProxyConfigJSON.parseItem(data)
+        return item.id > 0 ? item : nil
     }
 
     /// POST `/vpnProxy/delete`

@@ -55,6 +55,20 @@ struct ProxyConfigSheet: View {
                 title: "代理参数",
                 desc: "类型、地址、认证与可用状态"
             )
+            FormFieldRow(label: "自定义名称") {
+                AppTextField(
+                    text: Binding(
+                        get: { model.activeForm?.customName ?? "" },
+                        set: { val in
+                            guard var f = model.activeForm else { return }
+                            f.customName = val
+                            model.activeForm = f
+                        }
+                    ),
+                    placeholder: "可选，仅展示",
+                    leadingSystemImage: "tag"
+                )
+            }
             FormFieldRow(label: "代理类型", required: true) {
                 SelectMenu(
                     options: model.typeOptions,
@@ -206,11 +220,11 @@ struct ProxyConfigSheet: View {
             paneHeader(
                 icon: "link",
                 title: "绑定租户",
-                desc: "空 = 全局共享代理池"
+                desc: "可多选；空 = 全局共享代理池"
             )
 
             HStack(spacing: 8) {
-                Image(systemName: form.tenantId == nil ? "globe" : "person.2")
+                Image(systemName: form.tenantIds.isEmpty ? "globe" : "person.2")
                     .foregroundColor(AppTheme.sidebarActive)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("当前绑定")
@@ -219,7 +233,7 @@ struct ProxyConfigSheet: View {
                     Text(model.selectedTenantLabel())
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
-                        .lineLimit(1)
+                        .lineLimit(2)
                 }
                 Spacer()
             }
@@ -247,7 +261,7 @@ struct ProxyConfigSheet: View {
                         id: nil,
                         title: "全局共享",
                         meta: "fallback pool",
-                        selected: form.tenantId == nil
+                        selected: form.tenantIds.isEmpty
                     )
                     if model.pagedTenants.isEmpty {
                         Text("无匹配租户")
@@ -257,12 +271,11 @@ struct ProxyConfigSheet: View {
                             .frame(maxWidth: .infinity)
                     } else {
                         ForEach(model.pagedTenants) { t in
-                            let tid = Int64(t.id)
                             tenantRow(
-                                id: tid,
+                                id: Int64(t.id),
                                 title: t.name,
                                 meta: t.region.isEmpty ? "#\(t.id)" : t.region,
-                                selected: form.tenantId != nil && form.tenantId == tid
+                                selected: Int64(t.id).map { form.tenantIds.contains($0) } ?? false
                             )
                         }
                     }
@@ -305,10 +318,30 @@ struct ProxyConfigSheet: View {
     private func tenantRow(id: Int64?, title: String, meta: String, selected: Bool) -> some View {
         Button(action: { model.selectTenant(id) }) {
             HStack(spacing: 8) {
-                Circle()
-                    .strokeBorder(selected ? AppTheme.sidebarActive : AppTheme.border(dark), lineWidth: 1.5)
-                    .background(Circle().fill(selected ? AppTheme.sidebarActive : Color.clear))
-                    .frame(width: 12, height: 12)
+                // 全局用圆点；租户用方框多选
+                if id == nil {
+                    Circle()
+                        .strokeBorder(selected ? AppTheme.sidebarActive : AppTheme.border(dark), lineWidth: 1.5)
+                        .background(Circle().fill(selected ? AppTheme.sidebarActive : Color.clear))
+                        .frame(width: 12, height: 12)
+                } else {
+                    RoundedRectangle(cornerRadius: 3)
+                        .strokeBorder(selected ? AppTheme.sidebarActive : AppTheme.border(dark), lineWidth: 1.5)
+                        .background(
+                            RoundedRectangle(cornerRadius: 3)
+                                .fill(selected ? AppTheme.sidebarActive : Color.clear)
+                        )
+                        .frame(width: 12, height: 12)
+                        .overlay(
+                            Group {
+                                if selected {
+                                    Image(systemName: "checkmark")
+                                        .font(.system(size: 7, weight: .bold))
+                                        .foregroundColor(.white)
+                                }
+                            }
+                        )
+                }
                 VStack(alignment: .leading, spacing: 1) {
                     Text(title)
                         .font(.system(size: 12, weight: .medium))

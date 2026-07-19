@@ -85,7 +85,7 @@ final class ProxyConfigViewModel: ObservableObject {
     func openEdit(_ item: VpnProxyItem) {
         activeForm = .from(item)
         tenantSearch = ""
-        jumpTenantPage(to: item.tenantId)
+        jumpTenantPage(to: item.tenantIds.first ?? item.tenantId)
     }
 
     func closeForm() {
@@ -292,20 +292,46 @@ final class ProxyConfigViewModel: ObservableObject {
         tenantPageIndex = next
     }
 
+    /// 多选：nil/0 = 切回全局（清空）；有 id = 切换勾选
     func selectTenant(_ id: Int64?) {
         guard var form = activeForm else { return }
-        form.tenantId = id
+        if id == nil || (id ?? 0) <= 0 {
+            form.tenantIds = []
+            activeForm = form
+            return
+        }
+        let tid = id!
+        if let idx = form.tenantIds.firstIndex(of: tid) {
+            form.tenantIds.remove(at: idx)
+        } else {
+            form.tenantIds.append(tid)
+        }
         activeForm = form
     }
 
+    func isTenantSelected(_ id: Int64?) -> Bool {
+        guard let form = activeForm else { return false }
+        if id == nil || (id ?? 0) <= 0 {
+            return form.tenantIds.isEmpty
+        }
+        return form.tenantIds.contains(id!)
+    }
+
     func selectedTenantLabel() -> String {
-        guard let form = activeForm, let tid = form.tenantId, tid > 0 else {
+        guard let form = activeForm, !form.tenantIds.isEmpty else {
             return "全局共享"
         }
-        if let t = parentTenants.first(where: { $0.id == "\(tid)" }) {
-            return t.name
+        if form.tenantIds.count == 1, let tid = form.tenantIds.first {
+            if let t = parentTenants.first(where: { $0.id == "\(tid)" }) {
+                return t.name
+            }
+            return "#\(tid)"
         }
-        return "#\(tid)"
+        let names = form.tenantIds.prefix(3).map { tid -> String in
+            parentTenants.first(where: { $0.id == "\(tid)" })?.name ?? "#\(tid)"
+        }
+        let more = form.tenantIds.count > 3 ? "…" : ""
+        return "已选 \(form.tenantIds.count) 个：\(names.joined(separator: "、"))\(more)"
     }
 
     private func jumpTenantPage(to tenantId: Int64?) {

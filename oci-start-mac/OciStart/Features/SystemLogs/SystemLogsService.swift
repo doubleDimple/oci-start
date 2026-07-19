@@ -36,6 +36,10 @@ struct SystemLogsService {
         req.setValue("text/event-stream", forHTTPHeaderField: "Accept")
         req.setValue("XMLHttpRequest", forHTTPHeaderField: "X-Requested-With")
         req.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
+        // 远程主机偶发不自动带 Cookie：显式附上 satoken，避免 SSE 被 302/空流
+        if let cookie = client.cookieHeader(for: baseURL), !cookie.isEmpty {
+            req.setValue(cookie, forHTTPHeaderField: "Cookie")
+        }
         req.timeoutInterval = 0
         return req
     }

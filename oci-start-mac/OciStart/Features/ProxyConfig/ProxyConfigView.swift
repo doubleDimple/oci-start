@@ -84,12 +84,13 @@ struct ProxyConfigView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 DataList {
-                    DataListColumnHeader(title: "类型", width: 72)
+                    DataListColumnHeader(title: "名称", width: 100)
+                    DataListColumnHeader(title: "类型", width: 64)
                     DataListColumnHeader(title: "地址", width: nil)
-                    DataListColumnHeader(title: "端口", width: 64)
-                    DataListColumnHeader(title: "用户名", width: 100)
-                    DataListColumnHeader(title: "密码", width: 90)
-                    DataListColumnHeader(title: "租户", width: 100)
+                    DataListColumnHeader(title: "端口", width: 56)
+                    DataListColumnHeader(title: "用户名", width: 88)
+                    DataListColumnHeader(title: "密码", width: 80)
+                    DataListColumnHeader(title: "租户", width: 110)
                     DataListColumnHeader(title: "强制", width: 72)
                     DataListColumnHeader(title: "连通状态", width: 80)
                     DataListColumnHeader(title: "操作", width: 170, alignment: .trailing)
@@ -108,12 +109,13 @@ struct ProxyConfigView: View {
 
     private func row(_ item: VpnProxyItem) -> some View {
         HStack(spacing: 0) {
-            cell(item.proxyType, width: 72, weight: .semibold)
+            cell(item.customName.isEmpty ? "—" : item.customName, width: 100, weight: .semibold)
+            cell(item.proxyType, width: 64, weight: .semibold)
             cell(item.proxyHost, width: nil)
-            cell("\(item.proxyPort)", width: 64)
-            cell(item.proxyUsername.isEmpty ? "—" : item.proxyUsername, width: 100)
+            cell("\(item.proxyPort)", width: 56)
+            cell(item.proxyUsername.isEmpty ? "—" : item.proxyUsername, width: 88)
             passwordCell(item)
-            cell(item.tenantLabel, width: 100)
+            cell(item.tenantLabel, width: 110)
             // 强制列可点切换（橙=强制 / 绿=非强制）
             forceShieldCell(item)
             StatusBadge(text: item.statusLabel, tone: item.statusTone)
@@ -213,7 +215,7 @@ struct ProxyConfigView: View {
 
     private func passwordCell(_ item: VpnProxyItem) -> some View {
         if item.proxyPassword.isEmpty {
-            return AnyView(cell("—", width: 90))
+            return AnyView(cell("—", width: 80))
         }
         let revealed = revealedPasswordIds.contains(item.id)
         return AnyView(
@@ -233,7 +235,7 @@ struct ProxyConfigView: View {
                         .font(.system(size: 10, weight: .medium))
                         .foregroundColor(AppTheme.sidebarText(dark))
                 }
-                .frame(width: 90, alignment: .leading)
+                .frame(width: 80, alignment: .leading)
             }
             .buttonStyle(PlainButtonStyle())
             .help(revealed ? "隐藏密码" : "显示密码")

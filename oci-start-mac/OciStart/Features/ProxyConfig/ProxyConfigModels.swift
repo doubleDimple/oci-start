@@ -12,20 +12,35 @@ struct VpnProxyItem: Identifiable, Equatable {
     var availableStatus: Int = 1
     /// 1 = 强制代理（不通则拒绝请求）
     var forceProxy: Int = 0
+    /// 兼容旧字段：首个绑定租户
     var tenantId: Int64? = nil
+    /// 多租户绑定
+    var tenantIds: [Int64] = []
     var tenantName: String = ""
+    /// 自定义名称（可选）
+    var customName: String = ""
     /// Client-side: row is currently being probed.
     var isTesting: Bool = false
 
     var isEnabled: Bool { availableStatus == 1 }
     var isForce: Bool { forceProxy == 1 }
 
+    var displayName: String {
+        let cn = customName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !cn.isEmpty { return cn }
+        return "\(proxyType) \(proxyHost):\(proxyPort)"
+    }
+
     var tenantLabel: String {
-        if let tid = tenantId, tid > 0 {
-            if !tenantName.isEmpty { return tenantName }
-            return "#\(tid)"
+        let ids = !tenantIds.isEmpty
+            ? tenantIds
+            : (tenantId.map { [$0] } ?? [])
+        if ids.isEmpty {
+            return "全局共享"
         }
-        return "全局共享"
+        if !tenantName.isEmpty { return tenantName }
+        if ids.count == 1 { return "#\(ids[0])" }
+        return "\(ids.count) 个租户"
     }
 
     /// 连通状态（落库 availableStatus：1=通畅，0=不通）
@@ -66,14 +81,27 @@ struct ProxyFormState: Equatable, Identifiable {
     var proxyPassword: String = ""
     var availableStatus: Int = 1
     var forceProxy: Int = 0
-    var tenantId: Int64? = nil
+    /// 多选父租户；空 = 全局共享
+    var tenantIds: [Int64] = []
+    var customName: String = ""
 
     var isEditing: Bool { id != nil }
+
+    /// 兼容：是否绑定了任一租户
+    var tenantId: Int64? { tenantIds.first }
 
     static func empty() -> ProxyFormState { ProxyFormState() }
 
     static func from(_ item: VpnProxyItem) -> ProxyFormState {
-        ProxyFormState(
+        let ids: [Int64]
+        if !item.tenantIds.isEmpty {
+            ids = item.tenantIds
+        } else if let tid = item.tenantId, tid > 0 {
+            ids = [tid]
+        } else {
+            ids = []
+        }
+        return ProxyFormState(
             id: item.id,
             proxyType: item.proxyType.isEmpty ? "HTTP" : item.proxyType,
             proxyHost: item.proxyHost,
@@ -82,7 +110,8 @@ struct ProxyFormState: Equatable, Identifiable {
             proxyPassword: item.proxyPassword,
             availableStatus: item.availableStatus,
             forceProxy: item.forceProxy,
-            tenantId: item.tenantId
+            tenantIds: ids,
+            customName: item.customName
         )
     }
 }
@@ -132,6 +161,25 @@ enum ProxyConfigJSON {
         let tid = int64(d["tenantId"])
         item.tenantId = tid > 0 ? tid : nil
         item.tenantName = str(d["tenantName"])
+        item.customName = str(d["customName"])
+        // tenantIds: 数组 或 兼容单值
+        if let arr = d["tenantIds"] as? [Any] {
+            item.tenantIds = arr.compactMap { v -> Int64? in
+                let n = int64(v)
+                return n > 0 ? n : nil
+            }
+        } else if let arr = d["tenantIds"] as? [Int] {
+            item.tenantIds = arr.compactMap { $0 > 0 ? Int64($0) : nil }
+        } else if let arr = d["tenantIds"] as? [Int64] {
+            item.tenantIds = arr.filter { $0 > 0 }
+        } else if tid > 0 {
+            item.tenantIds = [tid]
+        } else {
+            item.tenantIds = []
+        }
+        if item.tenantId == nil, let first = item.tenantIds.first {
+            item.tenantId = first
+        }
         return item
     }
 
