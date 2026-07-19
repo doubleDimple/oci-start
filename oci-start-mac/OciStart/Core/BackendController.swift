@@ -20,16 +20,22 @@ final class BackendController: ObservableObject {
 
     private init() {}
 
+    /// Incremented by `stop()` so an in-flight `start()` loop exits cleanly (mode switch).
+    private var startEpoch: UInt64 = 0
+
     @MainActor
     func start() async {
         if case .ready = state { return }
         if case .starting = state { return }
         state = .starting
+        startEpoch &+= 1
+        let epoch = startEpoch
 
         let probeURL = URL(string: "http://127.0.0.1:\(defaultPort)/login")!
 
         // Already running (previous launch / manual)
         if await ping(probeURL) {
+            guard epoch == startEpoch else { return }
             state = .ready
             appendBackendLog("port \(defaultPort) already up → ready")
             return
@@ -38,6 +44,7 @@ final class BackendController: ObservableObject {
         guard let javaURL = resolveJava(),
               let jarURL = resolveServerJar() else {
             // Xcode debug without embedded runtime
+            guard epoch == startEpoch else { return }
             state = .ready
             appendBackendLog("no embedded jre/jar → external mode ready")
             return
@@ -84,6 +91,7 @@ final class BackendController: ObservableObject {
             try proc.run()
             appendBackendLog("spawned java pid=\(proc.processIdentifier) jar=\(jarURL.lastPathComponent)")
         } catch {
+            guard epoch == startEpoch else { return }
             state = .failed("启动 Java 失败：\(error.localizedDescription)")
             appendBackendLog("spawn failed: \(error)")
             return
@@ -94,26 +102,39 @@ final class BackendController: ObservableObject {
 
         for i in 0..<90 {
             try? await Task.sleep(nanoseconds: 1_000_000_000)
+            if epoch != startEpoch {
+                appendBackendLog("start cancelled (epoch mismatch) after \(i + 1)s")
+                return
+            }
             if await ping(probeURL) {
+                guard epoch == startEpoch else { return }
                 state = .ready
                 appendBackendLog("ready after \(i + 1)s")
                 return
             }
             if !proc.isRunning {
+                guard epoch == startEpoch else { return }
                 let code = proc.terminationStatus
                 state = .failed("后端进程退出 (code=\(code))，见 Application Support/OciStart/backend.log")
                 appendBackendLog("java exited code=\(code)")
                 return
             }
         }
+        guard epoch == startEpoch else { return }
         state = .failed("后端启动超时（90 秒），见 backend.log")
         appendBackendLog("timeout 90s")
     }
 
-    /// Stop embedded backend. Call on app quit (menu / Dock / Cmd+Q).
+    /// Stop embedded backend. Call on app quit (menu / Dock / Cmd+Q) or when switching to remote mode.
     /// Also cleans up orphan Java on :9856 left from a previous crash.
     func stop() {
         appendBackendLog("stop requested")
+        // Invalidate any in-flight start() wait loop.
+        if Thread.isMainThread {
+            startEpoch &+= 1
+        } else {
+            DispatchQueue.main.sync { self.startEpoch &+= 1 }
+        }
         processLock.lock()
         let proc = process
         process = nil

@@ -14,14 +14,19 @@ final class LoginFormModel: ObservableObject {
     }
 
     @Published var tab: Tab = .login
-    @Published var serverURL = "http://localhost:9856"
+    @Published var serverURL = AppSession.localDefaultURL
     @Published var username = ""
     @Published var password = ""
     @Published var confirmPassword = ""
     @Published var verificationCode = ""
     @Published var mfaCode = ""
     @Published var rememberMe = true
-    @Published var showServer = false
+    /// Last / current deployment choice.
+    @Published var deploymentMode: DeploymentMode = .local
+    /// This session has an active mode (user just picked, or remembered choice was restored).
+    @Published var modeActivated = false
+    /// UserDefaults: user has explicitly chosen a mode at least once (not first install).
+    @Published var hasPersistedChoice = false
     @Published var locale: AppLocale = .zhCN
 
     @Published var messageEnabled = false
@@ -79,16 +84,20 @@ final class LoginFormModel: ObservableObject {
     }
 
     var isRemoteServer: Bool {
-        !AppSession.isLocalServerURL(serverURL)
+        modeActivated && deploymentMode.isRemote
+    }
+
+    var isLocalActivated: Bool {
+        modeActivated && deploymentMode == .local
     }
 
     /// Login button always pressable when form is ready — empty fields shake instead of hard-disable.
     func canAttemptLogin(backendReady: Bool) -> Bool {
-        backendReady && !isSubmitting && !isLoadingMeta
+        modeActivated && backendReady && !isSubmitting && !isLoadingMeta
     }
 
     func canAttemptRegister(backendReady: Bool) -> Bool {
-        backendReady && !isSubmitting && !isLoadingMeta
+        modeActivated && backendReady && !isSubmitting && !isLoadingMeta
     }
 
     /// Returns false if empty required fields (and bumps shake tokens).

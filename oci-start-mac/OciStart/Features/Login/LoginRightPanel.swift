@@ -11,17 +11,19 @@ struct LoginRightPanel: View {
     var onSendCode: () -> Void
     var onOAuth: (String) -> Void
     var onServerCommit: () -> Void = {}
+    var onDeploymentMode: (DeploymentMode) -> Void = { _ in }
     var onForgotPassword: () -> Void = {}
     var onLocale: (AppLocale) -> Void = { _ in }
 
     private var formReady: Bool {
+        guard model.modeActivated else { return false }
         if model.isRemoteServer { return true }
         return backend.isReadyForLogin
     }
 
-    /// Local backend still starting — full panel becomes a minimal spinner.
+    /// Only after user picks「本机使用」and backend is still coming up.
     private var showBootLoading: Bool {
-        guard !model.isRemoteServer else { return false }
+        guard model.isLocalActivated else { return false }
         switch backend.state {
         case .idle, .starting: return true
         default: return false
@@ -29,7 +31,7 @@ struct LoginRightPanel: View {
     }
 
     private var localBootFailed: String? {
-        guard !model.isRemoteServer else { return nil }
+        guard model.isLocalActivated else { return nil }
         if case .failed(let m) = backend.state { return m }
         return nil
     }
@@ -50,6 +52,7 @@ struct LoginRightPanel: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .animation(.easeInOut(duration: 0.28), value: showBootLoading)
         .animation(.easeInOut(duration: 0.28), value: localBootFailed != nil)
+        .animation(.easeInOut(duration: 0.22), value: model.modeActivated)
         .background(Color.clear)
     }
 
@@ -60,12 +63,25 @@ struct LoginRightPanel: View {
             topChipBar
                 .padding(.horizontal, 56)
                 .padding(.top, 48)
+            deploymentModeSwitcher
+                .padding(.horizontal, 56)
+                .padding(.top, 28)
             Spacer(minLength: 0)
-            ProgressView()
-                .progressViewStyle(CircularProgressViewStyle())
-                .scaleEffect(1.55)
+            VStack(spacing: 14) {
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle())
+                    .scaleEffect(1.55)
+                Text(model.locale == .enUS ? "Starting local backend…" : "正在启动本机服务…")
+                    .font(.system(size: 13))
+                    .foregroundColor(LoginPalette.muted(dark))
+                Text(model.locale == .enUS
+                     ? "Switch to Remote if you already deployed a server"
+                     : "若已远程部署，可切换到「已远程部署」")
+                    .font(.system(size: 12))
+                    .foregroundColor(LoginPalette.muted(dark).opacity(0.9))
+                    .multilineTextAlignment(.center)
+            }
             Spacer(minLength: 0)
-            // Balance top chrome so spinner sits optical center
             Color.clear.frame(height: 48 + 28)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -76,6 +92,9 @@ struct LoginRightPanel: View {
             topChipBar
                 .padding(.horizontal, 56)
                 .padding(.top, 48)
+            deploymentModeSwitcher
+                .padding(.horizontal, 56)
+                .padding(.top, 28)
             Spacer(minLength: 0)
             VStack(spacing: 14) {
                 Image(systemName: "exclamationmark.triangle.fill")
@@ -89,6 +108,12 @@ struct LoginRightPanel: View {
                     .foregroundColor(LoginPalette.muted(dark))
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 360)
+                Text(model.locale == .enUS
+                     ? "Or switch to Remote and connect an existing server"
+                     : "也可切换到「已远程部署」连接已有服务")
+                    .font(.system(size: 12))
+                    .foregroundColor(LoginPalette.muted(dark))
+                    .multilineTextAlignment(.center)
             }
             .padding(.horizontal, 56)
             Spacer(minLength: 0)
@@ -108,56 +133,67 @@ struct LoginRightPanel: View {
                 brand
                     .padding(.bottom, 34)
 
-                if model.allowRegister {
-                    tabs
-                        .padding(.bottom, 26)
-                        .transition(.opacity.combined(with: .move(edge: .top)))
+                deploymentModeSwitcher
+                    .padding(.bottom, 22)
+
+                if !model.modeActivated && !model.hasPersistedChoice {
+                    pickModeHint
+                        .padding(.bottom, 8)
+                        .transition(.opacity)
                 }
 
-                if model.showServer {
-                    serverRow
+                if model.modeActivated {
+                    if model.allowRegister {
+                        tabs
+                            .padding(.bottom, 26)
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
+
+                    if model.isRemoteServer {
+                        serverRow
+                            .padding(.bottom, 14)
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
+
+                    statusStrip
                         .padding(.bottom, 14)
-                        .transition(.opacity.combined(with: .move(edge: .top)))
-                }
 
-                statusStrip
-                    .padding(.bottom, 14)
+                    ZStack {
+                        Group {
+                            if model.tab == .login {
+                                loginFields
+                            } else {
+                                registerFields
+                            }
+                        }
+                        .opacity(model.isLoadingMeta ? 0.45 : 1)
+                        .allowsHitTesting(!model.isLoadingMeta)
+                        .animation(.easeOut(duration: 0.2), value: model.isLoadingMeta)
 
-                ZStack {
-                    Group {
-                        if model.tab == .login {
-                            loginFields
-                        } else {
-                            registerFields
+                        if model.isLoadingMeta {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle())
+                                .scaleEffect(1.05)
+                                .transition(.opacity)
                         }
                     }
-                    .opacity(model.isLoadingMeta ? 0.45 : 1)
-                    .allowsHitTesting(!model.isLoadingMeta)
-                    .animation(.easeOut(duration: 0.2), value: model.isLoadingMeta)
+                    .animation(.easeOut(duration: 0.18), value: model.isLoadingMeta)
 
-                    if model.isLoadingMeta {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle())
-                            .scaleEffect(1.05)
+                    if let e = model.errorText {
+                        Text(e)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(Color(hex: "ef4444"))
+                            .padding(.top, 12)
+                            .fixedSize(horizontal: false, vertical: true)
                             .transition(.opacity)
                     }
-                }
-                .animation(.easeOut(duration: 0.18), value: model.isLoadingMeta)
-
-                if let e = model.errorText {
-                    Text(e)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(Color(hex: "ef4444"))
-                        .padding(.top, 12)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .transition(.opacity)
-                }
-                if let info = model.infoText {
-                    Text(info)
-                        .font(.system(size: 13))
-                        .foregroundColor(LoginPalette.muted(dark))
-                        .padding(.top, 8)
-                        .transition(.opacity)
+                    if let info = model.infoText {
+                        Text(info)
+                            .font(.system(size: 13))
+                            .foregroundColor(LoginPalette.muted(dark))
+                            .padding(.top, 8)
+                            .transition(.opacity)
+                    }
                 }
             }
             .padding(.horizontal, 56)
@@ -165,7 +201,8 @@ struct LoginRightPanel: View {
             .padding(.bottom, 40)
             .frame(maxWidth: 520, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .center)
-            .animation(.easeInOut(duration: 0.22), value: model.showServer)
+            .animation(.easeInOut(duration: 0.22), value: model.deploymentMode)
+            .animation(.easeInOut(duration: 0.22), value: model.modeActivated)
             .animation(.easeInOut(duration: 0.22), value: model.allowRegister)
             .animation(.easeInOut(duration: 0.22), value: model.tab)
             .animation(.easeInOut(duration: 0.2), value: model.errorText)
@@ -174,7 +211,23 @@ struct LoginRightPanel: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    // MARK: - Top: locale + server
+    private var pickModeHint: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "hand.tap")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(LoginPalette.primary(dark))
+            Text(model.locale == .enUS
+                 ? "First launch: choose Local or Remote. Your choice will be remembered."
+                 : "首次使用请选择「本机使用」或「已远程部署」，之后会自动记住")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(LoginPalette.muted(dark))
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 4)
+    }
+
+    // MARK: - Top: locale
 
     private var topChipBar: some View {
         HStack(spacing: 10) {
@@ -193,35 +246,81 @@ struct LoginRightPanel: View {
             .shadow(color: Color.black.opacity(dark ? 0.3 : 0.08), radius: 10, y: 4)
 
             Spacer()
-
-            Button(action: {
-                withAnimation(.easeInOut(duration: 0.22)) {
-                    model.showServer.toggle()
-                }
-            }) {
-                HStack(spacing: 8) {
-                    Image(systemName: "server.rack")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(LoginPalette.muted(dark))
-                    Text(model.showServer
-                         ? (model.locale == .enUS ? "Hide server" : "收起服务器")
-                         : (model.locale == .enUS ? "Server" : "服务器"))
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(LoginPalette.muted(dark))
-                    if model.isRemoteServer {
-                        Circle()
-                            .fill(Color(hex: "22c55e"))
-                            .frame(width: 6, height: 6)
-                    }
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(LoginPalette.chipBg(dark))
-                .cornerRadius(999)
-                .shadow(color: Color.black.opacity(dark ? 0.3 : 0.08), radius: 10, y: 4)
-            }
-            .buttonStyle(PlainButtonStyle())
         }
+    }
+
+    /// 本机使用 / 已远程部署 — first install must tap; later launches restore last choice.
+    private var deploymentModeSwitcher: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Text(model.locale == .enUS ? "Deployment" : "部署方式")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(LoginPalette.text(dark))
+                if !model.modeActivated && !model.hasPersistedChoice {
+                    Text(model.locale == .enUS ? "required" : "首次必选")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(LoginPalette.primary(dark))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(LoginPalette.tabActiveBg(dark))
+                        .cornerRadius(999)
+                }
+                Spacer(minLength: 0)
+            }
+
+            HStack(spacing: 4) {
+                modeSegment(
+                    .local,
+                    title: model.locale == .enUS ? "Local" : "本机使用",
+                    subtitle: model.locale == .enUS ? "Start backend here" : "启动本地后端"
+                )
+                modeSegment(
+                    .remote,
+                    title: model.locale == .enUS ? "Remote" : "已远程部署",
+                    subtitle: model.locale == .enUS ? "No local Java" : "不启动本地服务"
+                )
+            }
+        }
+    }
+
+    private func modeSegment(_ mode: DeploymentMode, title: String, subtitle: String) -> some View {
+        let selected = model.modeActivated && model.deploymentMode == mode
+        return Button(action: {
+            if model.modeActivated, model.deploymentMode == mode { return }
+            onDeploymentMode(mode)
+        }) {
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Image(systemName: mode == .local ? "laptopcomputer" : "cloud")
+                        .font(.system(size: 11, weight: .semibold))
+                    Text(title)
+                        .font(.system(size: 13, weight: .bold))
+                }
+                .foregroundColor(selected ? LoginPalette.tabActiveText(dark) : LoginPalette.text(dark))
+                Text(subtitle)
+                    .font(.system(size: 11))
+                    .foregroundColor(selected ? LoginPalette.tabActiveText(dark).opacity(0.85) : LoginPalette.muted(dark))
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(selected ? LoginPalette.tabActiveBg(dark) : LoginPalette.chipBg(dark))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(
+                        selected
+                            ? LoginPalette.primary(dark).opacity(dark ? 0.45 : 0.2)
+                            : LoginPalette.line(dark).opacity(0.6),
+                        lineWidth: selected ? 1.5 : 1
+                    )
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+        .disabled(model.isSubmitting || model.isLoadingMeta)
     }
 
     private func langItem(_ loc: AppLocale, _ title: String) -> some View {
@@ -292,16 +391,16 @@ struct LoginRightPanel: View {
         .buttonStyle(PlainButtonStyle())
     }
 
-    /// Server URL + Connect — title shared, field and button same box height.
+    /// Remote server URL + Connect — only visible in remote deployment mode.
     private var serverRow: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(model.locale == .enUS ? "Server" : "服务器地址")
+            Text(model.locale == .enUS ? "Server URL" : "服务器地址")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(LoginPalette.text(dark))
             HStack(alignment: .center, spacing: 12) {
                 LoginField(
                     title: "",
-                    placeholder: "http://localhost:9856",
+                    placeholder: "https://your-host:port",
                     text: $model.serverURL,
                     secure: false,
                     dark: dark,
@@ -313,7 +412,8 @@ struct LoginRightPanel: View {
                         ? (model.locale == .enUS ? "…" : "连接中")
                         : (model.locale == .enUS ? "Connect" : "连接"),
                     loading: model.isLoadingMeta,
-                    enabled: !model.serverURL.trimmingCharacters(in: .whitespaces).isEmpty,
+                    enabled: !model.serverURL.trimmingCharacters(in: .whitespaces).isEmpty
+                        && !model.serverURL.trimmingCharacters(in: .whitespaces).hasSuffix("://"),
                     dark: dark,
                     minWidth: 96,
                     action: onServerCommit
@@ -327,36 +427,37 @@ struct LoginRightPanel: View {
 
     @ViewBuilder
     private var statusStrip: some View {
-        if model.isRemoteServer {
-            if let err = model.metaError, !model.isLoadingMeta {
-                compactStatus(
-                    icon: "wifi.exclamationmark",
-                    color: Color(hex: "ef4444"),
-                    text: model.locale == .enUS ? "Remote unreachable" : "远程服务器不可用",
-                    detail: err
-                )
+        if model.modeActivated {
+            if model.isRemoteServer {
+                if let err = model.metaError, !model.isLoadingMeta {
+                    compactStatus(
+                        icon: "wifi.exclamationmark",
+                        color: Color(hex: "ef4444"),
+                        text: model.locale == .enUS ? "Remote unreachable" : "远程服务器不可用",
+                        detail: err
+                    )
+                } else if model.metaLoadedURL != nil, !model.isLoadingMeta {
+                    compactStatus(
+                        icon: "checkmark.circle.fill",
+                        color: Color(hex: "22c55e"),
+                        text: model.locale == .enUS ? "Remote ready" : "远程服务器已就绪"
+                    )
+                } else if !model.isLoadingMeta {
+                    compactStatus(
+                        icon: "link",
+                        color: LoginPalette.muted(dark),
+                        text: model.locale == .enUS
+                            ? "Enter URL and tap Connect — no local backend"
+                            : "填写地址后点「连接」— 不会启动本地后端"
+                    )
+                }
             } else if model.metaLoadedURL != nil, !model.isLoadingMeta {
                 compactStatus(
                     icon: "checkmark.circle.fill",
                     color: Color(hex: "22c55e"),
-                    text: model.locale == .enUS ? "Remote ready" : "远程服务器已就绪"
-                )
-            } else if !model.isLoadingMeta {
-                compactStatus(
-                    icon: "link",
-                    color: LoginPalette.muted(dark),
-                    text: model.locale == .enUS
-                        ? "Tap Connect to load login options"
-                        : "填写地址后点「连接」加载登录配置"
+                    text: model.locale == .enUS ? "Local backend ready" : "本机服务已就绪，请登录"
                 )
             }
-            // loading: spinner overlay on form — no extra strip
-        } else if model.metaLoadedURL != nil, !model.isLoadingMeta {
-            compactStatus(
-                icon: "checkmark.circle.fill",
-                color: Color(hex: "22c55e"),
-                text: model.locale == .enUS ? "Ready to sign in" : "服务已就绪，请登录"
-            )
         }
     }
 

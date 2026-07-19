@@ -42,6 +42,7 @@ struct LoginView: View {
                         onSendCode: { Task { await doSendCode() } },
                         onOAuth: { provider in Task { await doOAuth(provider) } },
                         onServerCommit: { applyServerAndLoadMeta() },
+                        onDeploymentMode: { mode in Task { await switchDeploymentMode(mode) } },
                         onForgotPassword: { model.openForgotPassword() },
                         onLocale: { loc in
                             UserDefaults.standard.set(loc.rawValue, forKey: "appLocale")
@@ -81,18 +82,24 @@ struct LoginView: View {
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
         .animation(.easeOut(duration: 0.18), value: model.showForgotPassword)
         .onAppear {
+            model.deploymentMode = session.deploymentMode
             model.serverURL = session.serverURL
+            model.hasPersistedChoice = session.hasChosenDeploymentMode
             if !session.username.isEmpty { model.username = session.username }
             if let raw = UserDefaults.standard.string(forKey: "appLocale"),
                let loc = AppLocale(rawValue: raw) {
                 model.locale = loc
             }
-            if model.isRemoteServer || backend.isReadyForLogin {
-                Task { await loadMeta(force: false) }
+            // First install: wait for explicit pick.
+            // Already chosen before: restore last mode and start/connect automatically.
+            if session.hasChosenDeploymentMode {
+                Task { await applyRememberedDeployment() }
+            } else {
+                model.modeActivated = false
             }
         }
         .onReceive(backend.$state) { state in
-            if case .ready = state, !model.isRemoteServer {
+            if case .ready = state, model.modeActivated, model.deploymentMode == .local {
                 Task { await loadMeta(force: false) }
             }
         }
@@ -149,12 +156,21 @@ struct LoginView: View {
     // MARK: - Meta
 
     private func loadMeta(force: Bool) async {
+        let activated = await MainActor.run { model.modeActivated }
+        guard activated else { return }
+
+        let mode = await MainActor.run { model.deploymentMode }
         let raw = await MainActor.run { model.serverURL }
         await MainActor.run { session.serverURL = raw }
         let target = session.serverURL
 
-        if AppSession.isLocalServerURL(target), !backend.isReadyForLogin {
+        if mode == .local, !backend.isReadyForLogin {
             return
+        }
+        // Remote with empty/placeholder host — wait for user to Connect.
+        if mode == .remote {
+            let host = URL(string: target)?.host ?? ""
+            if host.isEmpty { return }
         }
 
         let skip = await MainActor.run { () -> Bool in
@@ -213,12 +229,86 @@ struct LoginView: View {
         }
     }
 
+    /// Restore last user-chosen mode (skip pick screen).
+    @MainActor
+    private func applyRememberedDeployment() async {
+        let mode = session.deploymentMode
+        withAnimation(.easeInOut(duration: 0.22)) {
+            model.deploymentMode = mode
+            model.modeActivated = true
+            model.hasPersistedChoice = true
+            model.errorText = nil
+            model.infoText = nil
+            model.metaError = nil
+            model.metaLoadedURL = nil
+            model.isLoadingMeta = false
+        }
+        // Align URL only; do not re-write "chosen" flag.
+        session.setDeploymentMode(mode, userChosen: false)
+        model.serverURL = session.serverURL
+
+        if mode == .remote {
+            // No local Java; load meta if remote URL already known.
+            await loadMeta(force: false)
+        } else {
+            await backend.start()
+            await loadMeta(force: true)
+        }
+    }
+
+    /// User taps a mode — persist choice and start local Java or enable remote form.
+    @MainActor
+    private func switchDeploymentMode(_ mode: DeploymentMode) async {
+        // Ignore only if already active same mode (re-tap after restore / pick).
+        if model.modeActivated, model.deploymentMode == mode { return }
+
+        withAnimation(.easeInOut(duration: 0.22)) {
+            model.deploymentMode = mode
+            model.modeActivated = true
+            model.hasPersistedChoice = true
+            model.errorText = nil
+            model.infoText = nil
+            model.metaError = nil
+            model.metaLoadedURL = nil
+            model.allowRegister = false
+            model.githubEnabled = false
+            model.googleEnabled = false
+            model.messageEnabled = false
+            model.mfaEnabled = false
+            model.isLoadingMeta = false
+        }
+
+        session.setDeploymentMode(mode, userChosen: true)
+        model.serverURL = session.serverURL
+
+        if mode == .remote {
+            // Free local Java if previously started this session.
+            await Task.detached(priority: .userInitiated) {
+                BackendController.shared.stop()
+            }.value
+            // User connects via「连接」when URL ready; auto-try if host already filled.
+            await loadMeta(force: false)
+        } else {
+            await backend.start()
+            await loadMeta(force: true)
+        }
+    }
+
     func applyServerAndLoadMeta() {
-        // Normalize URL immediately so remote/local mode flips smoothly.
         let raw = model.serverURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !raw.isEmpty {
-            model.serverURL = raw
-            session.serverURL = raw
+        guard !raw.isEmpty else { return }
+
+        // Remote form but user pasted localhost → flip to local smoothly.
+        if model.deploymentMode == .remote, AppSession.isLocalServerURL(raw) {
+            model.serverURL = AppSession.localDefaultURL
+            Task { await switchDeploymentMode(.local) }
+            return
+        }
+
+        model.serverURL = raw
+        session.serverURL = raw
+        if model.deploymentMode == .remote {
+            session.lastRemoteServerURL = raw
         }
         withAnimation(.easeInOut(duration: 0.2)) {
             model.errorText = nil
@@ -230,7 +320,16 @@ struct LoginView: View {
     // MARK: - Login / Register
 
     private func doLogin() async {
-        let remote = await MainActor.run { model.isRemoteServer }
+        let activated = await MainActor.run { model.modeActivated }
+        if !activated {
+            await MainActor.run {
+                model.errorText = model.locale == .enUS
+                    ? "Choose deployment mode first"
+                    : "请先点选部署方式"
+            }
+            return
+        }
+        let remote = await MainActor.run { model.deploymentMode == .remote }
         if !remote && !backend.isReadyForLogin {
             await MainActor.run {
                 model.errorText = model.locale == .enUS
@@ -238,6 +337,17 @@ struct LoginView: View {
                     : "后端尚未就绪，请稍候再试"
             }
             return
+        }
+        if remote {
+            let host = await MainActor.run { URL(string: model.serverURL)?.host ?? "" }
+            if host.isEmpty {
+                await MainActor.run {
+                    model.errorText = model.locale == .enUS
+                        ? "Enter a remote server URL first"
+                        : "请先填写远程服务器地址"
+                }
+                return
+            }
         }
 
         let valid = await MainActor.run { model.validateLoginFields() }

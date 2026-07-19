@@ -37,12 +37,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         mainWindowController = wc
         presentMainWindow(reason: "launch")
 
-        // Show login UI first (fields disabled until ready), then start backend.
-        // Keep a short delay so the first frame paints before Java spawn.
+        // Login first — do NOT auto-start embedded Java.
+        // Backend starts only after user explicitly picks「本机使用」on the login page.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
             Task {
-                await backend.start()
-                Self.log("backend state=\(String(describing: backend.state))")
+                Self.log("await user deployment choice (no auto backend start); lastMode=\(session.deploymentMode.rawValue)")
                 await session.bootstrap()
                 Self.log("bootstrap isLoggedIn=\(session.isLoggedIn)")
             }

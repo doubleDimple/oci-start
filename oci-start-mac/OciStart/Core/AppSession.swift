@@ -1,11 +1,21 @@
 import Foundation
 import Combine
 
+/// Local embedded backend vs already-deployed remote server.
+enum DeploymentMode: String, CaseIterable {
+    case local
+    case remote
+
+    var isRemote: Bool { self == .remote }
+}
+
 /// Authentication + shell chrome state (no business list caches).
 /// Not marked @MainActor on the type: AppDelegate must touch `.shared` on the main
 /// thread only. Methods that update @Published should run on main.
 final class AppSession: ObservableObject {
     static let shared = AppSession()
+
+    static let localDefaultURL = "http://localhost:9856"
 
     @Published private(set) var isLoggedIn = false
     @Published var lastError: String?
@@ -14,22 +24,53 @@ final class AppSession: ObservableObject {
     @Published private(set) var siteName: String = "OCI-START"
     /// 1 = Oracle, 2 = GCP (align web header provider switch)
     @Published private(set) var cloudProvider: Int = 1
+    /// Remembered on disk; login UI can switch smoothly without re-asking each launch.
+    @Published private(set) var deploymentMode: DeploymentMode = .local
 
     private let auth = AuthService()
     private let defaultsKey = "serverURL"
+    private let remoteURLKey = "remoteServerURL"
+    private let deploymentModeKey = "deploymentMode"
+    /// True only after the user has explicitly tapped a deployment option at least once.
+    private let deploymentChosenKey = "deploymentModeChosen"
     private let userKey = "lastUsername"
     private let cloudKey = "cloudProvider"
 
+    /// First install / never tapped → false. After user picks once → true (auto-apply next launch).
+    var hasChosenDeploymentMode: Bool {
+        UserDefaults.standard.bool(forKey: deploymentChosenKey)
+    }
+
     var serverURL: String {
         get {
-            let raw = UserDefaults.standard.string(forKey: defaultsKey) ?? "http://localhost:9856"
+            let raw = UserDefaults.standard.string(forKey: defaultsKey) ?? Self.localDefaultURL
             return Self.normalize(raw)
         }
         set {
-            UserDefaults.standard.set(Self.normalize(newValue), forKey: defaultsKey)
+            let normalized = Self.normalize(newValue)
+            UserDefaults.standard.set(normalized, forKey: defaultsKey)
+            if !Self.isLocalServerURL(normalized) {
+                UserDefaults.standard.set(normalized, forKey: remoteURLKey)
+            }
             objectWillChange.send()
         }
     }
+
+    /// Last non-local URL so switching Local → Remote restores the address.
+    var lastRemoteServerURL: String {
+        get {
+            let raw = UserDefaults.standard.string(forKey: remoteURLKey) ?? ""
+            let n = Self.normalize(raw.isEmpty ? "https://" : raw)
+            return Self.isLocalServerURL(n) ? "https://" : n
+        }
+        set {
+            let n = Self.normalize(newValue)
+            guard !Self.isLocalServerURL(n) else { return }
+            UserDefaults.standard.set(n, forKey: remoteURLKey)
+        }
+    }
+
+    var isRemoteDeployment: Bool { deploymentMode.isRemote }
 
     var cloudProviderName: String {
         switch cloudProvider {
@@ -44,6 +85,74 @@ final class AppSession: ObservableObject {
         username = UserDefaults.standard.string(forKey: userKey) ?? ""
         let stored = UserDefaults.standard.integer(forKey: cloudKey)
         cloudProvider = stored == 0 ? 1 : stored
+        deploymentMode = Self.loadDeploymentMode()
+        // Keep active URL consistent with remembered mode.
+        if deploymentMode == .local, !Self.isLocalServerURL(serverURL) {
+            lastRemoteServerURL = serverURL
+            UserDefaults.standard.set(Self.localDefaultURL, forKey: defaultsKey)
+        } else if deploymentMode == .remote, Self.isLocalServerURL(serverURL) {
+            let remote = UserDefaults.standard.string(forKey: remoteURLKey) ?? ""
+            if !remote.isEmpty, !Self.isLocalServerURL(remote) {
+                UserDefaults.standard.set(Self.normalize(remote), forKey: defaultsKey)
+            }
+        }
+    }
+
+    private static func loadDeploymentMode() -> DeploymentMode {
+        if let raw = UserDefaults.standard.string(forKey: "deploymentMode"),
+           let mode = DeploymentMode(rawValue: raw) {
+            return mode
+        }
+        // Migrate: infer from previously saved server URL.
+        let url = UserDefaults.standard.string(forKey: "serverURL") ?? localDefaultURL
+        let mode: DeploymentMode = isLocalServerURL(url) ? .local : .remote
+        UserDefaults.standard.set(mode.rawValue, forKey: "deploymentMode")
+        if mode == .remote, !isLocalServerURL(url) {
+            UserDefaults.standard.set(normalize(url), forKey: "remoteServerURL")
+        }
+        return mode
+    }
+
+    /// Switch deployment mode and align `serverURL`. Does not start/stop Java — caller owns backend lifecycle.
+    /// - Parameter userChosen: when true (default), marks that the user has picked a mode (persist for next launch).
+    @MainActor
+    func setDeploymentMode(_ mode: DeploymentMode, userChosen: Bool = true) {
+        if userChosen {
+            UserDefaults.standard.set(true, forKey: deploymentChosenKey)
+        }
+        guard mode != deploymentMode else {
+            // Still normalize URL for current mode.
+            alignServerURL(for: mode)
+            return
+        }
+        if deploymentMode == .remote, mode == .local {
+            if !Self.isLocalServerURL(serverURL) {
+                lastRemoteServerURL = serverURL
+            }
+        }
+        deploymentMode = mode
+        UserDefaults.standard.set(mode.rawValue, forKey: deploymentModeKey)
+        alignServerURL(for: mode)
+    }
+
+    @MainActor
+    private func alignServerURL(for mode: DeploymentMode) {
+        switch mode {
+        case .local:
+            if !Self.isLocalServerURL(serverURL) {
+                lastRemoteServerURL = serverURL
+            }
+            UserDefaults.standard.set(Self.localDefaultURL, forKey: defaultsKey)
+        case .remote:
+            if Self.isLocalServerURL(serverURL) {
+                let restored = lastRemoteServerURL
+                UserDefaults.standard.set(
+                    restored == "https://" ? restored : Self.normalize(restored),
+                    forKey: defaultsKey
+                )
+            }
+        }
+        objectWillChange.send()
     }
 
     @MainActor
