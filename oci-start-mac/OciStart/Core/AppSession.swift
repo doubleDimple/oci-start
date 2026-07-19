@@ -191,6 +191,20 @@ final class AppSession: ObservableObject {
             s = "http://\(s)"
         }
         while s.hasSuffix("/") { s.removeLast() }
+        // 用户常从浏览器地址栏粘贴带路径的 URL（/login、/index、/tenants…），
+        // 若保留 path，后续 makeURL 会拼成 /tenants/boot/... 导致整站 404 Not Found。
+        if var comps = URLComponents(string: s), comps.host != nil {
+            let path = comps.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            if !path.isEmpty {
+                comps.path = ""
+                comps.query = nil
+                comps.fragment = nil
+                if let rebuilt = comps.string {
+                    s = rebuilt
+                    while s.hasSuffix("/") { s.removeLast() }
+                }
+            }
+        }
         return s
     }
 }

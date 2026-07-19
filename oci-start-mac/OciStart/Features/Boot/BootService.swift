@@ -207,6 +207,9 @@ struct BootService {
         req.setValue("text/event-stream", forHTTPHeaderField: "Accept")
         req.setValue("XMLHttpRequest", forHTTPHeaderField: "X-Requested-With")
         req.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
+        if let cookie = client.cookieHeader(for: baseURL), !cookie.isEmpty {
+            req.setValue(cookie, forHTTPHeaderField: "Cookie")
+        }
         req.timeoutInterval = 0
         return req
     }

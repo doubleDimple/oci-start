@@ -90,14 +90,44 @@ final class APIClient {
 
     /// 尽量从 JSON body 抽出可读错误（如 syncOci `{"status":"error","message":"..."}`）
     private static func friendlyServerMessage(data: Data, status: Int) -> String {
+        if status == 404 {
+            return Self.notFoundMessage(data: data)
+        }
         if let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-            if let msg = obj["message"] as? String, !msg.isEmpty { return msg }
-            if let msg = obj["msg"] as? String, !msg.isEmpty { return msg }
-            if let err = obj["error"] as? String, !err.isEmpty { return err }
+            if let msg = obj["message"] as? String, !msg.isEmpty, !Self.isGenericNotFound(msg) {
+                return msg
+            }
+            if let msg = obj["msg"] as? String, !msg.isEmpty, !Self.isGenericNotFound(msg) {
+                return msg
+            }
+            if let err = obj["error"] as? String, !err.isEmpty {
+                if Self.isGenericNotFound(err) {
+                    return Self.notFoundMessage(data: data)
+                }
+                return err
+            }
         }
         let raw = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        if !raw.isEmpty, raw.count < 240 { return raw }
+        if !raw.isEmpty, raw.count < 240 {
+            if Self.isGenericNotFound(raw) { return Self.notFoundMessage(data: data) }
+            return raw
+        }
         return "HTTP \(status)"
+    }
+
+    private static func isGenericNotFound(_ s: String) -> Bool {
+        let t = s.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return t == "not found" || t == "notfound" || t.contains("whitelabel error")
+    }
+
+    /// 远程旧版服务端缺少 Mac 聚合接口时常见 404，给出可操作提示。
+    private static func notFoundMessage(data: Data) -> String {
+        var pathHint = ""
+        if let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let path = obj["path"] as? String, !path.isEmpty {
+            pathHint = "（\(path)）"
+        }
+        return "接口不存在\(pathHint)。请确认远程服务器已升级到与客户端匹配的版本（含 Mac 原生 API）。"
     }
 
     /// Binary / export download (returns body + suggested filename).
@@ -117,8 +147,7 @@ final class APIClient {
         for (k, v) in headers { req.setValue(v, forHTTPHeaderField: k) }
         let (data, http) = try await data(for: req)
         guard (200..<300).contains(http.statusCode) else {
-            let msg = String(data: data, encoding: .utf8) ?? "HTTP \(http.statusCode)"
-            throw APIError.serverMessage(msg.isEmpty ? "HTTP \(http.statusCode)" : msg)
+            throw APIError.serverMessage(Self.friendlyServerMessage(data: data, status: http.statusCode))
         }
         var name: String?
         if let cd = http.value(forHTTPHeaderField: "Content-Disposition") {
@@ -144,8 +173,7 @@ final class APIClient {
         }
         let (data, http) = try await data(for: req)
         guard (200..<300).contains(http.statusCode) else {
-            let msg = String(data: data, encoding: .utf8) ?? "HTTP \(http.statusCode)"
-            throw APIError.serverMessage(msg.isEmpty ? "HTTP \(http.statusCode)" : msg)
+            throw APIError.serverMessage(Self.friendlyServerMessage(data: data, status: http.statusCode))
         }
         return data
     }
@@ -161,8 +189,7 @@ final class APIClient {
         }
         let (data, http) = try await data(for: req)
         guard (200..<300).contains(http.statusCode) else {
-            let msg = String(data: data, encoding: .utf8) ?? "HTTP \(http.statusCode)"
-            throw APIError.serverMessage(msg.isEmpty ? "HTTP \(http.statusCode)" : msg)
+            throw APIError.serverMessage(Self.friendlyServerMessage(data: data, status: http.statusCode))
         }
         return data
     }
@@ -239,8 +266,7 @@ final class APIClient {
         req.httpBody = body
         let (data, http) = try await data(for: req)
         guard (200..<300).contains(http.statusCode) else {
-            let msg = String(data: data, encoding: .utf8) ?? "HTTP \(http.statusCode)"
-            throw APIError.serverMessage(msg.isEmpty ? "HTTP \(http.statusCode)" : msg)
+            throw APIError.serverMessage(Self.friendlyServerMessage(data: data, status: http.statusCode))
         }
         return data
     }
@@ -382,21 +408,46 @@ final class APIClient {
 
     /// True only if a non-empty `satoken` cookie exists for this host.
     func hasSaTokenCookie(baseURL: String) -> Bool {
-        guard let host = URL(string: baseURL)?.host,
-              let cookies = HTTPCookieStorage.shared.cookies else { return false }
-        for c in cookies {
-            let domainOK = c.domain.contains(host) || host.contains(c.domain.trimmingCharacters(in: CharacterSet(charactersIn: ".")))
-            if domainOK && (c.name == "satoken" || c.name.lowercased().contains("satoken")) {
-                return !c.value.isEmpty
+        !(cookieHeader(for: baseURL) ?? "").isEmpty
+    }
+
+    /// 组装当前 baseURL 应对的 Cookie 头（含 satoken），供 SSE / 特殊请求显式携带。
+    func cookieHeader(for baseURL: String) -> String? {
+        guard let url = try? makeURL(baseURL, path: "/"),
+              let host = url.host else { return nil }
+        let all = HTTPCookieStorage.shared.cookies ?? []
+        var matched: [HTTPCookie] = []
+        for c in all {
+            let domain = c.domain.trimmingCharacters(in: CharacterSet(charactersIn: "."))
+            let domainOK = c.domain.contains(host)
+                || host.contains(domain)
+                || c.domain == host
+                || (isLocalHost(host) && isLocalHost(c.domain))
+            if domainOK {
+                matched.append(c)
             }
         }
-        // Also accept localhost / 127.0.0.1 crossover
-        for c in cookies where c.name == "satoken" && !c.value.isEmpty {
-            if c.domain.contains("localhost") || c.domain.contains("127.0.0.1") || host == "localhost" || host == "127.0.0.1" {
-                return true
+        // 优先保证 satoken 在内；无匹配时再放宽 localhost 交叉
+        if matched.isEmpty {
+            for c in all where c.name == "satoken" || c.name.lowercased().contains("satoken") {
+                if isLocalHost(host) || isLocalHost(c.domain) {
+                    matched.append(c)
+                }
             }
         }
-        return false
+        guard !matched.isEmpty else { return nil }
+        // 去重 name，后写覆盖
+        var byName: [String: String] = [:]
+        for c in matched where !c.value.isEmpty {
+            byName[c.name] = c.value
+        }
+        guard !byName.isEmpty else { return nil }
+        return byName.map { "\($0.key)=\($0.value)" }.joined(separator: "; ")
+    }
+
+    private func isLocalHost(_ raw: String) -> Bool {
+        let h = raw.trimmingCharacters(in: CharacterSet(charactersIn: ".")).lowercased()
+        return h == "localhost" || h == "127.0.0.1" || h == "0.0.0.0" || h == "::1" || h == "[::1]"
     }
 
     /// Strict session probe: must have satoken cookie AND authenticated JSON API.

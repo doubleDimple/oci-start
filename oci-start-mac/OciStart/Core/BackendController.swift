@@ -36,7 +36,7 @@ final class BackendController: ObservableObject {
         }
 
         guard let javaURL = resolveJava(),
-              let jarURL = Bundle.main.url(forResource: "server", withExtension: "jar") else {
+              let jarURL = resolveServerJar() else {
             // Xcode debug without embedded runtime
             state = .ready
             appendBackendLog("no embedded jre/jar → external mode ready")
@@ -156,6 +156,15 @@ final class BackendController: ObservableObject {
     var isReadyForLogin: Bool {
         if case .ready = state { return true }
         return false
+    }
+
+    /// Prefer `~/.ocistart/server.jar` (optional override), then bundled `server.jar`.
+    private func resolveServerJar() -> URL? {
+        let upgraded = appDataDir().appendingPathComponent("server.jar")
+        if FileManager.default.fileExists(atPath: upgraded.path) {
+            return upgraded
+        }
+        return Bundle.main.url(forResource: "server", withExtension: "jar")
     }
 
     /// Kill java processes listening on `port` if cmdline looks like our server.jar.
