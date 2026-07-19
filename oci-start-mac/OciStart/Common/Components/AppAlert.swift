@@ -37,4 +37,30 @@ enum AppAlert {
         alert.addButton(withTitle: "好")
         alert.runModal()
     }
+
+    /// 带单行输入的确认框；取消返回 nil。
+    static func prompt(
+        title: String,
+        message: String,
+        defaultValue: String = "",
+        placeholder: String = "",
+        confirmTitle: String = "确定",
+        cancelTitle: String = "取消"
+    ) -> String? {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = message
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: confirmTitle)
+        alert.addButton(withTitle: cancelTitle)
+
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 24))
+        field.stringValue = defaultValue
+        field.placeholderString = placeholder
+        alert.accessoryView = field
+        alert.window.initialFirstResponder = field
+
+        guard alert.runModal() == .alertFirstButtonReturn else { return nil }
+        return field.stringValue
+    }
 }

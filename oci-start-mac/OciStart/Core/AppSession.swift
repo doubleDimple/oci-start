@@ -167,6 +167,19 @@ final class AppSession: ObservableObject {
         if Thread.isMainThread { apply() } else { DispatchQueue.main.async(execute: apply) }
     }
 
+    /// Update site logo name (安全管理页保存 Logo 后刷新顶栏).
+    func applySiteName(_ name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        if Thread.isMainThread {
+            siteName = trimmed
+        } else {
+            DispatchQueue.main.async { [weak self] in
+                self?.siteName = trimmed
+            }
+        }
+    }
+
     func fetchLoginFactors() async -> APIClient.LoginFactorConfig {
         await auth.loginFactorConfig(baseURL: serverURL)
     }
