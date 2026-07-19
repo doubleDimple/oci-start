@@ -49,4 +49,19 @@ public class VersionController  extends BaseController{
             return ApiResponse.error("更新失败：" + e.getMessage());
         }
     }
+
+    /**
+     * 仅把 currentVersion 标记为 latestVersion，不执行安装脚本。
+     * 供桌面端（Mac）自行替换 jar 后写库使用。
+     */
+    @PostMapping("/mark-updated")
+    public ApiResponse markUpdated() {
+        try {
+            versionCheckTask.updateComplete();
+            return ApiResponse.success("版本已标记为最新");
+        } catch (Exception e) {
+            log.warn("标记版本失败, 原因为: {}", e.getMessage());
+            return ApiResponse.error("标记失败：" + e.getMessage());
+        }
+    }
 }

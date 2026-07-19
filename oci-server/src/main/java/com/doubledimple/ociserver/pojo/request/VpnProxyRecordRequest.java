@@ -2,12 +2,12 @@ package com.doubledimple.ociserver.pojo.request;
 
 import lombok.Data;
 
-import javax.persistence.Column;
+import java.util.List;
 
 /**
  * @version 1.0.0
  * @ClassName VpnProxyRecordRequest
- * @Description TODO
+ * @Description VPN 代理保存/查询请求
  * @Author doubleDimple
  * @Date 2025-11-01 13:48
  */
@@ -49,7 +49,17 @@ public class VpnProxyRecordRequest extends BaseRequest{
     private Integer forceProxy = 0;
 
     /**
-     * 绑定的父租户 ID（null / 不传 = 全局共享）
+     * 绑定的父租户 ID（兼容旧版单选；与 tenantIds 二选一，tenantIds 优先）
      */
     private Long tenantId;
+
+    /**
+     * 绑定的父租户 ID 列表（多选；空/null = 全局共享）
+     */
+    private List<Long> tenantIds;
+
+    /**
+     * 自定义名称（可选，可空）
+     */
+    private String customName;
 }

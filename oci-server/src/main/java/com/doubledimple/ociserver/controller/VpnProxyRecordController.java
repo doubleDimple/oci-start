@@ -128,4 +128,43 @@ public class VpnProxyRecordController extends BaseController{
             return ApiResponse.error("一键测试代理失败: " + e.getMessage());
         }
     }
+
+    /**
+     * 查询租户当前绑定的代理（用于租户列表护盾快捷配置）
+     * body: { tenantId }
+     */
+    @PostMapping("/findByTenant")
+    @ResponseBody
+    public ApiResponse findByTenant(@RequestBody VpnProxyRecordRequest request) {
+        try {
+            if (request == null || request.getTenantId() == null) {
+                return ApiResponse.error("租户 id 不能为空");
+            }
+            VpnProxyRecord record = vpnProxyRecordService.findBoundByTenantId(request.getTenantId());
+            return ApiResponse.success(record);
+        } catch (Exception e) {
+            log.error("查询租户绑定代理失败", e);
+            return ApiResponse.error("查询租户绑定代理失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 租户快捷绑定/解绑代理
+     * body: { tenantId, id: proxyId 可空=解绑 }
+     */
+    @PostMapping("/bindTenant")
+    @ResponseBody
+    public ApiResponse bindTenant(@RequestBody VpnProxyRecordRequest request) {
+        try {
+            if (request == null || request.getTenantId() == null) {
+                return ApiResponse.error("租户 id 不能为空");
+            }
+            // id 表示目标代理；null/0 = 解绑
+            vpnProxyRecordService.bindTenant(request.getTenantId(), request.getId());
+            return ApiResponse.success();
+        } catch (Exception e) {
+            log.error("绑定租户代理失败", e);
+            return ApiResponse.error("绑定租户代理失败: " + e.getMessage());
+        }
+    }
 }

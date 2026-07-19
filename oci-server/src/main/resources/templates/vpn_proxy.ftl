@@ -61,6 +61,7 @@
             <table class="table">
                 <thead>
                 <tr>
+                    <th>${msg.get("vpn.customName")}</th>
                     <th>${msg.get("vpn.type")}</th>
                     <th>${msg.get("vpn.url")}</th>
                     <th>${msg.get("vpn.port")}</th>
@@ -74,7 +75,7 @@
                 </thead>
                 <tbody id="tableBody">
                 <tr>
-                    <td colspan="9" style="text-align: center; padding: 30px;">
+                    <td colspan="10" style="text-align: center; padding: 30px;">
                         <i class="fas fa-spinner fa-spin" style="font-size: 24px; color: var(--accent-blue); margin-right: 10px;"></i>
                         <span style="color: var(--text-secondary);">${msg.get("common.loading")}</span>
                     </td>
@@ -112,6 +113,12 @@
                             <span>${msg.get("vpn.pane.proxy")}</span>
                         </div>
                         <p class="pane-desc">${msg.get("vpn.pane.proxy.desc")}</p>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="customName">${msg.get("vpn.customName")}</label>
+                        <input type="text" id="customName" name="customName" class="form-input"
+                               placeholder="${msg.get("vpn.customName.placeholder")}" maxlength="128">
                     </div>
 
                     <div class="form-group">
@@ -180,7 +187,7 @@
                             <i class="fas fa-link"></i>
                             <span>${msg.get("vpn.tenant")}</span>
                         </div>
-                        <p class="pane-desc">${msg.get("vpn.tenant.hint")}</p>
+                        <p class="pane-desc">${msg.get("vpn.tenant.hint.multi")}</p>
                     </div>
 
                     <div class="tenant-selected-bar" id="tenantSelectedBar">
@@ -261,7 +268,10 @@
         vpn_force: "${msg.get('vpn.force')?js_string}",
         vpn_force_on: "${msg.get('vpn.force.on')?js_string}",
         vpn_force_off: "${msg.get('vpn.force.off')?js_string}",
-        vpn_force_hint: "${msg.get('vpn.force.hint')?js_string}"
+        vpn_force_hint: "${msg.get('vpn.force.hint')?js_string}",
+        vpn_customName: "${msg.get('vpn.customName')?js_string}",
+        vpn_tenant_multi: "${msg.get('vpn.tenant.multi')?js_string}",
+        vpn_tenant_selected_count: "${msg.get('vpn.tenant.selectedCount')?js_string}"
 
     }
 </script>

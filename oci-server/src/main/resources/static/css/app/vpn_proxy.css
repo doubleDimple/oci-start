@@ -479,6 +479,38 @@ select.form-input {
     background: var(--accent-green);
 }
 
+/* 多选复选框样式（替代单选圆点） */
+.tenant-item-check {
+    width: 15px; height: 15px; border-radius: 4px;
+    border: 2px solid var(--text-secondary);
+    flex-shrink: 0;
+    position: relative;
+    opacity: 0.85;
+    box-sizing: border-box;
+}
+
+.tenant-item.is-active .tenant-item-check {
+    border-color: var(--accent-green);
+    background: var(--accent-green);
+    opacity: 1;
+}
+
+.tenant-item.is-active .tenant-item-check::after {
+    content: '';
+    position: absolute;
+    left: 3px;
+    top: 0px;
+    width: 4px;
+    height: 8px;
+    border: solid #fff;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+
+.tenant-item.is-global .tenant-item-check {
+    border-radius: 50%;
+}
+
 .tenant-item-body {
     min-width: 0; flex: 1;
 }

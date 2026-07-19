@@ -11,6 +11,8 @@ import javax.persistence.Id;
 import javax.persistence.Table;
 import javax.persistence.Transient;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * @version 1.0.0
@@ -72,16 +74,29 @@ public class VpnProxyRecord {
     private Integer forceProxy = 0;
 
     /**
-     * 绑定的父租户 ID（null 表示全局共享代理）
+     * 绑定的父租户 ID（兼容旧数据；正式绑定以 vpn_proxy_tenant_bind 为准。
+     * null 且无 bind 记录 = 全局共享代理）
      */
     @Column(name = "tenant_id")
     private Long tenantId;
 
     /**
-     * 绑定租户展示名（非持久化，列表接口填充）
+     * 自定义名称（可选，仅展示）
+     */
+    @Column(name = "custom_name", length = 128)
+    private String customName;
+
+    /**
+     * 绑定租户展示名（非持久化，列表接口填充；多租户时逗号拼接）
      */
     @Transient
     private String tenantName;
+
+    /**
+     * 绑定的父租户 ID 列表（非持久化，列表/编辑接口填充）
+     */
+    @Transient
+    private List<Long> tenantIds = new ArrayList<>();
 
     @Column(name = "update_time")
     private LocalDateTime updateTime;

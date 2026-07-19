@@ -7,8 +7,8 @@ let totalPages = 0;
 const i18n = window.I18N;
 /** @type {{id:string,name:string,region?:string}[]} */
 let parentTenants = [];
-/** 当前弹窗选中的租户 id，空字符串 = 全局共享 */
-let selectedTenantId = '';
+/** 当前弹窗多选的租户 id 列表；空数组 = 全局共享 */
+let selectedTenantIds = [];
 /** 右侧租户列表分页（不含「全局共享」固定项） */
 const TENANT_PAGE_SIZE = 7;
 let tenantPageIndex = 0;
@@ -109,18 +109,18 @@ function getFilteredTenants() {
 }
 
 /**
- * 渲染右侧可搜索 + 分页租户列表（全局共享固定在顶部，不占分页名额）
- * @param {string} selectedId 空字符串表示全局
+ * 渲染右侧可搜索 + 分页租户列表（多选；全局共享固定在顶部，不占分页名额）
+ * @param {string[]|string|null} selectedIds 空数组/空 = 全局
  * @param {object} [opts]
  * @param {boolean} [opts.resetPage] 搜索时重置到第 1 页
- * @param {boolean} [opts.jumpToSelected] 打开编辑时跳到选中租户所在页
+ * @param {boolean} [opts.jumpToSelected] 打开编辑时跳到首个选中租户所在页
  */
-function renderTenantPicker(selectedId, opts) {
+function renderTenantPicker(selectedIds, opts) {
     opts = opts || {};
-    selectedTenantId = selectedId == null ? '' : String(selectedId);
+    selectedTenantIds = normalizeSelectedIds(selectedIds);
     var hidden = document.getElementById('tenantId');
     if (hidden) {
-        hidden.value = selectedTenantId;
+        hidden.value = selectedTenantIds.length ? selectedTenantIds.join(',') : '';
     }
     updateTenantSelectedLabel();
 
@@ -134,10 +134,11 @@ function renderTenantPicker(selectedId, opts) {
     if (opts.resetPage) {
         tenantPageIndex = 0;
     }
-    if (opts.jumpToSelected && selectedTenantId) {
+    if (opts.jumpToSelected && selectedTenantIds.length) {
+        var firstId = selectedTenantIds[0];
         var jumpIdx = -1;
         for (var j = 0; j < filtered.length; j++) {
-            if (String(filtered[j].id) === String(selectedTenantId)) {
+            if (String(filtered[j].id) === String(firstId)) {
                 jumpIdx = j;
                 break;
             }
@@ -155,13 +156,17 @@ function renderTenantPicker(selectedId, opts) {
 
     var start = tenantPageIndex * TENANT_PAGE_SIZE;
     var pageItems = filtered.slice(start, start + TENANT_PAGE_SIZE);
+    var selectedSet = {};
+    for (var s = 0; s < selectedTenantIds.length; s++) {
+        selectedSet[String(selectedTenantIds[s])] = true;
+    }
 
     var html = '';
-    // 全局共享固定置顶
+    // 全局共享固定置顶（清空多选）
     var globalLabel = i18n.vpn_tenant_global || '全局共享';
-    var globalActive = !selectedTenantId ? ' is-active' : '';
+    var globalActive = selectedTenantIds.length === 0 ? ' is-active' : '';
     html += '<button type="button" class="tenant-item is-global' + globalActive + '" data-id="" onclick="selectTenant(\'\')">'
-        + '<span class="tenant-item-radio"></span>'
+        + '<span class="tenant-item-check"></span>'
         + '<span class="tenant-item-body">'
         + '<div class="tenant-item-name">' + escapeHtml(globalLabel) + '</div>'
         + '<div class="tenant-item-meta">fallback pool</div>'
@@ -175,11 +180,11 @@ function renderTenantPicker(selectedId, opts) {
     } else {
         for (var i = 0; i < pageItems.length; i++) {
             var t = pageItems[i];
-            var active = (selectedTenantId && String(selectedTenantId) === String(t.id)) ? ' is-active' : '';
+            var active = selectedSet[String(t.id)] ? ' is-active' : '';
             var meta = t.region ? escapeHtml(t.region) : ('#' + escapeHtml(t.id));
             html += '<button type="button" class="tenant-item' + active + '" data-id="' + escapeHtml(t.id)
                 + '" onclick="selectTenant(\'' + String(t.id).replace(/'/g, '') + '\')">'
-                + '<span class="tenant-item-radio"></span>'
+                + '<span class="tenant-item-check"></span>'
                 + '<span class="tenant-item-body">'
                 + '<div class="tenant-item-name" title="' + escapeHtml(t.name) + '">' + escapeHtml(t.name) + '</div>'
                 + '<div class="tenant-item-meta">' + meta + '</div>'
@@ -189,6 +194,29 @@ function renderTenantPicker(selectedId, opts) {
 
     listEl.innerHTML = html;
     renderTenantPager(tenantPageIndex + 1, totalPages, total);
+}
+
+function normalizeSelectedIds(ids) {
+    if (ids == null || ids === '') {
+        return [];
+    }
+    if (typeof ids === 'string' || typeof ids === 'number') {
+        var one = String(ids).trim();
+        return one ? [one] : [];
+    }
+    if (!Array.isArray(ids)) {
+        return [];
+    }
+    var out = [];
+    var seen = {};
+    for (var i = 0; i < ids.length; i++) {
+        if (ids[i] == null || ids[i] === '') continue;
+        var s = String(ids[i]);
+        if (seen[s]) continue;
+        seen[s] = true;
+        out.push(s);
+    }
+    return out;
 }
 
 function renderTenantPager(page, totalPages, totalItems) {
@@ -227,47 +255,77 @@ function changeTenantPage(delta) {
         return;
     }
     tenantPageIndex = next;
-    renderTenantPicker(selectedTenantId, {});
+    renderTenantPicker(selectedTenantIds, {});
 }
 
 function updateTenantSelectedLabel() {
     var el = document.getElementById('tenantSelectedLabel');
     var bar = document.getElementById('tenantSelectedBar');
     if (!el) return;
-    if (!selectedTenantId) {
+    if (!selectedTenantIds.length) {
         el.textContent = i18n.vpn_tenant_global || '全局共享';
         el.classList.add('is-global');
         if (bar) bar.classList.remove('has-tenant');
         return;
     }
-    var name = '';
-    for (var i = 0; i < parentTenants.length; i++) {
-        if (String(parentTenants[i].id) === String(selectedTenantId)) {
-            name = parentTenants[i].name;
-            break;
+    var names = [];
+    for (var s = 0; s < selectedTenantIds.length; s++) {
+        var sid = selectedTenantIds[s];
+        var name = '';
+        for (var i = 0; i < parentTenants.length; i++) {
+            if (String(parentTenants[i].id) === String(sid)) {
+                name = parentTenants[i].name;
+                break;
+            }
         }
+        names.push(name || ('#' + sid));
     }
-    el.textContent = name || ('#' + selectedTenantId);
+    if (names.length === 1) {
+        el.textContent = names[0];
+    } else {
+        var tpl = (i18n && i18n.vpn_tenant_selected_count) ? i18n.vpn_tenant_selected_count : '已选 {0} 个';
+        el.textContent = tpl.replace('{0}', String(names.length)) + '：' + names.slice(0, 3).join('、')
+            + (names.length > 3 ? '…' : '');
+    }
     el.classList.remove('is-global');
     if (bar) bar.classList.add('has-tenant');
 }
 
+/** 多选切换：空 id = 切回全局；有 id = 勾选/取消 */
 function selectTenant(id) {
-    renderTenantPicker(id == null ? '' : String(id), {});
+    if (id == null || id === '') {
+        renderTenantPicker([], {});
+        return;
+    }
+    var sid = String(id);
+    var next = selectedTenantIds.slice();
+    var idx = -1;
+    for (var i = 0; i < next.length; i++) {
+        if (String(next[i]) === sid) {
+            idx = i;
+            break;
+        }
+    }
+    if (idx >= 0) {
+        next.splice(idx, 1);
+    } else {
+        next.push(sid);
+    }
+    renderTenantPicker(next, {});
 }
 
 function onTenantSearchInput() {
-    renderTenantPicker(selectedTenantId, { resetPage: true });
+    renderTenantPicker(selectedTenantIds, { resetPage: true });
 }
 
-function fillTenantSelect(selectedId) {
+function fillTenantSelect(selectedIds) {
     var searchEl = document.getElementById('tenantSearch');
     if (searchEl) {
         searchEl.value = '';
     }
     tenantPageIndex = 0;
-    var id = selectedId == null ? '' : String(selectedId);
-    renderTenantPicker(id, { jumpToSelected: !!id });
+    var ids = normalizeSelectedIds(selectedIds);
+    renderTenantPicker(ids, { jumpToSelected: ids.length > 0 });
 }
 
 function loadProxyList(pageNum) {
@@ -391,36 +449,21 @@ function openAddModal() {
     document.getElementById('proxyForm').reset();
     document.getElementById('proxyId').value = '';
     document.getElementById('forceProxy').value = '0';
+    var cn = document.getElementById('customName');
+    if (cn) cn.value = '';
     document.getElementById('modalTitle').textContent = i18n.vpn_save || '新增代理';
-    fillTenantSelect('');
+    fillTenantSelect([]);
     refreshProxyModalSelects();
     modal.style.display = 'flex';
     setTimeout(() => { modal.style.opacity = '1'; }, 50);
 }
 
-/** 列表缓存，编辑时取完整字段（含 tenantId） */
+/** 列表缓存，编辑时取完整字段（含 tenantIds） */
 var proxyListCache = {};
 /** 正在测试中的代理 id 集合 */
 var testingProxyIds = {};
 /** 是否正在一键全部测试 */
 var isTestingAll = false;
-
-function openEditModal(id, proxyType, proxyHost, proxyPort, proxyUsername, proxyPassword, availableStatus, tenantId, forceProxy) {
-    const modal = document.getElementById('proxyModal');
-    document.getElementById('proxyId').value = id;
-    document.getElementById('proxyType').value = proxyType;
-    document.getElementById('proxyHost').value = proxyHost;
-    document.getElementById('proxyPort').value = proxyPort;
-    document.getElementById('proxyUsername').value = proxyUsername || '';
-    document.getElementById('proxyPassword').value = proxyPassword || '';
-    document.getElementById('availableStatus').value = availableStatus;
-    document.getElementById('forceProxy').value = forceProxy != null ? String(forceProxy) : '0';
-    fillTenantSelect(tenantId != null && tenantId !== '' ? tenantId : '');
-    document.getElementById('modalTitle').textContent = i18n.vpn_edit;
-    refreshProxyModalSelects();
-    modal.style.display = 'flex';
-    setTimeout(() => { modal.style.opacity = '1'; }, 50);
-}
 
 function openEditModalFromRecord(id) {
     var record = proxyListCache[id];
@@ -428,17 +471,25 @@ function openEditModalFromRecord(id) {
         Swal.fire({ title: 'error', text: 'record not found', icon: 'error' });
         return;
     }
-    openEditModal(
-        record.id,
-        record.proxyType,
-        record.proxyHost,
-        record.proxyPort,
-        record.proxyUsername || '',
-        record.proxyPassword || '',
-        record.availableStatus,
-        record.tenantId,
-        record.forceProxy
-    );
+    const modal = document.getElementById('proxyModal');
+    document.getElementById('proxyId').value = record.id;
+    document.getElementById('proxyType').value = record.proxyType;
+    document.getElementById('proxyHost').value = record.proxyHost;
+    document.getElementById('proxyPort').value = record.proxyPort;
+    document.getElementById('proxyUsername').value = record.proxyUsername || '';
+    document.getElementById('proxyPassword').value = record.proxyPassword || '';
+    document.getElementById('availableStatus').value = record.availableStatus;
+    document.getElementById('forceProxy').value = record.forceProxy != null ? String(record.forceProxy) : '0';
+    var cn = document.getElementById('customName');
+    if (cn) cn.value = record.customName || '';
+    var ids = record.tenantIds && record.tenantIds.length
+        ? record.tenantIds
+        : (record.tenantId != null && record.tenantId !== '' ? [record.tenantId] : []);
+    fillTenantSelect(ids);
+    document.getElementById('modalTitle').textContent = i18n.vpn_edit;
+    refreshProxyModalSelects();
+    modal.style.display = 'flex';
+    setTimeout(() => { modal.style.opacity = '1'; }, 50);
 }
 
 function closeProxyModal() {
@@ -458,7 +509,12 @@ function handleSaveProxy(event) {
     const proxyPassword = document.getElementById('proxyPassword').value;
     const availableStatus = document.getElementById('availableStatus').value;
     const forceProxy = document.getElementById('forceProxy').value;
-    const tenantIdRaw = selectedTenantId || (document.getElementById('tenantId') && document.getElementById('tenantId').value) || '';
+    const customNameEl = document.getElementById('customName');
+    const customName = customNameEl ? (customNameEl.value || '').trim() : '';
+    const tenantIdList = (selectedTenantIds || []).map(function(x) {
+        var n = parseInt(x, 10);
+        return isNaN(n) ? null : n;
+    }).filter(function(x) { return x != null && x > 0; });
 
     if (!proxyType || !proxyHost || !proxyPort) {
         Swal.fire({ title: 'error', text: i18n.common_plzInputGlobalRequired, icon: 'warning', confirmButtonColor: '#ff9800' });
@@ -479,7 +535,9 @@ function handleSaveProxy(event) {
         proxyPassword: proxyPassword || null,
         availableStatus: parseInt(availableStatus),
         forceProxy: parseInt(forceProxy) === 1 ? 1 : 0,
-        tenantId: tenantIdRaw ? parseInt(tenantIdRaw) : null
+        customName: customName,
+        tenantIds: tenantIdList,
+        tenantId: tenantIdList.length ? tenantIdList[0] : null
     };
     fetch('/vpnProxy/saveOrUpdate', {
         method: 'POST',
@@ -554,11 +612,22 @@ function togglePassword(element) {
 }
 
 function formatTenantLabel(record) {
-    if (record.tenantId == null || record.tenantId === '') {
+    var ids = record.tenantIds && record.tenantIds.length
+        ? record.tenantIds
+        : (record.tenantId != null && record.tenantId !== '' ? [record.tenantId] : []);
+    if (!ids.length) {
         return '<span style="color: var(--text-secondary);">' + (i18n.vpn_tenant_global || '全局共享') + '</span>';
     }
-    var name = record.tenantName || ('#' + record.tenantId);
-    return '<span style="color: #28a745;">' + escapeHtml(name) + '</span>';
+    var name = record.tenantName || ids.map(function(id) { return '#' + id; }).join(', ');
+    return '<span style="color: #28a745;" title="' + escapeHtml(name) + '">' + escapeHtml(name) + '</span>';
+}
+
+function formatCustomName(record) {
+    var n = (record.customName || '').trim();
+    if (!n) {
+        return '<span style="color: var(--text-secondary);">—</span>';
+    }
+    return '<span class="truncate" title="' + escapeHtml(n) + '">' + escapeHtml(n) + '</span>';
 }
 
 function escapeHtml(str) {
@@ -575,7 +644,7 @@ function renderTableView(data) {
     const tbody = document.getElementById('tableBody');
     proxyListCache = {};
     if (!data || data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 30px;">'
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 30px;">'
             + '<i class="fas fa-inbox" style="font-size: 24px; color: var(--text-secondary); margin-right: 10px;"></i>'
             + '<span style="color: var(--text-secondary);">'+i18n.common_noData+'</span></td></tr>';
         return;
@@ -591,8 +660,10 @@ function renderTableView(data) {
         const username = record.proxyUsername || '-';
         const password = record.proxyPassword || '';
         const tenantLabel = formatTenantLabel(record);
+        const customNameHtml = formatCustomName(record);
 
         html += '<tr data-proxy-id="' + record.id + '">';
+        html += '<td>' + customNameHtml + '</td>';
         html += '<td>' + record.proxyType + '</td>';
         html += '<td><span class="truncate" title="' + escapeHtml(record.proxyHost) + '">' + escapeHtml(record.proxyHost) + '</span></td>';
         html += '<td>' + record.proxyPort + '</td>';
@@ -649,6 +720,9 @@ function toggleForceProxy(id) {
         return;
     }
     var next = (record.forceProxy === 1 || record.forceProxy === true || record.forceProxy === '1') ? 0 : 1;
+    var tIds = record.tenantIds && record.tenantIds.length
+        ? record.tenantIds
+        : (record.tenantId != null ? [record.tenantId] : []);
     var requestData = {
         id: record.id,
         proxyType: record.proxyType,
@@ -658,7 +732,9 @@ function toggleForceProxy(id) {
         proxyPassword: record.proxyPassword || null,
         availableStatus: record.availableStatus != null ? record.availableStatus : 1,
         forceProxy: next,
-        tenantId: record.tenantId != null ? record.tenantId : null
+        customName: record.customName != null ? record.customName : '',
+        tenantIds: tIds,
+        tenantId: tIds.length ? tIds[0] : null
     };
     fetch('/vpnProxy/saveOrUpdate', {
         method: 'POST',
