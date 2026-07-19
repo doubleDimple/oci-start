@@ -5,6 +5,8 @@ final class APIClient {
     static let shared = APIClient()
 
     private let session: URLSession
+    /// 长耗时接口（如 `/tenants/syncOci`，Web 侧约 3 分钟进度窗口）
+    private let longSession: URLSession
 
     private init() {
         let config = URLSessionConfiguration.default
@@ -14,11 +16,23 @@ final class APIClient {
         config.timeoutIntervalForRequest = 30
         config.timeoutIntervalForResource = 60
         session = URLSession(configuration: config)
+
+        let longConfig = URLSessionConfiguration.default
+        longConfig.httpCookieStorage = HTTPCookieStorage.shared
+        longConfig.httpShouldSetCookies = true
+        longConfig.httpCookieAcceptPolicy = .always
+        longConfig.timeoutIntervalForRequest = 200
+        longConfig.timeoutIntervalForResource = 210
+        longSession = URLSession(configuration: longConfig)
     }
 
     // MARK: - Raw
 
     func data(for request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        try await data(for: request, using: session)
+    }
+
+    private func data(for request: URLRequest, using session: URLSession) async throws -> (Data, HTTPURLResponse) {
         do {
             let (data, response) = try await session.compatData(for: request)
             guard let http = response as? HTTPURLResponse else {
@@ -50,20 +64,53 @@ final class APIClient {
     }
 
     func getJSON(_ url: URL, headers: [String: String]) async throws -> Data {
+        try await getJSON(url, headers: headers, longTimeout: false)
+    }
+
+    /// - Parameter longTimeout: 使用长会话（约 200s），给同步类接口用。
+    func getJSON(
+        _ url: URL,
+        headers: [String: String] = [:],
+        longTimeout: Bool
+    ) async throws -> Data {
         var req = URLRequest(url: url)
         req.setValue("application/json", forHTTPHeaderField: "Accept")
         req.setValue("XMLHttpRequest", forHTTPHeaderField: "X-Requested-With")
         for (k, v) in headers { req.setValue(v, forHTTPHeaderField: k) }
-        let (data, http) = try await data(for: req)
+        if longTimeout {
+            req.timeoutInterval = 200
+        }
+        let sess = longTimeout ? longSession : session
+        let (data, http) = try await data(for: req, using: sess)
         guard (200..<300).contains(http.statusCode) else {
-            let msg = String(data: data, encoding: .utf8) ?? "HTTP \(http.statusCode)"
-            throw APIError.serverMessage(msg.isEmpty ? "HTTP \(http.statusCode)" : msg)
+            throw APIError.serverMessage(Self.friendlyServerMessage(data: data, status: http.statusCode))
         }
         return data
     }
 
+    /// 尽量从 JSON body 抽出可读错误（如 syncOci `{"status":"error","message":"..."}`）
+    private static func friendlyServerMessage(data: Data, status: Int) -> String {
+        if let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            if let msg = obj["message"] as? String, !msg.isEmpty { return msg }
+            if let msg = obj["msg"] as? String, !msg.isEmpty { return msg }
+            if let err = obj["error"] as? String, !err.isEmpty { return err }
+        }
+        let raw = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !raw.isEmpty, raw.count < 240 { return raw }
+        return "HTTP \(status)"
+    }
+
     /// Binary / export download (returns body + suggested filename).
     func download(_ url: URL, headers: [String: String] = [:]) async throws -> (Data, String?) {
+        let result = try await downloadWithHeaders(url, headers: headers)
+        return (result.data, result.filename)
+    }
+
+    /// Binary download with response header map (e.g. migration `X-MASTER-KEY`).
+    func downloadWithHeaders(
+        _ url: URL,
+        headers: [String: String] = [:]
+    ) async throws -> (data: Data, filename: String?, headers: [AnyHashable: Any]) {
         var req = URLRequest(url: url)
         req.setValue("*/*", forHTTPHeaderField: "Accept")
         req.setValue("XMLHttpRequest", forHTTPHeaderField: "X-Requested-With")
@@ -81,7 +128,7 @@ final class APIClient {
                 name = String(cd[r]).replacingOccurrences(of: "filename=", with: "").trimmingCharacters(in: .whitespaces)
             }
         }
-        return (data, name)
+        return (data, name, http.allHeaderFields)
     }
 
     func putJSON(_ url: URL, body: [String: Any]? = [:]) async throws -> Data {
@@ -132,19 +179,28 @@ final class APIClient {
 
     /// JSON POST body (empty `{}` when body is nil).
     func postJSON(_ url: URL, body: [String: Any]? = [:]) async throws -> Data {
+        try await postJSON(url, body: body, longTimeout: false)
+    }
+
+    /// - Parameter longTimeout: 使用长会话（约 200s），给安装/同步类接口用。
+    func postJSON(_ url: URL, body: [String: Any]? = [:], longTimeout: Bool) async throws -> Data {
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
         req.setValue("application/json; charset=utf-8", forHTTPHeaderField: "Content-Type")
         req.setValue("application/json", forHTTPHeaderField: "Accept")
         req.setValue("XMLHttpRequest", forHTTPHeaderField: "X-Requested-With")
+        if longTimeout {
+            req.timeoutInterval = 200
+        }
         if let body = body {
             req.httpBody = try JSONSerialization.data(withJSONObject: body)
         } else {
             req.httpBody = Data("{}".utf8)
         }
-        let (data, http) = try await data(for: req)
+        let sess = longTimeout ? longSession : session
+        let (data, http) = try await data(for: req, using: sess)
         guard (200..<300).contains(http.statusCode) else {
-            throw APIError.serverMessage("HTTP \(http.statusCode)")
+            throw APIError.serverMessage(Self.friendlyServerMessage(data: data, status: http.statusCode))
         }
         return data
     }
