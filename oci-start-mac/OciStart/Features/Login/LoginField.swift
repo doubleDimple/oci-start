@@ -6,6 +6,10 @@ import AppKit
 /// Smooth box input aligned with web `login_user.css` `.form-control`:
 /// height 48, radius 12, soft fill, focus border + glow — no bottom underline.
 struct LoginField: View {
+    /// Shared with trailing action buttons so rows stay equal height.
+    static let boxHeight: CGFloat = 48
+    static let boxRadius: CGFloat = AppInputStyle.radius
+
     let title: String
     let placeholder: String
     @Binding var text: String
@@ -23,10 +27,6 @@ struct LoginField: View {
     @State private var shakeX: CGFloat = 0
     @State private var lastShake = 0
     @State private var hovering = false
-
-    /// Login form uses a slightly taller box; same radius / colors as `AppInputStyle`.
-    private let fieldHeight: CGFloat = 48
-    private let fieldRadius: CGFloat = AppInputStyle.radius
 
     private var fillColor: Color {
         AppInputStyle.fill(dark, focused: focused)
@@ -88,13 +88,13 @@ struct LoginField: View {
                 }
             }
             .padding(.horizontal, 14)
-            .frame(height: fieldHeight)
+            .frame(height: Self.boxHeight)
             .background(
-                RoundedRectangle(cornerRadius: fieldRadius)
+                RoundedRectangle(cornerRadius: Self.boxRadius)
                     .fill(fillColor)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: fieldRadius)
+                RoundedRectangle(cornerRadius: Self.boxRadius)
                     .stroke(borderColor, lineWidth: focused ? 1.5 : 1)
             )
             .shadow(color: glowColor, radius: focused ? 6 : 0, y: 0)
@@ -102,7 +102,8 @@ struct LoginField: View {
             .animation(.easeOut(duration: 0.15), value: hovering)
             .onHover { hovering = $0 && enabled }
         }
-        .padding(.bottom, 6)
+        // Empty-title fields sit inline with action buttons — no extra bottom pad.
+        .padding(.bottom, title.isEmpty ? 0 : 6)
         .opacity(enabled ? 1 : 0.5)
         .offset(x: shakeX)
         .onChange(of: shakeToken) { token in
@@ -124,6 +125,53 @@ struct LoginField: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Trailing action (same height / radius as LoginField box)
+
+/// Pill-free side button matched to `LoginField.boxHeight` for code/send & connect rows.
+struct LoginFieldActionButton: View {
+    let title: String
+    var loading: Bool = false
+    var enabled: Bool = true
+    var dark: Bool = true
+    var minWidth: CGFloat = 108
+    let action: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                if loading {
+                    ProgressView()
+                        .scaleEffect(0.65)
+                        .frame(width: 14, height: 14)
+                }
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
+                    .lineLimit(1)
+            }
+            .foregroundColor(LoginPalette.text(dark))
+            .padding(.horizontal, 16)
+            .frame(minWidth: minWidth)
+            .frame(height: LoginField.boxHeight)
+            .background(
+                RoundedRectangle(cornerRadius: LoginField.boxRadius)
+                    .fill(LoginPalette.oauthBg(dark).opacity(hovering && enabled ? 0.92 : 1))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: LoginField.boxRadius)
+                    .stroke(LoginPalette.oauthBorder(dark), lineWidth: 1)
+            )
+        }
+        .buttonStyle(LoginPressButtonStyle())
+        .disabled(!enabled || loading)
+        .opacity(enabled ? 1 : 0.45)
+        .onHover { hovering = $0 && enabled }
+        .animation(.easeOut(duration: 0.15), value: hovering)
+        .animation(.easeOut(duration: 0.15), value: loading)
     }
 }
 
@@ -323,7 +371,7 @@ struct LoginPillButton: View {
     }
 }
 
-private struct LoginPressButtonStyle: ButtonStyle {
+struct LoginPressButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.985 : 1)

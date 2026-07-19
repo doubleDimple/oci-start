@@ -163,50 +163,67 @@ struct LoginView: View {
         if skip { return }
 
         await MainActor.run {
-            model.isLoadingMeta = true
-            model.metaError = nil
-            model.infoText = nil
+            withAnimation(.easeInOut(duration: 0.2)) {
+                model.isLoadingMeta = true
+                model.metaError = nil
+                model.infoText = nil
+                model.errorText = nil
+            }
         }
 
         do {
             let meta = try await session.fetchLoginPageMeta()
             let factors = await session.fetchLoginFactors()
             await MainActor.run {
-                model.allowRegister = meta.allowRegister
-                model.githubEnabled = meta.githubEnabled
-                model.googleEnabled = meta.googleEnabled
-                model.messageEnabled = factors.messageEnabled
-                model.mfaEnabled = factors.mfaEnabled
-                if factors.messageEnabled && !factors.mfaEnabled {
-                    model.verifyMethod = .message
-                } else if factors.mfaEnabled && !factors.messageEnabled {
-                    model.verifyMethod = .mfa
-                }
-                model.metaLoadedURL = target
-                model.isLoadingMeta = false
-                if model.isRemoteServer {
-                    model.infoText = model.locale == .enUS ? "Remote server connected" : "已连接远程服务器"
+                withAnimation(.easeInOut(duration: 0.28)) {
+                    model.allowRegister = meta.allowRegister
+                    model.githubEnabled = meta.githubEnabled
+                    model.googleEnabled = meta.googleEnabled
+                    model.messageEnabled = factors.messageEnabled
+                    model.mfaEnabled = factors.mfaEnabled
+                    if factors.messageEnabled && !factors.mfaEnabled {
+                        model.verifyMethod = .message
+                    } else if factors.mfaEnabled && !factors.messageEnabled {
+                        model.verifyMethod = .mfa
+                    }
+                    model.metaLoadedURL = target
+                    model.isLoadingMeta = false
+                    if model.isRemoteServer {
+                        model.infoText = model.locale == .enUS ? "Remote server connected" : "已连接远程服务器"
+                    }
                 }
             }
         } catch {
             await MainActor.run {
-                model.isLoadingMeta = false
-                model.metaLoadedURL = nil
-                model.metaError = error.localizedDescription
-                model.allowRegister = false
-                model.githubEnabled = false
-                model.googleEnabled = false
-                model.messageEnabled = false
-                model.mfaEnabled = false
-                if model.isRemoteServer {
-                    model.errorText = (model.locale == .enUS ? "Cannot reach server: " : "无法连接远程服务器：")
-                        + error.localizedDescription
+                withAnimation(.easeInOut(duration: 0.22)) {
+                    model.isLoadingMeta = false
+                    model.metaLoadedURL = nil
+                    model.metaError = error.localizedDescription
+                    model.allowRegister = false
+                    model.githubEnabled = false
+                    model.googleEnabled = false
+                    model.messageEnabled = false
+                    model.mfaEnabled = false
+                    if model.isRemoteServer {
+                        model.errorText = (model.locale == .enUS ? "Cannot reach server: " : "无法连接远程服务器：")
+                            + error.localizedDescription
+                    }
                 }
             }
         }
     }
 
     func applyServerAndLoadMeta() {
+        // Normalize URL immediately so remote/local mode flips smoothly.
+        let raw = model.serverURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !raw.isEmpty {
+            model.serverURL = raw
+            session.serverURL = raw
+        }
+        withAnimation(.easeInOut(duration: 0.2)) {
+            model.errorText = nil
+            model.infoText = nil
+        }
         Task { await loadMeta(force: true) }
     }
 

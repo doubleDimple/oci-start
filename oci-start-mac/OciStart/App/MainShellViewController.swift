@@ -86,7 +86,9 @@ final class MainShellViewController: NSViewController {
             .environmentObject(appearance)
         let drop = DropdownHostingView(rootView: AnyView(overlay))
         drop.isInteractive = { [weak self] in
-            self?.chrome.open != .none
+            guard let self = self else { return false }
+            // 语言/用户下拉 或 右侧消息抽屉打开时接收点击
+            return self.chrome.open != .none || self.header.showMessages
         }
         drop.translatesAutoresizingMaskIntoConstraints = true
         drop.autoresizingMask = [.width, .height]
@@ -115,11 +117,14 @@ final class MainShellViewController: NSViewController {
             }
             .store(in: &cancellables)
 
-        // Close dropdowns when navigating
+        // Close dropdowns / message drawer / 业务窗内菜单 when navigating
         navigation.selectionDidChange
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 self?.chrome.close()
+                self?.header.closeMessages()
+                // 清掉租户/实例/开机操作浮层，避免 catcher 残留挡死下一页
+                FloatingMenuDismiss.all()
             }
             .store(in: &cancellables)
     }

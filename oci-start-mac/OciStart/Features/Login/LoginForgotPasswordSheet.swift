@@ -139,11 +139,11 @@ struct LoginForgotPasswordSheet: View {
                     enabled: !model.resetBusy
                 )
 
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 8) {
                     Text("验证码")
-                        .font(.system(size: 15, weight: .heavy))
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(LoginPalette.text(dark))
-                    HStack(spacing: 12) {
+                    HStack(alignment: .center, spacing: 12) {
                         LoginField(
                             title: "",
                             placeholder: "消息验证码",
@@ -151,28 +151,21 @@ struct LoginForgotPasswordSheet: View {
                             dark: dark,
                             enabled: !model.resetBusy
                         )
-                        Button(action: onSendCode) {
-                            Text(model.resetCodeCountdown > 0
-                                 ? "\(model.resetCodeCountdown)s"
-                                 : (model.resetSendingCode ? "发送中" : "发送验证码"))
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundColor(LoginPalette.text(dark))
-                                .padding(.horizontal, 14)
-                                .frame(height: 44)
-                                .background(LoginPalette.oauthBg(dark))
-                                .cornerRadius(999)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 999)
-                                        .stroke(LoginPalette.oauthBorder(dark), lineWidth: 1)
-                                )
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        .disabled(model.resetBusy
-                                  || model.resetSendingCode
-                                  || model.resetCodeCountdown > 0
-                                  || model.resetUsername.trimmingCharacters(in: .whitespaces).isEmpty)
+                        LoginFieldActionButton(
+                            title: model.resetCodeCountdown > 0
+                                ? "\(model.resetCodeCountdown)s"
+                                : (model.resetSendingCode ? "发送中" : "发送验证码"),
+                            loading: model.resetSendingCode,
+                            enabled: !model.resetBusy
+                                && model.resetCodeCountdown == 0
+                                && !model.resetUsername.trimmingCharacters(in: .whitespaces).isEmpty,
+                            dark: dark,
+                            minWidth: 118,
+                            action: onSendCode
+                        )
                     }
                 }
+                .padding(.bottom, 6)
             }
         case 2:
             VStack(alignment: .leading, spacing: 14) {

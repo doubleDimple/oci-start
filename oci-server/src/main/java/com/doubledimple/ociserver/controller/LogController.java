@@ -59,6 +59,20 @@ public class LogController  extends BaseController{
     @ResponseBody
     public ResponseEntity<Map<String, Object>> openLogsJson(
             @RequestParam(value = "lines", required = false, defaultValue = "300") int lines) {
+        return buildLogLinesJson(lines, true);
+    }
+
+    /**
+     * 系统日志历史行 JSON（Mac 客户端 / AJAX，isBootLog=false）
+     */
+    @GetMapping("/logs/json")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> systemLogsJson(
+            @RequestParam(value = "lines", required = false, defaultValue = "300") int lines) {
+        return buildLogLinesJson(lines, false);
+    }
+
+    private ResponseEntity<Map<String, Object>> buildLogLinesJson(int lines, boolean isBootLog) {
         if (lines <= 0) {
             lines = 300;
         }
@@ -67,7 +81,7 @@ public class LogController  extends BaseController{
         }
         Map<String, Object> result = new HashMap<>();
         try {
-            List<String> logLines = logService.getLatestLogLines(lines, true);
+            List<String> logLines = logService.getLatestLogLines(lines, isBootLog);
             result.put("lines", logLines);
             result.put("count", logLines.size());
         } catch (Exception e) {
