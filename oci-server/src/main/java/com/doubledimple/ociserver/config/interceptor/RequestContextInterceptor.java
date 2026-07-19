@@ -2,12 +2,12 @@ package com.doubledimple.ociserver.config.interceptor;
 
 import com.doubledimple.dao.entity.Tenant;
 import com.doubledimple.ocicommon.enums.CloudTypeEnum;
+import com.doubledimple.ociserver.config.TenantProxyBinder;
 import com.doubledimple.ociserver.config.context.RequestContextHolder;
 import com.doubledimple.ociserver.pojo.request.RequestContext;
 import com.doubledimple.ociserver.service.TenantService;
 import com.oracle.bmc.auth.SimpleAuthenticationDetailsProvider;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
@@ -64,10 +64,10 @@ public class RequestContextInterceptor implements HandlerInterceptor {
         RequestContext context = new RequestContext();
         context.setTenant(tenant);
 
-        if (tenant.getCloudType() == CloudTypeEnum.ORACLE_CLOUD.getType()) {
+        /*if (tenant.getCloudType() == CloudTypeEnum.ORACLE_CLOUD.getType()) {
             SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
             context.setProvider(provider);
-        }
+        }*/
 
         RequestContextHolder.set(context);
 
@@ -77,5 +77,7 @@ public class RequestContextInterceptor implements HandlerInterceptor {
     @Override
     public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) {
         RequestContextHolder.clear();
+        // 释放线程池线程上的代理 ThreadLocal，避免串请求
+        TenantProxyBinder.clear();
     }
 }
