@@ -5,13 +5,40 @@ import Foundation
 enum EmailSheet: Identifiable, Equatable {
     case compose
     case addContact
+    case enableTenant(DisabledTenantItem)
     case recordDetail(EmailBodyItem)
 
     var id: String {
         switch self {
         case .compose: return "compose"
         case .addContact: return "addContact"
+        case .enableTenant(let t): return "enable-\(t.id)"
         case .recordDetail(let r): return "detail-\(r.emailBodyId.isEmpty ? "\(r.id)" : r.emailBodyId)"
+        }
+    }
+}
+
+/// 邮件管理主分区（全页切换，避免三栏嵌套滚动）。
+enum EmailMainSection: String, CaseIterable, Identifiable {
+    case tenants
+    case contacts
+    case records
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .tenants: return "租户服务"
+        case .contacts: return "收件人"
+        case .records: return "发送记录"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .tenants: return "server.rack"
+        case .contacts: return "person.2"
+        case .records: return "envelope"
         }
     }
 }

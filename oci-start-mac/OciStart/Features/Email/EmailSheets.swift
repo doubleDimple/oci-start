@@ -17,6 +17,8 @@ struct EmailSheetHost: View {
             composeSheet
         case .addContact:
             addContactSheet
+        case .enableTenant:
+            enableTenantSheet
         case .recordDetail:
             detailSheet
         }
@@ -176,6 +178,38 @@ struct EmailSheetHost: View {
                 FormFieldRow(label: "邮箱地址", required: true) {
                     AppTextField(text: $model.newContactEmail, placeholder: "name@example.com")
                 }
+                formErrorLine()
+            }
+        }
+    }
+
+    // MARK: - Enable tenant email
+
+    private var enableTenantSheet: some View {
+        let tenantName = model.enableTargetTenant?.name ?? "租户"
+        return chrome(title: "开启邮件服务", systemImage: "envelope.badge", width: 460, height: 300, footer: {
+            HStack(spacing: 10) {
+                AppButton(title: "取消", kind: .secondary) { presentationMode.wrappedValue.dismiss() }
+                AppButton(title: "确认开启", systemImage: "checkmark", kind: .primary, isLoading: model.formBusy) {
+                    model.submitEnable()
+                }
+            }
+        }) {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("为「\(tenantName)」配置发件域名")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(primaryText)
+                FormFieldRow(label: "邮箱域名", required: true) {
+                    AppTextField(
+                        text: $model.enableDomainInput,
+                        placeholder: "example.com",
+                        leadingSystemImage: "globe"
+                    )
+                }
+                Text("域名需已在 OCI Email Delivery 中验证。开启后将使用该域名作为发件后缀。")
+                    .font(.system(size: 11))
+                    .foregroundColor(mutedText)
+                    .fixedSize(horizontal: false, vertical: true)
                 formErrorLine()
             }
         }

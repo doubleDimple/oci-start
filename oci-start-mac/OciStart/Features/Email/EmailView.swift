@@ -1,6 +1,7 @@
 import SwiftUI
 
 /// 原生邮件管理（对齐 Web `/email/management` · `email.ftl`）。
+/// 列表类页面：主分区 Tab + FilterBar + 卡片/DataList + PaginationBar（对齐质量管理视觉体系）。
 struct EmailView: View {
     @EnvironmentObject private var session: AppSession
     @EnvironmentObject private var appearance: AppearanceController
@@ -15,25 +16,23 @@ struct EmailView: View {
             systemImage: "envelope",
             toolbar: { toolbar },
             content: {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 14) {
-                        if let err = model.errorText, !err.isEmpty {
-                            errorBanner(err)
-                        }
-                        HStack(alignment: .top, spacing: 14) {
-                            tenantPanel
-                                .frame(minWidth: 0, maxWidth: .infinity)
-                            contactPanel
-                                .frame(minWidth: 0, maxWidth: .infinity)
-                        }
-                        .frame(minHeight: 320)
-                        recordsPanel
+                VStack(spacing: 0) {
+                    if let err = model.errorText, !err.isEmpty {
+                        errorBanner(err)
+                            .padding(.horizontal, 16)
+                            .padding(.top, 12)
                     }
-                    .padding(16)
+                    mainSectionBar
+                        .padding(.horizontal, 16)
+                        .padding(.top, 12)
+                        .padding(.bottom, 4)
+                    filterBar
+                    sectionBody
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .appLoading(model.isLoading)
-            }
+                .appLoading(pageLoading)
+            },
+            footer: { paginationFooter }
         )
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
         .onAppear { model.start() }
@@ -47,6 +46,18 @@ struct EmailView: View {
         .environmentObject(appearance)
     }
 
+    private var pageLoading: Bool {
+        switch model.mainSection {
+        case .tenants: return model.tenantsLoading && currentTenantEmpty
+        case .contacts: return model.contactsLoading && model.contacts.isEmpty
+        case .records: return model.recordsLoading && model.records.isEmpty
+        }
+    }
+
+    private var currentTenantEmpty: Bool {
+        model.tenantTab == .enabled ? model.enabledConfigs.isEmpty : model.disabledTenants.isEmpty
+    }
+
     // MARK: - Toolbar
 
     private var toolbar: some View {
@@ -54,15 +65,584 @@ struct EmailView: View {
             AppButton(title: "发送邮件", systemImage: "square.and.pencil", kind: .primary) {
                 model.openCompose()
             }
-            AppButton(title: "刷新", systemImage: "arrow.clockwise", kind: .secondary) {
+            AppButton(
+                title: "刷新",
+                systemImage: "arrow.clockwise",
+                kind: .secondary,
+                isLoading: model.isLoading || sectionBusy
+            ) {
                 Task { await model.reloadAll() }
             }
         }
     }
 
-    private func errorBanner(_ text: String) -> some View {
+    private var sectionBusy: Bool {
+        switch model.mainSection {
+        case .tenants: return model.tenantsLoading
+        case .contacts: return model.contactsLoading
+        case .records: return model.recordsLoading
+        }
+    }
+
+    // MARK: - Main section tabs
+
+    private var mainSectionBar: some View {
+        HStack(spacing: 8) {
+            ForEach(EmailMainSection.allCases) { section in
+                sectionTab(section)
+            }
+        }
+    }
+
+    private func sectionTab(_ section: EmailMainSection) -> some View {
+        let active = model.mainSection == section
+        let count = sectionBadge(section)
+        return Button(action: { model.switchMainSection(section) }) {
+            HStack(spacing: 8) {
+                Image(systemName: section.systemImage)
+                    .font(.system(size: 12, weight: .semibold))
+                Text(section.title)
+                    .font(.system(size: 13, weight: active ? .semibold : .medium))
+                if let count = count {
+                    Text("\(count)")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(active ? .white : AppTheme.sidebarText(dark))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(
+                            Capsule()
+                                .fill(active ? AppTheme.sidebarActive : AppTheme.border(dark).opacity(0.55))
+                        )
+                }
+            }
+            .foregroundColor(active ? AppTheme.sidebarActive : AppTheme.sidebarText(dark))
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(active ? AppTheme.sidebarActive.opacity(0.12) : AppTheme.sidebarBg(dark))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(
+                        active ? AppTheme.sidebarActive.opacity(0.45) : AppTheme.border(dark).opacity(0.7),
+                        lineWidth: 1
+                    )
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+        .animation(.easeInOut(duration: 0.15), value: active)
+    }
+
+    private func sectionBadge(_ section: EmailMainSection) -> Int64? {
+        switch section {
+        case .tenants:
+            return model.tenantTab == .enabled ? model.enabledTotal : model.disabledTotal
+        case .contacts:
+            return model.contactPage.totalElements
+        case .records:
+            return model.recordPage.totalElements
+        }
+    }
+
+    // MARK: - Filter
+
+    private var filterBar: some View {
+        FilterBar(
+            leading: {
+                Group {
+                    switch model.mainSection {
+                    case .tenants:
+                        HStack(spacing: 10) {
+                            tenantSubTabs
+                            SearchField(
+                                text: Binding(
+                                    get: { model.tenantSearch },
+                                    set: { model.onTenantSearchChanged($0) }
+                                ),
+                                placeholder: "搜索租户 / 发件地址…",
+                                fillsWidth: true
+                            )
+                            .frame(maxWidth: 280)
+                        }
+                    case .contacts:
+                        Text("管理常用收件人，发送邮件时可多选")
+                            .font(.system(size: 12))
+                            .foregroundColor(AppTheme.sidebarText(dark))
+                    case .records:
+                        Text("查看历史发送结果与收件明细")
+                            .font(.system(size: 12))
+                            .foregroundColor(AppTheme.sidebarText(dark))
+                    }
+                }
+            },
+            trailing: {
+                Group {
+                    switch model.mainSection {
+                    case .tenants:
+                        AppButton(
+                            title: "刷新",
+                            systemImage: "arrow.clockwise",
+                            kind: .secondary,
+                            isLoading: model.tenantsLoading
+                        ) {
+                            model.refreshTenants()
+                        }
+                    case .contacts:
+                        HStack(spacing: 8) {
+                            AppButton(title: "添加", systemImage: "plus", kind: .primary) {
+                                model.openAddContact()
+                            }
+                            AppButton(
+                                title: "刷新",
+                                systemImage: "arrow.clockwise",
+                                kind: .secondary,
+                                isLoading: model.contactsLoading
+                            ) {
+                                Task { await model.loadContacts() }
+                            }
+                        }
+                    case .records:
+                        HStack(spacing: 8) {
+                            AppButton(title: "清空", systemImage: "trash", kind: .danger) {
+                                model.batchDeleteRecords()
+                            }
+                            AppButton(
+                                title: "刷新",
+                                systemImage: "arrow.clockwise",
+                                kind: .secondary,
+                                isLoading: model.recordsLoading
+                            ) {
+                                Task { await model.loadRecords() }
+                            }
+                        }
+                    }
+                }
+            }
+        )
+    }
+
+    private var tenantSubTabs: some View {
+        HStack(spacing: 0) {
+            ForEach(EmailTenantTab.allCases) { tab in
+                let active = model.tenantTab == tab
+                let count = tab == .enabled ? model.enabledTotal : model.disabledTotal
+                Button(action: { model.switchTenantTab(tab) }) {
+                    HStack(spacing: 5) {
+                        Text(tab.title)
+                            .font(.system(size: 12, weight: active ? .semibold : .regular))
+                        Text("\(count)")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(active ? .white : AppTheme.sidebarText(dark).opacity(0.85))
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1)
+                            .background(
+                                Capsule().fill(active ? AppTheme.sidebarActive : AppTheme.border(dark).opacity(0.5))
+                            )
+                    }
+                    .foregroundColor(active ? AppTheme.sidebarActive : AppTheme.sidebarText(dark))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(active ? AppTheme.sidebarActive.opacity(0.12) : Color.clear)
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+        }
+        .padding(3)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(AppTheme.pageBg(dark).opacity(0.65))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(AppTheme.border(dark).opacity(0.55), lineWidth: 1)
+        )
+    }
+
+    // MARK: - Section body
+
+    @ViewBuilder
+    private var sectionBody: some View {
+        switch model.mainSection {
+        case .tenants:
+            tenantsBody
+        case .contacts:
+            contactsBody
+        case .records:
+            recordsBody
+        }
+    }
+
+    // MARK: Tenants
+
+    private var tenantsBody: some View {
+        Group {
+            if model.tenantsLoading && currentTenantEmpty {
+                loadingBox
+            } else if currentTenantEmpty {
+                EmptyStateView(
+                    icon: model.tenantTab == .enabled ? "server.rack" : "checkmark.circle",
+                    title: model.tenantTab == .enabled ? "暂无已开启租户" : "全部租户均已开启",
+                    subtitle: model.tenantTab == .enabled
+                        ? "可在「未开启」中为租户启用邮件服务"
+                        : "没有待开启的租户",
+                    actionTitle: model.tenantTab == .enabled ? "查看未开启" : nil,
+                    action: model.tenantTab == .enabled
+                        ? { model.switchTenantTab(.disabled) }
+                        : nil
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if model.tenantTab == .enabled {
+                ScrollView {
+                    LazyVStack(spacing: 12) {
+                        ForEach(model.enabledConfigs) { item in
+                            enabledCard(item)
+                        }
+                    }
+                    .padding(16)
+                }
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 12) {
+                        ForEach(model.disabledTenants) { item in
+                            disabledCard(item)
+                        }
+                    }
+                    .padding(16)
+                }
+            }
+        }
+    }
+
+    private func enabledCard(_ item: TenantEmailConfigItem) -> some View {
+        HStack(alignment: .center, spacing: 14) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color(hex: "4a9eff").opacity(0.14))
+                    .frame(width: 40, height: 40)
+                Image(systemName: "envelope.fill")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(Color(hex: "4a9eff"))
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    Text(item.displaySender)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
+                        .lineLimit(1)
+                    StatusBadge(text: "运行中", tone: .success)
+                }
+                if !item.tenantName.isEmpty {
+                    Text(item.tenantName)
+                        .font(.system(size: 12))
+                        .foregroundColor(AppTheme.sidebarText(dark))
+                        .lineLimit(1)
+                }
+                usageBar(item)
+            }
+
+            Spacer(minLength: 8)
+
+            AppButton(title: "禁用", systemImage: "trash", kind: .danger) {
+                model.disableConfig(item)
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(cardBackground)
+        .overlay(cardStroke(accent: Color(hex: "4a9eff"), active: true))
+        .shadow(color: Color.black.opacity(dark ? 0.18 : 0.05), radius: 8, y: 2)
+    }
+
+    private func usageBar(_ item: TenantEmailConfigItem) -> some View {
+        HStack(spacing: 10) {
+            Text("今日 \(item.todaySentCount)/\(item.dailyEmailLimit)")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(AppTheme.sidebarText(dark))
+                .frame(width: 96, alignment: .leading)
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(AppTheme.border(dark).opacity(0.45))
+                    Capsule()
+                        .fill(item.usageTone.color(dark: dark))
+                        .frame(width: max(6, geo.size.width * CGFloat(item.usagePercent)))
+                }
+            }
+            .frame(height: 6)
+            .frame(maxWidth: 220)
+            Text("\(Int(item.usagePercent * 100))%")
+                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                .foregroundColor(item.usageTone.color(dark: dark))
+                .frame(width: 36, alignment: .trailing)
+        }
+    }
+
+    private func disabledCard(_ item: DisabledTenantItem) -> some View {
+        HStack(alignment: .center, spacing: 14) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color(hex: "9b59b6").opacity(0.14))
+                    .frame(width: 40, height: 40)
+                Image(systemName: "plus.circle")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(Color(hex: "9b59b6"))
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(item.name)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
+                    .lineLimit(1)
+                Text(item.region.isEmpty ? "未开启邮件服务" : item.region)
+                    .font(.system(size: 12))
+                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 8)
+
+            AppButton(title: "开启服务", systemImage: "plus", kind: .primary) {
+                model.openEnableTenant(item)
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(cardBackground)
+        .overlay(cardStroke(accent: Color(hex: "9b59b6"), active: false))
+        .shadow(color: Color.black.opacity(dark ? 0.18 : 0.05), radius: 8, y: 2)
+    }
+
+    // MARK: Contacts
+
+    private var contactsBody: some View {
+        Group {
+            if model.contactsLoading && model.contacts.isEmpty {
+                loadingBox
+            } else if model.contacts.isEmpty {
+                EmptyStateView(
+                    icon: "person.crop.circle.badge.plus",
+                    title: "暂无收件人",
+                    subtitle: "添加收件人后即可发送邮件",
+                    actionTitle: "添加收件人",
+                    action: { model.openAddContact() }
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 12) {
+                        ForEach(model.contacts) { c in
+                            contactCard(c)
+                        }
+                    }
+                    .padding(16)
+                }
+            }
+        }
+    }
+
+    private func contactCard(_ c: EmailContactItem) -> some View {
+        HStack(spacing: 14) {
+            ZStack {
+                Circle()
+                    .fill(Color(hex: "3fb950").opacity(0.15))
+                    .frame(width: 40, height: 40)
+                Text(avatarLetter(c))
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(Color(hex: "3fb950"))
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(c.name.isEmpty ? "—" : c.name)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
+                    .lineLimit(1)
+                Text(c.email)
+                    .font(.system(size: 12))
+                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 8)
+
+            if !c.createTime.isEmpty {
+                Text(c.createTime)
+                    .font(.system(size: 11))
+                    .foregroundColor(AppTheme.sidebarText(dark).opacity(0.85))
+            }
+
+            AppButton(title: "删除", systemImage: "trash", kind: .danger) {
+                model.deleteContact(c)
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(cardBackground)
+        .overlay(cardStroke(accent: Color(hex: "3fb950"), active: false))
+        .shadow(color: Color.black.opacity(dark ? 0.18 : 0.05), radius: 8, y: 2)
+    }
+
+    private func avatarLetter(_ c: EmailContactItem) -> String {
+        let base = c.name.isEmpty ? c.email : c.name
+        return String(base.prefix(1)).uppercased()
+    }
+
+    // MARK: Records
+
+    private var recordsBody: some View {
+        Group {
+            if model.recordsLoading && model.records.isEmpty {
+                loadingBox
+            } else if model.records.isEmpty {
+                EmptyStateView(
+                    icon: "envelope",
+                    title: "暂无发送记录",
+                    subtitle: "发送邮件后将在此显示",
+                    actionTitle: "发送邮件",
+                    action: { model.openCompose() }
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                DataList {
+                    DataListColumnHeader(title: "主题", width: nil)
+                    DataListColumnHeader(title: "时间", width: 150)
+                    DataListColumnHeader(title: "租户", width: 120)
+                    DataListColumnHeader(title: "收件", width: 56)
+                    DataListColumnHeader(title: "成功", width: 56)
+                    DataListColumnHeader(title: "失败", width: 56)
+                    DataListColumnHeader(title: "操作", width: 120, alignment: .trailing)
+                } content: {
+                    ForEach(model.records) { r in
+                        DataListRow(action: { model.openRecordDetail(r) }) {
+                            recordRow(r)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func recordRow(_ r: EmailBodyItem) -> some View {
+        HStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(r.subjectText)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
+                    .lineLimit(1)
+                if !r.senderEmail.isEmpty {
+                    Text(r.senderEmail)
+                        .font(.system(size: 11))
+                        .foregroundColor(AppTheme.sidebarText(dark))
+                        .lineLimit(1)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Text(r.createTime.isEmpty ? "—" : r.createTime)
+                .font(.system(size: 12))
+                .foregroundColor(AppTheme.sidebarText(dark))
+                .frame(width: 150, alignment: .leading)
+                .lineLimit(1)
+
+            Text(r.tenantText)
+                .font(.system(size: 12))
+                .foregroundColor(AppTheme.sidebarText(dark))
+                .frame(width: 120, alignment: .leading)
+                .lineLimit(1)
+
+            Text("\(r.receiveTotal)")
+                .font(.system(size: 12, weight: .medium, design: .monospaced))
+                .frame(width: 56, alignment: .leading)
+
+            Text("\(r.receiveSuccessTotal)")
+                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                .foregroundColor(StatusTone.success.color(dark: dark))
+                .frame(width: 56, alignment: .leading)
+
+            Text("\(r.receiveFailTotal)")
+                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                .foregroundColor(
+                    r.receiveFailTotal > 0
+                        ? StatusTone.danger.color(dark: dark)
+                        : AppTheme.sidebarText(dark)
+                )
+                .frame(width: 56, alignment: .leading)
+
+            HStack(spacing: 6) {
+                AppButton(title: "详情", kind: .secondary) {
+                    model.openRecordDetail(r)
+                }
+                AppButton(title: "删除", systemImage: "trash", kind: .danger) {
+                    model.deleteRecord(r)
+                }
+            }
+            .frame(width: 120, alignment: .trailing)
+        }
+    }
+
+    // MARK: - Pagination
+
+    @ViewBuilder
+    private var paginationFooter: some View {
+        switch model.mainSection {
+        case .tenants:
+            if model.tenantTab == .enabled {
+                PaginationBar(state: $model.enabledPage) {
+                    model.onEnabledPageChange()
+                }
+            } else {
+                PaginationBar(state: $model.disabledPage) {
+                    model.onDisabledPageChange()
+                }
+            }
+        case .contacts:
+            PaginationBar(state: $model.contactPage) {
+                model.onContactPageChange()
+            }
+        case .records:
+            PaginationBar(state: $model.recordPage) {
+                model.onRecordPageChange()
+            }
+        }
+    }
+
+    // MARK: - Shared chrome
+
+    private var cardBackground: some View {
+        RoundedRectangle(cornerRadius: 14)
+            .fill(AppTheme.sidebarBg(dark))
+    }
+
+    private func cardStroke(accent: Color, active: Bool) -> some View {
+        RoundedRectangle(cornerRadius: 14)
+            .stroke(
+                active
+                    ? accent.opacity(dark ? 0.35 : 0.28)
+                    : AppTheme.border(dark).opacity(0.7),
+                lineWidth: 1
+            )
+    }
+
+    private var loadingBox: some View {
         HStack {
+            Spacer()
+            ProgressView().scaleEffect(0.85)
+            Text("加载中…")
+                .font(.system(size: 12))
+                .foregroundColor(AppTheme.sidebarText(dark))
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func errorBanner(_ text: String) -> some View {
+        HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundColor(Color(hex: "f85149"))
             Text(text).font(.system(size: 12))
             Spacer()
             Button("重试") { Task { await model.reloadAll() } }
@@ -72,487 +652,5 @@ struct EmailView: View {
         .padding(12)
         .background(Color(hex: "f85149").opacity(0.1))
         .cornerRadius(8)
-    }
-
-    // MARK: - Tenant panel
-
-    private var tenantPanel: some View {
-        panelCard {
-            panelHeader(
-                title: "可用租户邮件服务",
-                systemImage: "server.rack",
-                trailing: {
-                    AppButton(title: "刷新", systemImage: "arrow.clockwise", kind: .secondary) {
-                        model.refreshTenants()
-                    }
-                }
-            )
-
-            // Tabs
-            HStack(spacing: 4) {
-                ForEach(EmailTenantTab.allCases) { tab in
-                    tenantTabButton(tab)
-                }
-            }
-            .padding(.bottom, 4)
-
-            SearchField(
-                text: Binding(
-                    get: { model.tenantSearch },
-                    set: { model.onTenantSearchChanged($0) }
-                ),
-                placeholder: "搜索租户…",
-                fillsWidth: true
-            )
-
-            Group {
-                if model.tenantsLoading && currentTenantEmpty {
-                    loadingBox
-                } else if currentTenantEmpty {
-                    EmptyStateView(
-                        icon: model.tenantTab == .enabled ? "server.rack" : "checkmark.circle",
-                        title: model.tenantTab == .enabled ? "暂无已开启租户" : "全部租户均已开启",
-                        subtitle: model.tenantTab == .enabled
-                            ? "可在「未开启」中为租户启用邮件服务"
-                            : nil
-                    )
-                    .frame(minHeight: 160)
-                } else if model.tenantTab == .enabled {
-                    enabledList
-                } else {
-                    disabledList
-                }
-            }
-            .frame(minHeight: 180, maxHeight: .infinity)
-
-            compactPager(
-                state: model.tenantTab == .enabled ? model.enabledPage : model.disabledPage,
-                onPrev: {
-                    if model.tenantTab == .enabled {
-                        model.enabledPage.goPrev()
-                        model.onEnabledPageChange()
-                    } else {
-                        model.disabledPage.goPrev()
-                        model.onDisabledPageChange()
-                    }
-                },
-                onNext: {
-                    if model.tenantTab == .enabled {
-                        model.enabledPage.goNext()
-                        model.onEnabledPageChange()
-                    } else {
-                        model.disabledPage.goNext()
-                        model.onDisabledPageChange()
-                    }
-                }
-            )
-        }
-    }
-
-    private var currentTenantEmpty: Bool {
-        model.tenantTab == .enabled ? model.enabledConfigs.isEmpty : model.disabledTenants.isEmpty
-    }
-
-    private func tenantTabButton(_ tab: EmailTenantTab) -> some View {
-        let active = model.tenantTab == tab
-        let count = tab == .enabled ? model.enabledTotal : model.disabledTotal
-        return Button(action: { model.switchTenantTab(tab) }) {
-            HStack(spacing: 6) {
-                Image(systemName: tab.systemImage)
-                    .font(.system(size: 11, weight: .semibold))
-                Text(tab.title)
-                    .font(.system(size: 12, weight: active ? .semibold : .regular))
-                Text("\(count)")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(active ? AppTheme.sidebarActive : AppTheme.sidebarText(dark).opacity(0.45))
-                    .cornerRadius(8)
-            }
-            .foregroundColor(active ? AppTheme.sidebarActive : AppTheme.sidebarText(dark))
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
-            .overlay(
-                Rectangle()
-                    .frame(height: 2)
-                    .foregroundColor(active ? AppTheme.sidebarActive : .clear),
-                alignment: .bottom
-            )
-        }
-        .buttonStyle(PlainButtonStyle())
-    }
-
-    private var enabledList: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                ForEach(model.enabledConfigs) { item in
-                    enabledRow(item)
-                    Divider().opacity(0.3)
-                }
-            }
-        }
-    }
-
-    private func enabledRow(_ item: TenantEmailConfigItem) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            VStack(alignment: .leading, spacing: 6) {
-                if !item.tenantName.isEmpty {
-                    Text(item.tenantName)
-                        .font(.system(size: 11))
-                        .foregroundColor(AppTheme.sidebarText(dark))
-                }
-                Text(item.displaySender)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
-                    .lineLimit(1)
-                HStack(spacing: 8) {
-                    Text("\(item.todaySentCount)/\(item.dailyEmailLimit)")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(AppTheme.sidebarText(dark))
-                    GeometryReader { geo in
-                        ZStack(alignment: .leading) {
-                            Capsule()
-                                .fill(AppTheme.border(dark).opacity(0.5))
-                            Capsule()
-                                .fill(item.usageTone.color(dark: dark))
-                                .frame(width: max(4, geo.size.width * CGFloat(item.usagePercent)))
-                        }
-                    }
-                    .frame(height: 4)
-                }
-            }
-            Spacer(minLength: 4)
-            Button(action: { model.disableConfig(item) }) {
-                Image(systemName: "trash")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(Color(hex: "f85149"))
-                    .padding(6)
-                    .background(Color(hex: "f85149").opacity(0.12))
-                    .cornerRadius(6)
-            }
-            .buttonStyle(PlainButtonStyle())
-            .help("禁用邮件服务")
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 10)
-    }
-
-    private var disabledList: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                ForEach(model.disabledTenants) { item in
-                    disabledRow(item)
-                    Divider().opacity(0.3)
-                }
-            }
-        }
-    }
-
-    private func disabledRow(_ item: DisabledTenantItem) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 10) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(item.name)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
-                        .lineLimit(1)
-                    if !item.region.isEmpty {
-                        Text(item.region)
-                            .font(.system(size: 11))
-                            .foregroundColor(AppTheme.sidebarText(dark))
-                    }
-                }
-                Spacer()
-                AppButton(
-                    title: model.expandingEnableId == item.id ? "收起" : "开启",
-                    systemImage: "plus",
-                    kind: .primary
-                ) {
-                    model.toggleEnableForm(item.id)
-                }
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 10)
-
-            if model.expandingEnableId == item.id {
-                HStack(spacing: 8) {
-                    AppTextField(
-                        text: Binding(
-                            get: { model.enableDomainDraft[item.id] ?? "" },
-                            set: { model.enableDomainDraft[item.id] = $0 }
-                        ),
-                        placeholder: "example.com"
-                    )
-                    AppButton(title: "确认", systemImage: "checkmark", kind: .primary) {
-                        model.submitEnable(item.id)
-                    }
-                    AppButton(title: "取消", kind: .secondary) {
-                        model.toggleEnableForm(item.id)
-                    }
-                }
-                .padding(.horizontal, 10)
-                .padding(.bottom, 10)
-                .padding(.top, 2)
-                .background(AppTheme.pageBg(dark).opacity(0.55))
-            }
-        }
-    }
-
-    // MARK: - Contacts panel
-
-    private var contactPanel: some View {
-        panelCard {
-            panelHeader(
-                title: "收件人",
-                systemImage: "person.crop.rectangle.stack",
-                trailing: {
-                    HStack(spacing: 6) {
-                        AppButton(title: "添加", systemImage: "plus", kind: .primary) {
-                            model.openAddContact()
-                        }
-                        AppButton(title: "刷新", systemImage: "arrow.clockwise", kind: .secondary) {
-                            Task { await model.loadContacts() }
-                        }
-                    }
-                }
-            )
-
-            Group {
-                if model.contactsLoading && model.contacts.isEmpty {
-                    loadingBox
-                } else if model.contacts.isEmpty {
-                    EmptyStateView(
-                        icon: "person.crop.circle.badge.plus",
-                        title: "暂无收件人",
-                        subtitle: "添加收件人后即可发送邮件",
-                        actionTitle: "添加收件人",
-                        action: { model.openAddContact() }
-                    )
-                    .frame(minHeight: 160)
-                } else {
-                    ScrollView {
-                        VStack(spacing: 0) {
-                            ForEach(model.contacts) { c in
-                                contactRow(c)
-                                Divider().opacity(0.3)
-                            }
-                        }
-                    }
-                }
-            }
-            .frame(minHeight: 180, maxHeight: .infinity)
-
-            compactPager(
-                state: model.contactPage,
-                onPrev: {
-                    model.contactPage.goPrev()
-                    model.onContactPageChange()
-                },
-                onNext: {
-                    model.contactPage.goNext()
-                    model.onContactPageChange()
-                }
-            )
-        }
-    }
-
-    private func contactRow(_ c: EmailContactItem) -> some View {
-        HStack(spacing: 10) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(c.name.isEmpty ? "—" : c.name)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
-                Text(c.email)
-                    .font(.system(size: 12))
-                    .foregroundColor(AppTheme.sidebarText(dark))
-            }
-            Spacer()
-            Button(action: { model.deleteContact(c) }) {
-                Image(systemName: "trash")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(Color(hex: "f85149"))
-                    .padding(6)
-                    .background(Color(hex: "f85149").opacity(0.12))
-                    .cornerRadius(6)
-            }
-            .buttonStyle(PlainButtonStyle())
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 10)
-    }
-
-    // MARK: - Records
-
-    private var recordsPanel: some View {
-        panelCard {
-            panelHeader(
-                title: "发送记录",
-                systemImage: "clock.arrow.circlepath",
-                trailing: {
-                    HStack(spacing: 6) {
-                        AppButton(title: "清空", systemImage: "trash", kind: .danger) {
-                            model.batchDeleteRecords()
-                        }
-                        AppButton(title: "刷新", systemImage: "arrow.clockwise", kind: .secondary) {
-                            Task { await model.loadRecords() }
-                        }
-                    }
-                }
-            )
-
-            Group {
-                if model.recordsLoading && model.records.isEmpty {
-                    loadingBox
-                } else if model.records.isEmpty {
-                    EmptyStateView(
-                        icon: "envelope",
-                        title: "暂无发送记录",
-                        subtitle: "发送邮件后将在此显示"
-                    )
-                    .frame(minHeight: 140)
-                } else {
-                    VStack(spacing: 0) {
-                        ForEach(model.records) { r in
-                            recordRow(r)
-                            Divider().opacity(0.3)
-                        }
-                    }
-                }
-            }
-
-            if model.recordPage.totalElements > 0 {
-                PaginationBar(state: $model.recordPage) {
-                    model.onRecordPageChange()
-                }
-            }
-        }
-    }
-
-    private func recordRow(_ r: EmailBodyItem) -> some View {
-        HStack(alignment: .center, spacing: 12) {
-            Button(action: { model.openRecordDetail(r) }) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(r.subjectText)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
-                        .lineLimit(1)
-                    HStack(spacing: 12) {
-                        metaChip(r.createTime.isEmpty ? "—" : r.createTime)
-                        metaChip(r.tenantText)
-                        metaChip("收件 \(r.receiveTotal)")
-                        Text("成功 \(r.receiveSuccessTotal)")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(StatusTone.success.color(dark: dark))
-                        Text("失败 \(r.receiveFailTotal)")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(StatusTone.danger.color(dark: dark))
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(PlainButtonStyle())
-
-            Button(action: { model.deleteRecord(r) }) {
-                Image(systemName: "trash")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(Color(hex: "f85149"))
-                    .padding(6)
-                    .background(Color(hex: "f85149").opacity(0.12))
-                    .cornerRadius(6)
-            }
-            .buttonStyle(PlainButtonStyle())
-
-            Image(systemName: "chevron.right")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(AppTheme.sidebarText(dark).opacity(0.6))
-                .onTapGesture { model.openRecordDetail(r) }
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 10)
-    }
-
-    private func metaChip(_ text: String) -> some View {
-        Text(text)
-            .font(.system(size: 11))
-            .foregroundColor(AppTheme.sidebarText(dark))
-            .lineLimit(1)
-    }
-
-    // MARK: - Shared chrome
-
-    private func panelCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            content()
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(AppTheme.sidebarBg(dark))
-        .cornerRadius(10)
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(AppTheme.border(dark).opacity(0.7), lineWidth: 1)
-        )
-    }
-
-    private func panelHeader<Trailing: View>(
-        title: String,
-        systemImage: String,
-        @ViewBuilder trailing: () -> Trailing
-    ) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: systemImage)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(AppTheme.sidebarActive)
-            Text(title)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
-            Spacer()
-            trailing()
-        }
-    }
-
-    private var loadingBox: some View {
-        HStack {
-            Spacer()
-            ProgressView().scaleEffect(0.8)
-            Text("加载中…")
-                .font(.system(size: 12))
-                .foregroundColor(AppTheme.sidebarText(dark))
-            Spacer()
-        }
-        .padding(.vertical, 40)
-    }
-
-    /// Compact prev/next for side panels (fixed page size from Web).
-    private func compactPager(state: PageState, onPrev: @escaping () -> Void, onNext: @escaping () -> Void) -> some View {
-        HStack(spacing: 8) {
-            Button(action: onPrev) {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 11, weight: .semibold))
-            }
-            .buttonStyle(PlainButtonStyle())
-            .disabled(state.isFirst)
-            .opacity(state.isFirst ? 0.35 : 1)
-
-            Text("\(state.displayPage) / \(max(state.totalPages, 1))")
-                .font(.system(size: 11, weight: .medium, design: .monospaced))
-                .foregroundColor(AppTheme.sidebarText(dark))
-
-            Button(action: onNext) {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .semibold))
-            }
-            .buttonStyle(PlainButtonStyle())
-            .disabled(state.isLast)
-            .opacity(state.isLast ? 0.35 : 1)
-
-            Spacer()
-            Text(state.rangeText)
-                .font(.system(size: 11))
-                .foregroundColor(AppTheme.sidebarText(dark).opacity(0.85))
-        }
-        .padding(.top, 4)
     }
 }
