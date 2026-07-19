@@ -511,9 +511,13 @@ public class ConsoleWebSocketHandler extends TextWebSocketHandler {
                 return false;
             }
 
-            // 获取绑定IP（用于SSH隧道本地绑定）
-            String bindingIp = getBindingIp();
-            // 获取服务器公网IP（用于客户端连接）
+            // 本地 VNC 转发必须绑 127.0.0.1，供 websockify 回环接入。
+            // 生产环境若绑公网 IP，websockify 探测 127.0.0.1:5900 会失败（Mac/Web 画面都黑）。
+            String localBind = "127.0.0.1";
+            int localVncPort = websockifyService.allocateLocalVncPort();
+            if (localVncPort <= 0) {
+                localVncPort = 5900;
+            }
             String serverIp = getServerPublicIp();
 
             sendMessage(webSocketSession, "服务器公网IP: " + serverIp + "\r\n");
@@ -521,58 +525,67 @@ public class ConsoleWebSocketHandler extends TextWebSocketHandler {
             sendMessage(webSocketSession, "连接ID: " + connectionId + "\r\n");
             sendMessage(webSocketSession, "目标实例: " + target + "\r\n");
             sendMessage(webSocketSession, "密钥文件: " + absoluteKeyFilePath + "\r\n");
+            sendMessage(webSocketSession, String.format("本机转发: %s:%d → 实例:5900\r\n", localBind, localVncPort));
 
-            //创建VNC隧道命令 - 使用公网IP
+            // SSH -L 127.0.0.1:localPort:localhost:5900（websockify 再暴露给客户端）
             String vncTunnelCommand = String.format(
                     "ssh -i %s -o StrictHostKeyChecking=no " +
                             "-o PubkeyAcceptedKeyTypes=+ssh-rsa -o HostKeyAlgorithms=+ssh-rsa " +
                             "-o ProxyCommand='ssh -i %s -o StrictHostKeyChecking=no " +
                             "-o PubkeyAcceptedKeyTypes=+ssh-rsa -o HostKeyAlgorithms=+ssh-rsa " +
                             "-W %%h:%%p -p 443 %s@%s' " +
-                            "-N -L %s:5900:localhost:5900 %s",
+                            "-N -L %s:%d:localhost:5900 %s",
                     absoluteKeyFilePath,
                     absoluteKeyFilePath,
                     connectionId,
                     proxyHost,
-                    bindingIp, // 使用适合环境的绑定IP
+                    localBind,
+                    localVncPort,
                     target
             );
 
             log.info("生成的VNC隧道命令: {}", vncTunnelCommand);
             sendMessage(webSocketSession, "执行VNC隧道命令...\r\n");
 
-            // 启动进程
             ProcessBuilder pb = new ProcessBuilder("/bin/bash", "-c", vncTunnelCommand);
-
-            // 🔧 设置工作目录为根目录，避免相对路径问题
             pb.directory(new File("/"));
 
             Process process = pb.start();
-
-            // 读取输出，保存线程引用
             Thread[] readers = readProcessOutput(webSocketSession, process);
 
-            // 等待隧道建立
             sendMessage(webSocketSession, "等待隧道建立...\r\n");
-            Thread.sleep(3000);
+            // 等进程存活 + 本地端口可连（最多 ~12s）
+            boolean portReady = false;
+            for (int i = 0; i < 40; i++) {
+                Thread.sleep(300);
+                if (!process.isAlive()) {
+                    break;
+                }
+                if (websockifyService.isPortConnectable(localBind, localVncPort)) {
+                    portReady = true;
+                    break;
+                }
+            }
 
-            // 检查进程是否仍在运行
             if (!process.isAlive()) {
                 int exitCode = process.exitValue();
                 sendMessage(webSocketSession, "SSH进程已退出，退出码: " + exitCode + "\r\n");
                 return false;
             }
 
-            // 保存进程和 reader 线程引用，统一管理生命周期
             sshTunnelProcesses.put(webSocketSession.getId(),
                     new SshTunnelProcess(process, readers[0], readers[1]));
             sessionLocks.put(webSocketSession.getId() + "_vnc_command", vncTunnelCommand);
 
-            sendMessage(webSocketSession, String.format("VNC隧道已建立: %s:5900\r\n", serverIp));
+            if (portReady) {
+                sendMessage(webSocketSession, String.format("VNC隧道已建立: %s:%d (本机)\r\n", localBind, localVncPort));
+            } else {
+                sendMessage(webSocketSession, String.format(
+                        "⚠️ SSH 进程在跑，但 %s:%d 尚未可连，仍尝试启动 websockify…\r\n",
+                        localBind, localVncPort));
+            }
 
-            // 发送VNC就绪消息
-            sendVncReadyMessage(webSocketSession, 5900, vncTunnelCommand);
-
+            sendVncReadyMessage(webSocketSession, localVncPort, vncTunnelCommand);
             return true;
         } catch (Exception e) {
             log.error("VNC隧道连接失败: {}", e.getMessage(), e);
@@ -636,24 +649,27 @@ public class ConsoleWebSocketHandler extends TextWebSocketHandler {
             response.put("connectionId", connectionId);
             response.put("command", vncCommand);
 
-            // 启动websockify代理
+            // 启动 websockify：0.0.0.0:wsPort → 127.0.0.1:vncPort
             int websockifyPort = websockifyService.startWebsockifyProxy(sessionId, vncPort);
 
             if (websockifyPort > 0) {
                 response.put("websockifyPort", websockifyPort);
-                response.put("vncUrl", String.format("ws://%s:%d/", serverIp, websockifyPort)); // 使用服务器公网IP
+                // 客户端用公网 IP + websockify 端口（HTTP 直连）；HTTPS 走 /websockify/{port}
+                response.put("vncUrl", String.format("ws://%s:%d/", serverIp, websockifyPort));
                 response.put("message", String.format("SSH隧道已建立，websockify代理端口: %d", websockifyPort));
 
-                sendMessage(webSocketSession, String.format("✅ SSH隧道已建立: %s:%d -> localhost:%d\r\n",
-                        serverIp, websockifyPort, vncPort)); // 使用服务器公网IP
-                sendMessage(webSocketSession, "✅ websockify代理已启动\r\n");
-                sendMessage(webSocketSession, "\r\n");
-
-                // 发送VNC设置指导
+                sendMessage(webSocketSession, String.format(
+                        "✅ websockify 已启动: %s:%d → 127.0.0.1:%d\r\n",
+                        serverIp, websockifyPort, vncPort));
+                sendMessage(webSocketSession, "   HTTP: ws://" + serverIp + ":" + websockifyPort + "/\r\n");
+                sendMessage(webSocketSession, "   HTTPS 反代: wss://host/websockify/" + websockifyPort + "\r\n");
             } else {
-                response.put("vncUrl", String.format("vnc://%s:%d", serverIp, vncPort)); // 使用服务器公网IP
+                // 本地转发仅绑 127.0.0.1，外网 VNC 客户端无法直连；明确告知
+                response.put("vncUrl", "");
                 response.put("message", "SSH隧道已建立，websockify启动失败");
-                sendMessage(webSocketSession, "⚠️ websockify启动失败，请使用VNC客户端连接\r\n");
+                sendMessage(webSocketSession, "⚠️ websockify 启动失败，浏览器/Mac 无法显示画面\r\n");
+                sendMessage(webSocketSession, "   请检查: 1) 是否安装 websockify  2) 本机 127.0.0.1:"
+                        + vncPort + " 是否可连  3) 服务端日志 Websockify 错误\r\n");
             }
 
             if (webSocketSession.isOpen()) {
@@ -697,8 +713,8 @@ public class ConsoleWebSocketHandler extends TextWebSocketHandler {
             );
 
             sendMessage(webSocketSession, "私钥文件: " + keyFilePath + "\r\n");
-            sendMessage(webSocketSession, "VNC隧道命令已准备就绪\r\n");
-            sendMessage(webSocketSession, String.format("然后使用VNC客户端连接到: %s:5900\r\n", serverIp));
+            sendMessage(webSocketSession, "VNC隧道命令已准备就绪（需在服务器本机执行）\r\n");
+            sendMessage(webSocketSession, "本机监听 127.0.0.1:5900；画面仍依赖 websockify\r\n");
 
             sendVncReadyMessage(webSocketSession, 5900, vncCmd);
 
@@ -969,27 +985,14 @@ public class ConsoleWebSocketHandler extends TextWebSocketHandler {
     }
 
     /**
-     * 获取服务器的绑定IP地址，用于SSH隧道
-     * 在本地开发环境使用0.0.0.0，在生产环境尝试使用公网IP
+     * SSH -L 本地绑定地址。
+     * <p>
+     * 固定 127.0.0.1：websockify 只能可靠连回环口；绑公网 IP 会导致
+     * 「隧道看似建立、websockify 探测 localhost/127.0.0.1 失败」。
+     * 对外暴露由 websockify 监听 0.0.0.0 或 Nginx /websockify/ 反代完成。
      */
     private String getBindingIp() {
-        // 获取环境变量或系统属性，判断是否为生产环境
-        String env = System.getProperty("spring.profiles.active", "dev");
-        boolean isProduction = "release".equals(env) || "prod".equals(env);
-
-        if (!isProduction) {
-            // 开发/测试环境返回0.0.0.0
-            log.info("本地开发环境，使用0.0.0.0作为绑定地址");
-            return "localhost";
-        }
-
-        // 生产环境尝试获取公网IP
-        try {
-            return getServerPublicIp();
-        } catch (Exception e) {
-            log.warn("无法获取服务器公网IP，使用0.0.0.0作为默认绑定地址: {}", e.getMessage());
-            return "0.0.0.0";
-        }
+        return "127.0.0.1";
     }
 
     /**

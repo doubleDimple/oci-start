@@ -3,6 +3,7 @@ package com.doubledimple.ociserver.controller;
 import com.doubledimple.dao.entity.InstanceDetails;
 import com.doubledimple.dao.entity.Tenant;
 import com.doubledimple.ocicommon.utils.IpUtils;
+import com.doubledimple.ociserver.config.socket.WebsockifyConfig;
 import com.doubledimple.ociserver.service.oracle.OracleInstanceService;
 import com.doubledimple.ociserver.service.TenantService;
 import com.doubledimple.ociserver.utils.oracle.OciConsoleUtils;
@@ -44,6 +45,9 @@ public class CloudShellController  extends BaseController{
 
     @Resource
     private OracleInstanceService oracleInstanceService;
+
+    @Resource
+    private WebsockifyConfig websockifyConfig;
 
     /**
      * 显示控制台终端页面
@@ -167,6 +171,41 @@ public class CloudShellController  extends BaseController{
             response.put("success", false);
             response.put("message", "创建控制台连接失败: " + e.getMessage());
             return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    /**
+     * 查询本机 websockify 是否可用（Mac 本地 / 服务器共用）。
+     */
+    @GetMapping("/websockify/status")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> websockifyStatus() {
+        Map<String, Object> response = new HashMap<>();
+        boolean installed = websockifyConfig.isWebsockifyAvailable();
+        response.put("success", true);
+        response.put("installed", installed);
+        response.put("binary", websockifyConfig.getResolvedBinary());
+        response.put("message", installed ? "websockify 已安装" : "websockify 未安装");
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 一键安装本机 websockify（pip --user / brew，无需 sudo）。
+     * 安装可能需 1–3 分钟，客户端请用长超时。
+     */
+    @PostMapping("/websockify/install")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> installWebsockify() {
+        try {
+            // 始终 200，由 success 字段表示结果，便于客户端展示安装日志
+            return ResponseEntity.ok(websockifyConfig.installWebsockify());
+        } catch (Exception e) {
+            log.error("安装 websockify 失败", e);
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("installed", false);
+            response.put("message", "安装失败: " + e.getMessage());
+            return ResponseEntity.ok(response);
         }
     }
 
