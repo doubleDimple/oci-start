@@ -13,10 +13,12 @@ final class EmailViewModel: ObservableObject {
     @Published private(set) var records: [EmailBodyItem] = []
     @Published private(set) var detailRecipients: [EmailSendRecordItem] = []
 
+    @Published var mainSection: EmailMainSection = .tenants
     @Published var tenantTab: EmailTenantTab = .enabled
     @Published var tenantSearch = ""
-    @Published var enableDomainDraft: [Int64: String] = [:]
-    @Published var expandingEnableId: Int64?
+    /// 开启邮件服务时填写的域名（Sheet）
+    @Published var enableDomainInput = ""
+    @Published private(set) var enableTargetTenant: DisabledTenantItem?
 
     @Published var enabledPage = PageState(page: 0, size: 5)
     @Published var disabledPage = PageState(page: 0, size: 5)
@@ -97,13 +99,31 @@ final class EmailViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Sections
+
+    func switchMainSection(_ section: EmailMainSection) {
+        guard mainSection != section else { return }
+        mainSection = section
+        errorText = nil
+        Task {
+            switch section {
+            case .tenants:
+                await loadCurrentTenantTab()
+                await refreshOtherTenantBadge()
+            case .contacts:
+                await loadContacts()
+            case .records:
+                await loadRecords()
+            }
+        }
+    }
+
     // MARK: - Tenants
 
     func switchTenantTab(_ tab: EmailTenantTab) {
         guard tenantTab != tab else { return }
         tenantTab = tab
         tenantSearch = ""
-        expandingEnableId = nil
         if tab == .enabled {
             enabledPage.page = 0
         } else {
@@ -129,7 +149,6 @@ final class EmailViewModel: ObservableObject {
 
     func refreshTenants() {
         tenantSearch = ""
-        expandingEnableId = nil
         if tenantTab == .enabled {
             enabledPage.page = 0
         } else {
@@ -200,41 +219,45 @@ final class EmailViewModel: ObservableObject {
         }
     }
 
-    func toggleEnableForm(_ tenantId: Int64) {
-        if expandingEnableId == tenantId {
-            expandingEnableId = nil
-        } else {
-            expandingEnableId = tenantId
-            if enableDomainDraft[tenantId] == nil {
-                enableDomainDraft[tenantId] = ""
-            }
-        }
+    func openEnableTenant(_ item: DisabledTenantItem) {
+        enableTargetTenant = item
+        enableDomainInput = ""
+        formError = nil
+        formBusy = false
+        activeSheet = .enableTenant(item)
     }
 
-    func submitEnable(_ tenantId: Int64) {
-        let domain = (enableDomainDraft[tenantId] ?? "")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+    func submitEnable() {
+        guard let tenant = enableTargetTenant else { return }
+        let domain = enableDomainInput.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !domain.isEmpty else {
-            ToastCenter.shared.error("请输入邮箱域名")
+            formError = "请输入邮箱域名"
             return
         }
         let pattern = #"^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*(\.[a-zA-Z]{2,})$"#
         guard domain.range(of: pattern, options: .regularExpression) != nil else {
-            ToastCenter.shared.error("域名格式错误，如 example.com")
+            formError = "域名格式错误，如 example.com"
             return
         }
+        formBusy = true
+        formError = nil
         Task {
             LoadingHUD.shared.begin()
             do {
-                try await service.enableEmail(tenantId: tenantId, domain: domain)
-                expandingEnableId = nil
-                enableDomainDraft[tenantId] = nil
+                try await service.enableEmail(tenantId: tenant.id, domain: domain)
+                activeSheet = nil
+                enableTargetTenant = nil
+                enableDomainInput = ""
                 disabledPage.page = 0
-                await loadDisabledTenants()
+                tenantTab = .enabled
+                enabledPage.page = 0
                 await loadEnabledConfigs()
+                await refreshOtherTenantBadge()
             } catch {
+                formError = error.localizedDescription
                 ToastCenter.shared.error(error.localizedDescription)
             }
+            formBusy = false
             LoadingHUD.shared.end()
         }
     }

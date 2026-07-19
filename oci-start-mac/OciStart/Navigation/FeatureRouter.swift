@@ -37,10 +37,32 @@ enum FeatureRouter {
                     .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
             )
         case .tenants:
-            // Native SwiftUI content in AppKit shell (same path as Dashboard/Regions).
-            // WebEmbed only for heavy secondary full pages (boot/region/cost/AI).
             root = AnyView(
                 TenantsView()
+                    .environmentObject(session)
+                    .environmentObject(navigation)
+                    .environmentObject(AppearanceController.shared)
+                    .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+            )
+        case .ai:
+            root = AnyView(
+                AiModelsView()
+                    .environmentObject(session)
+                    .environmentObject(navigation)
+                    .environmentObject(AppearanceController.shared)
+                    .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+            )
+        case .vpsList:
+            root = AnyView(
+                VpsListView()
+                    .environmentObject(session)
+                    .environmentObject(navigation)
+                    .environmentObject(AppearanceController.shared)
+                    .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+            )
+        case .aiChat:
+            root = AnyView(
+                AiChatView()
                     .environmentObject(session)
                     .environmentObject(navigation)
                     .environmentObject(AppearanceController.shared)
@@ -81,6 +103,102 @@ enum FeatureRouter {
         case .openLogs:
             root = AnyView(
                 OpenLogsView()
+                    .environmentObject(session)
+                    .environmentObject(navigation)
+                    .environmentObject(AppearanceController.shared)
+                    .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+            )
+        case .ipQuality:
+            root = AnyView(
+                IpQualityView()
+                    .environmentObject(session)
+                    .environmentObject(navigation)
+                    .environmentObject(AppearanceController.shared)
+                    .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+            )
+        case .systemLogs:
+            root = AnyView(
+                SystemLogsView()
+                    .environmentObject(session)
+                    .environmentObject(navigation)
+                    .environmentObject(AppearanceController.shared)
+                    .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+            )
+        case .settings:
+            root = AnyView(
+                SecuritySettingsView()
+                    .environmentObject(session)
+                    .environmentObject(navigation)
+                    .environmentObject(AppearanceController.shared)
+                    .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+            )
+        case .proxyConfig:
+            root = AnyView(
+                ProxyConfigView()
+                    .environmentObject(session)
+                    .environmentObject(navigation)
+                    .environmentObject(AppearanceController.shared)
+                    .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+            )
+        case .notify:
+            root = AnyView(
+                NotifyView()
+                    .environmentObject(session)
+                    .environmentObject(navigation)
+                    .environmentObject(AppearanceController.shared)
+                    .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+            )
+        case .memo:
+            root = AnyView(
+                MemoView()
+                    .environmentObject(session)
+                    .environmentObject(navigation)
+                    .environmentObject(AppearanceController.shared)
+                    .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+            )
+        case .migration:
+            root = AnyView(
+                MigrationView()
+                    .environmentObject(session)
+                    .environmentObject(navigation)
+                    .environmentObject(AppearanceController.shared)
+                    .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+            )
+        case .mfa:
+            root = AnyView(
+                MfaBackupView()
+                    .environmentObject(session)
+                    .environmentObject(navigation)
+                    .environmentObject(AppearanceController.shared)
+                    .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+            )
+        case .apiTokens:
+            root = AnyView(
+                ApiTokensView()
+                    .environmentObject(session)
+                    .environmentObject(navigation)
+                    .environmentObject(AppearanceController.shared)
+                    .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+            )
+        case .keyConfig:
+            root = AnyView(
+                KeyConfigView()
+                    .environmentObject(session)
+                    .environmentObject(navigation)
+                    .environmentObject(AppearanceController.shared)
+                    .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+            )
+        case .cloudflare:
+            root = AnyView(
+                CloudflareView()
+                    .environmentObject(session)
+                    .environmentObject(navigation)
+                    .environmentObject(AppearanceController.shared)
+                    .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+            )
+        case .edgeOne:
+            root = AnyView(
+                EdgeOneView()
                     .environmentObject(session)
                     .environmentObject(navigation)
                     .environmentObject(AppearanceController.shared)

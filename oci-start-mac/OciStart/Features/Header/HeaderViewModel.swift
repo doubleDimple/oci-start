@@ -102,8 +102,30 @@ final class HeaderViewModel: ObservableObject {
     }
 
     func openMessages() {
+        messageDetail = nil
+        selectedMessage = nil
         showMessages = true
         Task { await loadMessages(page: 1) }
+    }
+
+    func closeMessages() {
+        showMessages = false
+        messageDetail = nil
+        selectedMessage = nil
+    }
+
+    func toggleMessages() {
+        if showMessages {
+            closeMessages()
+        } else {
+            openMessages()
+        }
+    }
+
+    /// 详情 → 列表
+    func backToMessageList() {
+        messageDetail = nil
+        selectedMessage = nil
     }
 
     func loadMessages(page: Int) async {
@@ -113,7 +135,7 @@ final class HeaderViewModel: ObservableObject {
             let url = try APIClient.shared.makeURL(session.serverURL, path: "/sysMessage/list")
             let raw = try await APIClient.shared.postJSON(url, body: [
                 "pageNum": page,
-                "pageSize": 5
+                "pageSize": 12
             ])
             messagePage = parseMessagePage(raw, pageNum: page)
         } catch {
