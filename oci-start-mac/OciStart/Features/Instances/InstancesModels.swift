@@ -34,8 +34,16 @@ struct InstanceItem: Identifiable, Equatable {
     var cpuAndMem: String = "/"
     var regionName: String = ""
     var regionCode: String = ""
+    /// VPS 监控：1=在线 0=离线（对齐 Web `onLineEnable`）
+    var onLineEnable: Int = 1
+    var monitorInstalled: Bool = false
+    /// 上次探针心跳（毫秒时间戳，0 表示无）
+    var lastHeartbeatMs: Int64 = 0
+    /// 区域国旗路径，如 `/images/flags/us.svg`
+    var flagUrl: String = ""
 
     var stateLower: String { state.lowercased() }
+    var isPingOnline: Bool { onLineEnable == 1 }
     var isRunning: Bool { stateLower == "running" }
     var isStopped: Bool { stateLower == "stopped" }
     var hasIpv6: Bool {
@@ -188,6 +196,30 @@ enum InstanceJSON {
         it.cpuAndMem = cm
         it.regionName = string(m["regionName"])
         it.regionCode = string(m["regionCode"])
+        it.onLineEnable = int(m["onLineEnable"])
+        // 缺省视为在线，与后端默认 1 对齐
+        if m["onLineEnable"] == nil { it.onLineEnable = 1 }
+        if let b = m["monitorInstalled"] as? Bool {
+            it.monitorInstalled = b
+        } else {
+            let s = string(m["monitorInstalled"]).lowercased()
+            it.monitorInstalled = (s == "true" || s == "1" || s == "yes")
+        }
+        // lastHeartbeat 可能是 epoch ms / Date 字符串
+        if let n = m["lastHeartbeat"] as? NSNumber {
+            var ms = n.doubleValue
+            if ms > 0, ms < 1_000_000_000_000 { ms *= 1000 }
+            it.lastHeartbeatMs = Int64(ms)
+        } else if let n = m["lastHeartbeat"] as? Int64 {
+            var ms = Double(n)
+            if ms > 0, ms < 1_000_000_000_000 { ms *= 1000 }
+            it.lastHeartbeatMs = Int64(ms)
+        } else if let s = m["lastHeartbeat"] as? String, let n = Double(s) {
+            var ms = n
+            if ms > 0, ms < 1_000_000_000_000 { ms *= 1000 }
+            it.lastHeartbeatMs = Int64(ms)
+        }
+        it.flagUrl = string(m["flagUrl"])
         return it
     }
 
@@ -223,7 +255,11 @@ enum InstanceSheet: Identifiable, Equatable {
     case updateVpu(InstanceItem)
     case changeIp(InstanceItem)
     case terminate(InstanceItem)
-    case embed(title: String, path: String, query: [String: String])
+    /// 系统重装（Web handleQuickDD）
+    case osReset(InstanceItem)
+    /// 重装 SSE 日志
+    case ddLog(InstanceItem)
+    // SSH / 控制台 / 网络管理均走 InstancesView 整页，不再用 sheet
 
     var id: String {
         switch self {
@@ -234,7 +270,63 @@ enum InstanceSheet: Identifiable, Equatable {
         case .updateVpu(let i): return "vpu-\(i.id)"
         case .changeIp(let i): return "ip-\(i.id)"
         case .terminate(let i): return "term-\(i.id)"
-        case .embed(let title, let path, _): return "embed-\(title)-\(path)"
+        case .osReset(let i): return "dd-\(i.id)"
+        case .ddLog(let i): return "ddlog-\(i.id)"
         }
     }
+}
+
+// MARK: - OS 重装选项（对齐 Web handleQuickDD 下拉）
+
+enum InstanceDDOsOptions {
+    /// id = "osType|osVersion"
+    static let all: [SelectOption] = [
+        SelectOption(id: "alpine|3.19", title: "Alpine 3.19"),
+        SelectOption(id: "alpine|3.20", title: "Alpine 3.20"),
+        SelectOption(id: "alpine|3.21", title: "Alpine 3.21"),
+        SelectOption(id: "alpine|3.22", title: "Alpine 3.22"),
+        SelectOption(id: "debian|9", title: "Debian 9"),
+        SelectOption(id: "debian|10", title: "Debian 10"),
+        SelectOption(id: "debian|11", title: "Debian 11"),
+        SelectOption(id: "debian|12", title: "Debian 12"),
+        SelectOption(id: "debian|13", title: "Debian 13"),
+        SelectOption(id: "ubuntu|16.04", title: "Ubuntu 16.04"),
+        SelectOption(id: "ubuntu|18.04", title: "Ubuntu 18.04"),
+        SelectOption(id: "ubuntu|20.04", title: "Ubuntu 20.04"),
+        SelectOption(id: "ubuntu|22.04", title: "Ubuntu 22.04"),
+        SelectOption(id: "ubuntu|24.04", title: "Ubuntu 24.04"),
+        SelectOption(id: "ubuntu|25.10", title: "Ubuntu 25.10"),
+        SelectOption(id: "centos|9", title: "CentOS 9"),
+        SelectOption(id: "centos|10", title: "CentOS 10"),
+        SelectOption(id: "rocky|8", title: "Rocky 8"),
+        SelectOption(id: "rocky|9", title: "Rocky 9"),
+        SelectOption(id: "rocky|10", title: "Rocky 10"),
+        SelectOption(id: "almalinux|8", title: "AlmaLinux 8"),
+        SelectOption(id: "almalinux|9", title: "AlmaLinux 9"),
+        SelectOption(id: "almalinux|10", title: "AlmaLinux 10"),
+        SelectOption(id: "oracle|8", title: "Oracle 8"),
+        SelectOption(id: "oracle|9", title: "Oracle 9"),
+        SelectOption(id: "oracle|10", title: "Oracle 10"),
+        SelectOption(id: "fedora|41", title: "Fedora 41"),
+        SelectOption(id: "fedora|42", title: "Fedora 42"),
+        SelectOption(id: "anolis|7", title: "Anolis 7"),
+        SelectOption(id: "anolis|8", title: "Anolis 8"),
+        SelectOption(id: "anolis|23", title: "Anolis 23"),
+        SelectOption(id: "opencloudos|8", title: "OpenCloudOS 8"),
+        SelectOption(id: "opencloudos|9", title: "OpenCloudOS 9"),
+        SelectOption(id: "openeuler|20.03", title: "OpenEuler 20.03"),
+        SelectOption(id: "openeuler|22.03", title: "OpenEuler 22.03"),
+        SelectOption(id: "openeuler|24.03", title: "OpenEuler 24.03"),
+        SelectOption(id: "openeuler|25.09", title: "OpenEuler 25.09"),
+        SelectOption(id: "opensuse|15.6", title: "OpenSUSE 15.6"),
+        SelectOption(id: "opensuse|16.0", title: "OpenSUSE 16.0"),
+        SelectOption(id: "opensuse|tumbleweed", title: "OpenSUSE Tumbleweed"),
+        SelectOption(id: "nixos|25.05", title: "NixOS 25.05"),
+        SelectOption(id: "kali|", title: "Kali Linux"),
+        SelectOption(id: "arch|", title: "Arch Linux"),
+        SelectOption(id: "gentoo|", title: "Gentoo"),
+        SelectOption(id: "aosc|", title: "AOSC"),
+        SelectOption(id: "fnos|", title: "FNOS"),
+        SelectOption(id: "netboot.xyz|", title: "Netboot.xyz")
+    ]
 }

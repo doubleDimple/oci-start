@@ -147,7 +147,8 @@ struct InstancesService {
     }
 
     /// Web changeSpecIp：body.tenantId = 本地 instance_detail 主键
-    func changeSpecIp(localId: String, cidrRanges: [String]) async throws -> String {
+    /// 成功时可带 `details.oldIp` / `details.newIp`
+    func changeSpecIp(localId: String, cidrRanges: [String]) async throws -> (message: String, oldIp: String?, newIp: String?) {
         let url = try client.makeURL(baseURL, path: "/oci/changeSpecIp")
         guard let tid = Int64(localId) else {
             throw APIError.serverMessage("实例ID无效")
@@ -158,7 +159,16 @@ struct InstancesService {
         ])
         let r = InstanceJSON.successMessage(raw, fallback: "IP 切换成功")
         if !r.ok { throw APIError.serverMessage(r.message) }
-        return r.message
+        var oldIp: String?
+        var newIp: String?
+        if let obj = try? JSONSerialization.jsonObject(with: raw) as? [String: Any],
+           let details = obj["details"] as? [String: Any] {
+            let o = InstanceJSON.string(details["oldIp"])
+            let n = InstanceJSON.string(details["newIp"])
+            if !o.isEmpty { oldIp = o }
+            if !n.isEmpty { newIp = n }
+        }
+        return (r.message, oldIp, newIp)
     }
 
     /// Web enableIpv6：body.tenantId = 本地 instance_detail 主键
@@ -184,5 +194,26 @@ struct InstancesService {
         let r = InstanceJSON.successMessage(raw, fallback: "本地记录已删除")
         if !r.ok { throw APIError.serverMessage(r.message) }
         return r.message
+    }
+
+    /// 系统重装 SSE（Web EventSource `/oci/instance/quickDD`）
+    func streamQuickDD(
+        instanceId: String,
+        osType: String,
+        osVersion: String,
+        password: String,
+        onEvent: @escaping (String, String) -> Void
+    ) async throws {
+        let url = try client.makeURL(baseURL, path: "/oci/instance/quickDD", query: [
+            "instanceId": instanceId,
+            "osType": osType,
+            "osVersion": osVersion,
+            "ddPassword": password
+        ])
+        var req = URLRequest(url: url)
+        req.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+        req.setValue("XMLHttpRequest", forHTTPHeaderField: "X-Requested-With")
+        req.timeoutInterval = 600
+        try await TenantSSEClient.shared.stream(request: req, onEvent: onEvent)
     }
 }
