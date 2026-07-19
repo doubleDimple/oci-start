@@ -36,6 +36,7 @@ enum NavID: String, CaseIterable, Hashable {
     case settings
     case proxyConfig
     // tools
+    case aiChat
     case notify
     case memo
     case migration

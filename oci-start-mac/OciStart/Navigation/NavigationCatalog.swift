@@ -43,7 +43,7 @@ enum NavigationCatalog {
             item(.edgeOne, "EdgeOne", "globe", "/dns/edgeone")
         ]),
         (.vps, [
-            item(.vpsList, "实例列表", "list.bullet", "/vps/instances/list")
+            item(.vpsList, "监控看板", "desktopcomputer", "/vps/instances/list")
         ]),
         (.system, [
             item(.ipQuality, "质量管理", "shield", "/system/ipSettings", [1]),
@@ -52,6 +52,7 @@ enum NavigationCatalog {
             item(.proxyConfig, "代理配置", "arrow.left.arrow.right", "/vpnProxy/page")
         ]),
         (.tools, [
+            item(.aiChat, "AI 对话", "bubble.left.and.bubble.right", "/ai/chat"),
             item(.notify, "通知管理", "bell", "/system/notifySettings"),
             item(.memo, "备忘管理", "book", "/system/memPage"),
             item(.migration, "数据迁移", "arrow.left.and.right", "/migration/migPage"),
