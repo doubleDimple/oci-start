@@ -19,6 +19,10 @@ final class InstancesViewModel: ObservableObject {
     @Published var namesHidden = true
 
     @Published var activeSheet: InstanceSheet?
+    /// SSH / 控制台 / 网络管理整页（非 sheet）
+    @Published var sshItem: InstanceItem?
+    @Published var consoleItem: InstanceItem?
+    @Published var vnicItem: InstanceItem?
 
     // Form fields for sheets
     @Published var formText = ""
@@ -26,14 +30,27 @@ final class InstancesViewModel: ObservableObject {
     @Published var formMemory = "6"
     @Published var formBootSize = "50"
     @Published var formVpu = "10"
-    @Published var formCidr = ""
+    /// 多段 CIDR（对齐 Web 可动态增减输入行；留空则随机分配）
+    @Published var formCidrLines: [String] = [""]
     @Published var formVerifyCode = ""
     @Published var formError: String?
     @Published var formBusy = false
     @Published var terminateCodeSent = false
+    /// 更换 IP 成功后的 old → new 详情
+    @Published var changeIpResult: (oldIp: String, newIp: String)?
+
+    // 系统重装（Quick DD）
+    @Published var ddOsId: String = "debian|12"
+    @Published var ddPassword: String = ""
+    @Published var ddLogLines: [String] = []
+    @Published var ddRunning = false
 
     private let session: AppSession
     private var service: InstancesService { InstancesService(baseURL: session.serverURL) }
+
+    var runningCount: Int { rows.filter(\.isRunning).count }
+    var stoppedCount: Int { rows.filter(\.isStopped).count }
+    var otherStateCount: Int { rows.count - runningCount - stoppedCount }
 
     init(session: AppSession = .shared) {
         self.session = session
@@ -42,8 +59,30 @@ final class InstancesViewModel: ObservableObject {
     func start() {
         Task {
             await loadParentTenants()
-            await reload()
+            if let pending = NavigationState.shared.takePendingInstancesFilter() {
+                await applyPendingFilter(pending)
+            } else {
+                await reload()
+            }
         }
+    }
+
+    /// 从租户详情跳入：预选父租户 + 区域并按区域租户 id 过滤
+    func applyPendingFilter(_ filter: PendingTenantListFilter) async {
+        selectedParentId = filter.parentTenantId
+        selectedRegionId = filter.regionTenantId
+        filterTenantId = filter.regionTenantId
+        pageState.page = 0
+        if !selectedParentId.isEmpty {
+            do {
+                regions = try await service.listRegions(parentId: selectedParentId).sorted {
+                    $0.region.localizedCaseInsensitiveCompare($1.region) == .orderedAscending
+                }
+            } catch {
+                regions = []
+            }
+        }
+        await reload()
     }
 
     // MARK: - List
@@ -82,7 +121,10 @@ final class InstancesViewModel: ObservableObject {
 
     func loadParentTenants() async {
         do {
-            parentTenants = try await service.listParentTenants()
+            // 对齐 Web：按 userName 排序
+            parentTenants = try await service.listParentTenants().sorted {
+                $0.userName.localizedCaseInsensitiveCompare($1.userName) == .orderedAscending
+            }
         } catch {
             parentTenants = []
         }
@@ -97,7 +139,14 @@ final class InstancesViewModel: ObservableObject {
         }
         Task {
             do {
-                regions = try await service.listRegions(parentId: selectedParentId)
+                let list = try await service.listRegions(parentId: selectedParentId)
+                // 对齐 Web：按 region 排序；仅一个区域时自动选中
+                regions = list.sorted {
+                    $0.region.localizedCaseInsensitiveCompare($1.region) == .orderedAscending
+                }
+                if regions.count == 1 {
+                    selectedRegionId = regions[0].id
+                }
             } catch {
                 regions = []
                 ToastCenter.shared.error(error.localizedDescription)
@@ -243,15 +292,28 @@ final class InstancesViewModel: ObservableObject {
     }
 
     func openUpdateVpu(_ item: InstanceItem) {
-        formVpu = item.vpusPerGB.isEmpty ? "10" : item.vpusPerGB
+        let raw = Int(item.vpusPerGB) ?? 10
+        let snapped = max(0, min(120, (raw / 10) * 10))
+        formVpu = "\(snapped)"
         formError = nil
         activeSheet = .updateVpu(item)
     }
 
     func openChangeIp(_ item: InstanceItem) {
-        formCidr = ""
+        formCidrLines = [""]
+        changeIpResult = nil
         formError = nil
+        formBusy = false
         activeSheet = .changeIp(item)
+    }
+
+    func addCidrLine() {
+        formCidrLines.append("")
+    }
+
+    func removeCidrLine(at index: Int) {
+        guard formCidrLines.count > 1, formCidrLines.indices.contains(index) else { return }
+        formCidrLines.remove(at: index)
     }
 
     func openTerminate(_ item: InstanceItem) {
@@ -263,19 +325,30 @@ final class InstancesViewModel: ObservableObject {
     }
 
     func openSSH(_ item: InstanceItem) {
-        activeSheet = .embed(
-            title: "SSH — \(item.displayName)",
-            path: "/oci/terminal",
-            query: ["instanceId": item.id]
-        )
+        FloatingMenuDismiss.all()
+        activeSheet = nil
+        consoleItem = nil
+        vnicItem = nil
+        sshItem = item
+    }
+
+    func closeSSH() {
+        FloatingMenuDismiss.all()
+        sshItem = nil
     }
 
     func openConsole(_ item: InstanceItem) {
-        activeSheet = .embed(
-            title: "控制台 — \(item.displayName)",
-            path: "/oci/console/terminal/\(item.id)",
-            query: [:]
-        )
+        // 必须先关掉所有窗内菜单，否则残留 catcher/panel 会挡住控制台所有按钮
+        FloatingMenuDismiss.all()
+        activeSheet = nil
+        sshItem = nil
+        vnicItem = nil
+        consoleItem = item
+    }
+
+    func closeConsole() {
+        FloatingMenuDismiss.all()
+        consoleItem = nil
     }
 
     func openVnic(_ item: InstanceItem) {
@@ -283,11 +356,25 @@ final class InstancesViewModel: ObservableObject {
             ToastCenter.shared.error("缺少 OCI 实例 OCID")
             return
         }
-        activeSheet = .embed(
-            title: "网络 — \(item.displayName)",
-            path: "/oci/vnic/manage",
-            query: ["instanceId": item.instanceId]
-        )
+        FloatingMenuDismiss.all()
+        activeSheet = nil
+        sshItem = nil
+        consoleItem = nil
+        vnicItem = item
+    }
+
+    func closeVnic() {
+        FloatingMenuDismiss.all()
+        vnicItem = nil
+    }
+
+    /// Web handleQuickDD：选系统 + 新密码 → SSE 日志
+    func openOsReset(_ item: InstanceItem) {
+        ddOsId = "debian|12"
+        ddPassword = ""
+        formError = nil
+        formBusy = false
+        activeSheet = .osReset(item)
     }
 
     // MARK: - Sheet submits
@@ -403,17 +490,27 @@ final class InstancesViewModel: ObservableObject {
     }
 
     func submitChangeIp(_ item: InstanceItem) {
-        let ranges = formCidr
-            .split(whereSeparator: { $0 == "," || $0 == "\n" || $0 == ";" })
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        let ranges = formCidrLines
+            .flatMap { line in
+                line.split(whereSeparator: { $0 == "," || $0 == ";" })
+                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            }
             .filter { !$0.isEmpty }
         Task {
             formBusy = true
             formError = nil
+            changeIpResult = nil
             do {
-                let msg = try await service.changeSpecIp(localId: item.id, cidrRanges: ranges)
+                let result = try await service.changeSpecIp(localId: item.id, cidrRanges: ranges)
+                if let old = result.oldIp, let neu = result.newIp, !neu.isEmpty {
+                    changeIpResult = (old, neu)
+                    ToastCenter.shared.success("\(result.message)：\(old.isEmpty ? "—" : old) → \(neu)")
+                } else {
+                    ToastCenter.shared.success(result.message)
+                }
+                // 对齐 Web：展示详情后短暂停留再关闭
+                try? await Task.sleep(nanoseconds: changeIpResult == nil ? 0 : 1_200_000_000)
                 activeSheet = nil
-                ToastCenter.shared.success(msg)
                 await reload()
             } catch {
                 formError = error.localizedDescription
@@ -491,6 +588,82 @@ final class InstancesViewModel: ObservableObject {
                 ToastCenter.shared.error(error.localizedDescription)
             }
             LoadingHUD.shared.end()
+        }
+    }
+
+    // MARK: - OS Reset (Quick DD)
+
+    func submitOsReset(_ item: InstanceItem) {
+        guard !ddOsId.isEmpty else {
+            formError = "请选择目标系统"
+            return
+        }
+        let pwd = ddPassword.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !pwd.isEmpty else {
+            formError = "请输入新 root 密码"
+            return
+        }
+        let parts = ddOsId.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false)
+        let osType = parts.first.map(String.init) ?? ""
+        let osVersion = parts.count > 1 ? String(parts[1]) : ""
+        guard !osType.isEmpty else {
+            formError = "请选择目标系统"
+            return
+        }
+        guard AppAlert.confirm(
+            title: "确认系统重装",
+            message: "将重装 \(item.displayName) 为 \(osType) \(osVersion)，磁盘数据会被覆盖，且不可恢复。是否继续？",
+            confirmTitle: "开始重装",
+            style: .critical
+        ) else { return }
+
+        ddLogLines = ["开始系统重装…", "实例：\(item.displayName)", "系统：\(osType) \(osVersion)"]
+        ddRunning = true
+        formBusy = true
+        formError = nil
+        activeSheet = .ddLog(item)
+
+        let localId = item.id
+        Task {
+            do {
+                try await self.service.streamQuickDD(
+                    instanceId: localId,
+                    osType: osType,
+                    osVersion: osVersion,
+                    password: pwd
+                ) { event, data in
+                    let line: String
+                    switch event {
+                    case "log", "message":
+                        line = data
+                    case "success":
+                        line = "✅ \(data)"
+                    case "complete":
+                        line = "—— \(data) ——"
+                    case "error":
+                        line = "❌ \(data)"
+                    default:
+                        line = "[\(event)] \(data)"
+                    }
+                    guard !line.isEmpty else { return }
+                    DispatchQueue.main.async {
+                        self.ddLogLines.append(line)
+                    }
+                }
+                await MainActor.run {
+                    self.ddRunning = false
+                    self.formBusy = false
+                    self.ddLogLines.append("流已结束")
+                }
+            } catch {
+                let msg = error.localizedDescription
+                await MainActor.run {
+                    self.ddRunning = false
+                    self.formBusy = false
+                    self.ddLogLines.append("❌ \(msg)")
+                    ToastCenter.shared.error(msg)
+                }
+            }
         }
     }
 }
