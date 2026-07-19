@@ -17,6 +17,7 @@ import com.doubledimple.ociserver.pojo.request.PasswordUpdateRequest;
 import com.doubledimple.ociserver.pojo.request.TaskConfigRequest;
 import com.doubledimple.ociserver.pojo.request.TelegramConfigRequest;
 import com.doubledimple.ociserver.pojo.request.TurnstileConfigRequest;
+import com.doubledimple.ociserver.config.context.UserContext;
 import com.doubledimple.ociserver.service.impl.system.SystemConfigService;
 import com.doubledimple.ociserver.third.dns.CloudflareService;
 import com.doubledimple.ociserver.utils.EdgeUtils;
@@ -75,7 +76,9 @@ public class SystemSettingsApiController  extends BaseController{
     public ResponseEntity<?> notifyConfigs() {
         try {
             Map<String, Object> data = new HashMap<>();
+            data.put("task", systemConfigService.getTaskConfig());
             data.put("telegram", systemConfigService.getTelegramConfig());
+            data.put("proxy", systemConfigService.getProxyConfig());
             data.put("dingTalk", systemConfigService.getDingTalkConfig());
             data.put("bark", systemConfigService.getBarkConfig());
             data.put("feishu", systemConfigService.getFeishuConfig());
@@ -209,6 +212,31 @@ public class SystemSettingsApiController  extends BaseController{
             return ResponseEntity.ok(body);
         } catch (Exception e) {
             log.error("获取 IP 质量检测配置失败", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(e.getMessage());
+        }
+    }
+
+    /**
+     * 聚合返回安全管理页配置（Mac / 原生客户端加载表单用，对齐 /system/settings）
+     */
+    @GetMapping("/securitySettingsConfigs")
+    public ResponseEntity<?> securitySettingsConfigs() {
+        try {
+            Map<String, Object> data = new HashMap<>();
+            data.put("currentUsername", UserContext.getUsername());
+            data.put("siteLogoName", systemConfigService.getSiteLogoName());
+            data.put("github", systemConfigService.getGithubConfig());
+            data.put("google", systemConfigService.getGoogleConfig());
+            data.put("mfa", systemConfigService.getMfaConfig());
+            data.put("turnstile", systemConfigService.getTurnstileConfig());
+            data.put("channelNotifyEnabled", systemConfigService.getChannelNotifyEnabled());
+            Map<String, Object> body = new HashMap<>();
+            body.put("success", true);
+            body.put("data", data);
+            return ResponseEntity.ok(body);
+        } catch (Exception e) {
+            log.error("获取安全管理配置失败", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(e.getMessage());
         }
@@ -417,6 +445,26 @@ public class SystemSettingsApiController  extends BaseController{
         } catch (Exception e) {
             log.error("获取API Token状态失败", e);
             return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    /**
+     * 聚合返回 API Token 配置 + 状态（Mac / 原生客户端加载表单用）
+     */
+    @GetMapping("/apiTokenConfigs")
+    public ResponseEntity<?> apiTokenConfigs() {
+        try {
+            Map<String, Object> data = new HashMap<>();
+            data.put("config", systemConfigService.getApiTokenConfig());
+            data.put("status", systemConfigService.getApiTokenStatus());
+            Map<String, Object> body = new HashMap<>();
+            body.put("success", true);
+            body.put("data", data);
+            return ResponseEntity.ok(body);
+        } catch (Exception e) {
+            log.error("获取 API Token 配置失败", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(e.getMessage());
         }
     }
 

@@ -1767,6 +1767,49 @@ textarea::placeholder { color: var(--text-secondary); }
 }
 
 /* 租户名列 */
+.col-proxy-shield {
+    text-align: center !important;
+    vertical-align: middle;
+}
+
+.tenant-proxy-shield {
+    font-size: 15px;
+    cursor: default;
+    line-height: 1;
+}
+
+/* 已绑定（非强制）：绿色护盾 */
+.tenant-proxy-shield.is-bound {
+    color: #1abc9c;
+    filter: drop-shadow(0 0 5px rgba(26, 188, 156, 0.45));
+}
+
+/* 强制代理：橙色护盾 */
+.tenant-proxy-shield.is-force {
+    color: #e67e22;
+    filter: drop-shadow(0 0 5px rgba(230, 126, 34, 0.5));
+}
+
+/* 未绑定：灰色弱化 */
+.tenant-proxy-shield.is-unbound {
+    color: #8b949e;
+    opacity: 0.55;
+    filter: none;
+}
+
+[data-theme="light"] .tenant-proxy-shield.is-bound {
+    color: #16a085;
+}
+
+[data-theme="light"] .tenant-proxy-shield.is-force {
+    color: #d35400;
+}
+
+[data-theme="light"] .tenant-proxy-shield.is-unbound {
+    color: #95a5a6;
+    opacity: 0.65;
+}
+
 .col-name {
     max-width: 180px;
     overflow: hidden;

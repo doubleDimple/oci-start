@@ -144,6 +144,18 @@ public class Tenant {
     @Transient
     private Boolean openBootFlag =  Boolean.FALSE;
 
+    /**
+     * 是否已绑定专属代理（列表展示护盾，非持久化）
+     */
+    @Transient
+    private Boolean proxyBound = Boolean.FALSE;
+
+    /**
+     * 是否强制代理（列表护盾橙色，非持久化）
+     */
+    @Transient
+    private Boolean proxyForce = Boolean.FALSE;
+
     @Transient
     private String activeDays;
 
@@ -396,6 +408,22 @@ public class Tenant {
 
     public void setOpenBootFlag(Boolean openBootFlag) {
         this.openBootFlag = openBootFlag;
+    }
+
+    public Boolean getProxyBound() {
+        return proxyBound != null && proxyBound;
+    }
+
+    public void setProxyBound(Boolean proxyBound) {
+        this.proxyBound = proxyBound;
+    }
+
+    public Boolean getProxyForce() {
+        return proxyForce != null && proxyForce;
+    }
+
+    public void setProxyForce(Boolean proxyForce) {
+        this.proxyForce = proxyForce;
     }
 
     public String getAccountCost() {

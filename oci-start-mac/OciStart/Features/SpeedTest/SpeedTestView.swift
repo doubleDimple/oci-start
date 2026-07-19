@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Web-parity 延迟测试 page (`speed_test.ftl` + `speed_test.css`).
+/// 全球链路监控（对齐 Web `speed_test.ftl`，UI 对齐 `IpQualityView` 基准）。
 struct SpeedTestView: View {
     @EnvironmentObject private var session: AppSession
     @EnvironmentObject private var appearance: AppearanceController
@@ -8,211 +8,266 @@ struct SpeedTestView: View {
 
     private var dark: Bool { appearance.isDarkEffective }
 
-    private let columns = [
-        GridItem(.adaptive(minimum: 220, maximum: 320), spacing: 16)
+    private let regionColumns = [
+        GridItem(.adaptive(minimum: 200, maximum: 360), spacing: 14)
     ]
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                pageHeader
-
-                if let err = model.errorText, !err.isEmpty {
-                    errorBanner(err)
-                }
-
-                statsRow
-
-                if !model.top5.isEmpty {
-                    rankSection
-                }
-
-                controlBar
-
-                if model.isLoadingRegions && model.regions.isEmpty {
-                    HStack {
-                        Spacer()
-                        ProgressView()
-                        Text("loading...")
-                            .font(.system(size: 13))
-                            .foregroundColor(SpeedTestTheme.muted(dark))
-                        Spacer()
-                    }
-                    .padding(.vertical, 40)
-                } else {
-                    LazyVGrid(columns: columns, spacing: 16) {
-                        ForEach(model.regions) { region in
-                            regionCard(region)
+        PageScaffold(
+            title: "全球链路监控",
+            subtitle: "出口 IP · 区域延迟探测 · Top5 优选",
+            systemImage: "globe",
+            toolbar: { toolbar },
+            content: {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) {
+                        if let err = model.errorText, !err.isEmpty {
+                            errorBanner(err)
                         }
+
+                        statsRow
+
+                        if !model.top5.isEmpty {
+                            rankSection
+                        }
+
+                        regionSection
                     }
+                    .padding(16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .appLoading(model.isLoadingRegions && model.regions.isEmpty)
             }
-            .padding(20)
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .background(SpeedTestTheme.bg(dark).ignoresSafeArea())
+        )
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
         .onAppear { model.start() }
         .onReceive(NotificationCenter.default.publisher(for: .ociReloadCurrentPage)) { _ in
             Task { await model.refresh() }
         }
+        .environmentObject(appearance)
     }
 
-    // MARK: - Header
+    // MARK: - Toolbar
 
-    private var pageHeader: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "globe")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundColor(SpeedTestTheme.primary(dark))
-            Text("全球链路监控")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundColor(SpeedTestTheme.text(dark))
-            Spacer()
+    private var toolbar: some View {
+        HStack(spacing: 8) {
+            AppButton(
+                title: "刷新",
+                systemImage: "arrow.clockwise",
+                kind: .secondary,
+                isLoading: model.isLoadingRegions && !model.isTesting
+            ) {
+                Task { await model.refresh() }
+            }
+            AppButton(
+                title: model.isTesting ? "测速中…" : "开始测速",
+                systemImage: "bolt.fill",
+                kind: .primary,
+                isLoading: model.isTesting,
+                enabled: !model.regions.isEmpty
+            ) {
+                Task { await model.runTest() }
+            }
         }
-        .padding(.bottom, 4)
     }
+
+    // MARK: - Error
 
     private func errorBanner(_ text: String) -> some View {
-        HStack {
+        HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
-            Text(text).font(.system(size: 12))
-            Spacer()
-            Button("重试") { Task { await model.refresh() } }
-                .buttonStyle(PlainButtonStyle())
+                .font(.system(size: 12))
+            Text(text)
+                .font(.system(size: 12))
+            Spacer(minLength: 8)
+            AppButton(title: "重试", kind: .secondary) {
+                Task { await model.refresh() }
+            }
         }
-        .foregroundColor(SpeedTestTheme.danger)
-        .padding(12)
-        .background(SpeedTestTheme.danger.opacity(0.1))
-        .cornerRadius(8)
+        .foregroundColor(Color(hex: "f85149"))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(Color(hex: "f85149").opacity(0.1))
+        .cornerRadius(10)
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color(hex: "f85149").opacity(0.25), lineWidth: 1)
+        )
     }
 
-    // MARK: - Stats (web .dashboard-header)
+    // MARK: - Stats（三等宽紧凑指标卡，避免 2fr 大空白）
 
     private var statsRow: some View {
-        // web: grid 2fr 1fr 1fr
-        HStack(alignment: .top, spacing: 16) {
-            statusCard(label: "当前出口 IP", value: model.clientIPText, icon: "network")
-                .frame(maxWidth: .infinity)
-                .frame(minWidth: 0)
-                .layoutPriority(2)
-            statusCard(label: "最优区域", value: model.bestRegionText, icon: "trophy.fill")
-                .frame(maxWidth: .infinity)
-                .frame(minWidth: 0)
-            statusCard(label: "平均延迟", value: model.avgLatencyText, icon: "stopwatch")
-                .frame(maxWidth: .infinity)
-                .frame(minWidth: 0)
+        HStack(alignment: .top, spacing: 14) {
+            metricCard(
+                label: "当前出口 IP",
+                value: model.clientIPText,
+                systemImage: "network",
+                accent: Color(hex: "4a9eff")
+            )
+            metricCard(
+                label: "最优区域",
+                value: model.bestRegionText,
+                systemImage: "trophy.fill",
+                accent: Color(hex: "f0b429")
+            )
+            metricCard(
+                label: "平均延迟",
+                value: model.avgLatencyText,
+                systemImage: "stopwatch",
+                accent: AppTheme.sidebarActive
+            )
         }
     }
 
-    private func statusCard(label: String, value: String, icon: String) -> some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 8) {
-                Text(label.uppercased())
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(SpeedTestTheme.muted(dark))
-                    .tracking(0.5)
-                Text(value)
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundColor(SpeedTestTheme.text(dark))
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.7)
+    private func metricCard(label: String, value: String, systemImage: String, accent: Color) -> some View {
+        HStack(alignment: .center, spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(accent.opacity(0.14))
+                    .frame(width: 40, height: 40)
+                Image(systemName: systemImage)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(accent)
             }
-            Spacer(minLength: 8)
-            Image(systemName: icon)
-                .font(.system(size: 28))
-                .foregroundColor(SpeedTestTheme.primary(dark).opacity(0.12))
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(label)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .lineLimit(1)
+                Text(value)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.75)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(18)
-        .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(SpeedTestTheme.surface2(dark))
-        )
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, minHeight: 68, alignment: .leading)
+        .background(AppTheme.sidebarBg(dark))
+        .cornerRadius(12)
         .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(SpeedTestTheme.border(dark), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(AppTheme.border(dark).opacity(0.7), lineWidth: 1)
         )
     }
 
-    // MARK: - Top5 (web .rank-section)
+    // MARK: - Top5
 
     private var rankSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 Image(systemName: "medal.fill")
+                    .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(SpeedTestTheme.success)
                 Text("延迟 Top 5（< 150ms）")
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(SpeedTestTheme.muted(dark))
+                    .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
+                Spacer(minLength: 0)
+                Text("\(model.top5.count)")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 2)
+                    .background(AppTheme.sidebarHover(dark))
+                    .cornerRadius(8)
             }
-            HStack(spacing: 10) {
-                ForEach(model.top5) { item in
+
+            // 用自适应流式布局，避免单行 Spacer 撑出空洞
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: 120, maximum: 220), spacing: 8)],
+                alignment: .leading,
+                spacing: 8
+            ) {
+                ForEach(Array(model.top5.enumerated()), id: \.element.id) { index, item in
                     HStack(spacing: 6) {
-                        Image(systemName: "bolt.fill")
-                            .font(.system(size: 10))
+                        Text("#\(index + 1)")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(SpeedTestTheme.success.opacity(0.85))
                         Text(item.name)
+                            .font(.system(size: 12, weight: .semibold))
+                            .lineLimit(1)
                         Text("\(item.ms)ms")
+                            .font(Font.system(size: 12, weight: .bold).monospacedDigit())
                     }
-                    .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(SpeedTestTheme.success)
-                    .padding(.horizontal, 12)
+                    .padding(.horizontal, 10)
                     .padding(.vertical, 6)
-                    .background(
-                        Capsule()
-                            .fill(SpeedTestTheme.success.opacity(0.08))
-                    )
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(SpeedTestTheme.success.opacity(0.08))
+                    .cornerRadius(8)
                     .overlay(
-                        Capsule()
-                            .stroke(SpeedTestTheme.success, lineWidth: 1)
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(SpeedTestTheme.success.opacity(0.45), lineWidth: 1)
                     )
+                }
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(AppTheme.sidebarBg(dark))
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(AppTheme.border(dark).opacity(0.7), lineWidth: 1)
+        )
+    }
+
+    // MARK: - Regions
+
+    private var regionSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Text("区域节点")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
+                Text("\(model.regions.count)")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 2)
+                    .background(AppTheme.sidebarHover(dark))
+                    .cornerRadius(8)
+                if model.isTesting {
+                    HStack(spacing: 6) {
+                        ProgressView().scaleEffect(0.55)
+                        Text("探测中")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(AppTheme.sidebarText(dark))
+                    }
                 }
                 Spacer(minLength: 0)
             }
-        }
-        .padding(15)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(SpeedTestTheme.surface2(dark))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(SpeedTestTheme.border(dark), lineWidth: 1)
-        )
-    }
 
-    // MARK: - Control
-
-    private var controlBar: some View {
-        HStack {
-            Spacer()
-            Button(action: {
-                Task { await model.runTest() }
-            }) {
-                HStack(spacing: 6) {
-                    if model.isTesting {
-                        ProgressView().scaleEffect(0.65)
-                    } else {
-                        Image(systemName: "bolt.fill")
+            if model.regions.isEmpty && !model.isLoadingRegions {
+                EmptyStateView(
+                    icon: "globe",
+                    title: "暂无区域节点",
+                    subtitle: "无法加载 Oracle 区域 endpoint，请检查后端连接",
+                    actionTitle: "重新加载",
+                    action: { Task { await model.refresh() } }
+                )
+                .frame(minHeight: 180)
+                .background(AppTheme.sidebarBg(dark))
+                .cornerRadius(12)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(AppTheme.border(dark).opacity(0.7), lineWidth: 1)
+                )
+            } else {
+                LazyVGrid(columns: regionColumns, spacing: 14) {
+                    ForEach(model.regions) { region in
+                        regionCard(region)
                     }
-                    Text(model.isTesting ? "测速中…" : "开始测速")
-                        .font(.system(size: 13, weight: .semibold))
                 }
-                .foregroundColor(.white)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 9)
-                .background(SpeedTestTheme.primary(dark))
-                .cornerRadius(6)
-                .shadow(color: SpeedTestTheme.primary(dark).opacity(0.28), radius: 6, y: 3)
             }
-            .buttonStyle(PlainButtonStyle())
-            .disabled(model.isTesting || model.regions.isEmpty)
-            .opacity(model.isTesting || model.regions.isEmpty ? 0.6 : 1)
         }
     }
-
-    // MARK: - Region card (web .region-node)
 
     private func regionCard(_ region: SpeedRegionEndpoint) -> some View {
         let state = model.latency[region.code] ?? .idle
@@ -222,89 +277,90 @@ struct SpeedTestView: View {
         }()
         let barFraction: CGFloat = {
             if case .ok(let ms) = state {
-                if ms < 500 { return CGFloat(max(0.05, 1.0 - Double(ms) / 500.0)) }
-                return 0.05
+                if ms < 500 { return CGFloat(max(0.06, 1.0 - Double(ms) / 500.0)) }
+                return 0.06
             }
             return 0
         }()
         let testing = state == .testing
 
-        return VStack(alignment: .leading, spacing: 12) {
-            HStack {
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
                 Text(region.simpleName)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(SpeedTestTheme.text(dark))
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
                     .lineLimit(1)
-                Spacer()
+                Spacer(minLength: 4)
                 Text(region.code)
-                    .font(.system(size: 11))
-                    .foregroundColor(SpeedTestTheme.muted(dark))
-                    .padding(.horizontal, 8)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .padding(.horizontal, 7)
                     .padding(.vertical, 2)
-                    .background(
-                        Capsule()
-                            .fill(SpeedTestTheme.nodeCodeBg(dark))
-                    )
-                    .overlay(
-                        Capsule()
-                            .stroke(SpeedTestTheme.border(dark), lineWidth: 1)
-                    )
+                    .background(AppTheme.sidebarHover(dark))
+                    .cornerRadius(6)
             }
 
-            HStack(alignment: .bottom, spacing: 4) {
-                Text(state.displayText)
-                    .font(.system(size: state == .timeout ? 16 : 28, weight: .heavy))
-                    .foregroundColor(
-                        state == .timeout
-                            ? SpeedTestTheme.muted(dark)
-                            : SpeedTestTheme.toneColor(tone, dark: dark)
-                    )
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
+            HStack(alignment: .firstTextBaseline, spacing: 3) {
+                Group {
+                    if testing {
+                        ProgressView()
+                            .scaleEffect(0.7)
+                            .frame(width: 22, height: 22)
+                    } else {
+                        Text(state.displayText)
+                            .font(Font.system(size: state == .timeout ? 15 : 26, weight: .bold).monospacedDigit())
+                            .foregroundColor(
+                                state == .timeout
+                                    ? AppTheme.sidebarText(dark)
+                                    : SpeedTestTheme.toneColor(tone, dark: dark)
+                            )
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
+                    }
+                }
                 if case .ok = state {
                     Text("ms")
-                        .font(.system(size: 12))
-                        .foregroundColor(SpeedTestTheme.muted(dark))
-                        .padding(.bottom, 4)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(AppTheme.sidebarText(dark))
                 }
-                Spacer()
+                Spacer(minLength: 0)
             }
-            .frame(height: 36, alignment: .bottomLeading)
+            .frame(height: 32, alignment: .bottomLeading)
 
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Capsule()
                         .fill(SpeedTestTheme.progressTrack(dark))
-                        .frame(height: 6)
+                        .frame(height: 5)
                     Capsule()
-                        .fill(barColor(tone: tone))
-                        .frame(width: max(0, geo.size.width * barFraction), height: 6)
-                        .animation(.easeOut(duration: 0.45), value: barFraction)
+                        .fill(barColor(tone: tone, testing: testing))
+                        .frame(width: max(0, geo.size.width * barFraction), height: 5)
+                        .animation(.easeOut(duration: 0.4), value: barFraction)
                 }
             }
-            .frame(height: 6)
+            .frame(height: 5)
         }
-        .padding(15)
-        .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(SpeedTestTheme.surface2(dark))
-        )
+        .padding(14)
+        .background(AppTheme.sidebarBg(dark))
+        .cornerRadius(12)
         .overlay(
-            RoundedRectangle(cornerRadius: 6)
+            RoundedRectangle(cornerRadius: 12)
                 .stroke(
-                    testing ? SpeedTestTheme.primary(dark) : SpeedTestTheme.border(dark),
+                    testing ? AppTheme.sidebarActive.opacity(0.85) : AppTheme.border(dark).opacity(0.7),
                     lineWidth: testing ? 1.5 : 1
                 )
         )
-        .shadow(color: Color.black.opacity(dark ? 0.25 : 0.05), radius: 3, y: 1)
+        .shadow(color: Color.black.opacity(dark ? 0.18 : 0.04), radius: 3, y: 1)
+        .animation(.easeInOut(duration: 0.18), value: testing)
     }
 
-    private func barColor(tone: SpeedLatencyTone) -> Color {
+    private func barColor(tone: SpeedLatencyTone, testing: Bool) -> Color {
+        if testing { return AppTheme.sidebarActive.opacity(0.35) }
         switch tone {
         case .fast: return SpeedTestTheme.success
         case .mid: return SpeedTestTheme.warning
         case .slow: return SpeedTestTheme.danger
-        case .neutral: return SpeedTestTheme.primary(dark)
+        case .neutral: return AppTheme.sidebarActive.opacity(0.35)
         }
     }
 }
