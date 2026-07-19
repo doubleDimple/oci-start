@@ -21,12 +21,45 @@ struct SysMessagePage: Equatable {
     var pageNum: Int = 1
 }
 
-// MARK: - Version
+// MARK: - Version（Mac 客户端：GitHub Release DMG）
 
 struct VersionCheckInfo: Equatable {
     var needUpdate: Bool = false
     var latestVersion: String = ""
     var currentVersion: String = ""
+    /// GitHub asset browser_download_url for the .dmg
+    var dmgURL: String = ""
+    var dmgFileName: String = ""
+}
+
+/// Mac client upgrade UI: download DMG → open.
+enum VersionUpdatePhase: Equatable {
+    case idle
+    /// Download progress 0…1
+    case downloading(Double)
+    /// Opening DMG in Finder
+    case opening
+    /// Local path of downloaded DMG
+    case completed(String)
+    case failed(String)
+
+    var isActive: Bool {
+        switch self {
+        case .idle, .completed: return false
+        default: return true
+        }
+    }
+}
+
+/// Non-actor progress hop for URLSession download callbacks (macOS 11 concurrency-safe).
+final class VersionDownloadProgressBridge: @unchecked Sendable {
+    var onProgress: ((Double) -> Void)?
+
+    func report(_ progress: Double) {
+        DispatchQueue.main.async { [weak self] in
+            self?.onProgress?(progress)
+        }
+    }
 }
 
 // MARK: - Asset analysis
