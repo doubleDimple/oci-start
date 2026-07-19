@@ -24,6 +24,8 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import com.doubledimple.ociserver.service.cloud.gcp.client.GcpAuthClient;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
@@ -78,6 +80,9 @@ public class GcpApiUtil {
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
+
+    @Autowired
+    private GcpAuthClient gcpAuthClient;
 
     public GcpApiUtil() {
         this.restTemplate = new RestTemplate();
@@ -649,81 +654,17 @@ public class GcpApiUtil {
     }
 
     /**
-     * 从服务账号密钥文件获取访问令牌
+     * 从服务账号密钥文件获取访问令牌（委托 GcpAuthClient，带缓存）
      */
     private String getAccessToken(String credentialsPath) throws IOException {
-        // 1. 读取服务账号密钥文件
-        Map<String, Object> credentialsJson;
-        try (FileInputStream fileInputStream = new FileInputStream(credentialsPath)) {
-            credentialsJson = objectMapper.readValue(fileInputStream, new TypeReference<Map<String, Object>>() {});
-        }
-
-        // 2. 准备JWT声明
-        String clientEmail = (String) credentialsJson.get("client_email");
-        String privateKeyPem = (String) credentialsJson.get("private_key");
-
-        // 使用BouncyCastle库处理RSA私钥签名
-        String jwt = createJwtToken(clientEmail, privateKeyPem);
-
-        // 3. 获取访问令牌
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("Content-Type", "application/x-www-form-urlencoded");
-
-        String requestBody = "grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=" + jwt;
-        HttpEntity<String> request = new HttpEntity<>(requestBody, headers);
-
-        ResponseEntity<String> response = restTemplate.postForEntity(OAUTH_TOKEN_URL, request, String.class);
-        Map<String, Object> tokenResponse = objectMapper.readValue(response.getBody(), new TypeReference<Map<String, Object>>() {});
-
-        return (String) tokenResponse.get("access_token");
+        return gcpAuthClient.getAccessToken(credentialsPath);
     }
 
     /**
      * 创建JWT令牌
      */
     public String createJwtToken(String clientEmail, String privateKeyPem) {
-        try {
-            return createJwtWithBouncyCastle(clientEmail, privateKeyPem);
-        } catch (Exception e) {
-            throw new RuntimeException("创建JWT令牌失败", e);
-        }
-    }
-
-    /**
-     * 使用BouncyCastle创建JWT
-     */
-    private String createJwtWithBouncyCastle(String clientEmail, String privateKeyPem) throws NoSuchAlgorithmException, InvalidKeySpecException, InvalidKeyException, UnsupportedEncodingException, SignatureException {
-        // 1. 转换私钥
-        privateKeyPem = privateKeyPem.replace("-----BEGIN PRIVATE KEY-----", "")
-                .replace("-----END PRIVATE KEY-----", "")
-                .replaceAll("\\s+", "");
-        byte[] privateKeyDer = Base64.getDecoder().decode(privateKeyPem);
-
-        PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(privateKeyDer);
-        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
-        PrivateKey privateKey = keyFactory.generatePrivate(keySpec);
-
-        // 2. 准备JWT数据
-        long now = System.currentTimeMillis() / 1000L;
-        String headerJson = "{\"alg\":\"RS256\",\"typ\":\"JWT\"}";
-        String claimsJson = String.format(
-                "{\"iss\":\"%s\",\"scope\":\"%s\",\"aud\":\"%s\",\"exp\":%d,\"iat\":%d}",
-                clientEmail, SCOPE, OAUTH_TOKEN_URL, now + 3600, now);
-
-        // 3. Base64编码
-        String encodedHeader = Base64.getUrlEncoder().withoutPadding().encodeToString(headerJson.getBytes("UTF-8"));
-        String encodedClaims = Base64.getUrlEncoder().withoutPadding().encodeToString(claimsJson.getBytes("UTF-8"));
-        String content = encodedHeader + "." + encodedClaims;
-
-        // 4. 签名
-        Signature signature = Signature.getInstance("SHA256withRSA");
-        signature.initSign(privateKey);
-        signature.update(content.getBytes("UTF-8"));
-        byte[] signatureBytes = signature.sign();
-        String encodedSignature = Base64.getUrlEncoder().withoutPadding().encodeToString(signatureBytes);
-
-        // 5. 组装JWT
-        return content + "." + encodedSignature;
+        return gcpAuthClient.createJwtToken(clientEmail, privateKeyPem);
     }
 
     /**
