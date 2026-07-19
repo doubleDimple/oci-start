@@ -1,7 +1,8 @@
 import SwiftUI
 import AppKit
 
-/// Boot modals: detail list / edit config / web embed (add config).
+/// Boot modals: edit config / 原生添加抢机配置（禁止 WebEmbed）。
+/// 开机详情与开机日志已改为 `BootDetailView` 整页，不在此弹框。
 struct BootSheetHost: View {
     let sheet: BootSheet
     @ObservedObject var model: BootViewModel
@@ -15,12 +16,10 @@ struct BootSheetHost: View {
 
     var body: some View {
         switch sheet {
-        case .detail:
-            detailSheet
         case .editDetail:
             editSheet
-        case .embed(let title, let path, let query):
-            embedSheet(title: title, path: path, query: query)
+        case .createConfig(let item):
+            createConfigSheet(item)
         }
     }
 
@@ -44,152 +43,13 @@ struct BootSheetHost: View {
         )
     }
 
-    // MARK: - Detail
-
-    private var detailSheet: some View {
-        chrome(
-            title: detailTitle,
-            systemImage: "list.bullet.rectangle",
-            width: 780,
-            height: 520,
-            footer: {
-                HStack {
-                    if let p = model.detailParent {
-                        AppButton(title: "刷新", systemImage: "arrow.clockwise", kind: .secondary) {
-                            Task { await model.loadDetail(p) }
-                        }
-                    }
-                    Spacer()
-                    AppButton(title: "关闭", kind: .secondary) { presentationMode.wrappedValue.dismiss() }
-                }
-            }
-        ) {
-            if model.detailLoading && model.detailItems.isEmpty {
-                HStack {
-                    Spacer()
-                    ProgressView().scaleEffect(0.8)
-                    Text("加载中…").font(.system(size: 12)).foregroundColor(mutedText)
-                    Spacer()
-                }
-                .padding(.vertical, 40)
-            } else if model.detailItems.isEmpty {
-                EmptyStateView(icon: "tray", title: "暂无子任务", subtitle: "该组下没有开机配置")
-                    .frame(minHeight: 200)
-            } else {
-                VStack(spacing: 0) {
-                    detailHeader
-                    ScrollView {
-                        VStack(spacing: 0) {
-                            ForEach(model.detailItems) { d in
-                                detailRow(d)
-                                Divider().opacity(0.3)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private var detailTitle: String {
-        if let p = model.detailParent {
-            return "开机详情 · \(p.displayTenant) · \(p.archText)"
-        }
-        return "开机详情"
-    }
-
-    private var detailHeader: some View {
-        HStack(spacing: 8) {
-            Group {
-                col("昨日", 48)
-                col("今日", 48)
-                col("失败", 48)
-                col("系统", 90)
-                col("配置", 110)
-            }
-            Group {
-                col("时段", 72)
-                col("间隔", 48)
-                col("密码", 72)
-                col("状态", 64)
-                col("创建", 110)
-            }
-            Text("操作")
-                .frame(width: 120, alignment: .trailing)
-        }
-        .font(.system(size: 10, weight: .semibold))
-        .foregroundColor(mutedText)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(AppSheetSurface.surface2(dark))
-    }
-
-    private func col(_ t: String, _ w: CGFloat) -> some View {
-        Text(t).frame(width: w, alignment: .leading)
-    }
-
-    private func detailRow(_ d: BootDetailItem) -> some View {
-        HStack(spacing: 8) {
-            Group {
-                cell("\(d.yesterdayAttemptCount)", 48)
-                cell("\(d.currentAttemptCount)", 48)
-                cell("\(d.failCount)", 48)
-                cell(d.osText, 90)
-                cell(d.configText, 110)
-            }
-            Group {
-                cell(d.dayGap.isEmpty ? "—" : d.dayGap, 72)
-                cell("\(d.loopTime)s", 48)
-                cell(d.rootPassword.isEmpty ? "—" : "••••••••", 72)
-                StatusBadge(text: d.statusText, tone: d.statusTone)
-                    .frame(width: 64, alignment: .leading)
-                cell(d.createdAt.isEmpty ? "—" : String(d.createdAt.prefix(16)), 110)
-            }
-            HStack(spacing: 4) {
-                miniBtn(d.status == 1 ? "停止" : "启动", danger: d.status == 1) {
-                    model.toggleDetailStatus(d, start: d.status != 1)
-                }
-                miniBtn("改", danger: false) { model.openEditDetail(d) }
-                miniBtn("删", danger: true) { model.deleteDetail(d) }
-            }
-            .frame(width: 120, alignment: .trailing)
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 8)
-    }
-
-    private func cell(_ t: String, _ w: CGFloat) -> some View {
-        Text(t)
-            .font(.system(size: 11))
-            .foregroundColor(primaryText)
-            .lineLimit(1)
-            .frame(width: w, alignment: .leading)
-    }
-
-    private func miniBtn(_ title: String, danger: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundColor(danger ? AppSheetSurface.accentRed(dark) : AppTheme.sidebarActive)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 4)
-                .background((danger ? AppSheetSurface.accentRed(dark) : AppTheme.sidebarActive).opacity(0.12))
-                .cornerRadius(5)
-        }
-        .buttonStyle(PlainButtonStyle())
-    }
-
     // MARK: - Edit
 
     private var editSheet: some View {
         chrome(title: "修改开机配置", systemImage: "slider.horizontal.3", width: 440, height: 420, footer: {
             HStack(spacing: 10) {
                 AppButton(title: "取消", kind: .secondary) {
-                    if let p = model.detailParent {
-                        model.activeSheet = .detail(p)
-                    } else {
-                        presentationMode.wrappedValue.dismiss()
-                    }
+                    presentationMode.wrappedValue.dismiss()
                 }
                 AppButton(title: "保存", kind: .primary, isLoading: model.formBusy) {
                     model.submitEditDetail()
@@ -224,35 +84,140 @@ struct BootSheetHost: View {
         }
     }
 
-    // MARK: - Embed
+    // MARK: - Create config
 
-    private func embedSheet(title: String, path: String, query: [String: String]) -> some View {
-        VStack(spacing: 0) {
-            HStack {
-                Text(title)
-                    .font(.system(size: 14, weight: .semibold))
-                Spacer()
-                Button("关闭") { presentationMode.wrappedValue.dismiss() }
-                    .buttonStyle(PlainButtonStyle())
+    private func createConfigSheet(_ item: BootTaskItem) -> some View {
+        chrome(
+            title: "添加抢机配置",
+            systemImage: "plus.circle",
+            width: 520,
+            height: 580,
+            footer: {
+                HStack {
+                    AppButton(title: "取消", kind: .secondary) { presentationMode.wrappedValue.dismiss() }
+                    Spacer()
+                    AppButton(
+                        title: "保存任务",
+                        systemImage: "checkmark",
+                        kind: .primary,
+                        isLoading: model.formBusy
+                    ) {
+                        model.submitCreateConfig()
+                    }
+                }
             }
-            .padding(12)
-            BootEmbedRepresentable(session: session, path: path, query: query, title: title)
-                .frame(minWidth: 860, minHeight: 560)
+        ) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 8) {
+                    Image(systemName: "person.2")
+                        .foregroundColor(AppTheme.sidebarActive)
+                    Text(item.displayTenant)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(primaryText)
+                    if !item.regionName.isEmpty {
+                        Text("· \(item.regionName)")
+                            .font(.system(size: 12))
+                            .foregroundColor(mutedText)
+                    }
+                    Spacer()
+                }
+                .padding(10)
+                .background(RoundedRectangle(cornerRadius: 10).fill(AppSheetSurface.panelBg(dark)))
+
+                FormFieldRow(label: "架构") {
+                    HStack(spacing: 8) {
+                        ForEach(["ARM", "AMD", "X86"], id: \.self) { arch in
+                            Button(action: { model.onCreateArchitectureChanged(arch) }) {
+                                Text(arch)
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(model.createArchitecture == arch ? .white : primaryText)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .fill(model.createArchitecture == arch
+                                                  ? AppTheme.sidebarActive
+                                                  : AppSheetSurface.panelBg(dark))
+                                    )
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
+                        Spacer()
+                        if model.createLoadingImages {
+                            ProgressView().scaleEffect(0.7)
+                        }
+                    }
+                }
+
+                HStack(spacing: 10) {
+                    FormFieldRow(label: "OCPU", required: true) {
+                        AppTextField(text: $model.createOcpu, placeholder: "1")
+                    }
+                    FormFieldRow(label: "内存 GB", required: true) {
+                        AppTextField(text: $model.createMemory, placeholder: "6")
+                    }
+                    FormFieldRow(label: "磁盘 GB", required: true) {
+                        AppTextField(text: $model.createDisk, placeholder: "50")
+                    }
+                }
+
+                HStack(spacing: 10) {
+                    FormFieldRow(label: "循环间隔(秒)", required: true) {
+                        AppTextField(text: $model.createLoopTime, placeholder: "60")
+                    }
+                    FormFieldRow(label: "实例数量", required: true) {
+                        AppTextField(text: $model.createCount, placeholder: "1")
+                    }
+                }
+
+                FormFieldRow(label: "时段范围") {
+                    AppTextField(text: $model.createDayGap, placeholder: "如 08:00-22:00，可空")
+                }
+                FormFieldRow(label: "Root 密码", required: true) {
+                    AppTextField(text: $model.createPassword, placeholder: "root 密码", secure: true)
+                }
+
+                FormFieldRow(label: "操作系统", required: true) {
+                    SelectMenu(
+                        options: model.createOSList.map { SelectOption(id: $0, title: $0) },
+                        selection: Binding(
+                            get: { model.createSelectedOS.isEmpty ? nil : model.createSelectedOS },
+                            set: { if let v = $0 { model.applyCreateOS(v) } }
+                        ),
+                        placeholder: model.createLoadingImages ? "加载镜像…" : "选择系统…",
+                        width: 460,
+                        enabled: !model.createOSList.isEmpty,
+                        searchable: true
+                    )
+                }
+                FormFieldRow(label: "系统版本", required: true) {
+                    SelectMenu(
+                        options: model.createVersions.map {
+                            SelectOption(id: $0.operatingSystemVersion, title: $0.operatingSystemVersion)
+                        },
+                        selection: Binding(
+                            get: { model.createSelectedVersion.isEmpty ? nil : model.createSelectedVersion },
+                            set: { if let v = $0 { model.applyCreateVersion(v) } }
+                        ),
+                        placeholder: "选择版本…",
+                        width: 460,
+                        enabled: !model.createVersions.isEmpty
+                    )
+                }
+
+                if !model.createImageId.isEmpty {
+                    Text("镜像 ID：\(model.createImageId)")
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundColor(mutedText)
+                        .lineLimit(1)
+                }
+
+                if let err = model.formError, !err.isEmpty {
+                    Text(err)
+                        .font(.system(size: 12))
+                        .foregroundColor(AppSheetSurface.accentRed(dark))
+                }
+            }
         }
-        .frame(width: 900, height: 620)
     }
-}
-
-/// Thin AppKit host for WebEmbedViewController inside SwiftUI sheet.
-private struct BootEmbedRepresentable: NSViewControllerRepresentable {
-    let session: AppSession
-    let path: String
-    let query: [String: String]
-    let title: String
-
-    func makeNSViewController(context: Context) -> WebEmbedViewController {
-        WebEmbedViewController(session: session, path: path, query: query, title: title)
-    }
-
-    func updateNSViewController(_ nsViewController: WebEmbedViewController, context: Context) {}
 }

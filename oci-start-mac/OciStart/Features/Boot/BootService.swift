@@ -141,4 +141,73 @@ struct BootService {
         ])
         try BootJSON.ensureSuccess(raw, fallback: "更新配置失败")
     }
+
+    // MARK: - Create config (align `/tenants/boot/save`)
+
+    func querySystemImages(tenantId: Int64, shapeType: String) async throws -> [TenantImageInfo] {
+        let url = try client.makeURL(baseURL, path: "/tenants/querySystemImages")
+        let raw = try await client.postJSON(url, body: [
+            "tenantId": "\(tenantId)",
+            "shapeType": shapeType
+        ])
+        if let obj = try? JSONSerialization.jsonObject(with: raw) as? [String: Any],
+           let data = obj["data"] {
+            let d = try JSONSerialization.data(withJSONObject: data)
+            return (try? JSONDecoder().decode([TenantImageInfo].self, from: d)) ?? []
+        }
+        return (try? JSONDecoder().decode([TenantImageInfo].self, from: raw)) ?? []
+    }
+
+    func saveBootInstance(fields: [String: String]) async throws {
+        let url = try client.makeURL(baseURL, path: "/tenants/boot/save")
+        let (data, http) = try await client.postForm(url, fields: fields)
+        guard (200..<300).contains(http.statusCode) else {
+            throw APIError.serverMessage(String(data: data, encoding: .utf8) ?? "保存失败")
+        }
+        if let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            if let ok = obj["success"] as? Bool, !ok {
+                let msg = (obj["message"] as? String) ?? "保存失败"
+                throw APIError.serverMessage(msg)
+            }
+            if let status = obj["status"] as? String, status.lowercased() != "success" {
+                let msg = (obj["message"] as? String) ?? "保存失败"
+                throw APIError.serverMessage(msg)
+            }
+        }
+    }
+
+    // MARK: - Boot log (web openBootLogDrawer)
+
+    /// `GET /system/openLogs/json` — 历史开机相关日志
+    func fetchBootLogHistory(lines: Int = 300) async throws -> [String] {
+        let url = try client.makeURL(
+            baseURL,
+            path: "/system/openLogs/json",
+            query: ["lines": "\(lines)"]
+        )
+        let raw = try await client.getJSON(url)
+        if let obj = try? JSONSerialization.jsonObject(with: raw) as? [String: Any] {
+            if let arr = obj["lines"] as? [String] { return arr }
+            if let arr = obj["data"] as? [String] { return arr }
+        }
+        if let arr = try? JSONDecoder().decode([String].self, from: raw) {
+            return arr
+        }
+        return []
+    }
+
+    /// SSE `GET /system/streamLogs?isBootLog=true`
+    func bootLogStreamRequest() throws -> URLRequest {
+        let url = try client.makeURL(
+            baseURL,
+            path: "/system/streamLogs",
+            query: ["isBootLog": "true"]
+        )
+        var req = URLRequest(url: url)
+        req.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+        req.setValue("XMLHttpRequest", forHTTPHeaderField: "X-Requested-With")
+        req.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
+        req.timeoutInterval = 0
+        return req
+    }
 }

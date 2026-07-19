@@ -3,20 +3,60 @@ import Foundation
 // MARK: - Sheets
 
 enum BootSheet: Identifiable, Equatable {
-    case detail(BootTaskItem)
     case editDetail(BootDetailItem)
-    case embed(title: String, path: String, query: [String: String])
+    /// 原生添加抢机配置（对齐 Web `/tenants/bootPage`，禁止 WebEmbed）
+    case createConfig(BootTaskItem)
 
     var id: String {
         switch self {
-        case .detail(let t): return "detail-\(t.id)"
         case .editDetail(let d): return "edit-\(d.id)"
-        case .embed(let title, let path, _): return "embed-\(title)-\(path)"
+        case .createConfig(let t): return "create-\(t.id)-\(t.tenantId)"
         }
     }
 
     static func == (lhs: BootSheet, rhs: BootSheet) -> Bool {
         lhs.id == rhs.id
+    }
+}
+
+// MARK: - Boot log line (web full_machine_list.js appendBootLogLine)
+
+struct BootLogLine: Identifiable, Equatable {
+    let id: Int
+    let text: String
+    let tone: BootLogTone
+
+    enum BootLogTone: Equatable {
+        case normal, success, warn, error
+    }
+
+    static func make(id: Int, raw: String) -> BootLogLine {
+        // 对齐 web appendBootLogLine
+        var text = raw
+        var tone: BootLogTone = .normal
+        if text.range(of: "[success]", options: .caseInsensitive) != nil {
+            tone = .success
+            text = text.replacingOccurrences(of: "[success]", with: "", options: .caseInsensitive)
+        } else if text.range(of: "[warn]", options: .caseInsensitive) != nil {
+            tone = .warn
+            text = text.replacingOccurrences(of: "[warn]", with: "", options: .caseInsensitive)
+        } else if text.range(of: "[error]", options: .caseInsensitive) != nil {
+            tone = .error
+            text = text.replacingOccurrences(of: "[error]", with: "", options: .caseInsensitive)
+        }
+        text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return BootLogLine(id: id, text: text.isEmpty ? raw : text, tone: tone)
+    }
+}
+
+enum BootLogConnectionState: Equatable {
+    case disconnected, connecting, connected
+    var title: String {
+        switch self {
+        case .disconnected: return "已断开"
+        case .connecting: return "连接中"
+        case .connected: return "已连接"
+        }
     }
 }
 

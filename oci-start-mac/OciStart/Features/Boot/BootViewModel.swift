@@ -37,6 +37,41 @@ final class BootViewModel: ObservableObject {
     @Published var formError: String?
     private var editingDetailId: Int64 = 0
 
+    // Create config form（对齐 Web add_boot）
+    @Published var createArchitecture = "ARM"
+    @Published var createOcpu = "1"
+    @Published var createMemory = "6"
+    @Published var createDisk = "50"
+    @Published var createLoopTime = "60"
+    @Published var createCount = "1"
+    @Published var createDayGap = ""
+    @Published var createPassword = ""
+    @Published var createImages: [TenantImageInfo] = []
+    @Published var createOSList: [String] = []
+    @Published var createSelectedOS = ""
+    @Published var createVersions: [TenantImageInfo] = []
+    @Published var createSelectedVersion = ""
+    @Published var createImageId = ""
+    @Published var createLoadingImages = false
+    private var createTenantId: Int64 = 0
+
+    // Boot log（详情页下方内嵌，web full_machine_list.js openBootLogDrawer）
+    @Published private(set) var bootLogLines: [BootLogLine] = []
+    @Published private(set) var bootLogConnection: BootLogConnectionState = .disconnected
+    @Published private(set) var bootLogLoadingHistory = false
+    @Published var bootLogAutoScroll = true
+    @Published private(set) var bootLogScrollToken = 0
+    @Published private(set) var bootLogTaskId: Int64 = 0
+    @Published private(set) var bootLogTitle = ""
+    private var bootLogNextId = 1
+    private var bootLogActive = false
+    private var bootLogTaskRegex: NSRegularExpression?
+
+    /// 当前日志面板是否正订阅该子任务
+    func bootLogActiveIdMatches(_ id: Int64) -> Bool {
+        bootLogActive && bootLogTaskId == id
+    }
+
     private let session: AppSession
     private var service: BootService { BootService(baseURL: session.serverURL) }
 
@@ -55,8 +90,34 @@ final class BootViewModel: ObservableObject {
     func start() {
         Task {
             await loadParentTenants()
-            await reload()
+            if let pending = NavigationState.shared.takePendingBootFilter() {
+                await applyPendingFilter(pending)
+            } else {
+                await reload()
+            }
         }
+    }
+
+    /// 从租户详情跳入：预选租户/区域并过滤抢机任务
+    func applyPendingFilter(_ filter: PendingTenantListFilter) async {
+        selectedParentId = filter.parentTenantId
+        selectedRegionId = filter.regionTenantId
+        if !selectedRegionId.isEmpty {
+            filterTenantId = selectedRegionId
+        } else if !selectedParentId.isEmpty {
+            filterTenantId = selectedParentId
+        } else {
+            filterTenantId = nil
+        }
+        pageState.page = 0
+        if !selectedParentId.isEmpty {
+            do {
+                regions = try await service.listRegions(parentId: selectedParentId)
+            } catch {
+                regions = []
+            }
+        }
+        await reload()
     }
 
     // MARK: - List
@@ -273,11 +334,18 @@ final class BootViewModel: ObservableObject {
         }
     }
 
+    /// 整页进入开机详情（非弹框）
     func openDetail(_ item: BootTaskItem) {
+        stopBootLogStream(keepActive: false)
         detailParent = item
         detailItems = []
-        activeSheet = .detail(item)
         Task { await loadDetail(item) }
+    }
+
+    func closeDetail() {
+        stopBootLogStream(keepActive: false)
+        detailParent = nil
+        detailItems = []
     }
 
     func loadDetail(_ item: BootTaskItem) async {
@@ -292,11 +360,129 @@ final class BootViewModel: ObservableObject {
     }
 
     func openAddConfig(_ item: BootTaskItem) {
-        activeSheet = .embed(
-            title: "添加抢机配置",
-            path: "/tenants/bootPage",
-            query: ["tenantId": "\(item.tenantId)"]
-        )
+        createTenantId = item.tenantId
+        createArchitecture = item.architecture.isEmpty ? "ARM" : item.architecture.uppercased()
+        if createArchitecture != "ARM" && createArchitecture != "AMD" && createArchitecture != "X86" {
+            createArchitecture = "ARM"
+        }
+        createOcpu = item.ocpu > 0 ? "\(item.ocpu)" : "1"
+        createMemory = item.memory > 0 ? "\(item.memory)" : "6"
+        createDisk = item.disk > 0 ? "\(item.disk)" : "50"
+        createLoopTime = item.loopTime > 0 ? "\(item.loopTime)" : "60"
+        createCount = "1"
+        createDayGap = item.dayGap
+        createPassword = randomPassword()
+        createImages = []
+        createOSList = []
+        createSelectedOS = ""
+        createVersions = []
+        createSelectedVersion = ""
+        createImageId = ""
+        formError = nil
+        formBusy = false
+        activeSheet = .createConfig(item)
+        Task { await loadCreateImages() }
+    }
+
+    func onCreateArchitectureChanged(_ arch: String) {
+        createArchitecture = arch
+        Task { await loadCreateImages() }
+    }
+
+    func loadCreateImages() async {
+        guard createTenantId > 0 else { return }
+        createLoadingImages = true
+        defer { createLoadingImages = false }
+        do {
+            let imgs = try await service.querySystemImages(
+                tenantId: createTenantId,
+                shapeType: createArchitecture
+            )
+            createImages = imgs
+            let oss = Array(Set(imgs.map(\.operatingSystem))).sorted()
+            createOSList = oss
+            if let first = oss.first {
+                applyCreateOS(first)
+            } else {
+                createSelectedOS = ""
+                createVersions = []
+                createSelectedVersion = ""
+                createImageId = ""
+            }
+        } catch {
+            createImages = []
+            createOSList = []
+            ToastCenter.shared.error(error.localizedDescription)
+        }
+    }
+
+    func applyCreateOS(_ os: String) {
+        createSelectedOS = os
+        createVersions = createImages.filter { $0.operatingSystem == os }
+        if let v = createVersions.first {
+            createSelectedVersion = v.operatingSystemVersion
+            createImageId = v.imageId
+        } else {
+            createSelectedVersion = ""
+            createImageId = ""
+        }
+    }
+
+    func applyCreateVersion(_ ver: String) {
+        createSelectedVersion = ver
+        if let hit = createVersions.first(where: { $0.operatingSystemVersion == ver }) {
+            createImageId = hit.imageId
+        }
+    }
+
+    func submitCreateConfig() {
+        guard createTenantId > 0 else {
+            formError = "租户无效"
+            return
+        }
+        guard !createImageId.isEmpty else {
+            formError = "请选择系统镜像"
+            return
+        }
+        let pwd = createPassword.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !pwd.isEmpty else {
+            formError = "请填写 Root 密码"
+            return
+        }
+        let fields: [String: String] = [
+            "tenantId": "\(createTenantId)",
+            "ocpu": createOcpu,
+            "memory": createMemory,
+            "disk": createDisk,
+            "architecture": createArchitecture,
+            "loopTime": createLoopTime,
+            "instanceCount": createCount,
+            "rootPassword": pwd,
+            "imageId": createImageId,
+            "operatingSystem": createSelectedOS,
+            "operatingSystemVersion": createSelectedVersion,
+            "dayGap": createDayGap,
+            "notifyFlag": "NO",
+            "cloudType": "1"
+        ]
+        Task {
+            formBusy = true
+            formError = nil
+            do {
+                try await service.saveBootInstance(fields: fields)
+                activeSheet = nil
+                ToastCenter.shared.success("抢机配置已创建")
+                await reload()
+            } catch {
+                formError = error.localizedDescription
+            }
+            formBusy = false
+        }
+    }
+
+    private func randomPassword(length: Int = 12) -> String {
+        let chars = Array("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%")
+        return String((0..<length).map { _ in chars.randomElement()! })
     }
 
     // MARK: - Detail actions
@@ -378,11 +564,9 @@ final class BootViewModel: ObservableObject {
                     rootPassword: pwd,
                     dayGap: editDayGap.trimmingCharacters(in: .whitespacesAndNewlines)
                 )
+                activeSheet = nil
                 if let parent = detailParent {
-                    activeSheet = .detail(parent)
                     await loadDetail(parent)
-                } else {
-                    activeSheet = nil
                 }
             } catch {
                 formError = error.localizedDescription
@@ -403,5 +587,181 @@ final class BootViewModel: ObservableObject {
         var s = r.region.isEmpty ? (r.tenancyName.isEmpty ? r.id : r.tenancyName) : r.region
         if r.isHomeRegion { s += " · 主" }
         return s
+    }
+
+    // MARK: - Boot log（详情页下方内嵌面板 + SSE，非弹框）
+
+    /// 对齐 Web：按子任务 id 过滤 `TaskId=…` 日志流
+    func openBootLog(for detail: BootDetailItem) {
+        let title: String
+        if let p = detailParent {
+            title = "\(p.displayTenant) · \(detail.osText)"
+        } else {
+            title = detail.osText
+        }
+        openBootLog(taskId: detail.id, title: title)
+    }
+
+    /// 列表组入口：进详情整页，并用组 bootId 拉日志
+    func openBootLog(for task: BootTaskItem) {
+        if detailParent?.id != task.id {
+            detailParent = task
+            detailItems = []
+            Task { await loadDetail(task) }
+        }
+        openBootLog(taskId: task.id, title: "\(task.displayTenant) · \(task.archText)")
+    }
+
+    func openBootLog(taskId: Int64, title: String) {
+        stopBootLogStream(keepActive: true)
+        bootLogTaskId = taskId
+        bootLogTitle = title
+        bootLogLines = []
+        bootLogNextId = 1
+        bootLogConnection = .disconnected
+        bootLogActive = true
+        let escaped = NSRegularExpression.escapedPattern(for: "\(taskId)")
+        // web: /[Tt]ask[Ii]d\s*[=:：]\s*{id}(?![0-9])/
+        bootLogTaskRegex = try? NSRegularExpression(
+            pattern: "[Tt]ask[Ii]d\\s*[=:：]\\s*\(escaped)(?![0-9])",
+            options: []
+        )
+        Task { await loadBootLogHistoryAndConnect() }
+    }
+
+    func closeBootLog() {
+        stopBootLogStream(keepActive: false)
+    }
+
+    /// 离开详情页时停 SSE
+    func stopBootLogIfLeaving() {
+        guard bootLogActive || bootLogConnection != .disconnected else { return }
+        stopBootLogStream(keepActive: false)
+    }
+
+    func clearBootLog() {
+        bootLogLines = []
+    }
+
+    func reconnectBootLog() {
+        guard bootLogActive, bootLogTaskId > 0 else { return }
+        Task { await connectBootLogStream() }
+    }
+
+    private func stopBootLogStream(keepActive: Bool) {
+        bootLogActive = keepActive
+        OpenLogsSSEClient.shared.stop(notify: false)
+        bootLogConnection = .disconnected
+        if !keepActive {
+            bootLogTaskId = 0
+            bootLogTitle = ""
+            bootLogTaskRegex = nil
+            bootLogLines = []
+        }
+    }
+
+    private func loadBootLogHistoryAndConnect() async {
+        bootLogLoadingHistory = true
+        defer { bootLogLoadingHistory = false }
+        do {
+            let lines = try await service.fetchBootLogHistory(lines: 400)
+            var built: [BootLogLine] = []
+            for line in lines {
+                guard matchesBootLogTask(line) else { continue }
+                let id = bootLogNextId
+                bootLogNextId += 1
+                built.append(BootLogLine.make(id: id, raw: line))
+            }
+            if built.count > 1000 {
+                built = Array(built.suffix(1000))
+            }
+            bootLogLines = built
+            if bootLogAutoScroll { bootLogScrollToken += 1 }
+        } catch {
+            // 历史失败不阻断 SSE
+            ToastCenter.shared.error("加载历史日志失败：\(error.localizedDescription)")
+        }
+        guard bootLogActive else { return }
+        await connectBootLogStream()
+    }
+
+    private func connectBootLogStream() async {
+        guard bootLogActive else { return }
+        bootLogConnection = .connecting
+        let req: URLRequest
+        do {
+            req = try service.bootLogStreamRequest()
+        } catch {
+            bootLogConnection = .disconnected
+            ToastCenter.shared.error(error.localizedDescription)
+            return
+        }
+        // Strong capture：与 OpenLogsViewModel 一致，页面生命周期内由 ViewModel 持有
+        OpenLogsSSEClient.shared.start(
+            request: req,
+            onOpen: {
+                DispatchQueue.main.async {
+                    self.bootLogConnection = .connected
+                }
+            },
+            onLine: { line in
+                DispatchQueue.main.async {
+                    self.appendBootLogLine(line)
+                }
+            },
+            onClose: { _ in
+                DispatchQueue.main.async {
+                    if self.bootLogActive {
+                        self.bootLogConnection = .disconnected
+                    }
+                }
+            }
+        )
+    }
+
+    private func matchesBootLogTask(_ text: String) -> Bool {
+        guard let re = bootLogTaskRegex else { return true }
+        let range = NSRange(text.startIndex..<text.endIndex, in: text)
+        return re.firstMatch(in: text, options: [], range: range) != nil
+    }
+
+    private func appendBootLogLine(_ raw: String) {
+        guard bootLogActive else { return }
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        guard matchesBootLogTask(trimmed) else { return }
+        let id = bootLogNextId
+        bootLogNextId += 1
+        var next = bootLogLines
+        next.append(BootLogLine.make(id: id, raw: trimmed))
+        if next.count > 1000 {
+            next.removeFirst(next.count - 1000)
+        }
+        bootLogLines = next
+        if bootLogAutoScroll {
+            bootLogScrollToken += 1
+        }
+    }
+
+    func copyBootLog() {
+        let text = bootLogLines.map(\.text).joined(separator: "\n")
+        guard !text.isEmpty else {
+            ToastCenter.shared.error("暂无日志")
+            return
+        }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+        ToastCenter.shared.success("日志已复制")
+    }
+
+    func copyPassword(_ pwd: String) {
+        let p = pwd.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !p.isEmpty else {
+            ToastCenter.shared.error("无密码")
+            return
+        }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(p, forType: .string)
+        ToastCenter.shared.success("密码已复制")
     }
 }
