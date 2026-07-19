@@ -34,17 +34,11 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-
-import static com.doubledimple.ociai.utils.OciUtils.getProvider;
 
 /**
  * Oracle Cloud AI 对话工具类
@@ -407,8 +401,10 @@ public class OciAiChatUtils {
 
     //获取所有可用的模型
     public List<com.oracle.bmc.generativeai.model.ModelSummary> getAllAvailableModels(Tenant tenant) {
-        SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
+        // server 注入的 applier：绑定代理后把 configurator 穿进 GenerativeAiClient
+        SimpleAuthenticationDetailsProvider provider = OciAiClientManager.buildAuthProvider(tenant);
         GenerativeAiClient client = GenerativeAiClient.builder()
+                .clientConfigurator(clientManager.resolveProxy(tenant))
                 .build(provider);
 
         ListModelsRequest request = com.oracle.bmc.generativeai.requests.ListModelsRequest.builder()

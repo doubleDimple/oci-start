@@ -50,6 +50,8 @@ public class OciServerApplication{
     public static void main(String[] args) {
         long startTime = System.currentTimeMillis();
         ConfigurableApplicationContext context = SpringApplication.run(OciServerApplication.class, args);
+        // 静态工具取 Bean 依赖此上下文（TenantProxyBinder / OciUtils.getProvider）
+        com.doubledimple.ociserver.config.SpringAppContext.set(context);
         Environment env = context.getEnvironment();
 
         String protocol = "http";

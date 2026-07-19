@@ -39,6 +39,7 @@ import java.io.PrintWriter;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
@@ -82,6 +83,37 @@ public class OTPController  extends BaseController {
         model.addAttribute("activePage", "mfa");
         model.addAttribute("currentUsername", UserContext.getUsername());
         return "mobile/mfa";
+    }
+
+    /**
+     * 聚合返回 MFA 密钥列表（Mac / 原生客户端用）
+     */
+    @GetMapping("/api/mfa/keys")
+    @ResponseBody
+    public ResponseEntity<?> listKeysJson() {
+        try {
+            List<OTPKey> otpKeys = otpService.getAllKeys();
+            List<Map<String, Object>> list = new ArrayList<>();
+            if (otpKeys != null) {
+                for (OTPKey k : otpKeys) {
+                    Map<String, Object> m = new HashMap<>();
+                    m.put("id", k.getId());
+                    m.put("keyName", k.getKeyName());
+                    m.put("secretKey", k.getSecretKey());
+                    m.put("issuer", k.getIssuer() != null ? k.getIssuer() : "Default");
+                    m.put("qrCode", k.getQrCode());
+                    list.add(m);
+                }
+            }
+            Map<String, Object> body = new HashMap<>();
+            body.put("success", true);
+            body.put("data", list);
+            return ResponseEntity.ok(body);
+        } catch (Exception e) {
+            log.error("获取 MFA 密钥列表失败", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(e.getMessage());
+        }
     }
 
     // 保存密钥
