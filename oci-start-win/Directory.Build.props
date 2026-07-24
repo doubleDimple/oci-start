@@ -1,0 +1,12 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <Company>OCI-Start</Company>
+    <Product>OCI-Start</Product>
+    <Version>0.1.0</Version>
+    <Authors>OCI-Start Contributors</Authors>
+  </PropertyGroup>
+</Project>

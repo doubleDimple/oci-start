@@ -1,0 +1,68 @@
+<UserControl x:Class="OciStart.Features.Login.LoginView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Grid Background="{StaticResource BgBrush}">
+    <Border Width="420"
+            VerticalAlignment="Center"
+            HorizontalAlignment="Center"
+            Background="{StaticResource SidebarBgBrush}"
+            BorderBrush="{StaticResource AppBorderBrush}"
+            BorderThickness="1"
+            CornerRadius="14"
+            Padding="28">
+      <StackPanel>
+        <TextBlock Text="OCI-Start"
+                   FontSize="24"
+                   FontWeight="SemiBold"
+                   Foreground="{StaticResource TextPrimaryBrush}" />
+        <TextBlock Text="Windows 原生客户端 · 对齐 oci-start-mac"
+                   Margin="0,6,0,20"
+                   Foreground="{StaticResource TextSecondaryBrush}"
+                   FontSize="12" />
+
+        <TextBlock Text="部署方式" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,8" />
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+          <Button x:Name="LocalModeButton"
+                  Content="本机内嵌"
+                  Style="{StaticResource SecondaryButton}"
+                  Margin="0,0,8,0"
+                  Click="OnLocalMode" />
+          <Button x:Name="RemoteModeButton"
+                  Content="远程服务器"
+                  Style="{StaticResource SecondaryButton}"
+                  Click="OnRemoteMode" />
+        </StackPanel>
+
+        <TextBlock Text="服务器地址" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,6" />
+        <TextBox x:Name="ServerUrlBox"
+                 Style="{StaticResource AppTextBox}"
+                 Margin="0,0,0,12"
+                 IsEnabled="False" />
+
+        <TextBlock Text="用户名" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,6" />
+        <TextBox x:Name="UserBox" Style="{StaticResource AppTextBox}" Margin="0,0,0,12" />
+
+        <TextBlock Text="密码" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,6" />
+        <PasswordBox x:Name="PassBox" Style="{StaticResource AppPasswordBox}" Margin="0,0,0,12" />
+
+        <TextBlock x:Name="StatusText"
+                   TextWrapping="Wrap"
+                   Foreground="{StaticResource TextSecondaryBrush}"
+                   Margin="0,0,0,12"
+                   FontSize="12" />
+
+        <TextBlock x:Name="ErrorText"
+                   TextWrapping="Wrap"
+                   Foreground="{StaticResource DangerBrush}"
+                   Margin="0,0,0,12"
+                   FontSize="12"
+                   Visibility="Collapsed" />
+
+        <Button Content="进入"
+                Style="{StaticResource PrimaryButton}"
+                HorizontalAlignment="Stretch"
+                Click="OnEnter" />
+      </StackPanel>
+    </Border>
+  </Grid>
+</UserControl>

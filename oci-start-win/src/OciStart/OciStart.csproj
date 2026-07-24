@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <UseWPF>true</UseWPF>
+    <ApplicationIcon />
+    <RootNamespace>OciStart</RootNamespace>
+    <AssemblyName>OciStart</AssemblyName>
+    <Description>OCI-Start native Windows client (WPF) — mirrors oci-start-mac.</Description>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Dedicated noVNC canvas only (align Mac WKWebView) — not full-page FTL embeds -->
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2903.40" />
+  </ItemGroup>
+
+</Project>

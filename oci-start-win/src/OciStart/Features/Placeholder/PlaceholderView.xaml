@@ -1,0 +1,27 @@
+<UserControl x:Class="OciStart.Features.Placeholder.PlaceholderView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Grid Background="{StaticResource BgBrush}">
+    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="480">
+      <TextBlock x:Name="TitleText"
+                 FontSize="22"
+                 FontWeight="SemiBold"
+                 Foreground="{StaticResource TextPrimaryBrush}"
+                 HorizontalAlignment="Center"
+                 Text="功能" />
+      <TextBlock x:Name="SubtitleText"
+                 Margin="0,12,0,0"
+                 FontSize="13"
+                 Foreground="{StaticResource TextSecondaryBrush}"
+                 TextWrapping="Wrap"
+                 TextAlignment="Center"
+                 Text="此页面将在后续 Phase 以原生 WPF 实现，对齐 oci-start-mac。" />
+      <TextBlock x:Name="PathText"
+                 Margin="0,20,0,0"
+                 FontFamily="Consolas, Cascadia Mono"
+                 FontSize="12"
+                 Foreground="{StaticResource TextSecondaryBrush}"
+                 HorizontalAlignment="Center" />
+    </StackPanel>
+  </Grid>
+</UserControl>

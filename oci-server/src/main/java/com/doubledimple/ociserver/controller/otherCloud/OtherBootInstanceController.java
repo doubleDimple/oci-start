@@ -190,6 +190,40 @@ public class OtherBootInstanceController  extends BaseController {
     }
 
     /**
+     * 实例列表 JSON（Mac / Windows 原生客户端）
+     */
+    @GetMapping("/list/json")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> listInstancesJson(
+            @RequestParam(defaultValue = "0") Long tenantId,
+            @RequestParam(defaultValue = "2") Integer cloudType,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        Map<String, Object> body = new HashMap<>();
+        try {
+            Pageable pageable = PageRequest.of(page, size);
+            Page<OtherBootInstance> instancePage;
+            if (tenantId == null || tenantId == 0L) {
+                instancePage = otherBootService.getInstancesByCloudType(cloudType, pageable);
+            } else {
+                instancePage = otherBootService.getInstancesByTenantAndCloudType(tenantId, cloudType, pageable);
+            }
+            body.put("success", true);
+            body.put("content", instancePage.getContent());
+            body.put("number", instancePage.getNumber());
+            body.put("size", instancePage.getSize());
+            body.put("totalElements", instancePage.getTotalElements());
+            body.put("totalPages", instancePage.getTotalPages());
+            return ResponseEntity.ok(body);
+        } catch (Exception e) {
+            log.error("获取实例列表 JSON 失败", e);
+            body.put("success", false);
+            body.put("message", "获取实例列表失败：" + e.getMessage());
+            return ResponseEntity.ok(body);
+        }
+    }
+
+    /**
      * 删除实例
      */
     @PostMapping("/{bootId}/delete")
