@@ -272,7 +272,7 @@ Thanks to everyone who has supported this project. The donation QR code is avail
 
 <div align="center">
 
-[![Star History Chart](https://api.star-history.com/svg?repos=doubleDimple/oci-start&type=Date)](https://star-history.com/#doubleDimple/oci-start&Date)
+[![Star History Chart](https://star-history.dera.page/svg?repos=doubleDimple/oci-start&type=Date)](https://star-history.dera.page/#doubleDimple/oci-start&type=Date)
 
 </div>
 
