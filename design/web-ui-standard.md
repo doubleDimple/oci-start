@@ -59,7 +59,9 @@ easy-dev 的 Oracle Redwood、`header-first` 顶栏、禁止阴影、6px 圆角 
 ```
 
 - 禁止 Avenir Next / Inter / Roboto 打头（中英混排发糊）。
-- 正文 16px、行高约 1.47；标题字重 **600**（不是 700）；大标题可略收 tracking（`-0.022em`）。
+- **字号按当前 Vue OCI 实例列表统一（2026-09-13 用户指定）**：正文、表格主文本/表头、按钮、输入框与表单标签 **14px**；说明、副行与页脚 **13px**；紧凑徽标 **12px**；业务模块标题 **16px**；弹窗标题 **18px**。正文行高仍约 1.47，标题字重 **600**。统计大数字保持各图表既有层级。
+- 统一使用 `--font-size-body/secondary/caption/section/dialog-title`，值只在 `tokens.css` 定义。不得为了紧凑布局再把主文本缩至 11–13px，`size="small"` 只控制组件高度/间距，不降低文字字号；手机断点也沿用同一字级。
+- 本轮覆盖已完成 A1–A7、共享导航与相关弹层；已认可的独立登录原型和 Canvas 地图绘制尺寸遵循各自专项，不受控制台字号规则改写。
 - `font-synthesis: none`；`-webkit-font-smoothing: antialiased`；`-moz-osx-font-smoothing: grayscale`。
 - 表格/表单/按钮必须继承 `--sans` 和 `--text-*`，不要 Element Plus 默认灰字。
 

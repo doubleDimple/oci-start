@@ -458,18 +458,25 @@ onBeforeUnmount(() => { generation += 1; readController.abort() })
 </template>
 
 <style scoped>
-.identity-content { color: var(--text-primary); font-family: var(--sans); }
-.tenant-context { display: flex; align-items: center; gap: 8px; margin: 0 0 20px; color: var(--text-secondary); font-size: 13px; }
+.identity-content { color: var(--text-primary); font-family: var(--sans); font-size: var(--font-size-body); }
+:global(.tenant-identity-dialog .el-dialog__title) { font-size: var(--font-size-dialog-title); }
+.identity-content :deep(.el-button), .identity-content :deep(.el-input__inner), .identity-content :deep(.el-select__wrapper), .identity-content :deep(.el-form-item__label), .identity-content :deep(.el-checkbox__label), .identity-content :deep(.el-radio__label), .identity-content :deep(.el-table) { font-size: var(--font-size-body); }
+.identity-content :deep(.el-alert__title) { font-size: var(--font-size-body); }
+.identity-content :deep(.el-alert__description), .identity-content :deep(.el-form-item__error), .identity-content :deep(.el-empty__description p) { font-size: var(--font-size-secondary); }
+.identity-content :deep(.el-tag) { font-size: var(--font-size-caption); }
+.identity-content :deep(.el-pagination) { --el-pagination-font-size: var(--font-size-body); --el-pagination-font-size-small: var(--font-size-body); }
+.identity-content :deep(.el-pagination .el-pager li) { font-size: var(--font-size-body); }
+.tenant-context { display: flex; align-items: center; gap: 8px; margin: 0 0 20px; color: var(--text-secondary); font-size: var(--font-size-secondary); }
 .context-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--brand); }
 .identity-tabs { margin-bottom: 10px; }
-.identity-tabs :deep(.el-tabs__item) { font-weight: 500; padding: 0 24px; font-size: 14px; }
+.identity-tabs :deep(.el-tabs__item) { font-weight: 500; padding: 0 24px; font-size: var(--font-size-body); }
 .identity-tabs :deep(.el-tabs__nav-wrap::after) { height: 1px; }
 .identity-panel { min-height: 220px; }
 .toolbar, .actions, .form-actions, .table-footer, .setting-row, .factor-row, .policy-row { display: flex; align-items: center; }
 .toolbar { justify-content: space-between; gap: 16px; margin-bottom: 22px; flex-wrap: wrap; }
 .actions { min-width: 0; gap: 8px; flex-wrap: wrap; }
 .actions :deep(.el-button + .el-button) { margin-left: 0; }
-.secondary, .field-hint { color: var(--text-secondary); font-size: 13px; line-height: 1.6; margin: 0; }
+.secondary, .field-hint { color: var(--text-secondary); font-size: var(--font-size-secondary); line-height: 1.6; margin: 0; }
 .identity-content :deep(.el-button) { max-width: 100%; min-height: 32px; height: auto; border-radius: var(--r-btn); font-family: var(--sans); line-height: 1.4; white-space: normal; transition: transform 180ms ease, background-color 180ms ease, border-color 180ms ease; }
 .identity-content :deep(.el-button > span) { min-width: 0; overflow-wrap: anywhere; }
 .identity-content :deep(.el-button:not(.is-disabled):active) { transform: scale(.97); }
@@ -481,10 +488,10 @@ onBeforeUnmount(() => { generation += 1; readController.abort() })
 .identity-content :deep(.el-checkbox) { margin-bottom: 16px; }
 .identity-content :deep(.el-form-item__label) { color: var(--text-primary); }
 .identity-table { border: 1px solid var(--border); border-radius: var(--r-sm); }
-.identity-table :deep(th.el-table__cell) { font-size: 12px; font-weight: 500; color: var(--text-secondary); background: var(--bg-hover); }
+.identity-table :deep(th.el-table__cell) { font-size: var(--font-size-body); font-weight: 500; color: var(--text-secondary); background: var(--bg-hover); }
 .identity-table :deep(td.el-table__cell) { padding-block: 13px; }
 .user-name { font-weight: 500; }
-.status-pill { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; border-radius: var(--r-pill); padding: 3px 9px; font-size: 11px; overflow-wrap: anywhere; }
+.status-pill { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; border-radius: var(--r-pill); padding: 3px 9px; font-size: var(--font-size-caption); overflow-wrap: anywhere; }
 .status-pill::before { content: ''; width: 4px; height: 4px; background: currentColor; border-radius: 50%; }
 .is-active { background: var(--status-ok-bg); color: var(--status-ok); }
 .is-inactive { background: var(--bg-hover); color: var(--text-secondary); }
@@ -492,15 +499,15 @@ onBeforeUnmount(() => { generation += 1; readController.abort() })
 .form-panel { max-width: 660px; margin-inline: auto; padding-bottom: 2px; }
 .section-title { margin-bottom: 24px; }
 .section-title > .el-button { padding-left: 0; margin-bottom: 12px; }
-.section-title h3, .email-panel h3 { font-size: 23px; font-weight: 600; letter-spacing: -.025em; margin: 0 0 8px; }
+.section-title h3, .email-panel h3 { font-size: var(--font-size-section); font-weight: 600; letter-spacing: -.025em; margin: 0 0 8px; }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .form-actions { justify-content: flex-end; flex-wrap: wrap; gap: 10px; padding-top: 24px; margin-top: 12px; border-top: 1px solid var(--border); }
 .spread { justify-content: space-between; }
 .setting-row { justify-content: space-between; gap: 20px; padding: 18px 0 24px; }
-.setting-row strong, .factor-label strong { font-size: 14px; font-weight: 500; }
+.setting-row strong, .factor-label strong { font-size: var(--font-size-body); font-weight: 500; }
 .setting-row p, .factor-label p { margin-top: 5px; }
 .policy-list, .factor-list { border: 1px solid var(--border); border-radius: var(--r-card); overflow: hidden; }
-.policy-row { justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; padding: 14px 16px; font-size: 13px; }
+.policy-row { justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; padding: 14px 16px; font-size: var(--font-size-body); }
 .policy-row + .policy-row, .factor-row + .factor-row { border-top: 1px solid var(--border); }
 .factor-row { gap: 16px; padding: 22px; }
 .factor-icon { font-size: 24px; color: var(--brand); flex-shrink: 0; }
@@ -511,7 +518,7 @@ onBeforeUnmount(() => { generation += 1; readController.abort() })
 .email-panel { padding-top: 6px; }
 .service-icon { font-size: 42px; color: var(--brand); margin-bottom: 18px; }
 .email-panel > .secondary { margin-bottom: 28px; }
-.field-hint { font-size: 12px; margin-top: 8px; }
+.field-hint { font-size: var(--font-size-secondary); margin-top: 8px; }
 .copy-field { display: flex; gap: 8px; width: 100%; }
 .copy-field .el-input { min-width: 0; }
 .credential-panel :deep(.el-input__inner) { font-family: var(--mono); }
@@ -524,7 +531,7 @@ onBeforeUnmount(() => { generation += 1; readController.abort() })
   .toolbar > .secondary { width: 100%; }
   .form-grid { grid-template-columns: 1fr; gap: 0; }
   .factor-row { padding: 16px 12px; gap: 12px; }
-  .factor-label p { font-size: 12px; }
+  .factor-label p { font-size: var(--font-size-secondary); }
   .form-actions.spread { flex-wrap: wrap; }
   .identity-tabs :deep(.el-tabs__item) { padding-inline: 16px; }
 }

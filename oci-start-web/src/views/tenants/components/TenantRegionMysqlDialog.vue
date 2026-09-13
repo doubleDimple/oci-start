@@ -368,34 +368,38 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.mysql-content { min-width: 0; color: var(--text-primary); font-family: var(--sans); }
+.mysql-content { min-width: 0; color: var(--text-primary); font-family: var(--sans); font-size: var(--font-size-body); }
+:global(.tenant-region-mysql-dialog .el-dialog__title) { font-size: var(--font-size-dialog-title); }
+.mysql-content :deep(.el-button), .mysql-content :deep(.el-input__inner), .mysql-content :deep(.el-select__wrapper), .mysql-content :deep(.el-form-item__label), .mysql-content :deep(.el-table) { font-size: var(--font-size-body); }
+.mysql-content :deep(.el-alert__title) { font-size: var(--font-size-body); }
+.mysql-content :deep(.el-alert__description), .mysql-content :deep(.el-form-item__error), .mysql-content :deep(.el-empty__description p) { font-size: var(--font-size-secondary); }
 .mysql-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
-.tenant-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-secondary); font-size: 12px; }
+.tenant-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-secondary); font-size: var(--font-size-secondary); }
 .toolbar-actions { display: flex; flex-shrink: 0; align-items: center; gap: 8px; }
 .toolbar-actions :deep(.el-button + .el-button) { margin-left: 0; }
 .mysql-content :deep(.el-alert) { margin-bottom: 14px; border-radius: var(--r-sm); }
 .mysql-table { border: 1px solid var(--border); border-radius: var(--r-sm); }
-.mysql-table :deep(th.el-table__cell) { padding-block: 8px; background: var(--bg-hover); color: var(--text-secondary); font-size: 12px; font-weight: 500; }
+.mysql-table :deep(th.el-table__cell) { padding-block: 8px; background: var(--bg-hover); color: var(--text-secondary); font-size: var(--font-size-body); font-weight: 500; }
 .mysql-table :deep(td.el-table__cell) { padding-block: 10px; }
-.cell-secondary { margin-top: 3px; color: var(--text-secondary); font-size: 12px; }
+.cell-secondary { margin-top: 3px; color: var(--text-secondary); font-size: var(--font-size-secondary); }
 .copy-name, .copy-endpoint, .copy-username, .icon-button { border: 0; background: transparent; color: var(--text-primary); font: inherit; cursor: pointer; }
 .copy-name, .copy-endpoint, .copy-username { display: block; max-width: 100%; padding: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
 .copy-name { font-weight: 500; }
-.copy-endpoint, .copy-username { font-family: var(--mono); font-size: 12px; }
+.copy-endpoint, .copy-username { font-family: var(--mono); font-size: var(--font-size-body); }
 .copy-name:hover, .copy-endpoint:hover, .copy-username:hover { color: var(--brand); }
 .copy-name:disabled { cursor: default; color: var(--text-primary); }
-.mysql-status { display: inline-flex; align-items: center; gap: 6px; color: var(--text-secondary); font-size: 12px; white-space: nowrap; }
+.mysql-status { display: inline-flex; align-items: center; gap: 6px; color: var(--text-secondary); font-size: var(--font-size-body); white-space: nowrap; }
 .mysql-status::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
 .mysql-status.is-active { color: var(--status-ok); }
 .mysql-status.is-failed { color: var(--status-danger); }
 .secret-row { display: flex; align-items: center; gap: 4px; min-width: 0; margin-top: 3px; }
-.secret-value { max-width: 178px; overflow: auto; color: var(--text-secondary); font-family: var(--mono); font-size: 12px; white-space: nowrap; scrollbar-width: thin; }
+.secret-value { max-width: 178px; overflow: auto; color: var(--text-secondary); font-family: var(--mono); font-size: var(--font-size-secondary); white-space: nowrap; scrollbar-width: thin; }
 .icon-button { display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: var(--r-sm); color: var(--text-secondary); }
 .icon-button > span { width: 15px; height: 15px; }
 .icon-button:hover:not(:disabled) { background: var(--bg-hover); color: var(--brand); }
 .icon-button:disabled { cursor: default; opacity: .4; }
 .mysql-delete-action { color: var(--status-danger); }
-.busy-status { margin: 12px 0 0; color: var(--text-secondary); font-size: 12px; }
+.busy-status { margin: 12px 0 0; color: var(--text-secondary); font-size: var(--font-size-secondary); }
 @media (max-width: 640px) {
   .mysql-toolbar { flex-wrap: wrap; }
   .tenant-label { flex-basis: 100%; }

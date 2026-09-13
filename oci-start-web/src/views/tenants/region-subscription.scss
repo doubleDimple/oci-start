@@ -1,21 +1,22 @@
 .subscription-page {
+  font-size: var(--font-size-body);
   .list-toolbar { gap: 8px; }
   .tenant-search { flex-basis: 180px; max-width: 280px; }
   .status-filter { width: 130px; }
-  .status-filter :deep(.el-select__wrapper) { min-height: 36px; border-radius: 10px; font-size: 12px; }
+  .status-filter :deep(.el-select__wrapper) { min-height: 36px; border-radius: 10px; font-size: var(--font-size-body); }
   .subscription-tabs {
     display: inline-flex; gap: 2px; flex: none; padding: 3px; border-radius: 12px; background: var(--bg-search);
     button {
       display: inline-flex; align-items: center; justify-content: center; gap: 7px;
       min-height: 30px; padding: 5px 11px; border: 0; border-radius: 9px;
-      background: transparent; color: var(--text-secondary); font: 500 12px var(--sans);
+      background: transparent; color: var(--text-secondary); font: 500 var(--font-size-body) var(--sans);
       white-space: nowrap; cursor: pointer;
       transition: color 180ms ease, background-color 180ms ease, box-shadow 180ms ease;
       &[aria-selected='true'] { color: var(--text-primary); background: var(--bg-card); box-shadow: var(--shadow-card); }
-      span { color: var(--text-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+      span { color: var(--text-muted); font-size: var(--font-size-secondary); font-variant-numeric: tabular-nums; }
     }
   }
-  .subscription-table { min-width: 680px; }
+  .subscription-table { min-width: 680px; font-size: var(--font-size-body); }
   .subscription-table td { height: 52px; padding-top: 8px; padding-bottom: 8px; }
   .key-column { width: 100px; }
   .checkbox-column { width: 44px; padding-right: 4px; }
@@ -28,13 +29,13 @@
   .row-actions .toolbar-button { width: 32px; height: 32px; }
   .cell-link, .region-code { font-weight: 500; white-space: nowrap; }
   .region-location { color: var(--text-secondary); }
-  .home-region { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--brand); }
+  .home-region { display: inline-flex; align-items: center; gap: 5px; font-size: var(--font-size-body); color: var(--brand); }
   .home-region i { font-size: 16px; }
-  .secondary-region { font-size: 12px; color: var(--text-muted); }
+  .secondary-region { font-size: var(--font-size-body); color: var(--text-muted); }
   .subscribe-row {
     display: inline-flex; align-items: center; gap: 4px; min-height: 32px; padding: 5px 9px;
     border: 1px solid color-mix(in srgb, var(--brand) 18%, transparent); border-radius: 9px;
-    background: transparent; color: var(--brand); font: 500 12px var(--sans); cursor: pointer;
+    background: transparent; color: var(--brand); font: 500 var(--font-size-body) var(--sans); cursor: pointer;
     transition: background-color 160ms ease, transform 160ms ease;
     &:not(:disabled):hover { background: var(--status-ok-bg); }
     &:not(:disabled):active { transform: scale(.97); }
@@ -42,25 +43,25 @@
   }
   .selection-context { padding-bottom: 10px; }
   .selection-context button:disabled { opacity: .5; cursor: default; }
-  .check-error { display: block; max-width: 420px; margin-top: 6px; font-size: 12px; color: var(--status-danger); overflow-wrap: anywhere; }
+  .check-error { display: block; max-width: 420px; margin-top: 6px; font-size: var(--font-size-secondary); color: var(--status-danger); overflow-wrap: anywhere; }
   .operation-notice {
     display: flex; flex-shrink: 0; align-items: center; gap: 9px; padding: 10px 14px; margin: 0 18px 10px;
-    border-radius: 10px; color: var(--brand); background: var(--status-ok-bg); font-size: 12px;
+    border-radius: 10px; color: var(--brand); background: var(--status-ok-bg); font-size: var(--font-size-body);
     > i { flex: none; font-size: 17px; }
     > span { flex: 1; }
-    button { flex: none; padding: 3px 0; border: 0; background: transparent; color: inherit; font: 500 12px var(--sans); cursor: pointer; }
+    button { flex: none; padding: 3px 0; border: 0; background: transparent; color: inherit; font: 500 var(--font-size-body) var(--sans); cursor: pointer; }
     &.has-failures { color: var(--status-warn); background: var(--status-warn-bg); }
   }
-  .footer-context { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 16px; min-width: 0; font-variant-numeric: tabular-nums; }
+  .footer-context { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 16px; min-width: 0; font-size: var(--font-size-secondary); font-variant-numeric: tabular-nums; }
   .tenant-context { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); }
-  .summary-retry { display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: transparent; color: var(--status-warn); font: inherit; cursor: pointer; }
+  .summary-retry { display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: transparent; color: var(--status-warn); font: inherit; font-size: var(--font-size-body); cursor: pointer; }
   .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   button:focus-visible, input[type='checkbox']:focus-visible, .table-stage:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
   .table-stage:focus-visible { outline-offset: -2px; }
   .tenant-search input::-webkit-search-cancel-button { display: none; }
 }
-.region-key { font-family: var(--mono, ui-monospace, monospace); font-size: 12px; font-weight: 500; letter-spacing: .015em; }
-.tenant-status { display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px; border-radius: var(--r-pill); font-size: 11px; font-weight: 500; white-space: nowrap; }
+.region-key { font-family: var(--mono, ui-monospace, monospace); font-size: var(--font-size-body); font-weight: 500; letter-spacing: .015em; }
+.tenant-status { display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px; border-radius: var(--r-pill); font-size: var(--font-size-caption); font-weight: 500; white-space: nowrap; }
 .subscription-status-ready { background: var(--status-ok-bg); color: var(--status-ok); }
 .subscription-status-progress { background: var(--status-warn-bg); color: var(--status-warn); }
 .subscription-status-failed { background: var(--status-danger-bg); color: var(--status-danger); }
@@ -69,17 +70,17 @@
   margin: 0;
   > div { display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 16px; padding: 13px 0; border-bottom: 1px solid color-mix(in srgb, var(--border) 40%, transparent); }
   > div:last-child { border: 0; }
-  dt { color: var(--text-secondary); font-size: 13px; }
-  dd { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; color: var(--text-primary); font-size: 13px; overflow-wrap: anywhere; }
-  .raw-status { color: var(--text-muted); font-size: 10px; }
+  dt { color: var(--text-secondary); font-size: var(--font-size-body); }
+  dd { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; color: var(--text-primary); font-size: var(--font-size-body); overflow-wrap: anywhere; }
+  .raw-status { color: var(--text-muted); font-size: var(--font-size-secondary); }
 }
-.dialog-description { margin: 0 0 16px; font-size: 14px; line-height: 1.6; color: var(--text-primary); }
-.dialog-hint { margin: 16px 0 0; color: var(--text-secondary); font-size: 12px; line-height: 1.7; }
-.dialog-error { padding: 10px 12px; border-radius: 9px; background: var(--status-danger-bg); color: var(--status-danger); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.dialog-description { margin: 0 0 16px; font-size: var(--font-size-body); line-height: 1.6; color: var(--text-primary); }
+.dialog-hint { margin: 16px 0 0; color: var(--text-secondary); font-size: var(--font-size-secondary); line-height: 1.7; }
+.dialog-error { padding: 10px 12px; border-radius: 9px; background: var(--status-danger-bg); color: var(--status-danger); font-size: var(--font-size-secondary); line-height: 1.6; overflow-wrap: anywhere; }
 .subscription-targets, .subscription-results {
   max-height: min(330px, 42vh); margin: 0; padding: 0; overflow: auto; overscroll-behavior: contain; list-style: none;
   border: 1px solid color-mix(in srgb, var(--border) 50%, transparent); border-radius: 12px;
-  li { padding: 12px 14px; border-bottom: 1px solid color-mix(in srgb, var(--border) 35%, transparent); font-size: 12px; }
+  li { padding: 12px 14px; border-bottom: 1px solid color-mix(in srgb, var(--border) 35%, transparent); font-size: var(--font-size-body); }
   li:last-child { border-bottom: 0; }
 }
 .subscription-targets li { display: flex; align-items: baseline; gap: 12px; overflow-wrap: anywhere; }
@@ -87,15 +88,15 @@
 .result-intro {
   display: flex; align-items: flex-start; gap: 12px; margin-bottom: 18px; color: var(--brand);
   > i { flex: none; margin-top: 1px; font-size: 25px; }
-  strong { font-size: 15px; font-weight: 600; }
-  p { margin: 6px 0 0; color: var(--text-secondary); font-size: 12px; line-height: 1.7; }
+  strong { font-size: var(--font-size-section); font-weight: 600; }
+  p { margin: 6px 0 0; color: var(--text-secondary); font-size: var(--font-size-secondary); line-height: 1.7; }
   &.has-failures { color: var(--status-warn); }
 }
 .result-region { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; color: var(--text-primary); overflow-wrap: anywhere; }
-.result-state { margin-left: auto; color: var(--text-muted); font-size: 11px; }
+.result-state { margin-left: auto; color: var(--text-muted); font-size: var(--font-size-secondary); }
 .result-success { color: var(--status-ok); }
 .result-failed { color: var(--status-danger); }
-.subscription-results li p { margin: 6px 0 0 53px; color: var(--text-secondary); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.subscription-results li p { margin: 6px 0 0 53px; color: var(--text-secondary); font-size: var(--font-size-secondary); line-height: 1.6; overflow-wrap: anywhere; }
 .dialog-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; padding-top: 10px; }
 .subscription-spin { animation: subscription-spin 1000ms linear infinite; }
 @keyframes subscription-spin { to { transform: rotate(360deg); } }
@@ -111,7 +112,7 @@
     .status-filter { order: 2; width: 130px; }
     .toolbar-actions { order: 3; }
     .list-footer { padding: 10px 12px; }
-    .footer-context { font-size: 11px; }
+    .footer-context { font-size: var(--font-size-secondary); }
     .operation-notice { margin-right: 12px; margin-left: 12px; }
   }
   .region-details > div { grid-template-columns: 80px minmax(0, 1fr); gap: 12px; }

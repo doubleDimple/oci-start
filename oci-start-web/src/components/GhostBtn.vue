@@ -10,7 +10,7 @@ defineProps<{ danger?: boolean; loading?: boolean; disabled?: boolean }>()
   background: var(--bg-card);
   color: var(--text-primary);
   font: inherit;
-  font-size: 14px;
+  font-size: var(--font-size-body);
   font-weight: 600;
   border-radius: var(--r-pill);
   padding: 10px 14px;

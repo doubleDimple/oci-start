@@ -164,9 +164,14 @@ onBeforeUnmount(() => {
 
 <style>
 .tenant-update-dialog {
+  font-size: var(--font-size-body);
   max-width: calc(100vw - 32px);
   padding: 26px;
 }
+.tenant-update-dialog .el-dialog__title { font-size: var(--font-size-dialog-title); }
+.tenant-update-dialog .el-button { font-size: var(--font-size-body); }
+.tenant-update-dialog .el-alert__title { font-size: var(--font-size-body); }
+.tenant-update-dialog .el-alert__description { font-size: var(--font-size-secondary); }
 .tenant-update-dialog .update-account {
   display: flex;
   align-items: center;
@@ -190,7 +195,7 @@ onBeforeUnmount(() => {
 }
 .tenant-update-dialog .update-account p {
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-secondary);
   margin: 5px 0 0;
 }
 .tenant-update-dialog .update-success {
@@ -205,7 +210,7 @@ onBeforeUnmount(() => {
   padding: 16px;
   background: var(--bg-search);
   border-radius: 12px;
-  font: 12px/1.7 var(--mono);
+  font: var(--font-size-secondary)/1.7 var(--mono);
   color: var(--text-primary);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -215,11 +220,11 @@ onBeforeUnmount(() => {
 }
 .tenant-update-dialog .update-error {
   color: var(--status-danger);
-  font-size: 13px;
+  font-size: var(--font-size-secondary);
 }
 .tenant-update-dialog .update-note {
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-secondary);
 }
 .tenant-update-dialog .el-dialog__footer {
   display: flex;

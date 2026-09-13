@@ -3,15 +3,17 @@ import { applyChrome } from './useChrome'
 
 const STORAGE_KEY = 'oci_theme'
 export type ThemeName = 'light' | 'dark'
+export type ThemePreference = ThemeName | 'system'
 
 export const theme = ref<ThemeName>('light')
+export const themeMode = ref<ThemePreference>('light')
+const systemTheme = window.matchMedia('(prefers-color-scheme: dark)')
+let listening = false
 
-function readStored(): ThemeName {
+function readStored(): ThemePreference {
   try {
     const saved = localStorage.getItem(STORAGE_KEY)
-    if (saved === 'system') {
-      return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
-    }
+    if (saved === 'system') return 'system'
     return saved === 'dark' ? 'dark' : 'light'
   } catch {
     return 'light'
@@ -25,16 +27,35 @@ function applyToDocument(name: ThemeName) {
 }
 
 export function applyStoredTheme() {
-  theme.value = readStored()
+  themeMode.value = readStored()
+  resolveTheme()
+  if (!listening) {
+    systemTheme.addEventListener('change', onSystemChange)
+    listening = true
+  }
+}
+
+function resolveTheme() {
+  theme.value = themeMode.value === 'system' ? (systemTheme.matches ? 'dark' : 'light') : themeMode.value
   applyToDocument(theme.value)
 }
 
-export function toggleTheme() {
-  theme.value = theme.value === 'dark' ? 'light' : 'dark'
-  applyToDocument(theme.value)
+function onSystemChange() {
+  if (themeMode.value === 'system') resolveTheme()
+}
+
+export function setTheme(mode: ThemePreference) {
+  themeMode.value = mode
+  resolveTheme()
   try {
-    localStorage.setItem(STORAGE_KEY, theme.value)
+    localStorage.setItem(STORAGE_KEY, mode)
   } catch {
     /* ignore */
   }
 }
+
+export function toggleTheme() {
+  setTheme(theme.value === 'dark' ? 'light' : 'dark')
+}
+
+if (import.meta.hot) import.meta.hot.dispose(() => systemTheme.removeEventListener('change', onSystemChange))

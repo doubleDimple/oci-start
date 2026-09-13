@@ -97,13 +97,18 @@ function ink() {
   }
 }
 
+function chartFontSize() {
+  return Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-size-secondary')) || 13
+}
+
 function applyChartTheme() {
   if (!chart) return
   const c = ink()
+  const fontSize = chartFontSize()
   chart.setOption({
-    legend: { textStyle: { color: c.text, fontSize: 12 } },
-    xAxis: { axisLabel: { fontSize: 10, color: c.muted } },
-    yAxis: { nameTextStyle: { color: c.muted }, splitLine: { lineStyle: { type: 'dashed', color: c.split } } },
+    legend: { textStyle: { color: c.text, fontSize } },
+    xAxis: { axisLabel: { fontSize, color: c.muted } },
+    yAxis: { axisLabel: { fontSize }, nameTextStyle: { color: c.muted, fontSize }, splitLine: { lineStyle: { type: 'dashed', color: c.split } } },
   })
 }
 
@@ -111,13 +116,14 @@ function initChart() {
   if (!chartEl.value) return
   chart = echarts.init(chartEl.value)
   const c = ink()
+  const fontSize = chartFontSize()
   chart.setOption({
     animation: false,
     grid: { left: 44, right: 12, top: 28, bottom: 24 },
-    legend: { top: 0, textStyle: { color: c.text, fontSize: 12 } },
+    legend: { top: 0, textStyle: { color: c.text, fontSize } },
     tooltip: { trigger: 'axis' },
-    xAxis: { type: 'category', data: [], boundaryGap: false, axisLabel: { fontSize: 10, color: c.muted } },
-    yAxis: { type: 'value', name: 'KB/s', nameTextStyle: { color: c.muted }, splitLine: { lineStyle: { type: 'dashed', color: c.split } } },
+    xAxis: { type: 'category', data: [], boundaryGap: false, axisLabel: { fontSize, color: c.muted } },
+    yAxis: { type: 'value', name: 'KB/s', axisLabel: { fontSize }, nameTextStyle: { color: c.muted, fontSize }, splitLine: { lineStyle: { type: 'dashed', color: c.split } } },
     series: [
       { name: t('dashboard.netUp'), type: 'line', smooth: true, showSymbol: false, lineStyle: { width: 2, color: '#0071e3' }, areaStyle: { color: 'rgba(0,113,227,0.08)' }, data: [] },
       { name: t('dashboard.netDown'), type: 'line', smooth: true, showSymbol: false, lineStyle: { width: 2, color: '#1b8a6a' }, areaStyle: { color: 'rgba(27,138,106,0.08)' }, data: [] },
@@ -279,13 +285,13 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.updated { margin-top: 12px; color: var(--text-secondary); font-size: 12px; text-align: right; }
+.updated { margin-top: 12px; color: var(--text-secondary); font-size: var(--font-size-secondary); text-align: right; }
 .kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 16px; }
 .kpi {
   background: var(--bg-card); border-radius: var(--r-card); box-shadow: var(--shadow-card);
   padding: 16px; display: flex; gap: 12px; align-items: center;
 }
-.kpi small { display: block; color: var(--text-secondary); font-size: 12px; }
+.kpi small { display: block; color: var(--text-secondary); font-size: var(--font-size-body); }
 .kpi b { font-size: 24px; letter-spacing: -0.03em; }
 .kpi b.fail { color: var(--status-danger); }
 .kpi-icon { width: 42px; height: 42px; border-radius: 14px; display: grid; place-items: center; font-size: 20px; }
@@ -297,15 +303,15 @@ onUnmounted(() => {
 .card { background: var(--bg-card); border-radius: var(--r-card); box-shadow: var(--shadow-card); padding: 18px; }
 .card.net { grid-column: span 2; }
 header { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; }
-header h3 { margin: 0; font-size: 15px; }
-header small { color: var(--text-secondary); }
-.ico { width: 36px; height: 36px; border-radius: 12px; background: var(--icon-mint); color: var(--brand); display: grid; place-items: center; }
+header h3 { margin: 0; font-size: var(--font-size-section); }
+header small { color: var(--text-secondary); font-size: var(--font-size-secondary); }
+.ico { width: 36px; height: 36px; border-radius: 12px; background: var(--icon-mint); color: var(--brand); display: grid; place-items: center; font-size: 16px; }
 .gauge-wrap { position: relative; width: 140px; height: 140px; margin: 12px auto; }
 .gauge { width: 100%; height: 100%; border-radius: 50%; }
-.gval { position: absolute; inset: 22px; border-radius: 50%; background: var(--bg-card); display: grid; place-items: center; font-weight: 700; }
+.gval { position: absolute; inset: 22px; border-radius: 50%; background: var(--bg-card); display: grid; place-items: center; font-size: var(--font-size-section); font-weight: 700; }
 .chart { height: 180px; }
 dl { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; margin: 12px 0 0; }
-dl div { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; }
+dl div { display: flex; justify-content: space-between; gap: 8px; font-size: var(--font-size-body); }
 dt { color: var(--text-secondary); }
 dd { margin: 0; font-weight: 600; }
 @media (max-width: 1100px) {

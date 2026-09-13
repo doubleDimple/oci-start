@@ -7,8 +7,16 @@ import tenantImport from './tenants/import'
 import tenantOperations from './tenants/operations'
 import tenantResources from './tenants/resources'
 import tenantSubscription from './tenants/subscriptions'
+import { headerZh } from './header'
+import { headerMessagesZh } from './headerMessages'
+import { headerAssetsZh } from './headerAssets'
+import { headerVersionZh } from './headerVersion'
 
 export default {
+  header: headerZh,
+  headerMessages: headerMessagesZh,
+  headerAssets: headerAssetsZh,
+  headerVersion: headerVersionZh,
   ociBoot: ociBoot.zh,
   regionGlobe: regionGlobe.zh,
   regionPage: regionPage.zh,

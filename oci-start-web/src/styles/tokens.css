@@ -61,6 +61,13 @@
           "Helvetica Neue", Helvetica, Arial, sans-serif;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
+  /* Match the OCI instance list; compact controls keep the same readable type size. */
+  --font-size-body: 14px;
+  --font-size-secondary: 13px;
+  --font-size-caption: 12px;
+  --font-size-section: 16px;
+  --font-size-dialog-title: 18px;
+
   --el-color-primary: var(--brand);
   --el-color-primary-light-3: color-mix(in srgb, var(--brand) 70%, #fff);
   --el-color-primary-light-5: color-mix(in srgb, var(--brand) 50%, #fff);
@@ -132,13 +139,22 @@
   --el-mask-color: rgba(0, 0, 0, 0.65);
 }
 
+/* Component CSS is lazy loaded; keep its type scale tied to the shared tokens. */
+html:root {
+  --el-font-size-base: var(--font-size-body);
+  --el-font-size-small: var(--font-size-secondary);
+  --el-font-size-extra-small: var(--font-size-caption);
+  --el-font-size-medium: var(--font-size-section);
+  --el-font-size-large: var(--font-size-dialog-title);
+}
+
 html, body, #app {
   height: 100%;
   margin: 0;
   background: var(--bg-page);
   color: var(--text-primary);
   font-family: var(--sans);
-  font-size: 16px;
+  font-size: var(--font-size-body);
   line-height: 1.47;
   font-synthesis: none;
   text-rendering: optimizeLegibility;

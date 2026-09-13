@@ -28,13 +28,13 @@ defineProps<{
 }
 .heading { min-width: 0; flex: 1 1 260px; }
 .kicker {
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   letter-spacing: 0.14em;
   font-weight: 600;
   color: var(--text-muted);
 }
 h1 { margin: 6px 0 4px; font-size: clamp(25px, 2.8vw, 32px); font-weight: 600; letter-spacing: -0.03em; }
-p { margin: 0; color: var(--text-secondary); font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+p { margin: 0; color: var(--text-secondary); font-size: var(--font-size-secondary); line-height: 1.6; overflow-wrap: anywhere; }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 @media (max-width: 760px) {
   .hero { align-items: flex-start; gap: 16px; margin-bottom: 20px; }

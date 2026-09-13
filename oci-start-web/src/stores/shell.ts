@@ -9,10 +9,15 @@ function readProvider(): { type: number; name: string } {
     const raw = localStorage.getItem(PROVIDER_KEY)
     if (raw) {
       const parsed = JSON.parse(raw)
-      if (parsed?.type) return parsed
+      // The header now exposes OCI only; discard a previously selected hidden provider.
+      if (Number(parsed?.type) === 1) return { type: 1, name: 'Oracle Cloud' }
     }
   } catch { /* ignore */ }
   return { type: 1, name: 'Oracle Cloud' }
+}
+
+function readCollapsed() {
+  try { return localStorage.getItem(SIDE_KEY) === '1' } catch { return false }
 }
 
 export const useShellStore = defineStore('shell', {
@@ -21,7 +26,7 @@ export const useShellStore = defineStore('shell', {
     active: 'api-dashboard',
     cloudType: readProvider().type,
     cloudName: readProvider().name,
-    collapsed: localStorage.getItem(SIDE_KEY) === '1',
+    collapsed: readCollapsed(),
     menuQuery: '',
   }),
   actions: {
@@ -50,11 +55,11 @@ export const useShellStore = defineStore('shell', {
       const found = PROVIDERS.find((p) => p.type === type) || PROVIDERS[0]
       this.cloudType = found.type
       this.cloudName = found.name
-      localStorage.setItem(PROVIDER_KEY, JSON.stringify({ type: found.type, name: found.name }))
+      try { localStorage.setItem(PROVIDER_KEY, JSON.stringify({ type: found.type, name: found.name })) } catch { /* session only */ }
     },
     toggleCollapsed() {
       this.collapsed = !this.collapsed
-      localStorage.setItem(SIDE_KEY, this.collapsed ? '1' : '0')
+      try { localStorage.setItem(SIDE_KEY, this.collapsed ? '1' : '0') } catch { /* session only */ }
     },
   },
 })

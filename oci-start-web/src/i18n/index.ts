@@ -6,8 +6,13 @@ export const LOCALE_STORAGE_KEY = 'lang'
 export type AppLocale = 'zh' | 'en'
 
 export function resolveInitialLocale(): AppLocale {
-  const saved = localStorage.getItem(LOCALE_STORAGE_KEY)
-  if (saved === 'zh' || saved === 'en') return saved
+  const urlLang = new URLSearchParams(window.location.search).get('lang')
+  if (urlLang === 'en' || urlLang === 'en_US') return 'en'
+  if (urlLang === 'zh' || urlLang === 'zh_CN' || urlLang === 'zh_TW') return 'zh'
+  try {
+    const saved = localStorage.getItem(LOCALE_STORAGE_KEY)
+    if (saved === 'en' || saved === 'en_US') return 'en'
+  } catch { /* default language */ }
   return 'zh'
 }
 

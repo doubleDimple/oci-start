@@ -360,13 +360,13 @@ onBeforeUnmount(() => {
 .tenant-regions-page .region-index { width: 60px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .tenant-regions-page .identity-column { width: 210px; min-width: 210px; }
 .tenant-regions-page .region-custom-name.is-expanded { max-width: 260px; white-space: normal; overflow-wrap: anywhere; }
-.region-home { color: var(--brand); font-size: 12px; }
-.region-sync-state { display: inline-flex; align-items: center; gap: 5px; color: var(--text-secondary); font-size: 12px; white-space: nowrap; }
+.region-home { color: var(--brand); font-size: var(--font-size-body); }
+.region-sync-state { display: inline-flex; align-items: center; gap: 5px; color: var(--text-secondary); font-size: var(--font-size-body); white-space: nowrap; }
 .region-sync-state.is-synced { color: var(--brand); }
 .region-sync-content { display: flex; align-items: flex-start; gap: 14px; padding: 8px 0; }
 .region-sync-content .sync-icon { flex: none; margin-top: 2px; color: var(--brand); font-size: 25px; }
-.region-sync-content strong { font-weight: 600; }
-.region-sync-content p { margin: 8px 0 0; color: var(--text-secondary); font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
+.region-sync-content strong { font-weight: 600; font-size: var(--font-size-body); }
+.region-sync-content p { margin: 8px 0 0; color: var(--text-secondary); font-size: var(--font-size-secondary); line-height: 1.7; overflow-wrap: anywhere; }
 .region-spinning { animation: region-spin 900ms linear infinite; }
 @keyframes region-spin { to { transform: rotate(360deg); } }
 @media (max-width: 700px) { .tenant-regions-page .tenant-search { flex: 1 1 160px; width: auto; } }

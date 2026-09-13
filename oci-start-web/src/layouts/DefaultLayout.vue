@@ -2,19 +2,33 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { MENU, PROVIDERS, type NavItem } from '@/nav/menu'
+import { ElMessage } from 'element-plus'
+import { MENU, type NavItem } from '@/nav/menu'
 import { useShellStore } from '@/stores/shell'
 import { useUserStore } from '@/stores/user'
-import { theme, toggleTheme } from '@/composables/useTheme'
+import { theme, themeMode, setTheme } from '@/composables/useTheme'
 import { chrome, setSidebarColor, setPageColor, resetChrome, SIDEBAR_SWATCHES, PAGE_SWATCHES } from '@/composables/useChrome'
 import { useLocale } from '@/composables/useLocale'
+import HeaderSearch from '@/components/header/HeaderSearch.vue'
+import HeaderMessages from '@/components/header/HeaderMessages.vue'
+import HeaderAssets from '@/components/header/HeaderAssets.vue'
+import HeaderVersion from '@/components/header/HeaderVersion.vue'
 
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const shell = useShellStore()
 const user = useUserStore()
-const { locale, setLocale } = useLocale()
+const { locale, setLocale, syncing: localeSyncing } = useLocale()
+const assets = ref<InstanceType<typeof HeaderAssets>>()
+const version = ref<InstanceType<typeof HeaderVersion>>()
+const userRequest = new AbortController()
+let disposed = false
+// Reset any hidden provider retained by an already mounted development session.
+if (shell.cloudType !== 1) shell.setCloud(1)
+const userLabel = computed(() => user.username || t(user.loading ? 'header.loading' : 'header.user'))
+const languageLabel = computed(() => `${t('header.language')} · ${locale.value === 'zh' ? '简体中文' : 'English'}`)
+const themeIcon = computed(() => themeMode.value === 'system' ? 'i-mdi-monitor' : theme.value === 'dark' ? 'i-mdi-weather-night' : 'i-mdi-white-balance-sunny')
 const avatarUrl = '/images/default-avatar.png'
 const compactMedia = window.matchMedia('(max-width: 760px)')
 const compactViewport = ref(compactMedia.matches)
@@ -40,10 +54,14 @@ function closeMobileNav() {
 }
 
 onMounted(() => {
-  user.load()
+  void user.load(userRequest.signal)
   compactMedia.addEventListener('change', updateViewport)
 })
-onBeforeUnmount(() => compactMedia.removeEventListener('change', updateViewport))
+onBeforeUnmount(() => {
+  disposed = true
+  userRequest.abort()
+  compactMedia.removeEventListener('change', updateViewport)
+})
 
 watch(() => route.path, async () => {
   mobileNavOpen.value = false
@@ -58,59 +76,78 @@ const visibleGroups = computed(() => {
     children: g.children.filter((it) => {
       if (it.cloudTypes && !it.cloudTypes.includes(shell.cloudType)) return false
       if (!q) return true
-      return t(it.labelKey).toLowerCase().includes(q) || t(g.labelKey).toLowerCase().includes(q)
+      return `${t(it.labelKey)} ${t(g.labelKey)} ${it.href}`.toLowerCase().includes(q)
     }),
   })).filter((g) => g.children.length > 0)
 })
 
-function openItem(it: NavItem) {
+function openItem(it: NavItem, event: MouseEvent) {
+  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return
+  event.preventDefault()
   mobileNavOpen.value = false
-  router.push(it.href)
+  shell.menuQuery = ''
+  if (it.newTab) window.open(router.resolve(it.href).href, '_blank', 'noopener')
+  else void router.push(it.href)
 }
 
-function switchCloud(type: number) {
-  if (shell.cloudType === type) return
-  shell.setCloud(type)
-  const href = type === 2 ? '/other/instances/list' : type === 1 ? '/tenants/list' : type === 3 ? '/azure/vms' : '/aws/ec2'
-  router.push(href)
+function changeTheme(value: unknown) {
+  if (value === 'dark' || value === 'light' || value === 'system') setTheme(value)
+}
+
+async function changeLocale(value: unknown) {
+  if (value !== 'zh' && value !== 'en') return
+  const succeeded = await setLocale(value)
+  if (!succeeded && !disposed) ElMessage.error(t('header.localeFailed'))
+}
+
+async function signOut() {
+  if (user.signingOut) return
+  const succeeded = await user.signOut()
+  if (!succeeded && !disposed) ElMessage.error(t('header.logoutFailed'))
+}
+
+function userCommand(value: unknown) {
+  if (value === 'assets') assets.value?.open()
+  else if (value === 'about') version.value?.open()
+  else if (value === 'logout') void signOut()
+  else if (value === 'retry') void user.load(userRequest.signal)
 }
 
 function isActive(it: NavItem) {
   return route.path === it.href
 }
 
-function openAbout() {
-  window.open('https://github.com/doubleDimple', '_blank', 'noopener')
-}
 </script>
 
 <template>
   <div class="shell" :class="{ collapsed: sidebarCollapsed, 'mobile-nav-open': mobileNavOpen }" @keydown.esc="closeMobileNav">
-    <Transition name="navigation-shade"><button v-if="compactViewport && mobileNavOpen" class="mobile-nav-backdrop" type="button" tabindex="-1" aria-label="收起导航" @click="closeMobileNav" /></Transition>
+    <Transition name="navigation-shade"><button v-if="compactViewport && mobileNavOpen" class="mobile-nav-backdrop" type="button" tabindex="-1" :aria-label="t('header.collapseNav')" @click="closeMobileNav" /></Transition>
     <aside class="side">
       <div class="brand">
-        <button ref="sidebarToggle" class="leaf" type="button" :aria-label="sidebarCollapsed ? '展开导航' : '收起导航'" :title="sidebarCollapsed ? '展开导航' : '收起导航'" :aria-expanded="!sidebarCollapsed" aria-controls="primary-navigation" @click="toggleSidebar">
+        <button ref="sidebarToggle" class="leaf" type="button" :aria-label="t(sidebarCollapsed ? 'header.expandNav' : 'header.collapseNav')" :title="t(sidebarCollapsed ? 'header.expandNav' : 'header.collapseNav')" :aria-expanded="!sidebarCollapsed" aria-controls="primary-navigation" @click="toggleSidebar">
           <i :class="compactViewport ? (mobileNavOpen ? 'i-mdi-close' : 'i-mdi-menu') : 'i-mdi-leaf'" aria-hidden="true" />
         </button>
-        <div class="brand-text">
+        <RouterLink to="/index" class="brand-text" :title="t('header.home')" :aria-label="t('header.home')" :tabindex="sidebarCollapsed ? -1 : undefined">
           <strong>{{ t('brand') }}</strong>
           <small>{{ t('brandSub') }}</small>
-        </div>
+        </RouterLink>
       </div>
 
-      <nav id="primary-navigation" class="nav" aria-label="主导航">
+      <nav id="primary-navigation" class="nav" :aria-label="t('header.navigation')">
         <template v-for="g in visibleGroups" :key="g.id">
           <div class="group-label">{{ t(g.labelKey) }}</div>
           <a
             v-for="it in g.children"
             :key="it.id"
-            :href="it.href"
+            :href="router.resolve(it.href).href"
+            :target="it.newTab ? '_blank' : undefined"
+            :rel="it.newTab ? 'noopener' : undefined"
             class="nav-item"
             :class="{ active: isActive(it) }"
             :title="t(it.labelKey)"
             :aria-label="t(it.labelKey)"
             :aria-current="isActive(it) ? 'page' : undefined"
-            @click.prevent="openItem(it)"
+            @click="openItem(it, $event)"
           >
             <i :class="it.icon" />
             <span>{{ t(it.labelKey) }}</span>
@@ -126,7 +163,7 @@ function openAbout() {
       <div class="side-user">
         <img :src="avatarUrl" alt="" />
         <div class="side-user-meta">
-          <b>{{ user.username || '—' }}</b>
+          <b>{{ userLabel }}</b>
           <small>{{ shell.cloudName }}</small>
         </div>
       </div>
@@ -134,14 +171,21 @@ function openAbout() {
 
     <div class="main" :inert="compactViewport && mobileNavOpen || undefined">
       <header class="top">
-        <label class="search">
-          <i class="i-mdi-magnify" />
-          <input v-model="shell.menuQuery" :placeholder="t('searchMenu')" :aria-label="t('searchMenu')" />
-        </label>
+        <HeaderSearch />
         <div class="top-right">
-          <button class="icon-btn" type="button" :title="theme === 'dark' ? t('themeLight') : t('themeDark')" :aria-label="theme === 'dark' ? t('themeLight') : t('themeDark')" @click="toggleTheme">
-            <i :class="theme === 'dark' ? 'i-mdi-white-balance-sunny' : 'i-mdi-weather-night'" />
-          </button>
+          <HeaderVersion ref="version" />
+          <el-dropdown trigger="click" @command="changeTheme">
+            <button class="icon-btn" type="button" :title="`${t('header.appearance')} · ${t(`header.${themeMode}`)}`" :aria-label="`${t('header.appearance')} · ${t(`header.${themeMode}`)}`">
+              <i :class="themeIcon" aria-hidden="true" />
+            </button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item v-for="mode in ['light', 'dark', 'system']" :key="mode" :command="mode" :class="{ 'is-active': themeMode === mode }">
+                  <span class="header-menu-label">{{ t(`header.${mode}`) }}</span><i v-if="themeMode === mode" class="i-mdi-check" aria-hidden="true" />
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
           <el-popover placement="bottom-end" :width="280" trigger="click">
             <template #reference>
               <button class="icon-btn" type="button" :title="t('chrome.title')" :aria-label="t('chrome.title')">
@@ -158,10 +202,13 @@ function openAbout() {
                   class="swatch"
                   :class="{ on: chrome.sidebar.toLowerCase() === c }"
                   :style="{ background: c }"
+                  :aria-label="t('header.sidebarColor', { color: c })"
+                  :title="t('header.sidebarColor', { color: c })"
+                  :aria-pressed="chrome.sidebar.toLowerCase() === c"
                   @click="setSidebarColor(c)"
                 />
                 <label class="swatch picker">
-                  <input type="color" :value="chrome.sidebar || '#1d1d1f'" @input="setSidebarColor(($event.target as HTMLInputElement).value)">
+                  <input type="color" :aria-label="t('header.customSidebar')" :title="t('header.customSidebar')" :value="chrome.sidebar || (theme === 'dark' ? '#000000' : '#1d1d1f')" @input="setSidebarColor(($event.target as HTMLInputElement).value)">
                 </label>
               </div>
               <p class="chrome-label">{{ t('chrome.page') }}</p>
@@ -173,42 +220,48 @@ function openAbout() {
                   class="swatch"
                   :class="{ on: chrome.page.toLowerCase() === c }"
                   :style="{ background: c }"
+                  :aria-label="t('header.pageColor', { color: c })"
+                  :title="t('header.pageColor', { color: c })"
+                  :aria-pressed="chrome.page.toLowerCase() === c"
                   @click="setPageColor(c)"
                 />
                 <label class="swatch picker">
-                  <input type="color" :value="chrome.page || '#f5f5f7'" @input="setPageColor(($event.target as HTMLInputElement).value)">
+                  <input type="color" :aria-label="t('header.customPage')" :title="t('header.customPage')" :value="chrome.page || (theme === 'dark' ? '#000000' : '#f5f5f7')" @input="setPageColor(($event.target as HTMLInputElement).value)">
                 </label>
               </div>
               <button class="reset" type="button" @click="resetChrome">{{ t('chrome.reset') }}</button>
             </div>
           </el-popover>
-          <button class="icon-btn" type="button" :aria-label="locale === 'zh' ? 'Switch to English' : '切换到中文'" @click="setLocale(locale === 'zh' ? 'en' : 'zh')">
-            <i class="i-mdi-translate" />
-          </button>
-          <el-dropdown trigger="click">
-            <button class="user-chip" type="button" :aria-label="`${user.username || '用户'} · ${t('cloudSwitch')}`">
+          <el-dropdown trigger="click" :disabled="localeSyncing" @command="changeLocale">
+            <button class="icon-btn" type="button" :disabled="localeSyncing" :aria-busy="localeSyncing" :title="languageLabel" :aria-label="languageLabel">
+              <i class="i-mdi-translate" aria-hidden="true" />
+            </button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="zh" :class="{ 'is-active': locale === 'zh' }"><span class="header-menu-label" lang="zh-CN">简体中文</span><i v-if="locale === 'zh'" class="i-mdi-check" aria-hidden="true" /></el-dropdown-item>
+                <el-dropdown-item command="en" :class="{ 'is-active': locale === 'en' }"><span class="header-menu-label" lang="en">English</span><i v-if="locale === 'en'" class="i-mdi-check" aria-hidden="true" /></el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+          <HeaderMessages />
+          <el-dropdown trigger="click" @command="userCommand">
+            <button class="user-chip" type="button" :title="t(user.loadFailed ? 'header.userFailed' : 'header.userMenu')" :aria-label="`${userLabel} · ${t('header.userMenu')}`">
               <img :src="avatarUrl" alt="" />
               <span>
-                <b>{{ user.username || '—' }}</b>
+                <b>{{ userLabel }}</b>
                 <small>{{ shell.cloudName }}</small>
               </span>
               <i class="i-mdi-chevron-down" />
             </button>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item disabled>{{ t('cloudSwitch') }}</el-dropdown-item>
-                <el-dropdown-item
-                  v-for="p in PROVIDERS"
-                  :key="p.type"
-                  :class="{ 'is-active': shell.cloudType === p.type }"
-                  @click="switchCloud(p.type)"
-                >
-                  {{ p.name }}
-                </el-dropdown-item>
-                <el-dropdown-item divided @click="openAbout">
+                <el-dropdown-item disabled><span class="header-account-summary">{{ userLabel }}<small>{{ shell.cloudName }}</small></span></el-dropdown-item>
+                <el-dropdown-item v-if="user.loadFailed" command="retry" :disabled="user.loading"><i class="i-mdi-refresh" aria-hidden="true" />{{ t('header.retryUser') }}</el-dropdown-item>
+                <el-dropdown-item divided command="assets"><i class="i-mdi-chart-box-outline" aria-hidden="true" />{{ t('header.assets') }}</el-dropdown-item>
+                <el-dropdown-item command="about"><i class="i-mdi-information-outline" aria-hidden="true" />
                   {{ t('about') }}
                 </el-dropdown-item>
-                <el-dropdown-item @click="user.signOut()">{{ t('logout') }}</el-dropdown-item>
+                <el-dropdown-item divided command="logout" :disabled="user.signingOut"><i class="i-mdi-logout" aria-hidden="true" />{{ t(user.signingOut ? 'header.signOutBusy' : 'logout') }}</el-dropdown-item>
               </el-dropdown-menu>
             </template>
           </el-dropdown>
@@ -221,6 +274,7 @@ function openAbout() {
         </RouterView>
       </section>
     </div>
+    <HeaderAssets ref="assets" />
   </div>
 </template>
 
@@ -281,6 +335,8 @@ function openAbout() {
 .leaf:active { transform: scale(.94); }
 .leaf:focus-visible { outline: 2px solid var(--text-on-dark); outline-offset: 3px; }
 .brand-text {
+  color: inherit;
+  text-decoration: none;
   min-width: 0;
   max-width: 160px;
   overflow: hidden;
@@ -288,6 +344,7 @@ function openAbout() {
   opacity: 1;
   transition: opacity 0.2s ease 0.06s, max-width 0.32s cubic-bezier(0.22, 1, 0.36, 1);
 }
+.brand-text:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 .collapsed .brand-text {
   opacity: 0;
   max-width: 0;
@@ -296,12 +353,12 @@ function openAbout() {
 }
 .brand-text strong {
   display: block;
-  font-size: 15px;
+  font-size: var(--font-size-section);
   letter-spacing: 0.02em;
 }
 .brand-text small {
   color: var(--text-on-dark-muted);
-  font-size: 11px;
+  font-size: var(--font-size-secondary);
 }
 .nav {
   flex: 1;
@@ -312,7 +369,7 @@ function openAbout() {
 .collapsed .nav { padding-right: 0; }
 .group-label {
   margin: 14px 10px 6px;
-  font-size: 10px;
+  font-size: var(--font-size-caption);
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--text-on-dark-muted);
@@ -337,7 +394,7 @@ function openAbout() {
   border-radius: 12px;
   color: var(--text-on-dark-muted);
   text-decoration: none;
-  font-size: 13px;
+  font-size: var(--font-size-body);
   font-weight: 500;
   overflow: hidden;
   white-space: nowrap;
@@ -368,14 +425,14 @@ function openAbout() {
   color: var(--nav-active-fg);
   box-shadow: 0 8px 18px rgba(27, 138, 106, 0.28);
 }
-.empty { color: var(--text-on-dark-muted); font-size: 12px; padding: 12px; }
+.empty { color: var(--text-on-dark-muted); font-size: var(--font-size-secondary); padding: 12px; }
 .quote {
   margin: 12px 8px;
   padding: 16px 14px;
   border-radius: 16px;
   background: color-mix(in srgb, var(--brand) 22%, transparent);
   color: var(--text-on-dark);
-  font-size: 13px;
+  font-size: var(--font-size-body);
   line-height: 1.45;
   font-weight: 600;
   overflow: hidden;
@@ -427,8 +484,8 @@ function openAbout() {
   pointer-events: none;
   transition: opacity 0.1s ease, max-width 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
-.side-user b, .user-chip b { display: block; font-size: 13px; }
-.side-user small, .user-chip small { color: var(--text-on-dark-muted); font-size: 11px; }
+.side-user b, .user-chip b { display: block; font-size: var(--font-size-body); }
+.side-user small, .user-chip small { color: var(--text-on-dark-muted); font-size: var(--font-size-secondary); }
 
 @media (prefers-reduced-motion: reduce) {
   .side,
@@ -461,28 +518,7 @@ function openAbout() {
   gap: 16px;
   flex-shrink: 0;
 }
-.search {
-  flex: 1;
-  max-width: 520px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: var(--bg-search);
-  border-radius: var(--r-pill);
-  padding: 0 14px;
-  height: 38px;
-  color: var(--text-muted);
-  min-width: 0;
-}
-.search input {
-  border: 0;
-  outline: 0;
-  background: transparent;
-  width: 100%;
-  font: inherit;
-  color: var(--text-primary);
-}
-.top-right { display: flex; align-items: center; gap: 8px; }
+.top-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .icon-btn {
   width: 38px; height: 38px; border: 0; border-radius: 50%;
   background: var(--bg-card); color: var(--text-secondary);
@@ -493,13 +529,17 @@ function openAbout() {
 }
 .icon-btn:hover { background: var(--bg-hover); }
 .icon-btn:active { transform: scale(.94); }
+.icon-btn:focus-visible, .user-chip:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+.icon-btn:disabled { cursor: wait; opacity: .55; }
+.icon-btn > i { font-size: 18px; }
 .user-chip {
   display: flex; align-items: center; gap: 8px;
   border: 0; background: var(--bg-card); border-radius: var(--r-pill);
   padding: 4px 10px 4px 4px; cursor: pointer;
   box-shadow: var(--shadow-card); color: var(--text-primary);
 }
-.user-chip span { text-align: left; line-height: 1.15; }
+.user-chip span { text-align: left; line-height: 1.15; max-width: 160px; overflow: hidden; }
+.user-chip b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .user-chip small { color: var(--text-secondary); }
 .content {
   flex: 1;
@@ -534,22 +574,25 @@ function openAbout() {
   .content { padding: 12px 14px 20px; }
   .user-chip { padding-right: 4px; }
   .user-chip > span, .user-chip > i { display: none; }
-  .search { padding-inline: 10px; }
-  .search input { font-size: 14px; }
   .quote { display: none; }
 }
 @media (max-width: 560px) {
   .top { height: auto; padding-block: 10px; flex-wrap: wrap; gap: 10px; }
-  .top-right { margin-left: auto; }
-  .search { order: 2; flex-basis: 100%; height: 36px; }
+  .top-right { margin-left: auto; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .icon-btn, .leaf, .navigation-shade-enter-active, .navigation-shade-leave-active { transition: none; }
 }
 </style>
 
 <style>
+.header-menu-label { flex: 1; margin-right: 18px; }
+.header-account-summary { color: var(--text-primary); font: var(--font-size-body)/1.5 var(--sans); max-width: 240px; overflow-wrap: anywhere; }
+.header-account-summary small { display: block; color: var(--text-secondary); font-size: var(--font-size-secondary); }
 .chrome-pop { padding: 4px 2px 2px; }
 .chrome-label {
   margin: 0 0 8px;
-  font-size: 12px;
+  font-size: var(--font-size-body);
   font-weight: 600;
   color: var(--text-secondary);
 }
@@ -561,6 +604,7 @@ function openAbout() {
   padding: 0; cursor: pointer; background: none;
 }
 .swatch.on { outline: 2px solid var(--brand); outline-offset: 2px; }
+.swatch:focus-visible, .swatch.picker:focus-within, .chrome-pop .reset:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
 .swatch.picker {
   display: grid; place-items: center; overflow: hidden;
   background: conic-gradient(from 90deg, #1d1d1f, #1b8a6a, #f5f5f7, #1d1d1f);
@@ -572,7 +616,7 @@ function openAbout() {
   margin-top: 14px; width: 100%; height: 32px;
   border: 1px solid var(--border); border-radius: 999px;
   background: var(--bg-card); color: var(--text-primary);
-  font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+  font: inherit; font-size: var(--font-size-body); font-weight: 600; cursor: pointer;
 }
 .chrome-pop .reset:hover { background: var(--bg-hover); }
 </style>

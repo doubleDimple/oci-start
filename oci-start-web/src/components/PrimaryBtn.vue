@@ -13,7 +13,7 @@ withDefaults(defineProps<{ loading?: boolean; disabled?: boolean; type?: 'button
   background: var(--brand);
   color: var(--nav-active-fg);
   font: inherit;
-  font-size: 14px;
+  font-size: var(--font-size-body);
   font-weight: 600;
   border-radius: var(--r-pill);
   padding: 10px 16px;

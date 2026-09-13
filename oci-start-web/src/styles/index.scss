@@ -6,6 +6,7 @@
     border-radius: var(--r-btn);
     font-weight: 600;
     font-family: var(--sans);
+    font-size: var(--font-size-body);
   }
   .el-button--primary {
     --el-button-bg-color: var(--brand);
@@ -23,6 +24,8 @@
   }
 
   .el-dialog {
+    --el-dialog-title-font-size: var(--font-size-dialog-title);
+    --el-dialog-content-font-size: var(--font-size-body);
     border-radius: var(--r-card);
     box-shadow: var(--shadow-card);
     background: var(--bg-card);
@@ -46,6 +49,10 @@
     color: var(--text-muted);
   }
 
+  .el-tag {
+    --el-tag-font-size: var(--font-size-caption);
+  }
+
   .el-dropdown-menu {
     border-radius: 14px;
     border: 1px solid var(--border);
@@ -56,12 +63,17 @@
   }
 
   .el-message-box {
+    --el-messagebox-font-size: var(--font-size-dialog-title);
+    --el-messagebox-content-font-size: var(--font-size-body);
+    --el-messagebox-error-font-size: var(--font-size-secondary);
     border-radius: var(--r-card);
     background: var(--bg-card);
     color: var(--text-primary);
   }
 
   .el-pagination {
+    --el-pagination-font-size: var(--font-size-body);
+    --el-pagination-font-size-small: var(--font-size-body);
     --el-pagination-hover-color: var(--brand);
     --el-pagination-button-color: var(--text-primary);
     --el-pagination-button-bg-color: var(--bg-card);
@@ -79,7 +91,7 @@
     --el-table-border-color: var(--border);
     --el-table-header-border-color: var(--border);
     font-family: var(--sans);
-    font-size: 14px;
+    font-size: var(--font-size-body);
     color: var(--text-primary);
   }
   .el-table th.el-table__cell {
@@ -92,5 +104,26 @@
 
   .el-loading-mask {
     background-color: color-mix(in srgb, var(--bg-card) 72%, transparent);
+  }
+}
+
+// Small controls retain their geometry and the same readable text, even after lazy CSS loads.
+html:root {
+  .el-input,
+  .el-textarea__inner,
+  .el-select .el-select__wrapper,
+  .el-form-item .el-form-item__label,
+  .el-checkbox .el-checkbox__label,
+  .el-radio .el-radio__label,
+  .el-switch .el-switch__label,
+  .el-select-dropdown__item,
+  .el-dropdown-menu .el-dropdown-menu__item,
+  .el-tabs__item {
+    font-size: var(--font-size-body);
+  }
+  .el-form-item__error,
+  .el-input__count,
+  .el-textarea__count {
+    font-size: var(--font-size-secondary);
   }
 }

@@ -1,4 +1,5 @@
 .tenants-page {
+  font-size: var(--font-size-body);
   width: 100%;
   min-width: 0;
   height: 100%;
@@ -36,12 +37,12 @@
   }
   .tenant-search:focus-within { border-color: var(--brand); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 10%, transparent); }
   .tenant-search > i { color: var(--text-muted); font-size: 19px; flex-shrink: 0; }
-  .tenant-search input { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; color: var(--text-primary); font: inherit; font-size: 13px; }
+  .tenant-search input { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; color: var(--text-primary); font: inherit; font-size: var(--font-size-body); }
   .tenant-search input::placeholder { color: var(--text-muted); }
   .tenant-search input:focus-visible { outline: none; }
   .tenant-search button { display: grid; place-items: center; width: 25px; height: 25px; padding: 0; flex-shrink: 0; border: 0; border-radius: 50%; background: transparent; color: var(--text-secondary); cursor: pointer; }
   .tenant-search button:hover { background: var(--bg-card); }
-  .tenant-search kbd { padding: 1px 5px; border: 1px solid color-mix(in srgb, var(--border) 65%, transparent); border-radius: 5px; color: var(--text-muted); font: 11px var(--sans); white-space: nowrap; }
+  .tenant-search kbd { padding: 1px 5px; border: 1px solid color-mix(in srgb, var(--border) 65%, transparent); border-radius: 5px; color: var(--text-muted); font: var(--font-size-caption) var(--sans); white-space: nowrap; }
   .toolbar-actions { display: flex; align-items: center; gap: 6px; margin-left: auto; flex-shrink: 0; }
   .toolbar-button {
     display: inline-flex;
@@ -55,7 +56,7 @@
     background: transparent;
     color: var(--text-secondary);
     font: inherit;
-    font-size: 12px;
+    font-size: var(--font-size-body);
     font-weight: 500;
     white-space: nowrap;
     cursor: pointer;
@@ -66,10 +67,10 @@
   .toolbar-button:not(:disabled):active { transform: scale(.97); }
   .toolbar-button:disabled { opacity: .5; cursor: default; }
   .privacy-toggle[aria-pressed='true'] { color: var(--brand); background: var(--status-ok-bg); }
-  .toolbar-actions .tenant-import { min-height: 36px; padding: 8px 13px; font-size: 12px; }
-  .search-context { display: flex; align-items: center; flex-shrink: 0; gap: 10px; flex-wrap: wrap; margin: 0; padding: 0 18px 12px; color: var(--text-secondary); font-size: 12px; }
-  .search-context button { padding: 0; border: 0; background: none; color: var(--brand); font: inherit; cursor: pointer; }
-  .list-error { display: flex; flex-shrink: 0; gap: 12px; align-items: center; padding: 12px; margin: 0 18px 12px; border-radius: 12px; background: var(--status-danger-bg); color: var(--status-danger); font-size: 13px; }
+  .toolbar-actions .tenant-import { min-height: 36px; padding: 8px 13px; font-size: var(--font-size-body); }
+  .search-context { display: flex; align-items: center; flex-shrink: 0; gap: 10px; flex-wrap: wrap; margin: 0; padding: 0 18px 12px; color: var(--text-secondary); font-size: var(--font-size-secondary); }
+  .search-context button { padding: 0; border: 0; background: none; color: var(--brand); font: inherit; font-size: var(--font-size-body); cursor: pointer; }
+  .list-error { display: flex; flex-shrink: 0; gap: 12px; align-items: center; padding: 12px; margin: 0 18px 12px; border-radius: 12px; background: var(--status-danger-bg); color: var(--status-danger); font-size: var(--font-size-secondary); }
   .list-error > div { flex: 1; }
   .list-error > i { font-size: 22px; flex: none; }
   .list-error p { margin: 4px 0 0; }
@@ -78,7 +79,7 @@
   .refresh-track { position: absolute; inset: 0 0 auto; height: 2px; overflow: hidden; z-index: 5; pointer-events: none; }
   .refresh-track span { display: block; width: 36%; height: 100%; background: var(--brand); animation: tenant-refresh 1200ms ease-in-out infinite; }
   .table-scroll { flex: 1; min-width: 0; min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; }
-  .tenant-table { width: 100%; min-width: 1090px; border-spacing: 0; border-collapse: separate; text-align: left; font-size: 13px; }
+  .tenant-table { width: 100%; min-width: 1090px; border-spacing: 0; border-collapse: separate; text-align: left; font-size: var(--font-size-body); }
   .tenant-table th {
     position: sticky;
     top: 0;
@@ -89,7 +90,7 @@
     border-bottom: 1px solid color-mix(in srgb, var(--border) 35%, transparent);
     background: var(--bg-card);
     color: var(--text-secondary);
-    font-size: 12px;
+    font-size: var(--font-size-body);
     font-weight: 500;
     white-space: nowrap;
   }
@@ -127,9 +128,9 @@
   .proxy-bound { color: var(--brand); background: var(--status-ok-bg); }
   .proxy-force { border-color: color-mix(in srgb, var(--brand) 40%, transparent); }
   .identity-text { min-width: 0; }
-  .edit-name { display: block; max-width: 205px; padding: 0; overflow: hidden; border: 0; background: transparent; color: var(--text-primary); font: inherit; font-size: 13px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; text-align: left; cursor: pointer; }
+  .edit-name { display: block; max-width: 205px; padding: 0; overflow: hidden; border: 0; background: transparent; color: var(--text-primary); font: inherit; font-size: var(--font-size-body); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; text-align: left; cursor: pointer; }
   .edit-name:hover { color: var(--brand); }
-  .private-name { display: flex; align-items: center; gap: 5px; max-width: 205px; margin-top: 6px; padding: 0; border: 0; background: transparent; overflow: hidden; color: var(--text-secondary); font: 11px var(--sans); text-align: left; cursor: pointer; }
+  .private-name { display: flex; align-items: center; gap: 5px; max-width: 205px; margin-top: 6px; padding: 0; border: 0; background: transparent; overflow: hidden; color: var(--text-secondary); font: var(--font-size-secondary) var(--sans); text-align: left; cursor: pointer; }
   .private-name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .private-name i { flex: none; font-size: 12px; }
   .edit-name > i, .cost-link > i { margin-left: 5px; opacity: 0; color: var(--brand); transition: opacity 160ms ease; }
@@ -137,13 +138,13 @@
   .cell-link { padding: 0; border: 0; background: transparent; color: var(--text-primary); font: inherit; cursor: pointer; }
   .cell-link:hover { color: var(--brand); }
   .cost-link { font-weight: 600; font-variant-numeric: tabular-nums; }
-  .cell-secondary { display: block; margin-top: 5px; color: var(--text-muted); font-size: 11px; white-space: nowrap; }
-  .region-name { color: var(--text-primary); font-size: 13px; font-weight: 500; white-space: nowrap; }
-  .task-state { display: inline-flex; align-items: center; gap: 5px; border-radius: 7px; color: var(--text-secondary); font-size: 11px; white-space: nowrap; }
+  .cell-secondary { display: block; margin-top: 5px; color: var(--text-muted); font-size: var(--font-size-secondary); white-space: nowrap; }
+  .region-name { color: var(--text-primary); font-size: var(--font-size-body); font-weight: 500; white-space: nowrap; }
+  .task-state { display: inline-flex; align-items: center; gap: 5px; border-radius: 7px; color: var(--text-secondary); font-size: var(--font-size-secondary); white-space: nowrap; }
   .task-running { color: var(--brand); }
-  .account-type { display: inline-block; max-width: 160px; color: var(--text-primary); font-size: 12px; line-height: 1.5; }
-  .created-at { color: var(--text-secondary); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .tenant-status { display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px; border-radius: var(--r-pill); font-size: 11px; font-weight: 500; white-space: nowrap; }
+  .account-type { display: inline-block; max-width: 160px; color: var(--text-primary); font-size: var(--font-size-body); line-height: 1.5; }
+  .created-at { color: var(--text-secondary); font-size: var(--font-size-body); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .tenant-status { display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px; border-radius: var(--r-pill); font-size: var(--font-size-caption); font-weight: 500; white-space: nowrap; }
   .tenant-status::before { content: ''; width: 5px; height: 5px; flex-shrink: 0; border-radius: 50%; background: currentColor; }
   .status-active { background: var(--status-ok-bg); color: var(--status-ok); }
   .status-inactive { background: var(--status-danger-bg); color: var(--status-danger); }
@@ -162,7 +163,7 @@
     background: var(--bg-card);
     color: var(--text-primary);
     font: inherit;
-    font-size: 12px;
+    font-size: var(--font-size-body);
     font-weight: 500;
     white-space: nowrap;
     cursor: pointer;
@@ -174,14 +175,16 @@
   .boot-button:disabled, .more-button:disabled { opacity: .5; cursor: default; }
   .tenant-table .row-saved > td { animation: tenant-row-saved 1400ms ease; }
 
-  .list-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; flex-shrink: 0; gap: 10px; padding: 12px 18px; border-top: 1px solid color-mix(in srgb, var(--border) 40%, transparent); color: var(--text-secondary); font-size: 12px; }
+  .list-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; flex-shrink: 0; gap: 10px; padding: 12px 18px; border-top: 1px solid color-mix(in srgb, var(--border) 40%, transparent); color: var(--text-secondary); font-size: var(--font-size-secondary); }
   .list-footer p { margin: 0; }
-  .list-footer .el-pagination { font-family: var(--sans); }
+  .list-footer .el-pagination { font-family: var(--sans); --el-pagination-font-size: var(--font-size-body); --el-pagination-font-size-small: var(--font-size-body); }
+  .list-footer .el-pagination .el-pager li, .list-footer .el-pagination .el-select__wrapper, .list-footer .el-pagination .el-input__inner { font-size: var(--font-size-body); }
+  .list-footer .el-pagination__total, .list-footer .el-pagination__jump { font-size: var(--font-size-secondary); }
   .list-footer .el-pagination .btn-prev, .list-footer .el-pagination .btn-next, .list-footer .el-pager li { border-radius: 8px; }
   .tenant-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; min-height: 300px; padding: 48px 24px; text-align: center; }
   .empty-icon { display: grid; place-items: center; width: 58px; height: 58px; margin-bottom: 4px; background: var(--bg-search); border-radius: 18px; color: var(--text-muted); font-size: 28px; }
-  .tenant-empty h3 { margin: 0; font-size: 17px; font-weight: 600; }
-  .tenant-empty p { max-width: 380px; margin: 0; color: var(--text-secondary); font-size: 13px; line-height: 1.65; }
+  .tenant-empty h3 { margin: 0; font-size: var(--font-size-section); font-weight: 600; }
+  .tenant-empty p { max-width: 380px; margin: 0; color: var(--text-secondary); font-size: var(--font-size-secondary); line-height: 1.65; }
   .tenant-empty button { margin-top: 5px; }
   .skeleton-row { animation: tenant-skeleton-pulse 1600ms ease-in-out infinite; }
   .skeleton { display: block; width: 70%; height: 10px; border-radius: 6px; background: var(--bg-search); }
@@ -226,7 +229,7 @@
   border-radius: 9px;
   color: var(--text-primary);
   font-family: var(--sans);
-  font-size: 12px;
+  font-size: var(--font-size-body);
   line-height: 1.4;
   white-space: normal;
   transition: background-color 140ms ease, color 140ms ease;
@@ -244,11 +247,13 @@
 .tenant-action-menu .el-dropdown-menu__item.is-disabled,
 .tenant-tools-menu .el-dropdown-menu__item.is-disabled { color: var(--text-muted); }
 
-.tenant-edit-dialog { max-width: calc(100vw - 32px); }
+.tenant-edit-dialog { max-width: calc(100vw - 32px); font-size: var(--font-size-body); }
+.tenant-edit-dialog .el-dialog__title { font-size: var(--font-size-dialog-title); }
+.tenant-edit-dialog .el-button, .tenant-edit-dialog .el-input__inner, .tenant-edit-dialog .el-select__wrapper, .tenant-edit-dialog .el-form-item__label { font-size: var(--font-size-body); }
 .tenant-edit-dialog .el-dialog__footer { display: flex; justify-content: flex-end; gap: 8px; padding-top: 24px; }
-.tenant-edit-dialog .edit-description { margin: 0 0 22px; color: var(--text-secondary); font-size: 14px; line-height: 1.6; }
-.tenant-edit-dialog .edit-field-label { display: block; margin-bottom: 10px; color: var(--text-primary); font-size: 13px; font-weight: 500; }
-.tenant-edit-dialog .field-error { margin: 10px 0 0; color: var(--status-danger); font-size: 12px; }
+.tenant-edit-dialog .edit-description { margin: 0 0 22px; color: var(--text-secondary); font-size: var(--font-size-secondary); line-height: 1.6; }
+.tenant-edit-dialog .edit-field-label { display: block; margin-bottom: 10px; color: var(--text-primary); font-size: var(--font-size-body); font-weight: 500; }
+.tenant-edit-dialog .field-error { margin: 10px 0 0; color: var(--status-danger); font-size: var(--font-size-secondary); }
 
 :root .el-button.tenant-delete-confirm {
   --el-button-bg-color: var(--status-danger);

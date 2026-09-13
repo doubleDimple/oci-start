@@ -351,29 +351,34 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.security-content { min-width: 0; }
+.security-content { min-width: 0; font-size: var(--font-size-body); }
+:global(.region-security-dialog .el-dialog__title) { font-size: var(--font-size-dialog-title); }
+.security-content :deep(.el-button), .security-content :deep(.el-input__inner), .security-content :deep(.el-select__wrapper), .security-content :deep(.el-checkbox__label) { font-size: var(--font-size-body); }
+.security-content :deep(.el-pagination) { --el-pagination-font-size: var(--font-size-body); --el-pagination-font-size-small: var(--font-size-body); }
+.security-content :deep(.el-pagination .el-pager li) { font-size: var(--font-size-body); }
+.security-content :deep(.el-pagination__total), .security-content :deep(.el-pagination__jump), .security-content :deep(.el-empty__description p) { font-size: var(--font-size-secondary); }
 .security-toolbar, .security-actions, .security-editor-actions, .security-pagination { display: flex; align-items: center; gap: 8px; }
 .security-toolbar { justify-content: space-between; gap: 12px; margin-bottom: 14px; }
 .security-direction { display: inline-flex; padding: 3px; border-radius: var(--r-pill); background: var(--bg-hover); }
-.security-direction button { padding: 7px 13px; border: 0; border-radius: var(--r-pill); background: transparent; color: var(--text-secondary); font: inherit; font-size: 13px; cursor: pointer; transition: background-color 180ms ease, color 180ms ease; white-space: nowrap; }
+.security-direction button { padding: 7px 13px; border: 0; border-radius: var(--r-pill); background: transparent; color: var(--text-secondary); font: inherit; font-size: var(--font-size-body); cursor: pointer; transition: background-color 180ms ease, color 180ms ease; white-space: nowrap; }
 .security-direction button.active { background: var(--bg-card); color: var(--text-primary); box-shadow: var(--shadow-card); }
 .security-direction button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 .security-direction button:disabled { cursor: default; opacity: .6; }
-.security-actions :deep(.btn), .security-editor-actions :deep(.btn) { min-height: 34px; padding: 7px 13px; font-size: 13px; }
+.security-actions :deep(.btn), .security-editor-actions :deep(.btn) { min-height: 34px; padding: 7px 13px; font-size: var(--font-size-body); }
 .security-editor { margin-bottom: 14px; padding: 14px; border: 1px solid var(--border); border-radius: var(--r-sm); }
 .security-fields { display: grid; grid-template-columns: 140px minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
 .security-fields label { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.security-fields label > span { font-size: 12px; color: var(--text-secondary); }
+.security-fields label > span { font-size: var(--font-size-body); color: var(--text-secondary); }
 .security-editor-actions { justify-content: flex-end; margin-top: 12px; }
-.security-error { color: var(--status-danger); font-size: 13px; margin: 10px 0 0; overflow-wrap: anywhere; }
-.security-error-panel { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 28px 16px; color: var(--status-danger); font-size: 13px; text-align: center; overflow-wrap: anywhere; }
+.security-error { color: var(--status-danger); font-size: var(--font-size-secondary); margin: 10px 0 0; overflow-wrap: anywhere; }
+.security-error-panel { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 28px 16px; color: var(--status-danger); font-size: var(--font-size-secondary); text-align: center; overflow-wrap: anywhere; }
 .security-error-panel p { margin: 0; }
-.security-table { font-family: var(--sans); font-size: 13px; }
-.security-table :deep(th.el-table__cell) { background: var(--bg-card); color: var(--text-secondary); font-size: 12px; font-weight: 500; padding-block: 7px; }
+.security-table { font-family: var(--sans); font-size: var(--font-size-body); }
+.security-table :deep(th.el-table__cell) { background: var(--bg-card); color: var(--text-secondary); font-size: var(--font-size-body); font-weight: 500; padding-block: 7px; }
 .security-table :deep(td.el-table__cell) { padding-block: 9px; }
-.security-table :deep(.el-button) { font-size: 12px; }
+.security-table :deep(.el-button) { font-size: var(--font-size-body); }
 .security-pagination { justify-content: space-between; padding-top: 12px; }
-.security-pagination > span { color: var(--text-secondary); font-size: 12px; white-space: nowrap; }
+.security-pagination > span { color: var(--text-secondary); font-size: var(--font-size-secondary); white-space: nowrap; }
 @media (max-width: 620px) {
   .security-toolbar { flex-wrap: wrap; }
   .security-actions { margin-left: auto; }

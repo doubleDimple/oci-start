@@ -455,15 +455,21 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.resource-body { color: var(--text-primary); font-family: var(--sans); }
-.resource-context { margin: -4px 0 24px; color: var(--text-secondary); font-size: 14px; overflow-wrap: anywhere; }
+.resource-body { color: var(--text-primary); font-family: var(--sans); font-size: var(--font-size-body); }
+:global(.tenant-resource-dialog .el-dialog__title) { font-size: var(--font-size-dialog-title); }
+:global(.tenant-resource-dialog .el-button), :global(.tenant-resource-dialog .el-input__inner), :global(.tenant-resource-dialog .el-select__wrapper), :global(.tenant-resource-dialog .el-form-item__label), :global(.tenant-resource-dialog .el-checkbox__label), :global(.tenant-resource-dialog .el-radio__label), :global(.tenant-resource-dialog .el-table) { font-size: var(--font-size-body); }
+:global(.tenant-resource-dialog .el-tag) { font-size: var(--font-size-caption); }
+:global(.tenant-resource-dialog .el-alert__title) { font-size: var(--font-size-body); }
+:global(.tenant-resource-dialog .el-alert__description), :global(.tenant-resource-dialog .el-form-item__error), :global(.tenant-resource-dialog .el-empty__description p) { font-size: var(--font-size-secondary); }
+.resource-body :deep(.el-date-editor .el-range-input), .resource-body :deep(.el-date-editor .el-range-separator) { font-size: var(--font-size-body); }
+.resource-context { margin: -4px 0 24px; color: var(--text-secondary); font-size: var(--font-size-secondary); overflow-wrap: anywhere; }
 .account-details { margin: 0; }
 .account-details > div { display: grid; grid-template-columns: 128px minmax(0, 1fr); gap: 20px; padding: 18px 0; border-bottom: 1px solid var(--border); }
 .account-details > div:last-child { border-bottom: 0; }
 .account-details dt { color: var(--text-secondary); }
 .account-details dd { margin: 0; overflow-wrap: anywhere; }
 .account-details .detail-feature { display: block; padding: 24px; margin-bottom: 6px; background: var(--bg-search); border: 0; border-radius: var(--r-card); }
-.detail-feature dd { margin-top: 8px; font-size: 24px; font-weight: 600; letter-spacing: -.022em; }
+.detail-feature dd { margin-top: 8px; font-size: var(--font-size-section); font-weight: 600; letter-spacing: -.022em; }
 .mono { font-family: var(--mono); }
 .transfer-summary { display: grid; gap: 12px; padding: 30px 0 38px; text-align: center; color: var(--text-secondary); }
 .transfer-summary strong { font-size: 44px; font-weight: 600; color: var(--brand); font-variant-numeric: tabular-nums; }
@@ -480,13 +486,13 @@ onBeforeUnmount(() => {
 .resource-table :deep(.el-table__cell) { padding: 13px 0; }
 .resource-table :deep(.audit-error-row) { --el-table-tr-bg-color: var(--status-danger-bg); }
 .resource-pagination { flex-wrap: wrap; justify-content: space-between; margin-top: 18px; }
-.page-size { color: var(--text-secondary); font-size: 13px; }
+.page-size { color: var(--text-secondary); font-size: var(--font-size-secondary); }
 .page-size :deep(.el-select) { width: 75px; }
 .page-controls { flex-wrap: wrap; }
-.page-controls > span { color: var(--text-secondary); font-size: 13px; white-space: nowrap; }
-.result-caption { margin: 0; color: var(--text-secondary); font-size: 13px; }
-.instance-type { font-size: 12px; color: var(--text-secondary); }
-.usage { display: flex; align-items: center; gap: 10px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.page-controls > span { color: var(--text-secondary); font-size: var(--font-size-secondary); white-space: nowrap; }
+.result-caption { margin: 0; color: var(--text-secondary); font-size: var(--font-size-secondary); }
+.instance-type { font-size: var(--font-size-body); color: var(--text-secondary); }
+.usage { display: flex; align-items: center; gap: 10px; font-size: var(--font-size-body); font-variant-numeric: tabular-nums; }
 .usage > span:last-child { width: 35px; text-align: right; }
 .usage-track { flex: 1; height: 6px; overflow: hidden; border-radius: var(--r-pill); background: var(--bg-search); }
 .usage-track > span { display: block; height: 100%; border-radius: inherit; background: currentColor; transform-origin: left; transition: transform 460ms cubic-bezier(.22, 1, .36, 1); }
@@ -494,16 +500,16 @@ onBeforeUnmount(() => {
 .warning { color: var(--status-warn); }
 .danger { color: var(--status-danger); }
 .volume-editor { margin-top: 20px; padding: 24px; background: var(--bg-search); border-radius: var(--r-card); }
-.volume-editor h3 { margin: 0 0 20px; font-size: 18px; font-weight: 600; }
+.volume-editor h3 { margin: 0 0 20px; font-size: var(--font-size-section); font-weight: 600; }
 .volume-editor :deep(.el-slider) { margin-inline: 7px; }
 .editor-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 22px; }
 .editor-actions :deep(.el-button + .el-button) { margin-left: 0; }
-.audit-note { margin: 14px 0 0; font-size: 12px; color: var(--text-muted); }
+.audit-note { margin: 14px 0 0; font-size: var(--font-size-secondary); color: var(--text-muted); }
 .resource-reveal-enter-active, .resource-reveal-leave-active { transition: transform 320ms cubic-bezier(.22, 1, .36, 1), opacity 220ms ease; }
 .resource-reveal-enter-from, .resource-reveal-leave-to { opacity: 0; transform: translateY(8px); }
 @media (max-width: 600px) {
   .account-details > div { grid-template-columns: 1fr; gap: 7px; }
-  .detail-feature dd { font-size: 21px; }
+  .detail-feature dd { font-size: var(--font-size-section); }
   .resource-pagination { gap: 16px; }
   .volume-editor { padding: 18px; }
   .volume-editor :deep(.el-slider__input) { width: 100px; }

@@ -12,7 +12,7 @@ const proxyPaths = [
   '/api', '/tenants', '/oci', '/boot', '/system', '/ws', '/ssl', '/dns',
   '/email', '/monitor', '/cost', '/vpnProxy', '/m', '/perform_login',
   '/perform_logout', '/resource', '/other', '/vps', '/ssh', '/migration',
-  '/mfa', '/ai', '/social', '/delayTest', '/instanceDetail', '/images', '/css', '/js',
+  '/mfa', '/ai', '/social', '/sysMessage', '/delayTest', '/instanceDetail', '/images', '/css', '/js',
   '/webfonts', '/script', '/login', '/about',
 ]
 

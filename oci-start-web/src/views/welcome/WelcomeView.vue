@@ -2,11 +2,14 @@
 import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import request from '@/api/request'
+import { acceptRemoteVersionSnapshot } from '@/api/headerVersion'
 
 const router = useRouter()
 
 onMounted(() => {
-  request.get('/api/version/check', { params: { refresh: true }, silent: true }).catch(() => undefined)
+  request.get('/api/version/check', { params: { refresh: true }, silent: true })
+    .then(body => acceptRemoteVersionSnapshot(body))
+    .catch(() => undefined)
 })
 </script>
 <template>
