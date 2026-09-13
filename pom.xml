@@ -35,6 +35,9 @@
         <caffeine.version>2.9.2</caffeine.version>
         <disruptor.version>3.4.4</disruptor.version>
         <openapi.version>1.7.0</openapi.version>
+        <frontend-maven-plugin.version>1.15.1</frontend-maven-plugin.version>
+        <node.version>v20.18.0</node.version>
+        <pnpm.version>9.12.1</pnpm.version>
     </properties>
 
     <modules>
@@ -501,15 +504,13 @@
         </dependencies>
     </dependencyManagement>
 
-    <!--<build>
-        <plugins>
-            <plugin>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-maven-plugin</artifactId>
-                <configuration>
-                    <mainClass>com.doubledimple.ociserver.OciServerApplication</mainClass> &lt;!&ndash; 替换为您的主类全限定名 &ndash;&gt;
-                </configuration>
-            </plugin>
-        </plugins>
-    </build>-->
+    <profiles>
+        <!-- 前端构建：mvn package -P web（先 generate-resources 再 pack，避免 reactor 顺序把空 static 打进 jar） -->
+        <profile>
+            <id>web</id>
+            <modules>
+                <module>oci-start-web</module>
+            </modules>
+        </profile>
+    </profiles>
 </project>

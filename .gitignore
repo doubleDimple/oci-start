@@ -1,6 +1,13 @@
 # Maven build output
 target/
 
+# Vue frontend
+oci-start-web/node_modules/
+oci-start-web/dist/
+oci-start-web/node/
+oci-server/src/main/resources/static/index.html
+oci-server/src/main/resources/static/assets/
+
 # IDE
 .idea/
 *.iml
@@ -9,6 +16,8 @@ target/
 # Runtime data
 data/
 logs/
+# Vue log views are source files, not runtime logs.
+!oci-start-web/src/views/logs/
 
 # Private keys
 *.pem

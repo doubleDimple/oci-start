@@ -1,0 +1,92 @@
+/* Short, interruptible feedback; pages never depend on animation to become visible. */
+:where(button, a, input, select, textarea, [role='button']):focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 3px;
+}
+
+.el-button:not(.is-link):not(.is-text) {
+  transition: transform 160ms cubic-bezier(.22, 1, .36, 1), background-color 160ms ease,
+    border-color 160ms ease, box-shadow 160ms ease;
+}
+.el-button:not(.is-disabled):not(.is-link):active { transform: scale(.97); }
+.el-button:focus-visible, .el-dialog__headerbtn:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 3px;
+}
+.el-input__wrapper, .el-select__wrapper {
+  transition: background-color 160ms ease, box-shadow 160ms ease;
+}
+.el-input__wrapper.is-focus, .el-select__wrapper.is-focused {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand) 55%, transparent);
+}
+.el-table .el-table__row > td { transition: background-color 140ms ease; }
+
+.page-view-enter-active {
+  transition: opacity 260ms ease, transform 260ms cubic-bezier(.22, 1, .36, 1);
+}
+.page-view-leave-active { transition: opacity 100ms ease; }
+.page-view-enter-from { opacity: 0; transform: translateY(6px); }
+.page-view-leave-to { opacity: 0; }
+
+.el-dialog {
+  --el-dialog-padding-primary: 26px;
+  max-height: calc(100dvh - 40px);
+  display: flex;
+  flex-direction: column;
+}
+.el-dialog__header { flex-shrink: 0; }
+.el-dialog__title { font-weight: 600; letter-spacing: -.022em; }
+.el-dialog__body { min-height: 0; overflow: auto; overscroll-behavior: contain; }
+.el-dialog__footer { flex-shrink: 0; }
+.el-message-box { max-width: calc(100vw - 32px); }
+
+.el-overlay.dialog-fade-enter-active,
+.el-overlay.fade-in-linear-enter-active {
+  animation: surface-backdrop-in 260ms ease both;
+}
+.el-overlay.dialog-fade-leave-active,
+.el-overlay.fade-in-linear-leave-active {
+  animation: surface-backdrop-out 180ms ease both;
+}
+.el-overlay.dialog-fade-enter-active .el-overlay-dialog,
+.el-overlay.dialog-fade-leave-active .el-overlay-dialog,
+.el-overlay.fade-in-linear-enter-active .el-overlay-message-box,
+.el-overlay.fade-in-linear-leave-active .el-overlay-message-box {
+  animation: none;
+}
+.el-overlay.dialog-fade-enter-active .el-dialog,
+.el-overlay.fade-in-linear-enter-active .el-message-box {
+  animation: surface-enter 260ms cubic-bezier(.22, 1, .36, 1) both;
+}
+.el-overlay.dialog-fade-leave-active .el-dialog,
+.el-overlay.fade-in-linear-leave-active .el-message-box {
+  animation: surface-leave 180ms cubic-bezier(.4, 0, 1, 1) both;
+}
+
+@keyframes surface-backdrop-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes surface-backdrop-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes surface-enter {
+  from { opacity: 0; transform: translateY(12px) scale(.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes surface-leave {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(6px) scale(.99); }
+}
+
+@media (max-width: 760px) {
+  .el-dialog { --el-dialog-padding-primary: 20px; max-height: calc(100dvh - 24px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .page-view-enter-from { transform: none; }
+  .el-overlay.dialog-fade-enter-active .el-dialog,
+  .el-overlay.dialog-fade-leave-active .el-dialog,
+  .el-overlay.fade-in-linear-enter-active .el-message-box,
+  .el-overlay.fade-in-linear-leave-active .el-message-box { animation: none; }
+}

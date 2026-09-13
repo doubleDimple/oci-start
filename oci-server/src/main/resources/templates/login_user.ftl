@@ -1,894 +1,211 @@
 <!DOCTYPE html>
-<html lang="${currentLocale}">
+<html lang="${currentLocale}" data-theme="dark">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <script>/* 防闪烁：提前设置主题 */
-        (function(){var t=localStorage.getItem('oci_theme')||'dark';if(t==='system')t=window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';document.documentElement.dataset.theme=t;})();
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>
+        (function () {
+            var t = 'dark';
+            try { t = localStorage.getItem('oci_theme') || t; } catch (e) {}
+            if (t === 'system') t = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+            document.documentElement.dataset.theme = t === 'light' ? 'light' : 'dark';
+        })();
     </script>
     <title>${msg.get('login.page.title')}</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="/css/all.min.css">
     <link rel="stylesheet" href="/css/common/fa-fix.css">
-    <link rel="stylesheet" href="/css/app/login_user.css">
+    <link rel="stylesheet" href="/css/app/login_user.css?v=20260913g">
     <script src="/js/common/jsencrypt.min.js"></script>
     <#if turnstileEnabled?? && turnstileEnabled>
     <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
     </#if>
-    <style>
-        :root{--bg:#ECEEF2;--panel:#F3F4F6;--card:#FFFFFF;--text:#111827;--muted:#6B7280;--line:#D1D5DB;--shadow:0 22px 60px rgba(15,23,42,.14);--r:26px}
-        body{background:var(--bg)}
-        .header,.footer{display:none}
-        .page-container{min-height:100vh;display:flex;flex-direction:column}
-        .main-content{flex:1;display:flex;align-items:center;justify-content:center;padding:36px 16px}
-
-        .auth-shell{width:min(1240px,100%);min-height:760px;background:var(--card);border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden;display:grid;grid-template-columns:1fr 1fr;position:relative}
-        .auth-shell:before{content:"";position:absolute;top:0;bottom:0;left:50%;width:1px;background:rgba(17,24,39,.06)}
-
-        .lang-selector{position:absolute;top:18px;right:18px;z-index:10;display:flex;gap:10px;align-items:center;padding:8px 12px;border-radius:999px;background:rgba(255,255,255,.92);backdrop-filter:saturate(140%) blur(8px);box-shadow:0 10px 26px rgba(15,23,42,.08)}
-        .lang-item{color:var(--muted);cursor:pointer;font-size:13px;letter-spacing:.2px;user-select:none}
-        .lang-item.active{color:var(--text);font-weight:700}
-        .lang-divider{color:#E5E7EB}
-
-        .hero-panel{background:var(--panel);display:flex;align-items:center;justify-content:center;padding:56px}
-        .hero-inner{width:100%;display:flex;align-items:center;justify-content:center}
-        #heroSvg{width:100%;max-width:520px;height:auto}
-
-        .form-panel{background:var(--card);display:flex;align-items:stretch;justify-content:stretch}
-        .login-card{width:100%;background:transparent;box-shadow:none;border-radius:0;padding:0}
-        .form-panel .login-card{padding:86px 96px 74px;display:flex;flex-direction:column;justify-content:center}
-
-
-        .brand{display:flex;align-items:center;gap:12px;margin-bottom:34px}
-        .brand-badge{width:38px;height:38px;border-radius:12px;background:#111827;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:16px;letter-spacing:.4px}
-        .brand-text{display:flex;flex-direction:column;line-height:1.05}
-        .brand-name{font-size:22px;font-weight:950;color:var(--text);letter-spacing:.2px}
-        .brand-sub{margin-top:6px;font-size:13px;color:var(--muted);letter-spacing:.2px}
-        .tab-group{background:transparent;border:none;box-shadow:none;margin-bottom:26px}
-        .tab{background:transparent;border-radius:999px}
-        .tab.active{background:rgba(17,24,39,.06)}
-
-        .form-group{margin-bottom:26px}
-        .form-group label{color:var(--text);font-weight:800;font-size:15px;letter-spacing:.2px;margin-bottom:12px}
-        .input-container{background:transparent;border:none;border-radius:0;padding:0;display:flex;align-items:center}
-        .input-icon{display:none}
-        .form-control{background:transparent;border:none;border-bottom:1px solid var(--line);border-radius:0;box-shadow:none;padding:14px 0 16px 0;font-size:17px;color:var(--text)}
-        .form-control:focus{outline:none;box-shadow:none;border-bottom:1px solid #111827}
-
-        .auth-form{width:100% !important;max-width:none !important}
-        .auth-form-single{width:100% !important;max-width:none !important}
-        .form-group{width:100% !important}
-        .input-container{width:100% !important}
-        .input-container .form-control{flex:1 1 auto !important;min-width:0;width:100% !important}
-        .verification-group{display:flex;align-items:center;gap:12px}
-        .verification-input{flex:1 1 auto !important;min-width:0}
-        .verification-input .form-control{width:100% !important}
-        .btn-send-code{white-space:nowrap}
-
-        .verification-group{gap:12px}
-        .verification-input .form-control{border-bottom:1px solid var(--line)}
-
-        .form-meta{display:flex;align-items:center;justify-content:space-between;gap:18px;margin:10px 0 30px;flex-wrap:nowrap}
-        .remember-me{display:flex;align-items:center;gap:8px;margin:0;white-space:nowrap}
-        .remember-me input{margin:0}
-        .remember-me span{white-space:nowrap;font-size:14px;font-weight:700;color:var(--text)}
-        .forgot-password-link{color:var(--muted);margin:0;font-size:14px;text-decoration:none;white-space:nowrap}
-        .forgot-password-link:hover{color:var(--text)}
-
-        .btn{border-radius:999px}
-        .btn-primary{background:#111827;border:none;box-shadow:none;height:56px;font-size:16px}
-        .btn-primary:hover{filter:brightness(.95)}
-        .btn-github{background:#F3F4F6;color:#111827;border:1px solid #E5E7EB;height:56px;font-size:16px}
-        .btn-github:hover{filter:brightness(.98)}
-        .btn-send-code{border-radius:999px}
-
-        @media (max-width:980px){
-            .auth-shell{grid-template-columns:1fr;min-height:auto}
-            .auth-shell:before{display:none}
-            .hero-panel{display:none}
-            .form-panel .login-card{padding:40px 26px}
-            .lang-selector{position:fixed}
-        }
-
-        .modal-overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:18px;background:rgba(17,24,39,.45);backdrop-filter:saturate(140%) blur(8px);z-index:1200}
-        .modal-overlay.active{display:flex}
-        .modal-overlay.show{display:flex}
-        .modal{width:min(560px,100%);background:var(--card);border-radius:24px;box-shadow:var(--shadow);border:1px solid rgba(17,24,39,.08);overflow:hidden}
-        .modal-header{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;background:rgba(17,24,39,.02);border-bottom:1px solid rgba(17,24,39,.08)}
-        .modal-title{font-weight:800;color:var(--text)}
-        .modal-close{background:transparent;border:none;color:var(--muted);font-size:16px;cursor:pointer;padding:8px;border-radius:999px}
-        .modal-close:hover{background:rgba(17,24,39,.06);color:var(--text)}
-        .modal-body{padding:18px 20px}
-        .modal-actions{display:flex;gap:12px;justify-content:flex-end;padding:16px 20px;border-top:1px solid rgba(17,24,39,.08);background:rgba(17,24,39,.02)}
-        .modal-box{padding:12px;background:rgba(17,24,39,.02);border:1px solid rgba(17,24,39,.08);border-radius:16px;font-size:14px;color:var(--text)}
-        .modal-box-list{margin:8px 0 0 20px;color:var(--muted)}
-        .modal-success{padding:16px;background:rgba(17,24,39,.02);border:1px solid rgba(17,24,39,.08);border-radius:16px;text-align:center}
-        .modal-success-title{font-size:14px;color:var(--text);font-weight:700}
-        .modal-success-sub{font-size:12px;color:var(--muted);margin-top:4px}
-        @media (max-width:520px){.modal{border-radius:18px}.modal-header,.modal-body,.modal-actions{padding-left:16px;padding-right:16px}}
-
-        /* --- hard override: make right panel inputs truly full width --- */
-        html body .form-panel,
-        html body .form-panel .login-card,
-        html body .form-panel .login-card form,
-        html body .form-panel .login-card #loginForm,
-        html body .form-panel .login-card #registerForm{
-            width:100% !important;
-            max-width:none !important;
-        }
-        html body .form-panel .login-card{
-            align-items:stretch !important;
-        }
-        html body .form-panel .login-card .form-group,
-        html body .form-panel .login-card .input-container{
-            width:100% !important;
-            max-width:none !important;
-        }
-        html body .form-panel .login-card .form-control,
-        html body .form-panel .login-card input,
-        html body .form-panel .login-card textarea,
-        html body .form-panel .login-card select{
-            width:100% !important;
-            max-width:none !important;
-            min-width:0 !important;
-            flex:1 1 auto !important;
-            box-sizing:border-box !important;
-        }
-        html body .form-panel .login-card .verification-row{
-            width:100% !important;
-            max-width:none !important;
-            display:flex !important;
-            gap:12px !important;
-        }
-        html body .form-panel .login-card .verification-row .form-control{
-            flex:1 1 auto !important;
-        }
-
-
-        /* --- forgot password modal: wider (landscape) + cleaner layout --- */
-        html body .modal{width:min(920px,calc(100% - 64px))!important;max-width:920px!important}
-        html body .modal-header{padding:16px 22px!important}
-        html body .modal-body{padding:18px 28px!important}
-        html body .modal-actions{padding:14px 22px!important}
-        @media (min-width:900px){
-            html body #resetStep1.active{display:grid!important;grid-template-columns:1fr 1fr;gap:16px 24px;align-items:start}
-            html body #resetStep1.active .step-description{grid-column:1/-1;margin:0 0 6px}
-            html body #resetStep1.active .form-group{margin:0}
-            html body #resetStep1.active .verification-group{display:flex;gap:12px;align-items:center}
-            html body #resetStep1.active .verification-input{flex:1;min-width:0}
-            html body #resetStep1.active .btn-send-code{white-space:nowrap;flex:0 0 auto}
-
-            html body #resetStep2.active{display:grid!important;grid-template-columns:1.2fr .8fr;gap:16px 24px;align-items:start}
-            html body #resetStep2.active .step-description{grid-column:1/-1;margin:0 0 6px}
-            html body #resetStep2.active .modal-box{margin:0}
-            html body #resetStep2.active .modal-box-list{margin:0;padding-left:18px}
-
-            html body #resetStep3.active{display:flex!important;flex-direction:row;align-items:center;justify-content:center;gap:24px}
-            html body #resetStep3.active .step-description{margin:0}
-            html body #resetStep3.active .modal-success{margin:0;width:min(440px,100%)}
-        }
-
-
-        /* --- modal fix: unify reset step1 inputs + keep code input visible --- */
-        html body #forgotPasswordModal .modal .form-group{width:100% !important;max-width:none !important;margin:0 0 18px}
-        html body #forgotPasswordModal .modal .input-container{width:100% !important;max-width:none !important;display:flex !important;align-items:center !important}
-        html body #forgotPasswordModal .modal .form-control{width:100% !important;max-width:none !important;min-width:0 !important;flex:1 1 auto !important;box-sizing:border-box !important;height:56px !important;padding:14px 0 16px 0 !important}
-        html body #forgotPasswordModal .modal .verification-group{width:100% !important;display:flex !important;align-items:center !important;gap:12px !important}
-        html body #forgotPasswordModal .modal .verification-input{flex:1 1 auto !important;min-width:240px !important}
-        html body #forgotPasswordModal .modal .verification-input .form-control{width:100% !important}
-        html body #forgotPasswordModal .modal .btn-send-code{flex:0 0 200px !important;width:200px !important;height:56px !important;white-space:nowrap !important;border-radius:999px !important}
-
-        @media (max-width:760px){
-            html body #forgotPasswordModal .modal .verification-group{flex-wrap:wrap !important}
-            html body #forgotPasswordModal .modal .btn-send-code{flex:1 1 100% !important;width:100% !important}
-            html body #forgotPasswordModal .modal .verification-input{min-width:0 !important}
-        }
-
-        .modal-overlay .modal-content .form-actions,
-        .modal-overlay .modal-content .modal-actions,
-        #resetPasswordModal .form-actions,
-        #resetPasswordModal .modal-actions{
-            display:flex !important;
-            gap:22px !important;
-            align-items:stretch !important;
-        }
-
-        .modal-overlay .modal-content .form-actions > button,
-        .modal-overlay .modal-content .form-actions > a,
-        .modal-overlay .modal-content .modal-actions > button,
-        .modal-overlay .modal-content .modal-actions > a,
-        #resetPasswordModal .form-actions > button,
-        #resetPasswordModal .form-actions > a,
-        #resetPasswordModal .modal-actions > button,
-        #resetPasswordModal .modal-actions > a{
-            flex: 1 1 0 !important;
-            width: 0 !important;
-            height: 64px !important;
-            border-radius: 999px !important;
-            font-size: 18px !important;
-            font-weight: 700 !important;
-            padding: 0 24px !important;
-            line-height: 64px !important;
-            box-sizing: border-box !important;
-        }
-
-        html body #forgotPasswordModal .modal-actions{
-            display:flex !important;
-            gap:22px !important;
-            align-items:stretch !important;
-        }
-
-        html body #forgotPasswordModal .modal-actions > button.btn-modal{
-            flex: 1 1 0 !important;
-            width: 0 !important;
-            min-width: 0 !important;
-
-            height: 64px !important;
-            line-height: 64px !important;
-            padding: 0 24px !important;
-
-            border-radius: 999px !important;
-            font-size: 18px !important;
-            font-weight: 800 !important;
-            box-sizing: border-box !important;
-        }
-
-        html body #forgotPasswordModal .modal-actions > button.btn-secondary.btn-modal{
-            background:#F3F4F6 !important;
-            color:#111827 !important;
-            border:1px solid rgba(17,24,39,.10) !important;
-        }
-
-        html body #forgotPasswordModal .modal-actions > button.btn-primary.btn-modal{
-            background:#111827 !important;
-            color:#FFFFFF !important;
-            border:none !important;
-        }
-        /* OAuth 一行双按钮 */
-        .oauth-row{
-            display:flex;
-            gap:12px;
-            margin-top:14px;
-            flex-wrap:nowrap;           /* 强制不换行 */
-        }
-
-        .oauth-row .btn-oauth{
-            flex:1 1 0;
-            min-width:0;                /* 允许收缩，避免被内容撑破导致换行 */
-            height:56px;
-            display:flex;
-            align-items:center;
-            justify-content:center;
-            gap:8px;
-        }
-
-        .oauth-row .btn-oauth span{
-            white-space:nowrap;
-            overflow:hidden;
-            text-overflow:ellipsis;
-        }
-
-        /* Google 按钮样式（按你现有 btn-github 风格来） */
-        .btn-google{
-            background:#F3F4F6;
-            color:#111827;
-            border:1px solid #E5E7EB;
-            height:56px;
-            font-size:16px;
-        }
-        .btn-google:hover{filter:brightness(.98)}
-
-        .oauth-row{
-            display:flex;
-            gap:16px;
-            margin-top:14px;
-            align-items:stretch;     /* 同高 */
-            flex-wrap:nowrap;        /* 不换行 */
-        }
-
-        .oauth-row .btn-oauth{
-            flex:1 1 0;
-            width:auto !important;
-            margin:0 !important;
-            height:56px;
-            display:flex;
-            align-items:center;
-            justify-content:center;
-            gap:8px;
-        }
-
-        .btn-google{
-            background:#F3F4F6;
-            color:#111827;
-            border:1px solid #E5E7EB;
-            height:56px;
-            font-size:16px;
-        }
-
-        /* ============================================================
-           暗色模式覆盖 [data-theme="dark"]
-           ============================================================ */
-        [data-theme="dark"]{
-            --bg:#1a1d21;--panel:#1e2124;--card:#22262b;
-            --text:#cdd9e5;--muted:#768390;--line:#31363d;
-            --shadow:0 22px 60px rgba(0,0,0,.55);
-        }
-        [data-theme="dark"] body{background:var(--bg)}
-        [data-theme="dark"] .auth-shell{background:var(--card)}
-        [data-theme="dark"] .auth-shell:before{background:rgba(255,255,255,.06)}
-        [data-theme="dark"] .lang-selector{background:rgba(34,38,43,.95);box-shadow:0 10px 26px rgba(0,0,0,.3)}
-        [data-theme="dark"] .lang-item{color:var(--muted)}
-        [data-theme="dark"] .lang-item.active{color:var(--text)}
-        [data-theme="dark"] .lang-divider{color:var(--line)}
-        [data-theme="dark"] .hero-panel{background:var(--panel)}
-        [data-theme="dark"] .form-control{
-            color:var(--text);border-bottom-color:var(--line);
-            background-color:transparent!important;
-            color-scheme:dark;
-        }
-        [data-theme="dark"] .form-control::placeholder{color:var(--muted);opacity:1}
-        [data-theme="dark"] .form-control:focus{border-bottom-color:#4d9eff;outline:none}
-        /* 压制浏览器 autofill 强制白底 */
-        [data-theme="dark"] .form-control:-webkit-autofill,
-        [data-theme="dark"] .form-control:-webkit-autofill:hover,
-        [data-theme="dark"] .form-control:-webkit-autofill:focus,
-        [data-theme="dark"] .form-control:-webkit-autofill:active{
-            -webkit-box-shadow:0 0 0 1000px #22262b inset!important;
-            -webkit-text-fill-color:#cdd9e5!important;
-            caret-color:#cdd9e5;
-            transition:background-color 9999s ease 0s;
-        }
-        [data-theme="dark"] .tab-group{background:transparent}
-        [data-theme="dark"] .tab{color:var(--text)}
-        [data-theme="dark"] .tab.active{background:rgba(77,158,255,.15);color:#4d9eff}
-        [data-theme="dark"] .brand-badge{background:#4d9eff;color:#fff}
-        [data-theme="dark"] .btn-primary{background:#4d9eff;color:#fff}
-        [data-theme="dark"] .btn-primary:hover{filter:brightness(.9)}
-        [data-theme="dark"] .btn-github,
-        [data-theme="dark"] .btn-google{background:#292d32;color:var(--text);border-color:var(--line)}
-        [data-theme="dark"] .btn-github:hover,
-        [data-theme="dark"] .btn-google:hover{filter:brightness(1.1)}
-        [data-theme="dark"] .forgot-password-link{color:var(--muted)}
-        [data-theme="dark"] .forgot-password-link:hover{color:var(--text)}
-        [data-theme="dark"] .remember-me span{color:var(--text)}
-        [data-theme="dark"] .step-description{background:rgba(255,255,255,.04);color:var(--muted);border-radius:8px;padding:12px}
-        [data-theme="dark"] .modal-overlay{background:rgba(0,0,0,.65);backdrop-filter:saturate(140%) blur(8px)}
-        [data-theme="dark"] .modal{background:var(--card);border:1px solid var(--line)}
-        [data-theme="dark"] .modal-header{background:rgba(255,255,255,.03);border-bottom-color:var(--line)}
-        [data-theme="dark"] .modal-actions{background:rgba(255,255,255,.03);border-top-color:var(--line)}
-        [data-theme="dark"] .modal-close{color:var(--muted)}
-        [data-theme="dark"] .modal-close:hover{background:rgba(255,255,255,.08);color:var(--text)}
-        [data-theme="dark"] .modal-box{background:rgba(255,255,255,.04);border-color:var(--line)}
-        [data-theme="dark"] .modal-box-list{color:var(--muted)}
-        [data-theme="dark"] .modal-success{background:rgba(255,255,255,.04);border-color:var(--line)}
-        [data-theme="dark"] .modal-steps::before{background:var(--line)}
-        [data-theme="dark"] .step-circle{background:var(--card);border-color:var(--line);color:var(--muted)}
-        [data-theme="dark"] #forgotPasswordModal .form-control{color:var(--text);border-bottom-color:var(--line)}
-        [data-theme="dark"] #forgotPasswordModal .modal-actions>button.btn-secondary.btn-modal{
-            background:#292d32!important;color:var(--text)!important;border-color:var(--line)!important}
-        [data-theme="dark"] #forgotPasswordModal .modal-actions>button.btn-primary.btn-modal{
-            background:#4d9eff!important;color:#fff!important;border:none!important}
-        [data-theme="dark"] footer a{color:var(--muted)!important}
-
-        /* --- 左侧角色：哭脸表情 --- */
-        #heroSvg .mouth-sad,
-        #heroSvg .tears{opacity:0;pointer-events:none;transition:opacity .28s ease}
-        #heroSvg .mouth-happy{opacity:1;transition:opacity .28s ease}
-        #heroSvg.is-crying .mouth-happy{opacity:0}
-        #heroSvg.is-crying .mouth-sad,
-        #heroSvg.is-crying .tears{opacity:1}
-        #heroSvg.is-crying .tears .tear{
-            transform-box:fill-box;
-            transform-origin:center top;
-            animation:heroTearDrop 1.1s ease-in infinite;
-        }
-        #heroSvg.is-crying .tears .tear:nth-child(2){animation-delay:.18s}
-        #heroSvg.is-crying .tears .tear:nth-child(3){animation-delay:.36s}
-        #heroSvg.is-crying .tears .tear:nth-child(4){animation-delay:.12s}
-        #heroSvg.is-crying .tears .tear:nth-child(5){animation-delay:.28s}
-        #heroSvg.is-crying .tears .tear:nth-child(6){animation-delay:.42s}
-        #heroSvg.is-crying .tears .tear:nth-child(7){animation-delay:.2s}
-        #heroSvg.is-crying .tears .tear:nth-child(8){animation-delay:.34s}
-        @keyframes heroTearDrop{
-            0%{opacity:0;transform:translateY(0)}
-            20%{opacity:.95}
-            100%{opacity:0;transform:translateY(14px)}
-        }
-        #heroSvg.is-crying{animation:heroCryShake .45s ease}
-        @keyframes heroCryShake{
-            0%,100%{transform:translateX(0)}
-            25%{transform:translateX(-3px)}
-            75%{transform:translateX(3px)}
-        }
-
-        /* 空输入框抖动提示 */
-        .form-control.input-shake{
-            animation:inputShake .45s ease;
-            border-bottom-color:#ef4444 !important;
-        }
-        @keyframes inputShake{
-            0%,100%{transform:translateX(0)}
-            15%{transform:translateX(-8px)}
-            30%{transform:translateX(8px)}
-            45%{transform:translateX(-6px)}
-            60%{transform:translateX(6px)}
-            75%{transform:translateX(-3px)}
-            90%{transform:translateX(3px)}
-        }
-        [data-theme="dark"] .form-control.input-shake{
-            border-bottom-color:#f87171 !important;
-        }
-
-        /* ============================================================
-           登录背景：极光流光 + 左栏节点网
-           ============================================================ */
-        html body{
-            background:transparent!important;
-            background-image:none!important;
-            background-color:transparent!important;
-        }
-        .login-aurora{
-            position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none;
-            background:
-                radial-gradient(1200px 700px at 12% 18%, rgba(91,61,246,.18), transparent 58%),
-                radial-gradient(900px 600px at 88% 78%, rgba(0,180,219,.14), transparent 55%),
-                linear-gradient(165deg, #eef1f6 0%, #e8ecf3 45%, #eef2f8 100%);
-        }
-        .login-aurora__blob{
-            position:absolute;border-radius:50%;filter:blur(64px);opacity:.72;
-            will-change:transform;
-            animation:loginAuroraDrift var(--dur,18s) ease-in-out infinite alternate;
-        }
-        .login-aurora__blob.b1{
-            width:52vw;height:52vw;max-width:720px;max-height:720px;
-            left:-12%;top:-18%;
-            background:radial-gradient(circle at 35% 35%, rgba(99,102,241,.55), rgba(99,102,241,0) 70%);
-            --dur:22s;--dx:8%;--dy:12%;
-        }
-        .login-aurora__blob.b2{
-            width:46vw;height:46vw;max-width:640px;max-height:640px;
-            right:-14%;top:8%;
-            background:radial-gradient(circle at 50% 40%, rgba(14,165,233,.48), rgba(14,165,233,0) 72%);
-            --dur:26s;--dx:-10%;--dy:8%;animation-delay:-4s;
-        }
-        .login-aurora__blob.b3{
-            width:58vw;height:58vw;max-width:780px;max-height:780px;
-            left:18%;bottom:-28%;
-            background:radial-gradient(circle at 45% 40%, rgba(167,139,250,.42), rgba(56,189,248,.12) 55%, transparent 72%);
-            --dur:30s;--dx:6%;--dy:-10%;animation-delay:-9s;
-        }
-        .login-aurora__blob.b4{
-            width:36vw;height:36vw;max-width:480px;max-height:480px;
-            left:42%;top:28%;
-            background:radial-gradient(circle at 50% 50%, rgba(59,130,246,.28), transparent 70%);
-            --dur:18s;--dx:-7%;--dy:9%;animation-delay:-2s;opacity:.55;
-        }
-        .login-aurora__noise{
-            position:absolute;inset:0;opacity:.045;mix-blend-mode:overlay;
-            background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
-            background-size:180px 180px;
-        }
-        .login-aurora__vignette{
-            position:absolute;inset:0;
-            background:radial-gradient(ellipse at center, transparent 40%, rgba(15,23,42,.08) 100%);
-        }
-        @keyframes loginAuroraDrift{
-            0%{transform:translate3d(0,0,0) scale(1)}
-            100%{transform:translate3d(var(--dx,6%),var(--dy,8%),0) scale(1.08)}
-        }
-
-        [data-theme="dark"] .login-aurora{
-            background:
-                radial-gradient(1100px 640px at 15% 20%, rgba(77,158,255,.16), transparent 58%),
-                radial-gradient(900px 560px at 85% 75%, rgba(139,92,246,.14), transparent 55%),
-                linear-gradient(165deg, #12151a 0%, #1a1d21 48%, #151820 100%);
-        }
-        [data-theme="dark"] .login-aurora__blob.b1{
-            background:radial-gradient(circle at 35% 35%, rgba(77,158,255,.42), rgba(77,158,255,0) 70%);
-            opacity:.85;
-        }
-        [data-theme="dark"] .login-aurora__blob.b2{
-            background:radial-gradient(circle at 50% 40%, rgba(139,92,246,.38), rgba(139,92,246,0) 72%);
-            opacity:.8;
-        }
-        [data-theme="dark"] .login-aurora__blob.b3{
-            background:radial-gradient(circle at 45% 40%, rgba(56,189,248,.28), rgba(99,102,241,.16) 50%, transparent 72%);
-            opacity:.75;
-        }
-        [data-theme="dark"] .login-aurora__blob.b4{
-            background:radial-gradient(circle at 50% 50%, rgba(34,211,238,.2), transparent 70%);
-            opacity:.5;
-        }
-        [data-theme="dark"] .login-aurora__noise{opacity:.06}
-        [data-theme="dark"] .login-aurora__vignette{
-            background:radial-gradient(ellipse at center, transparent 35%, rgba(0,0,0,.45) 100%);
-        }
-
-        .page-container{position:relative;z-index:1}
-        .auth-shell{
-            background:rgba(255,255,255,.88)!important;
-            backdrop-filter:saturate(140%) blur(14px);
-            -webkit-backdrop-filter:saturate(140%) blur(14px);
-            border:1px solid rgba(255,255,255,.55);
-        }
-        [data-theme="dark"] .auth-shell{
-            background:rgba(34,38,43,.82)!important;
-            border:1px solid rgba(255,255,255,.06);
-        }
-
-        .hero-panel{
-            position:relative;overflow:hidden;
-            background:
-                radial-gradient(ellipse at 30% 20%, rgba(99,102,241,.12), transparent 55%),
-                radial-gradient(ellipse at 80% 80%, rgba(14,165,233,.1), transparent 50%),
-                var(--panel)!important;
-        }
-        [data-theme="dark"] .hero-panel{
-            background:
-                radial-gradient(ellipse at 30% 20%, rgba(77,158,255,.14), transparent 55%),
-                radial-gradient(ellipse at 80% 80%, rgba(139,92,246,.1), transparent 50%),
-                var(--panel)!important;
-        }
-        .hero-net{
-            position:absolute;inset:0;width:100%;height:100%;
-            pointer-events:none;z-index:0;opacity:.9;
-        }
-        .hero-inner{position:relative;z-index:1}
-        #heroSvg{filter:drop-shadow(0 18px 40px rgba(15,23,42,.12))}
-        [data-theme="dark"] #heroSvg{filter:drop-shadow(0 18px 40px rgba(0,0,0,.35))}
-
-        @media (prefers-reduced-motion: reduce){
-            .login-aurora__blob{animation:none!important}
-            .hero-net{display:none}
-        }
-
-    </style>
 </head>
 <body>
-<div class="login-aurora" aria-hidden="true">
-    <div class="login-aurora__blob b1"></div>
-    <div class="login-aurora__blob b2"></div>
-    <div class="login-aurora__blob b3"></div>
-    <div class="login-aurora__blob b4"></div>
-    <div class="login-aurora__noise"></div>
-    <div class="login-aurora__vignette"></div>
-</div>
-<div class="page-container">
-    <main class="main-content">
-        <div class="auth-shell">
-            <div class="lang-selector" data-current-locale="${currentLocale}">
-                <span class="lang-item ${(currentLocale == 'zh_CN')?string('active', '')}" onclick="setLocale('zh_CN')">中文</span>
-                <span class="lang-divider">|</span>
-                <span class="lang-item ${(currentLocale == 'en_US')?string('active', '')}" onclick="setLocale('en_US')">English</span>
+<section class="stage" aria-labelledby="heroBrandName">
+    <div class="brand">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M12 2.5c0 0 6.8 7.4 6.8 12.1A6.8 6.8 0 0 1 12 21.4a6.8 6.8 0 0 1-6.8-6.8C5.2 9.9 12 2.5 12 2.5z" stroke="var(--brand-hi)" stroke-width="1.6" stroke-linejoin="round"/>
+            <path d="M12 17.6a3 3 0 0 1-3-3c0-1.6 3-5 3-5s3 3.4 3 5a3 3 0 0 1-3 3z" fill="var(--brand-hi)"/>
+        </svg>
+        <span class="nm" id="heroBrandName">${siteLogoName!'OCI-START'} <em>/ <#if currentLocale?starts_with('zh')>多云工作台<#else>Cloud workspace</#if></em></span>
+    </div>
+    <div class="pitch">
+        <h2><#if currentLocale?starts_with('zh')>所有云端，一处掌控。<#else>Every cloud. One place.</#if></h2>
+        <p><#if currentLocale?starts_with('zh')>把分散在各个租户里的实例、网络与自动化任务，收进同一个控制台。<#else>Bring instances, networks and automated tasks across your tenants into one console.</#if></p>
+    </div>
+    <div class="mapbox login-mapbox" aria-hidden="true">
+        <canvas id="loginRegionMap"></canvas>
+        <div id="loginMapTooltip" role="presentation"><strong></strong><span></span></div>
+    </div>
+    <div class="stats">
+        <div class="stat"><b id="loginMapRegionCount">17</b><span><#if currentLocale?starts_with('zh')>地图区域节点<#else>Map locations</#if></span></div>
+        <div class="stat"><b>OCI · GCP</b><span><#if currentLocale?starts_with('zh')>支持云平台<#else>Cloud platforms</#if></span></div>
+        <div class="stat"><b class="live"><#if currentLocale?starts_with('zh')>自动化<#else>Automation</#if></b><span><#if currentLocale?starts_with('zh')>任务与资源管理<#else>Tasks and resources</#if></span></div>
+    </div>
+    <div class="foot">&copy; 2026 doubleDimple · <a href="https://github.com/doubleDimple/oci-start" target="_blank" rel="noopener">GitHub</a> · <a href="https://github.com/doubleDimple/oci-start#readme" target="_blank" rel="noopener"><#if currentLocale?starts_with('zh')>文档<#else>Docs</#if></a></div>
+</section>
+
+<section class="auth">
+        <div class="topbar">
+            <div class="lang" data-current-locale="${currentLocale}">
+                <button type="button" class="${(currentLocale == 'zh_CN')?string('active', '')}" aria-current="${currentLocale?starts_with('zh')?string('true','false')}" onclick="setLocale('zh_CN')">中文</button>
+                <i aria-hidden="true">/</i>
+                <button type="button" class="${(currentLocale == 'en_US')?string('active', '')}" aria-current="${currentLocale?starts_with('en')?string('true','false')}" onclick="setLocale('en_US')">EN</button>
             </div>
+            <button class="icon-btn" type="button" id="themeToggle" title="<#if currentLocale?starts_with('zh')>切换外观<#else>Switch appearance</#if>" aria-label="<#if currentLocale?starts_with('zh')>切换外观<#else>Switch appearance</#if>" onclick="toggleLoginTheme()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+            </button>
+        </div>
 
-            <section class="hero-panel" aria-hidden="true">
-                <canvas id="heroNetCanvas" class="hero-net"></canvas>
-                <div class="hero-inner">
-                    <svg id="heroSvg" viewBox="0 0 520 520" xmlns="http://www.w3.org/2000/svg">
-                        <defs>
-                            <linearGradient id="heroGradMain" x1="0%" y1="0%" x2="100%" y2="100%">
-                                <stop offset="0%" stop-color="#6D8CFF"/>
-                                <stop offset="55%" stop-color="#4D6BFF"/>
-                                <stop offset="100%" stop-color="#3B5BDB"/>
-                            </linearGradient>
-                            <linearGradient id="heroGradEdge" x1="0%" y1="0%" x2="0%" y2="100%">
-                                <stop offset="0%" stop-color="#2A3344"/>
-                                <stop offset="100%" stop-color="#151B26"/>
-                            </linearGradient>
-                            <linearGradient id="heroGradSat" x1="0%" y1="0%" x2="100%" y2="100%">
-                                <stop offset="0%" stop-color="#67E8F9"/>
-                                <stop offset="100%" stop-color="#38BDF8"/>
-                            </linearGradient>
-                            <linearGradient id="heroGradCloud" x1="0%" y1="0%" x2="0%" y2="100%">
-                                <stop offset="0%" stop-color="#A78BFA"/>
-                                <stop offset="100%" stop-color="#7C5CFC"/>
-                            </linearGradient>
-                            <linearGradient id="heroGradGlass" x1="0%" y1="0%" x2="0%" y2="100%">
-                                <stop offset="0%" stop-color="#FFFFFF" stop-opacity=".2"/>
-                                <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
-                            </linearGradient>
-                            <filter id="heroSoftShadow" x="-20%" y="-20%" width="140%" height="140%">
-                                <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#0F172A" flood-opacity=".18"/>
-                            </filter>
-                        </defs>
+        <div class="login-card">
+                <h1><#if currentLocale?starts_with('zh')>欢迎回来<#else>Welcome back</#if></h1>
+                <p class="lede"><#if currentLocale?starts_with('zh')>登录后继续管理你的云端资源。<#else>Sign in to continue managing your cloud resources.</#if></p>
 
-                        <!--
-                          绘制顺序：后 → 前
-                          机柜(后) → 主控 → 卫星 → 云(前) → logo(最前且更靠左)
-                          底边 y=410，脸区互不遮挡
-                        -->
+                <#if allowRegister?? && allowRegister>
+                    <div class="tab-group">
+                        <button type="button" class="tab active" onclick="switchTab('login')">${msg.get('login.title')}</button>
+                        <button type="button" class="tab" onclick="switchTab('register')">${msg.get('login.register')}</button>
+                    </div>
+                </#if>
 
-                        <!-- 机柜（后） -->
-                        <g filter="url(#heroSoftShadow)">
-                            <rect x="348" y="178" width="74" height="232" rx="20" fill="url(#heroGradEdge)"/>
-                            <rect x="348" y="178" width="74" height="232" rx="20" fill="url(#heroGradGlass)"/>
-                            <circle cx="385" cy="198" r="3.8" fill="#34D399"/>
-                            <circle cx="368" cy="242" r="11.5" fill="#FFFFFF"/>
-                            <circle cx="402" cy="242" r="11.5" fill="#FFFFFF"/>
-                            <circle data-pupil="1" data-max="5" cx="368" cy="242" r="4.4" fill="#0F172A"/>
-                            <circle data-pupil="1" data-max="5" cx="402" cy="242" r="4.4" fill="#0F172A"/>
-                            <path class="mouth-happy" d="M372 270 L398 270" fill="none" stroke="#E2E8F0" stroke-width="3.8" stroke-linecap="round" opacity=".9"/>
-                            <path class="mouth-sad" d="M372 276 C380 266 390 266 398 276" fill="none" stroke="#E2E8F0" stroke-width="3.8" stroke-linecap="round"/>
-                            <g class="tears">
-                                <ellipse class="tear" cx="360" cy="258" rx="2.3" ry="3.6" fill="#7DD3FC"/>
-                                <ellipse class="tear" cx="410" cy="258" rx="2.3" ry="3.6" fill="#7DD3FC"/>
-                            </g>
-                            <rect x="364" y="310" width="40" height="5" rx="2.5" fill="#38BDF8" opacity=".5"/>
-                            <rect x="364" y="326" width="40" height="5" rx="2.5" fill="#64748B" opacity=".45"/>
-                            <rect x="364" y="342" width="26" height="5" rx="2.5" fill="#64748B" opacity=".35"/>
-                        </g>
+                <form id="loginForm" method="post" action="/perform_login" novalidate class="auth-form ${(allowRegister?? && allowRegister)?string('active','auth-form-single')}">
+                    <#if turnstileEnabled?? && turnstileEnabled>
+                    <div id="turnstileContainer" style="margin-bottom:18px;text-align:center;">
+                        <div class="cf-turnstile"
+                             data-sitekey="${turnstileSiteKey!''}"
+                             data-callback="onTurnstileSuccess"
+                             data-expired-callback="onTurnstileExpired"
+                             data-theme="auto">
+                        </div>
+                        <div id="turnstileHint" style="font-size:12px;color:var(--text-muted);margin-top:8px;"><#if currentLocale?starts_with('zh')>完成验证后，登录表单将自动显示<#else>The sign-in form will appear after verification.</#if></div>
+                    </div>
+                    </#if>
 
-                        <!-- 主控 -->
-                        <g filter="url(#heroSoftShadow)">
-                            <rect x="200" y="112" width="156" height="298" rx="36" fill="url(#heroGradMain)"/>
-                            <rect x="200" y="112" width="156" height="298" rx="36" fill="url(#heroGradGlass)"/>
-                            <ellipse cx="278" cy="112" rx="26" ry="8.5" fill="none" stroke="#C7D2FE" stroke-width="3" opacity=".8"/>
-                            <circle cx="278" cy="102" r="5.5" fill="#E0E7FF"/>
-                            <line x1="278" y1="108" x2="278" y2="120" stroke="#C7D2FE" stroke-width="3" stroke-linecap="round"/>
-                            <rect x="218" y="140" width="10" height="10" rx="2.5" fill="#67E8F9"/>
-                            <rect x="232" y="140" width="10" height="10" rx="2.5" fill="#A5B4FC" opacity=".9"/>
-                            <rect x="246" y="140" width="10" height="10" rx="2.5" fill="#FFFFFF" opacity=".3"/>
-                            <circle cx="248" cy="208" r="16" fill="#FFFFFF"/>
-                            <circle cx="308" cy="208" r="16" fill="#FFFFFF"/>
-                            <circle data-pupil="1" data-max="6.5" cx="248" cy="208" r="6.2" fill="#0F172A"/>
-                            <circle data-pupil="1" data-max="6.5" cx="308" cy="208" r="6.2" fill="#0F172A"/>
-                            <path class="mouth-happy" d="M260 248 C274 266 292 266 306 248" fill="none" stroke="#0F172A" stroke-width="7.5" stroke-linecap="round"/>
-                            <path class="mouth-sad" d="M260 264 C274 246 292 246 306 264" fill="none" stroke="#0F172A" stroke-width="7.5" stroke-linecap="round"/>
-                            <g class="tears">
-                                <ellipse class="tear" cx="236" cy="230" rx="3.2" ry="5" fill="#7DD3FC"/>
-                                <ellipse class="tear" cx="320" cy="230" rx="3.2" ry="5" fill="#7DD3FC"/>
-                            </g>
-                            <rect x="236" y="318" width="80" height="7" rx="3.5" fill="#FFFFFF" opacity=".18"/>
-                            <rect x="250" y="338" width="52" height="6" rx="3" fill="#FFFFFF" opacity=".12"/>
-                        </g>
-
-                        <!-- 卫星 -->
-                        <g filter="url(#heroSoftShadow)">
-                            <circle cx="462" cy="358" r="52" fill="url(#heroGradSat)"/>
-                            <circle cx="462" cy="358" r="52" fill="url(#heroGradGlass)"/>
-                            <ellipse cx="462" cy="358" rx="58" ry="14" fill="none" stroke="#E0F2FE" stroke-width="2.2" opacity=".5" transform="rotate(-14 462 358)"/>
-                            <circle cx="442" cy="344" r="11" fill="#FFFFFF"/>
-                            <circle cx="480" cy="344" r="11" fill="#FFFFFF"/>
-                            <circle data-pupil="1" data-max="4.5" cx="442" cy="344" r="4.2" fill="#0F172A"/>
-                            <circle data-pupil="1" data-max="4.5" cx="480" cy="344" r="4.2" fill="#0F172A"/>
-                            <path class="mouth-happy" d="M448 376 L476 376" fill="none" stroke="#0F172A" stroke-width="5" stroke-linecap="round"/>
-                            <path class="mouth-sad" d="M450 384 C458 372 466 372 474 384" fill="none" stroke="#0F172A" stroke-width="5" stroke-linecap="round"/>
-                            <g class="tears">
-                                <ellipse class="tear" cx="434" cy="360" rx="2.5" ry="3.8" fill="#BAE6FD"/>
-                                <ellipse class="tear" cx="488" cy="360" rx="2.5" ry="3.8" fill="#BAE6FD"/>
-                            </g>
-                        </g>
-
-                        <!-- 云（前）：平滑单路径，GCP/Material 云图标比例 -->
-                        <g filter="url(#heroSoftShadow)">
-                            <!-- 底边 y=410；左瓣→顶瓣→右瓣，圆润连续 -->
-                            <path fill="url(#heroGradCloud)" d="
-                                M 86 410
-                                C 64 410 48 394 48 372
-                                C 48 352 62 336 82 332
-                                C 86 304 110 284 140 284
-                                C 156 260 186 248 216 256
-                                C 236 240 266 244 282 266
-                                C 310 270 330 294 330 322
-                                C 354 328 370 350 370 376
-                                C 370 398 352 410 328 410
-                                Z"/>
-                            <path fill="url(#heroGradGlass)" d="
-                                M 86 410
-                                C 64 410 48 394 48 372
-                                C 48 352 62 336 82 332
-                                C 86 304 110 284 140 284
-                                C 156 260 186 248 216 256
-                                C 236 240 266 244 282 266
-                                C 310 270 330 294 330 322
-                                C 354 328 370 350 370 376
-                                C 370 398 352 410 328 410
-                                Z"/>
-                            <circle cx="148" cy="328" r="15" fill="#FFFFFF"/>
-                            <circle cx="200" cy="328" r="15" fill="#FFFFFF"/>
-                            <circle data-pupil="1" data-max="6" cx="148" cy="328" r="5.8" fill="#0F172A"/>
-                            <circle data-pupil="1" data-max="6" cx="200" cy="328" r="5.8" fill="#0F172A"/>
-                            <path class="mouth-happy" d="M158 362 C172 378 188 378 202 362" fill="none" stroke="#0F172A" stroke-width="7.5" stroke-linecap="round"/>
-                            <path class="mouth-sad" d="M158 374 C172 358 188 358 202 374" fill="none" stroke="#0F172A" stroke-width="7.5" stroke-linecap="round"/>
-                            <g class="tears">
-                                <ellipse class="tear" cx="136" cy="348" rx="3.2" ry="5" fill="#7DD3FC"/>
-                                <ellipse class="tear" cx="212" cy="348" rx="3.2" ry="5" fill="#7DD3FC"/>
-                            </g>
-                        </g>
-
-                        <!-- logo 角色：更靠左 -->
-                        <g id="ociBuddy" filter="url(#heroSoftShadow)">
-                            <rect x="12" y="356" width="120" height="54" rx="18" fill="#0F172A" opacity=".95"/>
-                            <rect x="12" y="356" width="120" height="54" rx="18" fill="url(#heroGradGlass)"/>
-                            <circle cx="24" cy="368" r="2.8" fill="#34D399"/>
-                            <circle cx="44" cy="378" r="10" fill="#FFFFFF"/>
-                            <circle cx="74" cy="378" r="10" fill="#FFFFFF"/>
-                            <circle data-pupil="1" data-max="6" cx="44" cy="378" r="4.2" fill="#0F172A"/>
-                            <circle data-pupil="1" data-max="6" cx="74" cy="378" r="4.2" fill="#0F172A"/>
-                            <path class="mouth-happy" d="M52 394 C56 398 62 398 66 394" fill="none" stroke="#E2E8F0" stroke-width="2.6" stroke-linecap="round" opacity=".9"/>
-                            <path class="mouth-sad" d="M52 398 C56 394 62 394 66 398" fill="none" stroke="#E2E8F0" stroke-width="2.6" stroke-linecap="round"/>
-                            <g class="tears">
-                                <ellipse class="tear" cx="36" cy="390" rx="2" ry="3" fill="#7DD3FC"/>
-                                <ellipse class="tear" cx="82" cy="390" rx="2" ry="3" fill="#7DD3FC"/>
-                            </g>
-                            <text x="108" y="382" text-anchor="middle"
-                                  font-size="11"
-                                  font-family="system-ui, -apple-system, Segoe UI, Roboto"
-                                  font-weight="800"
-                                  fill="#93C5FD">oci</text>
-                            <text x="108" y="398" text-anchor="middle"
-                                  font-size="11"
-                                  font-family="system-ui, -apple-system, Segoe UI, Roboto"
-                                  font-weight="800"
-                                  fill="#E2E8F0">start</text>
-                        </g>
-                    </svg>
-                </div>
-            </section>
-
-            <section class="form-panel">
-                <div class="login-card">
-
-                    <div class="brand">
-                        <div class="brand-badge">OS</div>
-                        <div class="brand-text">
-                            <div class="brand-name">OCI-START</div>
-                            <div class="brand-sub">Welcome back</div>
+                    <div id="loginFormContent"<#if turnstileEnabled?? && turnstileEnabled> style="display:none"</#if>>
+                    <div class="field form-group">
+                        <label for="username">${msg.get('login.username')}</label>
+                        <div class="ctrl input-container">
+                            <input type="text" id="username" name="username" class="form-control" autocomplete="username" autocapitalize="none" spellcheck="false" required placeholder="${msg.get('login.username.placeholder')}">
+                            <i class="fas fa-user input-icon"></i>
                         </div>
                     </div>
 
-                    <#if allowRegister?? && allowRegister>
-                        <div class="tab-group">
-                            <div class="tab active" onclick="switchTab('login')">${msg.get('login.title')}</div>
-                            <div class="tab" onclick="switchTab('register')">${msg.get('login.register')}</div>
+                    <div class="field form-group">
+                        <label for="password">${msg.get('login.password')}</label>
+                        <div class="ctrl input-container password-container">
+                            <input type="password" id="password" name="password" class="form-control" autocomplete="current-password" required placeholder="${msg.get('login.password.placeholder')}">
+                            <button type="button" class="peek password-toggle" id="loginPasswordToggle" aria-controls="password" aria-pressed="false" aria-label="<#if currentLocale?starts_with('zh')>显示密码<#else>Show password</#if>" data-show-label="<#if currentLocale?starts_with('zh')>显示密码<#else>Show password</#if>" data-hide-label="<#if currentLocale?starts_with('zh')>隐藏密码<#else>Hide password</#if>"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.8-6.5 10-6.5S22 12 22 12s-3.8 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.8"/></svg></button>
+                        </div>
+                    </div>
+
+                    <div id="verificationGroup" style="display: none;">
+                        <div class="field form-group">
+                            <label for="verificationCode">${msg.get('login.verify.code')}</label>
+                            <div class="verification-group">
+                                <div class="verification-input">
+                                    <input type="text" id="verificationCode" name="verificationCode" class="form-control" placeholder="${msg.get('login.verify.code.placeholder')}">
+                                </div>
+                                <button type="button" class="btn btn-send-code" id="sendCodeBtn">
+                                    <i class="fas fa-paper-plane"></i>
+                                    <span>${msg.get('login.btn.send.code')}</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="mfaGroup" style="display: none;">
+                        <div class="field form-group">
+                            <label for="mfaCode">${msg.get('login.mfa.code')}</label>
+                            <div class="ctrl input-container">
+                                <input type="text" id="mfaCode" name="mfaCode" class="form-control" placeholder="${msg.get('login.mfa.code.placeholder')}" maxlength="6">
+                                <i class="fas fa-shield-alt input-icon"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="verificationChoice" style="display: none;">
+                        <div class="field form-group">
+                            <label>${msg.get('login.verify.method')}</label>
+                            <div class="tab-group" style="margin-bottom: 12px;">
+                                <button type="button" class="tab active" onclick="switchVerificationMethod('message')" id="messageTab">
+                                    <i class="fas fa-envelope"></i> <span>${msg.get('login.verify.method.msg')}</span>
+                                </button>
+                                <button type="button" class="tab" onclick="switchVerificationMethod('mfa')" id="mfaTab">
+                                    <i class="fas fa-shield-alt"></i> <span>${msg.get('login.verify.method.mfa')}</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="aux form-meta">
+                        <label class="check remember-me">
+                            <input type="checkbox" name="remember-me" value="true">
+                            <span>${msg.get('login.remember.me')}</span>
+                        </label>
+                        <a href="#" class="link forgot-password-link" onclick="openForgotPasswordModal(); return false;">${msg.get('login.forgot.password')}</a>
+                    </div>
+
+                    <button type="submit" class="submit btn btn-primary" id="loginButton" disabled>
+                        <span class="spin" aria-hidden="true"></span><span class="txt">${msg.get('login.btn.login')}</span>
+                    </button>
+                    <p class="msg" aria-hidden="true"></p>
+                    <#if (githubEnabled?? && githubEnabled) || (googleEnabled?? && googleEnabled)>
+                        <div class="oauth-row">
+                            <#if githubEnabled?? && githubEnabled>
+                                <button type="button" id="githubLoginBtn" class="btn btn-github btn-oauth">
+                                    <i class="fab fa-github"></i>
+                                    <span>${msg.get('login.btn.github')}</span>
+                                </button>
+                            </#if>
+                            <#if googleEnabled?? && googleEnabled>
+                                <button type="button" id="googleLoginBtn" class="btn btn-google btn-oauth">
+                                    <i class="fab fa-google"></i>
+                                    <span>${msg.get('login.btn.google')}</span>
+                                </button>
+                            </#if>
                         </div>
                     </#if>
+                    </div>
+                </form>
 
-                    <form id="loginForm" method="post" action="/perform_login" novalidate class="auth-form ${(allowRegister?? && allowRegister)?string('active','auth-form-single')}">
-                        <#if turnstileEnabled?? && turnstileEnabled>
-                        <div id="turnstileContainer" style="margin-bottom:18px;text-align:center;">
-                            <div class="cf-turnstile"
-                                 data-sitekey="${turnstileSiteKey!''}"
-                                 data-callback="onTurnstileSuccess"
-                                 data-expired-callback="onTurnstileExpired"
-                                 data-theme="light">
-                            </div>
-                            <div id="turnstileHint" style="font-size:12px;color:#9CA3AF;margin-top:8px;">完成验证后，登录表单将自动显示</div>
-                        </div>
-                        </#if>
-
-                        <div id="loginFormContent"<#if turnstileEnabled?? && turnstileEnabled> style="display:none"</#if>>
-                        <div class="form-group">
-                            <label for="username">${msg.get('login.username')}</label>
-                            <div class="input-container">
-                                <input type="text" id="username" name="username" class="form-control" required placeholder="${msg.get('login.username.placeholder')}">
+                <#if allowRegister?? && allowRegister>
+                    <form id="registerForm" method="post" action="/api/register-first-user" class="auth-form" style="display: none;">
+                        <div class="field form-group">
+                            <label for="registerUsername">${msg.get('login.username')}</label>
+                            <div class="ctrl input-container">
+                                <input type="text" id="registerUsername" name="username" class="form-control" required placeholder="${msg.get('login.username.placeholder')}">
                                 <i class="fas fa-user input-icon"></i>
                             </div>
                         </div>
-
-                        <div class="form-group">
-                            <label for="password">${msg.get('login.password')}</label>
-                            <div class="input-container">
-                                <input type="password" id="password" name="password" class="form-control" required placeholder="${msg.get('login.password.placeholder')}">
+                        <div class="field form-group">
+                            <label for="registerPassword">${msg.get('login.password')}</label>
+                            <div class="ctrl input-container">
+                                <input type="password" id="registerPassword" name="password" class="form-control" required placeholder="${msg.get('login.password.placeholder')}">
                                 <i class="fas fa-lock input-icon"></i>
                             </div>
                         </div>
-
-                        <div id="verificationGroup" style="display: none;">
-                            <div class="form-group">
-                                <label for="verificationCode">${msg.get('login.verify.code')}</label>
-                                <div class="verification-group">
-                                    <div class="verification-input">
-                                        <input type="text" id="verificationCode" name="verificationCode" class="form-control" placeholder="${msg.get('login.verify.code.placeholder')}">
-                                    </div>
-                                    <button type="button" class="btn btn-send-code" id="sendCodeBtn">
-                                        <i class="fas fa-paper-plane"></i>
-                                        <span>${msg.get('login.btn.send.code')}</span>
-                                    </button>
-                                </div>
+                        <div class="field form-group">
+                            <label for="confirmPassword">${msg.get('login.confirm.password')}</label>
+                            <div class="ctrl input-container">
+                                <input type="password" id="confirmPassword" name="confirmPassword" class="form-control" required placeholder="${msg.get('login.confirm.password.placeholder')}">
+                                <i class="fas fa-lock input-icon"></i>
                             </div>
                         </div>
-
-                        <div id="mfaGroup" style="display: none;">
-                            <div class="form-group">
-                                <label for="mfaCode">${msg.get('login.mfa.code')}</label>
-                                <div class="input-container">
-                                    <input type="text" id="mfaCode" name="mfaCode" class="form-control" placeholder="${msg.get('login.mfa.code.placeholder')}" maxlength="6">
-                                    <i class="fas fa-shield-alt input-icon"></i>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div id="verificationChoice" style="display: none;">
-                            <div class="form-group">
-                                <label>${msg.get('login.verify.method')}</label>
-                                <div class="tab-group" style="margin-bottom: 12px;">
-                                    <div class="tab active" onclick="switchVerificationMethod('message')" id="messageTab">
-                                        <i class="fas fa-envelope"></i> <span>${msg.get('login.verify.method.msg')}</span>
-                                    </div>
-                                    <div class="tab" onclick="switchVerificationMethod('mfa')" id="mfaTab">
-                                        <i class="fas fa-shield-alt"></i> <span>${msg.get('login.verify.method.mfa')}</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="form-meta">
-                            <label class="remember-me">
-                                <input type="checkbox" name="remember-me" value="true">
-                                <span>${msg.get('login.remember.me')}</span>
-                            </label>
-                            <a href="#" class="forgot-password-link" onclick="openForgotPasswordModal()">${msg.get('login.forgot.password')}</a>
-                        </div>
-
-                        <button type="submit" class="btn btn-primary" id="loginButton" disabled>
-                            <i class="fas fa-sign-in-alt"></i> <span>${msg.get('login.btn.login')}</span>
+                        <button type="submit" class="submit btn btn-primary">
+                            <i class="fas fa-user-plus"></i> <span>${msg.get('login.register')}</span>
                         </button>
-                        <#if (githubEnabled?? && githubEnabled) || (googleEnabled?? && googleEnabled)>
-                            <div class="oauth-row">
-                                <#if githubEnabled?? && githubEnabled>
-                                    <button type="button" id="githubLoginBtn" class="btn btn-github btn-oauth">
-                                        <i class="fab fa-github"></i>
-                                        <span>${msg.get('login.btn.github')}</span>
-                                    </button>
-                                </#if>
-
-                                <#if googleEnabled?? && googleEnabled>
-                                    <button type="button" id="googleLoginBtn" class="btn btn-google btn-oauth">
-                                        <i class="fab fa-google"></i>
-                                        <span>${msg.get('login.btn.google')}</span>
-                                    </button>
-                                </#if>
-                            </div>
-                        </#if>
-                        </div><!-- /#loginFormContent -->
                     </form>
-
-                    <#if allowRegister?? && allowRegister>
-                        <form id="registerForm" method="post" action="/api/register-first-user" class="auth-form" style="display: none;">
-                            <div class="form-group">
-                                <label for="registerUsername">${msg.get('login.username')}</label>
-                                <div class="input-container">
-                                    <input type="text" id="registerUsername" name="username" class="form-control" required placeholder="${msg.get('login.username.placeholder')}">
-                                    <i class="fas fa-user input-icon"></i>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label for="registerPassword">${msg.get('login.password')}</label>
-                                <div class="input-container">
-                                    <input type="password" id="registerPassword" name="password" class="form-control" required placeholder="${msg.get('login.password.placeholder')}">
-                                    <i class="fas fa-lock input-icon"></i>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label for="confirmPassword">${msg.get('login.confirm.password')}</label>
-                                <div class="input-container">
-                                    <input type="password" id="confirmPassword" name="confirmPassword" class="form-control" required placeholder="${msg.get('login.confirm.password.placeholder')}">
-                                    <i class="fas fa-lock input-icon"></i>
-                                </div>
-                            </div>
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-user-plus"></i> <span>${msg.get('login.register')}</span>
-                            </button>
-                        </form>
-                    </#if>
-                </div>
-            </section>
+                </#if>
         </div>
-    </main>
-    <!-- 版权信息 -->
-    <footer style="text-align:center;padding:14px 0 18px;font-size:12px;color:var(--muted)">
-        &copy; 2025 <a href="https://github.com/doubleDimple" target="_blank" rel="noopener"
-           style="color:var(--muted);text-decoration:none">doubleDimple</a>
-        &nbsp;·&nbsp; OCI-START
-    </footer>
-</div>
+        <div class="authfoot"><#if allowRegister?? && allowRegister><#if currentLocale?starts_with('zh')>首次使用？切换到注册以创建账号。<#else>New here? Switch to Register to create an account.</#if><#else><#if currentLocale?starts_with('zh')>还没有账号？请联系管理员开通。<#else>Need an account? Contact your administrator.</#if></#if></div>
+</section>
 
 <div id="forgotPasswordModal" class="modal-overlay">
     <div class="modal">
         <div class="modal-header">
             <div class="modal-title"><i class="fas fa-key"></i> ${msg.get('login.reset.title')}</div>
-            <button type="button" class="modal-close" onclick="closeForgotPasswordModal()"><i class="fas fa-times"></i></button>
+            <button type="button" class="modal-close" aria-label="<#if currentLocale?starts_with('zh')>关闭<#else>Close</#if>" onclick="closeForgotPasswordModal()"><i class="fas fa-times" aria-hidden="true"></i></button>
         </div>
 
         <div class="modal-steps">
@@ -910,14 +227,14 @@
         <div class="modal-body">
             <div class="reset-step active" id="resetStep1">
                 <div class="step-description"><i class="fas fa-info-circle"></i> ${msg.get('login.reset.info1')}</div>
-                <div class="form-group">
+                <div class="field form-group">
                     <label>${msg.get('login.username')}</label>
-                    <div class="input-container">
+                    <div class="ctrl input-container">
                         <input type="text" id="resetUsername" class="form-control" placeholder="${msg.get('login.username.placeholder')}">
                         <i class="fas fa-user input-icon"></i>
                     </div>
                 </div>
-                <div class="form-group">
+                <div class="field form-group">
                     <label>${msg.get('login.verify.code')}</label>
                     <div class="verification-group">
                         <div class="verification-input">
@@ -932,10 +249,10 @@
 
             <div class="reset-step" id="resetStep2">
                 <div class="step-description"><i class="fas fa-shield-alt"></i> ${msg.get('login.reset.info2')}</div>
-                <div class="form-group">
+                <div class="field form-group">
                     <label>${msg.get('login.reset.method.title')}</label>
                     <div class="modal-box">
-                        <i class="fas fa-robot" style="color: var(--primary-color);"></i>
+                        <i class="fas fa-robot"></i>
                         ${msg.get('login.reset.method.desc')}
                         <ul class="modal-box-list">
                             <li>${msg.get('login.reset.method.list1')}</li>
@@ -946,9 +263,9 @@
             </div>
 
             <div class="reset-step" id="resetStep3">
-                <div class="step-description"><i class="fas fa-check-circle" style="color: var(--success-color);"></i> ${msg.get('login.reset.success')}</div>
+                <div class="step-description"><i class="fas fa-check-circle"></i> ${msg.get('login.reset.success')}</div>
                 <div class="modal-success">
-                    <i class="fas fa-paper-plane" style="font-size: 32px; color: var(--success-color); margin-bottom: 8px;"></i>
+                    <i class="fas fa-paper-plane" style="font-size: 32px; color: var(--status-ok); margin-bottom: 8px;"></i>
                     <div class="modal-success-title">${msg.get('login.reset.success')}</div>
                     <div class="modal-success-sub">${msg.get('login.reset.check.msg')}</div>
                 </div>
@@ -957,7 +274,7 @@
         </div>
 
         <div class="modal-actions">
-            <button type="button" class="btn btn-secondary btn-modal" onclick="closeForgotPasswordModal()">${msg.get('login.btn.cancel')}</button>
+            <button type="button" class="btn btn-secondary btn-modal" id="resetCancelBtn" onclick="closeForgotPasswordModal()">${msg.get('login.btn.cancel')}</button>
             <button type="button" class="btn btn-primary btn-modal" id="resetNextBtn" onclick="nextResetStep()">${msg.get('login.btn.next')}</button>
         </div>
     </div>
@@ -1006,341 +323,45 @@
     };
 </script>
 <script>
-    function setLocale(code){var u=new URL(window.location.href);var c1=code;var c2=String(code).replace('_','-');u.searchParams.set('lang',c1);u.searchParams.set('locale',c1);u.searchParams.set('kc_locale',c2);u.searchParams.set('ui_locales',c2);window.location.href=u.toString()}
-
-    /**
-     * 左侧 SVG 角色：
-     * - 眼球跟踪鼠标 / 输入框
-     * - 密码框害羞低头
-     * - 登录失败哭脸（window.setHeroMood）
-     */
+    function setLocale(code) {
+        var u = new URL(window.location.href);
+        var c2 = String(code).replace('_', '-');
+        u.searchParams.set('lang', code);
+        u.searchParams.set('locale', code);
+        u.searchParams.set('kc_locale', c2);
+        u.searchParams.set('ui_locales', c2);
+        window.location.href = u.toString();
+    }
+    function syncThemeIcon() {
+        var dark = document.documentElement.dataset.theme === 'dark';
+        var btn = document.getElementById('themeToggle');
+        if (!btn) return;
+        var chinese = document.documentElement.lang.indexOf('zh') === 0;
+        var label = dark ? (chinese ? '切换到浅色' : 'Switch to light appearance') : (chinese ? '切换到深色' : 'Switch to dark appearance');
+        btn.setAttribute('aria-label', label);
+        btn.setAttribute('title', label);
+    }
+    function toggleLoginTheme() {
+        var next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+        document.documentElement.dataset.theme = next;
+        try { localStorage.setItem('oci_theme', next); } catch (e) {}
+        syncThemeIcon();
+    }
+    syncThemeIcon();
     (function () {
-        var cryTimer = null;
-        var isCrying = false;
-
-        /** @param {'cry'|'normal'} mood @param {{duration?:number}} [opts] */
-        window.setHeroMood = function (mood, opts) {
-            var svg = document.getElementById('heroSvg');
-            if (!svg) return;
-            if (cryTimer) {
-                clearTimeout(cryTimer);
-                cryTimer = null;
-            }
-            if (mood === 'cry') {
-                isCrying = true;
-                svg.classList.remove('is-crying');
-                // 重触发 shake 动画
-                void svg.offsetWidth;
-                svg.classList.add('is-crying');
-                var duration = (opts && opts.duration) || 4200;
-                cryTimer = setTimeout(function () {
-                    window.setHeroMood('normal');
-                }, duration);
-            } else {
-                isCrying = false;
-                svg.classList.remove('is-crying');
-            }
-        };
-
-        function initEyeTrack() {
-            var svg = document.getElementById('heroSvg');
-            if (!svg) return;
-
-            var formPanel = document.querySelector('.form-panel');
-            var pupils = [].slice.call(svg.querySelectorAll('[data-pupil]')).map(function (el) {
-                return {
-                    el: el,
-                    parent: el.parentNode,
-                    baseX: parseFloat(el.getAttribute('cx') || 0),
-                    baseY: parseFloat(el.getAttribute('cy') || 0),
-                    max: parseFloat(el.getAttribute('data-max') || 6),
-                    ox: 0,
-                    oy: 0
-                };
-            });
-            if (!pupils.length) return;
-
-            var targetX = null;
-            var targetY = null;
-            var hasPointer = false;
-            var focusedInput = null;
-            var shyMode = false;
-
-            function setTarget(x, y) {
-                targetX = x;
-                targetY = y;
-            }
-
-            function clearTarget() {
-                if (!focusedInput) {
-                    targetX = null;
-                    targetY = null;
-                }
-            }
-
-            function lookAtInput(input) {
-                if (!input) return;
-                var rect = input.getBoundingClientRect();
-                var x = rect.left + Math.min(rect.width * 0.35, 48);
-                var y = rect.top + rect.height / 2;
-
-                try {
-                    if (typeof input.selectionStart === 'number' && input.type !== 'password') {
-                        var style = window.getComputedStyle(input);
-                        var mirror = document.createElement('span');
-                        mirror.style.cssText = [
-                            'position:absolute', 'visibility:hidden', 'white-space:pre',
-                            'font:' + style.font, 'letter-spacing:' + style.letterSpacing,
-                            'padding-left:' + style.paddingLeft, 'border-left:' + style.borderLeftWidth + ' solid transparent'
-                        ].join(';');
-                        var text = (input.value || '').slice(0, input.selectionStart);
-                        mirror.textContent = text || '.';
-                        document.body.appendChild(mirror);
-                        var caretOffset = mirror.getBoundingClientRect().width;
-                        document.body.removeChild(mirror);
-                        if (!text) caretOffset = 0;
-                        x = rect.left + parseFloat(style.paddingLeft || 0) + Math.min(caretOffset, rect.width - 12);
-                    }
-                } catch (e) { /* ignore */ }
-
-                if (shyMode) {
-                    x = rect.left + rect.width * 0.5;
-                    y = rect.top + rect.height + 18;
-                }
-
-                setTarget(x, y);
-            }
-
-            function onPointerMove(e) {
-                if (isCrying) return; // 哭脸时低头不追鼠标
-                var p = (e.touches && e.touches[0]) ? e.touches[0] : e;
-                if (typeof p.clientX !== 'number') return;
-                hasPointer = true;
-                if (shyMode && focusedInput) {
-                    lookAtInput(focusedInput);
-                    return;
-                }
-                setTarget(p.clientX, p.clientY);
-            }
-
-            function onPointerLeave() {
-                hasPointer = false;
-                if (focusedInput) {
-                    lookAtInput(focusedInput);
-                } else {
-                    clearTarget();
-                }
-            }
-
-            function isTrackableInput(el) {
-                if (!el || el.tagName !== 'INPUT') return false;
-                var t = (el.type || 'text').toLowerCase();
-                return t === 'text' || t === 'password' || t === 'email' || t === 'tel' || t === 'number' || t === 'search';
-            }
-
-            function onFocusIn(e) {
-                var el = e.target;
-                if (!isTrackableInput(el)) return;
-                if (formPanel && !formPanel.contains(el) && !el.closest('.modal-overlay')) return;
-                focusedInput = el;
-                shyMode = (el.type || '').toLowerCase() === 'password';
-                if (!isCrying) lookAtInput(el);
-            }
-
-            function onFocusOut(e) {
-                if (e.target !== focusedInput) return;
-                focusedInput = null;
-                shyMode = false;
-                if (!hasPointer && !isCrying) clearTarget();
-            }
-
-            function onInputOrSelect(e) {
-                // 用户开始改输入：收起哭脸
-                if (isCrying && isTrackableInput(e.target)) {
-                    window.setHeroMood('normal');
-                }
-                if (e.target === focusedInput && !isCrying) lookAtInput(focusedInput);
-            }
-
-            function tick() {
-                pupils.forEach(function (p) {
-                    var dx = 0, dy = 0;
-                    if (isCrying) {
-                        // 哭脸：瞳孔往下看
-                        dx = 0;
-                        dy = p.max;
-                    } else if (targetX != null && targetY != null) {
-                        var pt = svg.createSVGPoint();
-                        pt.x = targetX;
-                        pt.y = targetY;
-                        var m = p.parent && p.parent.getScreenCTM ? p.parent.getScreenCTM() : null;
-                        if (m) {
-                            var lp = pt.matrixTransform(m.inverse());
-                            dx = lp.x - p.baseX;
-                            dy = lp.y - p.baseY;
-                        }
-                    }
-                    var d = Math.sqrt(dx * dx + dy * dy) || 1;
-                    var mm = Math.min(p.max, d);
-                    var tx = dx / d * mm;
-                    var ty = dy / d * mm;
-                    if (shyMode && !isCrying) {
-                        ty = Math.min(p.max, Math.max(ty, p.max * 0.55));
-                    }
-                    var ease = isCrying ? 0.2 : (focusedInput ? 0.28 : 0.22);
-                    p.ox += (tx - p.ox) * ease;
-                    p.oy += (ty - p.oy) * ease;
-                    if (targetX == null && !isCrying) {
-                        p.ox += (0 - p.ox) * 0.12;
-                        p.oy += (0 - p.oy) * 0.12;
-                    }
-                    p.el.setAttribute('transform', 'translate(' + p.ox.toFixed(3) + ' ' + p.oy.toFixed(3) + ')');
-                });
-                requestAnimationFrame(tick);
-            }
-
-            document.addEventListener('mousemove', onPointerMove, { passive: true });
-            document.addEventListener('pointermove', onPointerMove, { passive: true });
-            document.addEventListener('touchmove', onPointerMove, { passive: true });
-            document.addEventListener('mouseleave', onPointerLeave, { passive: true });
-            window.addEventListener('blur', onPointerLeave, { passive: true });
-
-            document.addEventListener('focusin', onFocusIn, true);
-            document.addEventListener('focusout', onFocusOut, true);
-            document.addEventListener('input', onInputOrSelect, true);
-            document.addEventListener('keyup', onInputOrSelect, true);
-            document.addEventListener('click', onInputOrSelect, true);
-            document.addEventListener('select', onInputOrSelect, true);
-
-            window.addEventListener('resize', function () {
-                if (focusedInput && !isCrying) lookAtInput(focusedInput);
-            }, { passive: true });
-
-            requestAnimationFrame(tick);
-        }
-
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', initEyeTrack);
-        } else {
-            initEyeTrack();
-        }
-    })();
-</script>
-<script>
-    /* 左栏节点网络：慢漂移 + 近距连线，不挡角色 SVG */
-    (function () {
-        if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-
-        var canvas = document.getElementById('heroNetCanvas');
-        if (!canvas) return;
-        var ctx = canvas.getContext('2d');
-        if (!ctx) return;
-
-        var panel = canvas.parentElement;
-        var nodes = [];
-        var dpr = Math.min(window.devicePixelRatio || 1, 2);
-        var w = 0, h = 0, running = true, raf = 0;
-
-        function isDark() {
-            return document.documentElement.dataset.theme === 'dark';
-        }
-
-        function resize() {
-            var rect = panel.getBoundingClientRect();
-            w = Math.max(1, Math.floor(rect.width));
-            h = Math.max(1, Math.floor(rect.height));
-            canvas.width = Math.floor(w * dpr);
-            canvas.height = Math.floor(h * dpr);
-            canvas.style.width = w + 'px';
-            canvas.style.height = h + 'px';
-            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-            seedNodes();
-        }
-
-        function seedNodes() {
-            var count = Math.max(18, Math.min(36, Math.floor((w * h) / 14000)));
-            nodes = [];
-            for (var i = 0; i < count; i++) {
-                nodes.push({
-                    x: Math.random() * w,
-                    y: Math.random() * h,
-                    vx: (Math.random() - 0.5) * 0.28,
-                    vy: (Math.random() - 0.5) * 0.28,
-                    r: 1.2 + Math.random() * 1.8
-                });
-            }
-        }
-
-        function step() {
-            if (!running) return;
-            var dark = isDark();
-            var lineBase = dark ? '77,158,255' : '99,102,241';
-            var nodeFill = dark ? 'rgba(125, 211, 252, 0.85)' : 'rgba(79, 70, 229, 0.75)';
-            var maxDist = Math.min(140, Math.max(90, w * 0.22));
-
-            ctx.clearRect(0, 0, w, h);
-
-            for (var i = 0; i < nodes.length; i++) {
-                var n = nodes[i];
-                n.x += n.vx;
-                n.y += n.vy;
-                if (n.x < -8) n.x = w + 8;
-                if (n.x > w + 8) n.x = -8;
-                if (n.y < -8) n.y = h + 8;
-                if (n.y > h + 8) n.y = -8;
-            }
-
-            for (var a = 0; a < nodes.length; a++) {
-                for (var b = a + 1; b < nodes.length; b++) {
-                    var dx = nodes[a].x - nodes[b].x;
-                    var dy = nodes[a].y - nodes[b].y;
-                    var dist = Math.sqrt(dx * dx + dy * dy);
-                    if (dist > maxDist) continue;
-                    var alpha = (1 - dist / maxDist) * (dark ? 0.28 : 0.22);
-                    ctx.strokeStyle = 'rgba(' + lineBase + ',' + alpha.toFixed(3) + ')';
-                    ctx.lineWidth = 1;
-                    ctx.beginPath();
-                    ctx.moveTo(nodes[a].x, nodes[a].y);
-                    ctx.lineTo(nodes[b].x, nodes[b].y);
-                    ctx.stroke();
-                }
-            }
-
-            for (var k = 0; k < nodes.length; k++) {
-                var p = nodes[k];
-                ctx.beginPath();
-                ctx.fillStyle = nodeFill;
-                ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.beginPath();
-                ctx.fillStyle = dark ? 'rgba(77,158,255,0.12)' : 'rgba(99,102,241,0.1)';
-                ctx.arc(p.x, p.y, p.r * 3.2, 0, Math.PI * 2);
-                ctx.fill();
-            }
-
-            raf = requestAnimationFrame(step);
-        }
-
-        function onVisibility() {
-            if (document.hidden) {
-                running = false;
-                if (raf) cancelAnimationFrame(raf);
-            } else {
-                running = true;
-                raf = requestAnimationFrame(step);
-            }
-        }
-
-        var ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(function () { resize(); }) : null;
-        if (ro) ro.observe(panel);
-        window.addEventListener('resize', resize, { passive: true });
-        document.addEventListener('visibilitychange', onVisibility);
-
-        // 主题切换后下一帧自动读 isDark
-        resize();
-        raf = requestAnimationFrame(step);
+        var button = document.getElementById('loginPasswordToggle');
+        var password = document.getElementById('password');
+        if (!button || !password) return;
+        button.addEventListener('click', function () {
+            var showing = password.type === 'password';
+            password.type = showing ? 'text' : 'password';
+            button.setAttribute('aria-pressed', String(showing));
+            button.setAttribute('aria-label', showing ? button.dataset.hideLabel : button.dataset.showLabel);
+            password.focus({ preventScroll: true });
+        });
     })();
 </script>
 <script src="/js/login/login_user_v1.js"></script>
+<script src="/js/login/login_map.js?v=20260913b" defer></script>
 </body>
 </html>

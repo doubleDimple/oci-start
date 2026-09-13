@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="zh" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#09161c" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>OCI-START</title>
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem('oci_theme') || 'light'
+          if (t === 'system') {
+            t = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
+          }
+          var theme = t === 'dark' ? 'dark' : 'light'
+          document.documentElement.setAttribute('data-theme', theme)
+          document.documentElement.classList.toggle('dark', theme === 'dark')
+        } catch (e) {}
+      })()
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

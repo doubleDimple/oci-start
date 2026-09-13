@@ -1,0 +1,122 @@
+.subscription-page {
+  .list-toolbar { gap: 8px; }
+  .tenant-search { flex-basis: 180px; max-width: 280px; }
+  .status-filter { width: 130px; }
+  .status-filter :deep(.el-select__wrapper) { min-height: 36px; border-radius: 10px; font-size: 12px; }
+  .subscription-tabs {
+    display: inline-flex; gap: 2px; flex: none; padding: 3px; border-radius: 12px; background: var(--bg-search);
+    button {
+      display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+      min-height: 30px; padding: 5px 11px; border: 0; border-radius: 9px;
+      background: transparent; color: var(--text-secondary); font: 500 12px var(--sans);
+      white-space: nowrap; cursor: pointer;
+      transition: color 180ms ease, background-color 180ms ease, box-shadow 180ms ease;
+      &[aria-selected='true'] { color: var(--text-primary); background: var(--bg-card); box-shadow: var(--shadow-card); }
+      span { color: var(--text-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+    }
+  }
+  .subscription-table { min-width: 680px; }
+  .subscription-table td { height: 52px; padding-top: 8px; padding-bottom: 8px; }
+  .key-column { width: 100px; }
+  .checkbox-column { width: 44px; padding-right: 4px; }
+  input[type='checkbox'] { width: 16px; height: 16px; margin: 0; vertical-align: middle; accent-color: var(--brand); cursor: pointer; }
+  input[type='checkbox']:disabled { cursor: default; }
+  .subscription-table tr.is-selected > td { background: color-mix(in srgb, var(--brand) 5%, var(--bg-card)); }
+  .subscription-table tr.is-selected:hover > td { background: color-mix(in srgb, var(--brand) 9%, var(--bg-card)); }
+  .row-actions-column { width: 105px; min-width: 105px; text-align: right; }
+  .row-actions { gap: 2px; }
+  .row-actions .toolbar-button { width: 32px; height: 32px; }
+  .cell-link, .region-code { font-weight: 500; white-space: nowrap; }
+  .region-location { color: var(--text-secondary); }
+  .home-region { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--brand); }
+  .home-region i { font-size: 16px; }
+  .secondary-region { font-size: 12px; color: var(--text-muted); }
+  .subscribe-row {
+    display: inline-flex; align-items: center; gap: 4px; min-height: 32px; padding: 5px 9px;
+    border: 1px solid color-mix(in srgb, var(--brand) 18%, transparent); border-radius: 9px;
+    background: transparent; color: var(--brand); font: 500 12px var(--sans); cursor: pointer;
+    transition: background-color 160ms ease, transform 160ms ease;
+    &:not(:disabled):hover { background: var(--status-ok-bg); }
+    &:not(:disabled):active { transform: scale(.97); }
+    &:disabled { opacity: .5; cursor: default; }
+  }
+  .selection-context { padding-bottom: 10px; }
+  .selection-context button:disabled { opacity: .5; cursor: default; }
+  .check-error { display: block; max-width: 420px; margin-top: 6px; font-size: 12px; color: var(--status-danger); overflow-wrap: anywhere; }
+  .operation-notice {
+    display: flex; flex-shrink: 0; align-items: center; gap: 9px; padding: 10px 14px; margin: 0 18px 10px;
+    border-radius: 10px; color: var(--brand); background: var(--status-ok-bg); font-size: 12px;
+    > i { flex: none; font-size: 17px; }
+    > span { flex: 1; }
+    button { flex: none; padding: 3px 0; border: 0; background: transparent; color: inherit; font: 500 12px var(--sans); cursor: pointer; }
+    &.has-failures { color: var(--status-warn); background: var(--status-warn-bg); }
+  }
+  .footer-context { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 16px; min-width: 0; font-variant-numeric: tabular-nums; }
+  .tenant-context { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); }
+  .summary-retry { display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: transparent; color: var(--status-warn); font: inherit; cursor: pointer; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  button:focus-visible, input[type='checkbox']:focus-visible, .table-stage:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+  .table-stage:focus-visible { outline-offset: -2px; }
+  .tenant-search input::-webkit-search-cancel-button { display: none; }
+}
+.region-key { font-family: var(--mono, ui-monospace, monospace); font-size: 12px; font-weight: 500; letter-spacing: .015em; }
+.tenant-status { display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px; border-radius: var(--r-pill); font-size: 11px; font-weight: 500; white-space: nowrap; }
+.subscription-status-ready { background: var(--status-ok-bg); color: var(--status-ok); }
+.subscription-status-progress { background: var(--status-warn-bg); color: var(--status-warn); }
+.subscription-status-failed { background: var(--status-danger-bg); color: var(--status-danger); }
+.subscription-status-unknown { background: var(--bg-search); color: var(--text-secondary); }
+.region-details {
+  margin: 0;
+  > div { display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 16px; padding: 13px 0; border-bottom: 1px solid color-mix(in srgb, var(--border) 40%, transparent); }
+  > div:last-child { border: 0; }
+  dt { color: var(--text-secondary); font-size: 13px; }
+  dd { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; color: var(--text-primary); font-size: 13px; overflow-wrap: anywhere; }
+  .raw-status { color: var(--text-muted); font-size: 10px; }
+}
+.dialog-description { margin: 0 0 16px; font-size: 14px; line-height: 1.6; color: var(--text-primary); }
+.dialog-hint { margin: 16px 0 0; color: var(--text-secondary); font-size: 12px; line-height: 1.7; }
+.dialog-error { padding: 10px 12px; border-radius: 9px; background: var(--status-danger-bg); color: var(--status-danger); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.subscription-targets, .subscription-results {
+  max-height: min(330px, 42vh); margin: 0; padding: 0; overflow: auto; overscroll-behavior: contain; list-style: none;
+  border: 1px solid color-mix(in srgb, var(--border) 50%, transparent); border-radius: 12px;
+  li { padding: 12px 14px; border-bottom: 1px solid color-mix(in srgb, var(--border) 35%, transparent); font-size: 12px; }
+  li:last-child { border-bottom: 0; }
+}
+.subscription-targets li { display: flex; align-items: baseline; gap: 12px; overflow-wrap: anywhere; }
+.subscription-targets .region-key, .result-region .region-key { width: 45px; flex: none; color: var(--text-secondary); }
+.result-intro {
+  display: flex; align-items: flex-start; gap: 12px; margin-bottom: 18px; color: var(--brand);
+  > i { flex: none; margin-top: 1px; font-size: 25px; }
+  strong { font-size: 15px; font-weight: 600; }
+  p { margin: 6px 0 0; color: var(--text-secondary); font-size: 12px; line-height: 1.7; }
+  &.has-failures { color: var(--status-warn); }
+}
+.result-region { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; color: var(--text-primary); overflow-wrap: anywhere; }
+.result-state { margin-left: auto; color: var(--text-muted); font-size: 11px; }
+.result-success { color: var(--status-ok); }
+.result-failed { color: var(--status-danger); }
+.subscription-results li p { margin: 6px 0 0 53px; color: var(--text-secondary); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.dialog-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; padding-top: 10px; }
+.subscription-spin { animation: subscription-spin 1000ms linear infinite; }
+@keyframes subscription-spin { to { transform: rotate(360deg); } }
+@media (max-width: 1000px) {
+  .subscription-page .tenant-search { max-width: none; }
+  .subscription-page .status-filter { width: 120px; }
+}
+@media (max-width: 700px) {
+  .subscription-page {
+    .subscription-tabs { flex: 1; }
+    .subscription-tabs button { flex: 1; min-height: 34px; }
+    .tenant-search { order: 2; flex: 1 1 180px; width: auto; }
+    .status-filter { order: 2; width: 130px; }
+    .toolbar-actions { order: 3; }
+    .list-footer { padding: 10px 12px; }
+    .footer-context { font-size: 11px; }
+    .operation-notice { margin-right: 12px; margin-left: 12px; }
+  }
+  .region-details > div { grid-template-columns: 80px minmax(0, 1fr); gap: 12px; }
+  .subscription-targets li { flex-wrap: wrap; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .subscription-page *, .subscription-spin { animation: none !important; transition: none !important; }
+}

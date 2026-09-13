@@ -142,6 +142,10 @@ thirdApi:
 oci:
   version: 5.7.92
   ssh-version: v-5.7.92
+  web:
+    # IDEA 点 OciServerApplication 时自动 pnpm run dev；生产 jar 找不到 oci-start-web 会跳过
+    auto-start: true
+    port: 5173
 
 ssl:
   staging: false

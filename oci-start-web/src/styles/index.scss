@@ -1,0 +1,96 @@
+/* Element Plus 贴到当前 token：圆角、字色、表格在亮/暗下都可读 */
+
+// Keep the shared theme above asynchronously loaded component styles.
+:root {
+  .el-button {
+    border-radius: var(--r-btn);
+    font-weight: 600;
+    font-family: var(--sans);
+  }
+  .el-button--primary {
+    --el-button-bg-color: var(--brand);
+    --el-button-border-color: var(--brand);
+    --el-button-hover-bg-color: var(--brand-hover);
+    --el-button-hover-border-color: var(--brand-hover);
+  }
+
+  .el-card {
+    border-radius: var(--r-card);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-card);
+    background: var(--bg-card);
+    color: var(--text-primary);
+  }
+
+  .el-dialog {
+    border-radius: var(--r-card);
+    box-shadow: var(--shadow-card);
+    background: var(--bg-card);
+    color: var(--text-primary);
+  }
+
+  .el-input__wrapper,
+  .el-select__wrapper {
+    border-radius: var(--r-pill);
+    background: var(--bg-search);
+    box-shadow: none;
+    color: var(--text-primary);
+  }
+  .el-input__inner,
+  .el-select__placeholder,
+  .el-select__selected-item {
+    color: var(--text-primary);
+    font-family: var(--sans);
+  }
+  .el-input__inner::placeholder {
+    color: var(--text-muted);
+  }
+
+  .el-dropdown-menu {
+    border-radius: 14px;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-card);
+    padding: 6px;
+    background: var(--bg-card);
+    color: var(--text-primary);
+  }
+
+  .el-message-box {
+    border-radius: var(--r-card);
+    background: var(--bg-card);
+    color: var(--text-primary);
+  }
+
+  .el-pagination {
+    --el-pagination-hover-color: var(--brand);
+    --el-pagination-button-color: var(--text-primary);
+    --el-pagination-button-bg-color: var(--bg-card);
+    --el-pagination-button-disabled-bg-color: var(--bg-card);
+    --el-text-color-primary: var(--text-primary);
+  }
+
+  .el-table {
+    --el-table-bg-color: var(--bg-card);
+    --el-table-tr-bg-color: var(--bg-card);
+    --el-table-header-bg-color: var(--bg-card);
+    --el-table-row-hover-bg-color: var(--bg-hover);
+    --el-table-text-color: var(--text-primary);
+    --el-table-header-text-color: var(--text-secondary);
+    --el-table-border-color: var(--border);
+    --el-table-header-border-color: var(--border);
+    font-family: var(--sans);
+    font-size: 14px;
+    color: var(--text-primary);
+  }
+  .el-table th.el-table__cell {
+    font-weight: 600;
+    color: var(--text-secondary);
+  }
+  .el-table .el-table__cell {
+    color: var(--text-primary);
+  }
+
+  .el-loading-mask {
+    background-color: color-mix(in srgb, var(--bg-card) 72%, transparent);
+  }
+}

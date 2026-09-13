@@ -18,6 +18,7 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -69,6 +70,9 @@ public class IndexController  extends BaseController {
                              Model model) {
         model.addAttribute("initialPath", path != null ? path : "/boot/dashboard");
         model.addAttribute("activePage", active != null ? active : "api-dashboard");
+        if (new ClassPathResource("static/index.html").exists()) {
+            return "forward:/index.html";
+        }
         return "layout";
     }
 

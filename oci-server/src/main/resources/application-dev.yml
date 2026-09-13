@@ -100,3 +100,6 @@ thirdApi:
 
 oci:
   version: 5.1.8
+  web:
+    auto-start: true
+    port: 5173

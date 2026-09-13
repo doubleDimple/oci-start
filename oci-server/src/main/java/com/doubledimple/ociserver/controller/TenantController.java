@@ -245,6 +245,8 @@ public class TenantController extends BaseController{
                 return ResponseEntity.ok(Collections.emptyList());
             }
             for (Tenant t : tenants) {
+                // JSON 数字可能超出浏览器的安全整数范围，沿用列表页的字符串标识。
+                t.setIdStr(String.valueOf(t.getId()));
                 t.setChildren(null);
             }
             return ResponseEntity.ok(tenants);

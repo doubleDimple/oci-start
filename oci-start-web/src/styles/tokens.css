@@ -1,0 +1,155 @@
+/* 布局真源：design/img.png。字色/字体：Apple Store（SF / 苹方，近黑墨色）。主色仍是森林绿。 */
+
+:root {
+  color-scheme: light;
+  --bg-app: #f5f5f7;
+  --bg-page: #f5f5f7;
+  --bg-sidebar: #1d1d1f;
+  --bg-card: #ffffff;
+  --bg-search: #f5f5f7;
+  --bg-hover: #f5f5f7;
+  --text-primary: #1d1d1f;
+  --text-secondary: #6e6e73;
+  --text-muted: #86868b;
+  --text-on-dark: #f5f5f7;
+  --text-on-dark-muted: #a1a1a6;
+  --brand: #1b8a6a;
+  --brand-hover: #157456;
+  --brand-deep: #0d4d3f;
+  --nav-active-fg: #ffffff;
+  --border: #d2d2d7;
+  --border-strong: #d2d2d7;
+  --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.04);
+  --status-ok: #1b8a6a;
+  --status-ok-bg: #e8f6f1;
+  --status-info: #0071e3;
+  --status-info-bg: #e8f1fb;
+  --status-warn: #b45309;
+  --status-warn-bg: #fff6e0;
+  --status-danger: #e24b4a;
+  --status-danger-bg: #fdeeee;
+  --icon-mint: #e8f6f1;
+  --icon-lavender: #eee9fe;
+  --icon-blue: #e8f1fb;
+  --icon-peach: #fff1e4;
+  --btn-dark: #1d1d1f;
+  --btn-dark-hover: #2d2d2f;
+
+  /* Map palettes follow design/dot-world-map.html; the console keeps its own theme. */
+  --region-map-dark-surface: #0a1420;
+  --region-map-dark-land: #22506b;
+  --region-map-dark-text: #dcecf3;
+  --region-map-dark-muted: #6f93a8;
+  --region-map-light-surface: #ffffff;
+  --region-map-light-land: #c3d2dc;
+  --region-map-light-text: #25323d;
+  --region-map-light-muted: #7d8c99;
+  --region-map-grid: #0f3247;
+  --region-map-arm: #f4b760;
+  --region-map-mine: #4fe3c1;
+
+  --r-btn: 12px;
+  --r-pill: 999px;
+  --r-card: 18px;
+  --r-sm: 10px;
+  --side-width: 220px;
+  --side-collapsed: 76px;
+  --topbar-h: 56px;
+
+  --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+          "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Microsoft YaHei",
+          "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --el-color-primary: var(--brand);
+  --el-color-primary-light-3: color-mix(in srgb, var(--brand) 70%, #fff);
+  --el-color-primary-light-5: color-mix(in srgb, var(--brand) 50%, #fff);
+  --el-color-primary-light-7: color-mix(in srgb, var(--brand) 30%, #fff);
+  --el-color-primary-light-8: color-mix(in srgb, var(--brand) 20%, #fff);
+  --el-color-primary-light-9: color-mix(in srgb, var(--brand) 12%, #fff);
+  --el-color-primary-dark-2: var(--brand-hover);
+  --el-color-success: var(--status-ok);
+  --el-color-warning: var(--status-warn);
+  --el-color-danger: var(--status-danger);
+  --el-color-info: var(--status-info);
+  --el-bg-color: var(--bg-card);
+  --el-bg-color-page: var(--bg-page);
+  --el-text-color-primary: var(--text-primary);
+  --el-text-color-regular: var(--text-primary);
+  --el-text-color-secondary: var(--text-secondary);
+  --el-text-color-placeholder: var(--text-muted);
+  --el-border-color: var(--border);
+  --el-border-color-light: var(--border);
+  --el-border-color-lighter: var(--border);
+  --el-fill-color: var(--bg-search);
+  --el-fill-color-light: var(--bg-hover);
+  --el-fill-color-blank: var(--bg-card);
+  --el-fill-color-lighter: var(--bg-page);
+  --el-disabled-text-color: var(--text-muted);
+  --el-mask-color: rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg-app: #000000;
+  --bg-page: #000000;
+  --bg-sidebar: #000000;
+  --bg-card: #1d1d1f;
+  --bg-search: #2c2c2e;
+  --bg-hover: #2c2c2e;
+  --text-primary: #f5f5f7;
+  --text-secondary: #a1a1a6;
+  --text-muted: #6e6e73;
+  --text-on-dark: #f5f5f7;
+  --text-on-dark-muted: #a1a1a6;
+  --border: #424245;
+  --border-strong: #565658;
+  --shadow-card: 0 2px 16px rgba(0, 0, 0, 0.45);
+  --status-ok-bg: #16352c;
+  --status-info-bg: #13263a;
+  --status-warn-bg: #3a2c12;
+  --status-danger-bg: #3a1616;
+  --icon-mint: #16352c;
+  --icon-lavender: #2a2640;
+  --icon-blue: #13263a;
+  --icon-peach: #3a2a16;
+  --btn-dark: #f5f5f7;
+  --btn-dark-hover: #ffffff;
+  --el-bg-color: var(--bg-card);
+  --el-bg-color-page: var(--bg-page);
+  --el-text-color-primary: var(--text-primary);
+  --el-text-color-regular: var(--text-primary);
+  --el-text-color-secondary: var(--text-secondary);
+  --el-text-color-placeholder: var(--text-muted);
+  --el-border-color: var(--border);
+  --el-border-color-light: var(--border);
+  --el-border-color-lighter: var(--border);
+  --el-fill-color: var(--bg-search);
+  --el-fill-color-light: var(--bg-hover);
+  --el-fill-color-blank: var(--bg-card);
+  --el-fill-color-lighter: var(--bg-page);
+  --el-disabled-text-color: var(--text-muted);
+  --el-mask-color: rgba(0, 0, 0, 0.65);
+}
+
+html, body, #app {
+  height: 100%;
+  margin: 0;
+  background: var(--bg-page);
+  color: var(--text-primary);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.47;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4 {
+  font-weight: 600;
+  letter-spacing: -0.022em;
+  color: var(--text-primary);
+}
+
+* { box-sizing: border-box; }
