@@ -1,13 +1,10 @@
 package com.doubledimple.ociserver.controller;
 
-import com.alibaba.fastjson2.JSON;
 import com.doubledimple.dao.entity.BootInstance;
 import com.doubledimple.dao.entity.Tenant;
-import com.doubledimple.dao.entity.TrafficAlert;
 import com.doubledimple.ocicommon.enums.RegionEnum;
 import com.doubledimple.ociserver.config.context.UserContext;
 import com.doubledimple.ociserver.config.exception.OciExceptionFactory;
-import com.doubledimple.ociserver.pojo.domain.query.BootInstanceQuery;
 import com.doubledimple.ociserver.pojo.dto.TenantTransferRequest;
 import com.doubledimple.ociserver.pojo.request.AuditLogRequest;
 import com.doubledimple.ociserver.pojo.request.DeleteOciUserRequest;
@@ -27,7 +24,6 @@ import com.doubledimple.ociserver.pojo.request.TenantDTO;
 import com.doubledimple.ociserver.pojo.request.TrafficAlertDTO;
 import com.doubledimple.ociserver.pojo.response.AccountCheckRes;
 import com.doubledimple.ocicommon.param.ApiResponse;
-import com.doubledimple.ociserver.pojo.response.BootInstanceRes;
 import com.doubledimple.ociserver.pojo.response.BootVolumeRes;
 import com.doubledimple.ociserver.pojo.response.OciGroupResp;
 import com.doubledimple.ociserver.pojo.response.TenantResp;
@@ -42,20 +38,16 @@ import com.doubledimple.ociserver.utils.oracle.MFAUtils;
 import com.doubledimple.ociserver.utils.oracle.OciLimitsUtils;
 import com.doubledimple.ociserver.utils.oracle.notify.NotificationUtils;
 import com.doubledimple.ociserver.utils.oracle.region.OciRegionSubscriptionUtils;
-import com.oracle.bmc.limits.model.ResourceAvailability;
 import com.oracle.bmc.core.responses.UpdateBootVolumeResponse;
 import com.oracle.bmc.identity.model.Region;
 import com.oracle.bmc.identity.model.RegionSubscription;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import com.doubledimple.ociserver.config.context.UserContext;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -71,8 +63,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-
-import static com.doubledimple.ociserver.utils.DesktopUtils.isMobileRequest;
 
 /**
  * @author doubleDimple
@@ -100,88 +90,6 @@ public class TenantController extends BaseController{
 
     @Resource
     VerifyService verifyService;
-
-
-
-    /**
-    * 租户列表
-    */
-    @GetMapping("/list")
-    public String listUsers(@RequestParam(defaultValue = "10") int size,
-                            @RequestParam(defaultValue = "0") int page,
-                            @RequestParam(required = false) String keyword,
-                            @RequestParam(required = false) Integer cloudType,
-                            HttpServletRequest request,
-                            Model model) {
-
-        boolean mobileRequest = isMobileRequest(request);
-        if (null == cloudType) cloudType = 1;
-        if (mobileRequest && size == 10) {
-            size = 20;
-        }
-        int adjustedPage = Math.max(0, page);
-
-        Page<Tenant> userPage;
-
-        try {
-            if (keyword != null && !keyword.trim().isEmpty()) {
-                userPage = tenantService.searchTenants(keyword, cloudType, adjustedPage, size);
-                model.addAttribute("keyword", keyword);
-            } else {
-                userPage = tenantService.getAllTenants(cloudType, adjustedPage, size);
-            }
-
-            log.debug("获取租户列表JSON成功,结果是:{}", JSON.toJSONString(userPage.getContent()));
-            model.addAttribute("tenants", userPage.getContent());
-            model.addAttribute("cloudType", cloudType);
-            model.addAttribute("currentPage", userPage.getNumber()); // Spring的page从0开始
-            model.addAttribute("totalPages", userPage.getTotalPages());
-            model.addAttribute("totalElements", userPage.getTotalElements());
-            model.addAttribute("size", size);
-            model.addAttribute("keyword", keyword);
-
-            // 分页计算
-            model.addAttribute("hasPrevious", userPage.hasPrevious());
-            model.addAttribute("hasNext", userPage.hasNext());
-            model.addAttribute("isFirst", userPage.isFirst());
-            model.addAttribute("isLast", userPage.isLast());
-
-            // 页码范围计算（用于PC端分页导航）
-            int startPage = Math.max(0, userPage.getNumber() - 2);
-            int endPage = Math.min(userPage.getTotalPages() - 1, userPage.getNumber() + 2);
-            model.addAttribute("startPage", startPage);
-            model.addAttribute("endPage", endPage);
-
-            // 用于移动端的分页信息
-            if (mobileRequest) {
-                Map<String, Object> paginationInfo = new HashMap<>();
-                paginationInfo.put("currentPage", userPage.getNumber());
-                paginationInfo.put("totalPages", userPage.getTotalPages());
-                paginationInfo.put("totalElements", userPage.getTotalElements());
-                paginationInfo.put("size", size);
-                paginationInfo.put("hasContent", userPage.hasContent());
-                paginationInfo.put("numberOfElements", userPage.getNumberOfElements());
-                model.addAttribute("paginationInfo", paginationInfo);
-            }
-
-            // 设置第一个租户ID（如果存在）
-            if (userPage.getContent().size() > 0) {
-                model.addAttribute("tenantId", String.valueOf(userPage.getContent().get(0).getId()));
-            }
-
-        } catch (Exception e) {
-            log.error("获取租户列表失败", e);
-            model.addAttribute("tenants", Collections.emptyList());
-            model.addAttribute("currentPage", 0);
-            model.addAttribute("totalPages", 0);
-            model.addAttribute("totalElements", 0);
-            model.addAttribute("size", size);
-            model.addAttribute("error", "加载数据失败，请稍后重试");
-        }
-        model.addAttribute("activePage", "api-management");
-        return "tenant_list";
-
-    }
 
     /**
      * 租户列表 JSON（AJAX分页）
@@ -217,22 +125,6 @@ public class TenantController extends BaseController{
     }
 
     /**
-     * 区域列表
-     */
-    @GetMapping("/regionList")
-    public String regionList(@RequestParam(defaultValue = "25") long tenantId,
-                            Model model,HttpServletRequest request) {
-        List<Tenant> tenants = tenantService.regionList(tenantId);
-        model.addAttribute("tenants", tenants);
-        model.addAttribute("activePage", "api-management");
-        if (tenants.size() > 0){
-            model.addAttribute("tenantId", String.valueOf(tenantId));
-        }
-        model.addAttribute("activePage", "api-management");
-        return "tenant_region_list";
-    }
-
-    /**
      * 租户详情区域列表 JSON（Mac 原生 / AJAX，对齐 regionList 页面数据）
      * <p>扁平行列表；清空嵌套 children，避免 {@code @JsonIdentityInfo} 把后续行序列化为 id 引用。
      */
@@ -254,20 +146,6 @@ public class TenantController extends BaseController{
             log.error("获取租户详情区域列表失败 tenantId={}", tenantId, e);
             return ResponseEntity.ok(Collections.emptyList());
         }
-    }
-
-    /**
-     * 区域订阅
-     */
-    @GetMapping("/regionSubList")
-    public String regionSubList(@RequestParam(defaultValue = "25") long tenantId,
-                                Model model, HttpServletRequest request) {
-        Tenant tenant = tenantService.getById(tenantId);
-        // 不再这里调用耗时的 regionSub 方法
-        model.addAttribute("tenantId", String.valueOf(tenantId));
-        model.addAttribute("tenant", tenant);
-        model.addAttribute("activePage", "api-management");
-        return "region_sub";
     }
 
     @GetMapping("/subscribed-regions-data")
@@ -476,37 +354,6 @@ public class TenantController extends BaseController{
         return ResponseEntity.ok(tenantService.getAllTenantsForDropdown());
     }
 
-    @GetMapping("/addSpeed")
-    public String addSpeedPage(Model model) {
-        model.addAttribute("tenant", new Tenant());
-        model.addAttribute("activePage", "api-management");
-        return "tenant_speed_add";
-    }
-
-    /**
-    * oci 添加机器页
-    */
-    @GetMapping("/bootPage")
-    public String addBootPage(Model model,@RequestParam("tenantId") Long id,HttpServletRequest request) {
-        model.addAttribute("tenantId", id);
-        model.addAttribute("activePage", "api-management");
-        return "add_boot";
-
-    }
-
-    /**
-     * gcp 添加机器页
-     */
-    @GetMapping("/gcpBootPage")
-    public String addGcpBootPage(Model model,@RequestParam("tenantId") Long id,HttpServletRequest request) {
-        model.addAttribute("tenantId", id);
-        model.addAttribute("activePage", "api-management");
-
-        return "gcp_add_boot";
-
-    }
-
-
     /**
     * @Description: 抢机配置
     * @Param: [com.doubledimple.dao.entity.BootInstance, org.springframework.web.servlet.mvc.support.RedirectAttributes, org.springframework.ui.Model, javax.servlet.http.HttpServletRequest]
@@ -532,9 +379,6 @@ public class TenantController extends BaseController{
         return ApiResponse.success(bootInstanceService.querySystemImage(imageInfoReq));
     }
 
-
-
-
     /**
     * 保存api信息
     */
@@ -552,7 +396,6 @@ public class TenantController extends BaseController{
             return ApiResponse.error("网络异常，请稍后重试");
         }
     }
-
 
     /**
      * 删除api
@@ -588,14 +431,13 @@ public class TenantController extends BaseController{
      * @return
      */
     @GetMapping(path = "/updateAccountDetail")
-    public String updateAccountDetail(@RequestParam("tenantId") String tenantId,Model model) {
+    public String updateAccountDetail(@RequestParam("tenantId") String tenantId) {
         try {
             tenantService.updateTenancyDetail(tenantId);
             //tenantService.updateAccountDetail(Long.valueOf(tenantId));
         } catch (Exception e) {
             log.warn("更新失败,原因为:{}",e.getMessage());
         }
-        model.addAttribute("activePage", "api-management");
         return "redirect:/tenants/list";
     }
 
@@ -615,33 +457,10 @@ public class TenantController extends BaseController{
         return emitter;
     }
 
-    @GetMapping("/bootList")
-    public String bootList(@RequestParam("tenantId") String tenantId,
-                            Model model,
-                           HttpServletRequest request,
-                           @RequestParam(value = "mobile",required = false) Boolean  mobile) {
-        BootInstanceQuery query = new BootInstanceQuery();
-        query.setTenantId(Long.valueOf(tenantId));
-        Pageable pageable = PageRequest.of(0, 1000);
-        Page<BootInstanceRes> bootPage = bootInstanceService.findBootInstances(query, pageable);
-        model.addAttribute("bootInstances", bootPage.getContent());
-        model.addAttribute("currentPage", 0);
-        model.addAttribute("totalPages", bootPage.getTotalPages());
-        model.addAttribute("activePage", "api-fullBootList");
-        if (isMobileRequest( request)){
-            return "mobile/full_machine_list";
-        }else{
-            return "full_machine_list";
-        }
-
-    }
-
-
     @PostMapping("test-instances")
     public void queryInstances(){
         //oracleInstanceService.queryInstanceByApis();
     }
-
 
     @GetMapping("/syncOci")
     @ResponseBody
@@ -690,12 +509,30 @@ public class TenantController extends BaseController{
     }
 
     /**
-    * @Description: 删除规则
-    * @Param: [java.lang.String]
-    * @return: org.springframework.http.ResponseEntity<?>
-    * @Author: doubleDimple
-    * @Date: 9/29/25 5:13 AM
+    * 修改原有安全规则，保留同一安全列表中的其他规则。
     */
+    @PutMapping("/security-rules/{id}")
+    public ResponseEntity<?> updateSecurityRule(@PathVariable String id, @RequestBody SecurityRuleDTO ruleDTO) {
+        try {
+            return ResponseEntity.ok(securityRuleService.updateSecurityRule(id, ruleDTO));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+        } catch (java.util.ConcurrentModificationException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.error(e.getMessage()));
+        } catch (com.oracle.bmc.model.BmcException e) {
+            log.warn("Failed to update security rule: {}", e.getMessage());
+            return ResponseEntity.status(e.getStatusCode() == 412 ? HttpStatus.CONFLICT : HttpStatus.BAD_GATEWAY)
+                    .body(ApiResponse.error(e.getStatusCode() == 412
+                            ? "Security rules changed. Refresh the list before editing again."
+                            : "Failed to update security rule: " + e.getMessage()));
+        } catch (Exception e) {
+            log.error("Failed to update security rule", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("Failed to update security rule: " + e.getMessage()));
+        }
+    }
+
+    /** 删除规则。 */
     @DeleteMapping("/security-rules/{id}")
     public ResponseEntity<?> deleteSecurityRule(@PathVariable String id) {
         try {
@@ -707,7 +544,6 @@ public class TenantController extends BaseController{
                     .body("Failed to delete security rule: " + e.getMessage());
         }
     }
-
 
     /**
     * @Description: createOciUser
@@ -791,7 +627,6 @@ public class TenantController extends BaseController{
         }
     }
 
-
     /**
      * 查询用户组
      */
@@ -840,8 +675,7 @@ public class TenantController extends BaseController{
     @GetMapping("/oracle-users-page")
     public ResponseEntity<List<UserRes>> getPageUsers(@RequestParam(defaultValue = "10") int size, // 默认改为20
                                                   @RequestParam(defaultValue = "0") int page,
-                                                  @RequestParam String tenantId,
-                                                      Model model) {
+                                                  @RequestParam String tenantId) {
         try {
             List<UserRes> users = tenantService.getPageUsers(tenantId).stream()
                     .map(user -> new UserRes
@@ -871,7 +705,6 @@ public class TenantController extends BaseController{
             return "Default";
         }
     }
-
 
     /**
      * 导出租户数据（增加验证逻辑）
@@ -964,7 +797,6 @@ public class TenantController extends BaseController{
     public SseEmitter checkAccountsStream() {
         return tenantService.streamAccountCheckProgress();
     }
-
 
     // 查询所有引导卷
     @GetMapping("boot-volumes")

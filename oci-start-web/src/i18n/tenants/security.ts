@@ -1,0 +1,28 @@
+export default {
+  zh: {
+    title: '安全规则', direction: '规则方向', ingress: '入站规则', egress: '出站规则', source: '来源 CIDR', destination: '目标 CIDR',
+    protocol: '协议', allProtocols: '所有协议', allPorts: '全部', ports: '端口范围', portsIcmp: '端口 / ICMP',
+    portsPlaceholder: '443 或 8000-8080；留空为全部端口', noPorts: '无需填写端口',
+    actions: '操作', refresh: '刷新', retry: '重新加载', addRule: '添加规则', add: '添加', save: '保存', edit: '编辑', delete: '删除', cancel: '取消',
+    empty: '暂无安全规则', count: '{count} 条规则', saved: '安全规则已保存', added: '安全规则已添加', deleted: '安全规则已删除',
+    invalidResponse: '安全规则返回格式异常，请刷新重试。', sourceRequired: '请填写{field}。',
+    portFormat: '填写一个端口或连续范围，例如 443 或 8000-8080；不连续端口请分别添加规则。',
+    portRange: '端口须在 0–65535 之间，范围起点不能大于终点。', unsupported: '当前服务暂不支持编辑安全规则，修改尚未保存。',
+    conflict: '安全规则已被更新，修改尚未保存。请取消编辑、刷新列表后重新选择规则。',
+    discardMessage: '尚未保存的规则修改将被舍弃。', discardTitle: '放弃修改？', discard: '放弃修改', keepEditing: '继续编辑',
+    deleteMessage: '删除 {protocol} · {address} 的{direction}？依赖此规则的网络连接可能中断。', deleteTitle: '删除安全规则', currentAddress: '当前地址',
+  },
+  en: {
+    title: 'Security rules', direction: 'Rule direction', ingress: 'Ingress rules', egress: 'Egress rules', source: 'Source CIDR', destination: 'Destination CIDR',
+    protocol: 'Protocol', allProtocols: 'All protocols', allPorts: 'All', ports: 'Port range', portsIcmp: 'Ports / ICMP',
+    portsPlaceholder: '443 or 8000-8080; empty means all ports', noPorts: 'No ports required',
+    actions: 'Actions', refresh: 'Refresh', retry: 'Reload', addRule: 'Add rule', add: 'Add', save: 'Save', edit: 'Edit', delete: 'Delete', cancel: 'Cancel',
+    empty: 'No security rules', count: '{count} rules', saved: 'Security rule saved', added: 'Security rule added', deleted: 'Security rule deleted',
+    invalidResponse: 'Invalid security rule response. Refresh and try again.', sourceRequired: 'Enter {field}.',
+    portFormat: 'Enter one port or a continuous range, such as 443 or 8000-8080. Add separate rules for noncontinuous ports.',
+    portRange: 'Ports must be between 0 and 65535, with the range start no greater than the end.', unsupported: 'This server does not support editing security rules yet. Your changes have not been saved.',
+    conflict: 'Security rules have changed. Your edit has not been saved. Cancel editing, refresh the list and select the rule again.',
+    discardMessage: 'Your unsaved rule changes will be discarded.', discardTitle: 'Discard changes?', discard: 'Discard changes', keepEditing: 'Keep editing',
+    deleteMessage: 'Delete {direction}: {protocol} · {address}? Connections that depend on this rule may be interrupted.', deleteTitle: 'Delete security rule', currentAddress: 'current address',
+  },
+}

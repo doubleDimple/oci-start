@@ -1,11 +1,18 @@
 <script setup lang="ts">
+import { ElTableColumn as BaseTableColumn } from 'element-plus'
+import PageErrorNotice from '@/components/PageErrorNotice.vue'
 import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute, useRouter } from 'vue-router'
 import type { TableInstance } from 'element-plus'
 import { fetchArmData, fetchMyRegions } from '@/api/resource'
 import { REGION_COORDINATES, englishRegionName, getContinent } from './regionCoords'
 import type { RegionGlobePoint } from './globeTypes'
 import GhostBtn from '@/components/GhostBtn.vue'
+import PagePagination from '@/components/PagePagination.vue'
+import MobileRecordList from '@/components/MobileRecordList.vue'
+import MobileRecordCard from '@/components/MobileRecordCard.vue'
+import { useCompactViewport } from '@/composables/useCompactViewport'
 
 const PAGE_SIZE = 10
 const REFRESH_MS = 5 * 60 * 1000
@@ -25,6 +32,7 @@ interface RegionRow extends Omit<RegionGlobePoint, 'lat' | 'lng'> {
 interface LoadProblem { key: string; detail: string }
 
 const { t, locale } = useI18n()
+const route = useRoute(), router = useRouter(), compact = useCompactViewport()
 const loading = ref(false)
 const armLoaded = ref(false)
 const mineLoaded = ref(false)
@@ -33,11 +41,14 @@ const mineLoading = ref(false)
 const lastUpdate = ref<Date | null>(null)
 const refreshClock = ref(Date.now())
 const loadProblems = ref<LoadProblem[]>([])
-const search = ref('')
-const continent = ref('all')
-const status = ref('all')
-const page = ref(1)
-const mapVisible = ref(true)
+const search = ref(typeof route.query.armSearch === 'string' ? route.query.armSearch : '')
+const continent = ref(routeContinent())
+const status = ref(routeStatus())
+const page = ref(routePage())
+function routePage() { const value = Number(route.query.armPage); return Number.isSafeInteger(value) && value > 0 ? value : 1 }
+function routeContinent() { const value = route.query.armContinent; return typeof value === 'string' && ['asia', 'europe', 'america-north', 'america-south', 'middle-east'].includes(value) ? value : 'all' }
+function routeStatus() { return route.query.armStatus === 'open' || route.query.armStatus === 'closed' ? route.query.armStatus : 'all' }
+const mapVisible = ref(!compact.value)
 const showArmRegions = ref(true)
 const showMyRegions = ref(true)
 const selectedRegion = ref<string | null>(null)
@@ -113,7 +124,13 @@ const allRows = computed<RegionRow[]>(() => {
     continent: getContinent(regionCode),
   })
   // Preserve every backend record, including regions missing from the fixed coordinate table.
-  const recorded = openRegions.value.map((record, index) => makeRow(record.region, 'record-' + index, record))
+  const occurrences = new Map<string, number>()
+  const recorded = openRegions.value.map(record => {
+    const identity = `${record.region}:${record.architectureType || ''}`
+    const occurrence = occurrences.get(identity) || 0
+    occurrences.set(identity, occurrence + 1)
+    return makeRow(record.region, `record-${identity}:${occurrence}`, record)
+  })
   const added = new Set(recorded.map(row => row.regionCode))
   const otherCodes = new Set([...Object.keys(REGION_COORDINATES), ...ownedRegionCodes.value])
   const remaining = [...otherCodes].filter(code => !added.has(code)).sort()
@@ -274,6 +291,15 @@ function locationHint(row: RegionRow) {
 async function scrollToSelection() {
   await nextTick()
   if (disposed) return
+  if (compact.value && tableArea.value) {
+    const selected = Array.from(tableArea.value.querySelectorAll<HTMLElement>('[data-region-code]')).find(element => element.dataset.regionCode === selectedRegion.value)
+    if (selected) {
+      const rowRect = selected.getBoundingClientRect(), viewport = tableArea.value.getBoundingClientRect()
+      if (rowRect.top < viewport.top) tableArea.value.scrollTop += rowRect.top - viewport.top
+      else if (rowRect.bottom > viewport.bottom) tableArea.value.scrollTop += rowRect.bottom - viewport.bottom
+    } else tableArea.value.scrollTop = 0
+    return
+  }
   const row = tableArea.value?.querySelector<HTMLElement>('[data-selected="true"]')?.closest('tr')
   const scroll = tableArea.value?.querySelector<HTMLElement>('.el-table__body-wrapper .el-scrollbar__wrap')
   if (!row || !scroll) { table.value?.setScrollTop(0); return }
@@ -284,10 +310,21 @@ async function scrollToSelection() {
 }
 function rowClassName({ row }: { row: RegionRow }) { return row.regionCode === selectedRegion.value ? 'region-selected-row' : '' }
 function updateVisibility() { pageActive.value = document.visibilityState !== 'hidden' }
-watch([search, continent, status], () => { page.value = 1 })
-watch(filteredRows, rows => {
-  page.value = Math.max(1, Math.min(page.value, Math.ceil(rows.length / PAGE_SIZE)))
+watch([search, continent, status], () => { page.value = 1 }, { flush: 'sync' })
+watch([filteredRows, loading], ([rows, pending]) => {
+  if (!pending && (armLoaded.value || mineLoaded.value)) page.value = Math.max(1, Math.min(page.value, Math.ceil(rows.length / PAGE_SIZE)))
 })
+watch(() => [route.query.armSearch, route.query.armContinent, route.query.armStatus, route.query.armPage], () => {
+  search.value = typeof route.query.armSearch === 'string' ? route.query.armSearch : ''
+  continent.value = routeContinent(); status.value = routeStatus(); page.value = routePage()
+})
+watch([search, continent, status, page], () => {
+  if (!compact.value) return
+  const state = { armSearch: search.value || undefined, armContinent: continent.value === 'all' ? undefined : continent.value,
+    armStatus: status.value === 'all' ? undefined : status.value, armPage: page.value > 1 ? String(page.value) : undefined }
+  if (Object.entries(state).every(([key, value]) => route.query[key] === value)) return
+  void router.replace({ query: { ...route.query, ...state, mobileRecord: undefined }, hash: route.hash })
+}, { flush: 'post' })
 watch(globePoints, points => {
   if (selectedRegion.value && !points.some(point => point.regionCode === selectedRegion.value)) selectedRegion.value = null
 })
@@ -305,6 +342,9 @@ onUnmounted(() => {
   if (refreshTimer !== null) window.clearInterval(refreshTimer)
   document.removeEventListener('visibilitychange', updateVisibility)
 })
+
+// Column slots cannot infer the parent table’s row type.
+const ElTableColumn = BaseTableColumn<RegionRow>
 </script>
 
 <template>
@@ -314,12 +354,12 @@ onUnmounted(() => {
         <el-input v-model="search" class="region-search" :placeholder="t('arm.searchPlaceholder')" :aria-label="t('arm.searchPlaceholder')" clearable><template #prefix><span class="i-mdi-magnify" aria-hidden="true" /></template></el-input>
         <el-select v-model="continent" class="continent-filter" :aria-label="t('regionPage.continentFilter')"><el-option v-for="item in continents" :key="item.value" :label="t(item.labelKey)" :value="item.value" /></el-select>
         <el-select v-model="status" class="status-filter" :aria-label="t('regionPage.statusFilter')"><el-option v-for="item in statuses" :key="item.value" :label="t(item.labelKey)" :value="item.value" /></el-select>
-        <div class="region-toolbar-actions">
+        <div class="region-toolbar-actions" data-page-error-anchor>
           <GhostBtn :loading="loading" :aria-label="t('regionPage.refresh')" @click="loadAll"><span class="i-mdi-refresh" aria-hidden="true" /><span class="toolbar-button-label">{{ t('regionPage.refresh') }}</span></GhostBtn>
           <GhostBtn :aria-label="t(mapVisible ? 'arm.mapHide' : 'arm.mapShow')" :aria-expanded="mapVisible" aria-controls="region-globe-panel" @click="mapVisible = !mapVisible"><span :class="mapVisible ? 'i-mdi-earth' : 'i-mdi-earth-off'" aria-hidden="true" /><span class="toolbar-button-label">{{ t(mapVisible ? 'arm.mapHide' : 'arm.mapShow') }}</span></GhostBtn>
         </div>
       </div>
-      <div v-if="visibleProblems.length" class="region-load-error" role="alert"><span class="i-mdi-alert-circle-outline" aria-hidden="true" /><div><p v-for="(problem, index) in visibleProblems" :key="index"><strong>{{ problem.title }}</strong><span v-if="problem.detail"> · {{ problem.detail }}</span></p></div><GhostBtn :loading="loading" @click="loadAll">{{ t('regionPage.retry') }}</GhostBtn></div>
+      <PageErrorNotice v-if="visibleProblems.length"><div><p v-for="(problem, index) in visibleProblems" :key="index"><strong>{{ problem.title }}</strong><span v-if="problem.detail"> · {{ problem.detail }}</span></p></div><GhostBtn :loading="loading" @click="loadAll">{{ t('regionPage.retry') }}</GhostBtn></PageErrorNotice>
       <div class="region-workspace" :class="{ 'map-collapsed': !mapVisible }">
         <aside id="region-globe-panel" v-show="mapVisible" class="globe-pane" :aria-label="t('regionPage.globeLabel')">
           <div class="globe-toolbar">
@@ -333,13 +373,21 @@ onUnmounted(() => {
             <p v-if="unmappedCount" class="globe-filter-note" role="status">{{ t('regionPage.unmappedCount', { count: unmappedCount }) }}</p>
           </div>
           <div class="globe-stage" :aria-busy="globeLoading">
-            <div v-if="globeLoadFailed" class="globe-placeholder" role="alert"><span class="i-mdi-earth-off" aria-hidden="true" /><p>{{ t('regionPage.globeLoadFailed') }}</p><GhostBtn @click="retryGlobe">{{ t('regionPage.retry') }}</GhostBtn></div>
+            <template v-if="globeLoadFailed"><PageErrorNotice v-if="mapVisible">{{ t('regionPage.globeLoadFailed') }}<GhostBtn @click="retryGlobe">{{ t('regionPage.retry') }}</GhostBtn></PageErrorNotice></template>
             <template v-else><component :is="globeComponent" :points="globePoints" :active="mapVisible && pageActive" :selected-region="selectedRegion" @select="selectRegion" /><div v-if="globeLoading" class="globe-placeholder globe-loading" role="status"><span class="i-mdi-earth" aria-hidden="true" /><p>{{ t('regionPage.globeLoading') }}</p></div></template>
           </div>
         </aside>
         <div class="region-list-pane">
-          <div ref="tableArea" class="region-table-area">
-            <el-table ref="table" :data="pagedRows" v-loading="loading && !armLoaded && !mineLoaded" height="100%" row-key="rowId" :row-class-name="rowClassName" class="region-table">
+          <div ref="tableArea" class="region-table-area" :class="{ 'is-compact': compact }">
+            <MobileRecordList v-if="compact" drilldown list-id="arm-regions" :record-keys="pagedRows.map(row => row.rowId)" :loading="loading">
+              <MobileRecordCard v-for="row in pagedRows" :key="row.rowId" :record-key="row.rowId" :data-region-code="row.regionCode" :class="{ 'region-mobile-selected': row.regionCode === selectedRegion }" :summary-title="row.name" :summary-meta="`${row.regionCode} · ${row.architectureType}`" :summary-status="armLoaded ? t(row.isOpen ? 'regionPage.hasHistory' : 'regionPage.noHistory') : ''" :summary-tone="row.isOpen ? 'success' : 'neutral'">
+                <template #identity><h2 class="mobile-record-title">{{ row.name }}</h2><span class="mobile-record-subtitle">{{ row.regionCode }}</span><span v-if="row.isMine" class="mobile-record-subtitle">{{ t('regionPage.ownedRegion') }}</span></template>
+                <dl class="mobile-record-fields"><div><dt>{{ t('regionPage.historyStatus') }}</dt><dd>{{ armLoaded ? t(row.isOpen ? 'regionPage.hasHistory' : 'regionPage.noHistory') : '—' }}</dd></div><div><dt>{{ t('arm.colArch') }}</dt><dd>{{ row.architectureType }}</dd></div><div><dt>{{ t('arm.colTotal') }}</dt><dd>{{ armLoaded ? row.openCount : '—' }}</dd></div><div><dt>{{ t('arm.colMonth') }}</dt><dd>{{ armLoaded ? row.monthlyOpenCount : '—' }}</dd></div><div class="mobile-record-wide"><dt>{{ t('arm.colOpenTime') }}</dt><dd>{{ formatDateTime(row.openTime) }}</dd></div><div class="mobile-record-wide"><dt>{{ t('regionPage.lastRecord') }}</dt><dd>{{ formatDateTime(row.lastNotifyTime) }}</dd></div></dl>
+                <template #footer><button type="button" class="mobile-record-button" :disabled="!mapRegionCodes.has(row.regionCode)" :title="locationHint(row)" :aria-pressed="selectedRegion === row.regionCode" @click="locateRegion(row.regionCode)"><i class="i-mdi-crosshairs-gps" aria-hidden="true" />{{ locationHint(row) }}</button></template>
+              </MobileRecordCard>
+              <p v-if="!pagedRows.length" class="region-mobile-empty" role="status">{{ loading ? t('arm.loading') : t('arm.empty') }}</p>
+            </MobileRecordList>
+            <el-table v-else ref="table" :data="pagedRows" v-loading="loading && !armLoaded && !mineLoaded" height="100%" row-key="rowId" :row-class-name="rowClassName" class="region-table">
               <el-table-column :label="t('regionPage.historyStatus')" width="128"><template #default="{ row }"><span class="region-status" :class="armLoaded && row.isOpen ? 'recorded' : 'muted'">{{ armLoaded ? t(row.isOpen ? 'regionPage.hasHistory' : 'regionPage.noHistory') : '—' }}</span></template></el-table-column>
               <el-table-column prop="regionCode" :label="t('arm.colCode')" min-width="176" show-overflow-tooltip />
               <el-table-column :label="t('arm.colName')" min-width="168"><template #default="{ row }"><button type="button" class="region-name" :disabled="!mapRegionCodes.has(row.regionCode)" :title="locationHint(row)" :aria-label="locationHint(row)" :aria-pressed="selectedRegion === row.regionCode" :data-selected="selectedRegion === row.regionCode" @click="locateRegion(row.regionCode)"><span v-if="row.isMine" class="owned-dot" :title="t('regionPage.ownedRegion')" /><span>{{ row.name }}</span><span v-if="mapRegionCodes.has(row.regionCode)" class="i-mdi-crosshairs-gps" aria-hidden="true" /></button></template></el-table-column>
@@ -351,7 +399,7 @@ onUnmounted(() => {
               <template #empty>{{ loading ? t('arm.loading') : t('arm.empty') }}</template>
             </el-table>
           </div>
-          <div class="region-pager"><span>{{ t('regionPage.matchingRows', { count: filteredRows.length }) }}</span><el-pagination v-model:current-page="page" :total="filteredRows.length" :page-size="PAGE_SIZE" :pager-count="5" layout="prev, pager, next" :aria-label="t('regionPage.pagination')" /></div>
+          <PagePagination v-model:current-page="page" :total="filteredRows.length" :page-size="PAGE_SIZE" :aria-label="t('regionPage.pagination')"><span>{{ t('regionPage.matchingRows', { count: filteredRows.length }) }}</span></PagePagination>
         </div>
       </div>
       <footer class="region-footer"><div class="region-counters"><span>{{ t('regionPage.totalRegions') }} <strong>{{ totalRegions }}</strong></span><span>{{ t('regionPage.armRecorded') }} <strong>{{ armLoaded ? openArmCount : '—' }}</strong></span><span :title="t('regionPage.todayHint')">{{ t('regionPage.today') }} <strong>{{ armLoaded ? todayNewCount : '—' }}</strong></span></div><span class="region-updated" :title="t('regionPage.refreshInterval')">{{ loading ? t('arm.loading') : updatedText }}</span></footer>
@@ -397,6 +445,9 @@ onUnmounted(() => {
 .region-list-pane { display: flex; flex-direction: column; height: 440px; min-width: 0; min-height: 350px; }
 .region-workspace.map-collapsed .region-list-pane { height: max(480px, calc(100dvh - 220px)); }
 .region-table-area { flex: 1; min-height: 0; overflow: hidden; }
+.region-table-area.is-compact { overflow: auto; overscroll-behavior: contain; }
+.region-mobile-selected { background: var(--status-ok-bg); box-shadow: inset 3px 0 var(--brand); }
+.region-mobile-empty { padding: 20px 14px; color: var(--text-secondary); }
 .region-table { font-family: var(--sans); font-size: var(--font-size-body); }
 .region-table :deep(th.el-table__cell) { height: 36px; padding: 6px 0; background: transparent; color: var(--text-secondary); font-size: var(--font-size-body); font-weight: 500; }
 .region-table :deep(td.el-table__cell) { height: 48px; padding: 7px 0; font-size: var(--font-size-body); font-variant-numeric: tabular-nums; }
@@ -413,10 +464,6 @@ onUnmounted(() => {
 .region-name:not(:disabled):hover, .region-name[aria-pressed='true'] { color: var(--brand); }
 .region-name:disabled { cursor: default; }
 .owned-dot { flex-shrink: 0; width: 5px; height: 5px; border-radius: 50%; background: var(--brand); }
-.region-pager { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; flex-shrink: 0; min-height: 50px; padding: 8px 14px; border-top: 1px solid var(--border); }
-.region-pager > span { color: var(--text-secondary); font-size: var(--font-size-secondary); }
-.region-pager :deep(.el-pagination) { --el-pagination-font-size: var(--font-size-body); max-width: 100%; flex-wrap: wrap; }
-.region-pager :deep(.el-pager li), .region-pager :deep(.btn-prev), .region-pager :deep(.btn-next) { min-width: 27px; }
 .region-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; flex-shrink: 0; gap: 8px 20px; padding: 11px 16px; border-top: 1px solid var(--border); }
 .region-counters { display: flex; flex-wrap: wrap; gap: 8px 20px; color: var(--text-secondary); font-size: var(--font-size-secondary); }
 .region-counters strong { margin-left: 4px; color: var(--text-primary); font-weight: 600; font-variant-numeric: tabular-nums; }
@@ -433,7 +480,6 @@ onUnmounted(() => {
   .toolbar-button-label { display: none; }
   .globe-toolbar { gap: 6px; padding: 10px; }
   .globe-categories { gap: 10px 16px; }
-  .region-pager { padding-inline: 10px; }
   .region-footer { padding-inline: 12px; }
   .region-load-error { flex-wrap: wrap; }
 }

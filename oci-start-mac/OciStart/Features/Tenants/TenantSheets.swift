@@ -110,7 +110,7 @@ struct TenantSheetHost: View {
             VStack(alignment: .leading, spacing: 14) {
                 Group {
                     Text("粘贴配置文本可自动解析字段")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(primaryText)
                         .padding(.bottom, 2)
                         .overlay(Rectangle().fill(border).frame(height: 1), alignment: .bottom)
@@ -160,10 +160,10 @@ struct TenantSheetHost: View {
                 AppTextField(text: $model.editText, placeholder: title)
                 hint(title.contains("成本") ? "用于统计账号费用，可填数字" : "最长 100 字符，便于区分同区域账号")
                 if let err = model.formError {
-                    Text(err).font(.system(size: 12)).foregroundColor(AppSheetSurface.accentRed(dark))
+                    Text(err).font(.system(size: 14)).foregroundColor(AppSheetSurface.accentRed(dark))
                 }
                 Text(item.displayName)
-                    .font(.system(size: 12))
+                    .font(.system(size: 13))
                     .foregroundColor(mutedText)
                     .padding(.top, 4)
             }
@@ -358,7 +358,7 @@ struct TenantSheetHost: View {
                 }
             }
             Text("共 \(model.notifyEmails.count) 个收件人")
-                .font(.system(size: 12))
+                .font(.system(size: 13))
                 .foregroundColor(mutedText)
                 .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -381,11 +381,11 @@ struct TenantSheetHost: View {
                     Image(systemName: "info.circle.fill")
                         .foregroundColor(AppSheetSurface.accentBlue(dark))
                     Text("MFA 状态")
-                        .font(.system(size: 13, weight: .medium))
+                        .font(.system(size: 14, weight: .medium))
                         .foregroundColor(primaryText)
                 }
                 Text(model.mfaStatusText)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(primaryText)
                 StatusBadge(
                     text: model.mfaEmailEnabled ? "邮箱 MFA 开" : "邮箱 MFA 关",
@@ -411,7 +411,7 @@ struct TenantSheetHost: View {
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(primaryText)
                 ForEach(model.policyInfoLines, id: \.self) { line in
-                    Text(line).font(.system(size: 12)).foregroundColor(mutedText)
+                    Text(line).font(.system(size: 14)).foregroundColor(mutedText)
                 }
                 Toggle("启用密码过期策略", isOn: $model.policyEnableExpiry)
                     .foregroundColor(primaryText)
@@ -478,7 +478,7 @@ struct TenantSheetHost: View {
             VStack(alignment: .leading, spacing: 14) {
                 if !model.emailInfo.isEmpty {
                     Text(model.emailInfo)
-                        .font(.system(size: 13))
+                        .font(.system(size: 14))
                         .foregroundColor(primaryText)
                         .padding(12)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -642,7 +642,7 @@ struct TenantSheetHost: View {
                                                 VStack(alignment: .leading, spacing: 8) {
                                                     field("卷名称", text: $model.editVolumeName)
                                                     Text("VPUs: \(Int(model.editVolumeVpus)) (10–120)")
-                                                        .font(.system(size: 12, weight: .medium))
+                                                        .font(.system(size: 14, weight: .medium))
                                                         .foregroundColor(primaryText)
                                                     Slider(value: $model.editVolumeVpus, in: 10...120, step: 10)
                                                     HStack(spacing: 8) {
@@ -673,7 +673,7 @@ struct TenantSheetHost: View {
             VStack(alignment: .leading, spacing: 12) {
                 ProgressView(value: Double(model.checkPercent), total: 100)
                 Text("\(model.checkPercent)%")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(mutedText)
                 if let r = model.checkResult {
                     HStack(spacing: 12) {
@@ -685,7 +685,7 @@ struct TenantSheetHost: View {
                         sectionTitle("失效账号列表")
                         ForEach(r.inactiveAccountNames, id: \.self) { name in
                             Text("· \(name)")
-                                .font(.system(size: 12, weight: .medium))
+                                .font(.system(size: 14, weight: .medium))
                                 .foregroundColor(Color(hex: "f85149"))
                         }
                     }
@@ -696,7 +696,7 @@ struct TenantSheetHost: View {
                         ForEach(Array(model.checkLines.suffix(40)), id: \.self) { line in
                             Text(line)
                                 .font(.system(size: 11, design: .monospaced))
-                                .foregroundColor(primaryText.opacity(0.88))
+                                .foregroundColor(primaryText)
                         }
                     }
                 }
@@ -716,10 +716,10 @@ struct TenantSheetHost: View {
                 formPanel {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("导出安全验证")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: 14, weight: .semibold))
                             .foregroundColor(primaryText)
                         Text("验证码已发送至您的通知终端，请输入 6 位验证码以确认导出。导出文件含 API 私钥，请妥善保管。")
-                            .font(.system(size: 12))
+                            .font(.system(size: 13))
                             .foregroundColor(mutedText)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -737,7 +737,7 @@ struct TenantSheetHost: View {
                         ProgressView().scaleEffect(0.7)
                     } else if model.exportSent {
                         Text("已发送")
-                            .font(.system(size: 12))
+                            .font(.system(size: 14))
                             .foregroundColor(AppTheme.sidebarActive)
                     }
                     Spacer(minLength: 0)
@@ -756,7 +756,7 @@ struct TenantSheetHost: View {
                 HStack(spacing: 10) {
                     ProgressView()
                     Text("处理中…")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: 13, weight: .medium))
                         .foregroundColor(mutedText)
                 }
                 formPanel {
@@ -764,7 +764,7 @@ struct TenantSheetHost: View {
                         ForEach(lines.suffix(50), id: \.self) { line in
                             Text(line)
                                 .font(.system(size: 11, design: .monospaced))
-                                .foregroundColor(primaryText.opacity(0.88))
+                                .foregroundColor(primaryText)
                         }
                     }
                 }
@@ -789,7 +789,7 @@ struct TenantSheetHost: View {
                     }
                 } else {
                     Text("同步期间请保持窗口打开")
-                        .font(.system(size: 11))
+                        .font(.system(size: 13))
                         .foregroundColor(mutedText)
                 }
             }
@@ -815,7 +815,7 @@ struct TenantSheetHost: View {
                             .foregroundColor(primaryText)
                             .lineLimit(1)
                         Text(model.syncStatusText)
-                            .font(.system(size: 12, weight: .medium))
+                            .font(.system(size: 14, weight: .medium))
                             .foregroundColor(syncPhaseColor(phase))
                             .lineLimit(2)
                             .fixedSize(horizontal: false, vertical: true)
@@ -838,7 +838,7 @@ struct TenantSheetHost: View {
 
                     HStack {
                         Text(syncPhaseLabel(phase))
-                            .font(.system(size: 11, weight: .medium))
+                            .font(.system(size: 13, weight: .medium))
                             .foregroundColor(mutedText)
                         Spacer()
                         Text("\(Int(model.syncPercent.rounded()))%")
@@ -849,7 +849,7 @@ struct TenantSheetHost: View {
 
                 formPanel {
                     Text(syncPhaseHint(phase))
-                        .font(.system(size: 11))
+                        .font(.system(size: 13))
                         .foregroundColor(mutedText)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -962,7 +962,7 @@ struct TenantSheetHost: View {
                     labeledSelect("操作系统", width: 280) {
                         if model.bootOSList.isEmpty {
                             Text("加载镜像中或暂无镜像…")
-                                .font(.system(size: 12))
+                                .font(.system(size: 13))
                                 .foregroundColor(mutedText)
                                 .frame(height: AppInputStyle.height, alignment: .leading)
                         } else {
@@ -979,7 +979,7 @@ struct TenantSheetHost: View {
                     labeledSelect("系统版本", width: 280) {
                         if model.bootVersions.isEmpty {
                             Text("—")
-                                .font(.system(size: 12))
+                                .font(.system(size: 13))
                                 .foregroundColor(mutedText)
                                 .frame(height: AppInputStyle.height, alignment: .leading)
                         } else {
@@ -1155,7 +1155,7 @@ struct TenantSheetHost: View {
                                     HStack(spacing: 0) {
                                         Button(action: { model.copyMysqlOcid(row) }) {
                                             Text(row.displayName.isEmpty ? "未命名" : row.displayName)
-                                                .font(.system(size: 12, weight: .semibold))
+                                                .font(.system(size: 14, weight: .semibold))
                                                 .foregroundColor(AppTheme.sidebarActive)
                                                 .lineLimit(1)
                                                 .help("点击复制 OCID")
@@ -1170,7 +1170,7 @@ struct TenantSheetHost: View {
 
                                         VStack(alignment: .leading, spacing: 2) {
                                             Text(row.loginUserDisplay)
-                                                .font(.system(size: 11, weight: .medium))
+                                                .font(.system(size: 14, weight: .medium))
                                                 .foregroundColor(primaryText)
                                                 .lineLimit(1)
                                             Button(action: { model.toggleMysqlPasswordReveal(row.id) }) {
@@ -1202,7 +1202,7 @@ struct TenantSheetHost: View {
                                                 Button("终止删除") { model.deleteMysql(row, tenant: t) }
                                             } label: {
                                                 Text("更多")
-                                                    .font(.system(size: 11, weight: .semibold))
+                                                    .font(.system(size: 14, weight: .semibold))
                                                     .foregroundColor(primaryText)
                                                     .padding(.horizontal, 8)
                                                     .padding(.vertical, 4)
@@ -1268,7 +1268,7 @@ struct TenantSheetHost: View {
         }) {
             VStack(alignment: .leading, spacing: 14) {
                 Text(model.regionSummaryText)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(primaryText)
                     .padding(14)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -1289,7 +1289,7 @@ struct TenantSheetHost: View {
                                         if r.isHomeRegion {
                                             StatusBadge(text: "Home", tone: .info)
                                         } else {
-                                            Text("—").foregroundColor(mutedText).font(.system(size: 12))
+                                            Text("—").foregroundColor(mutedText).font(.system(size: 14))
                                         }
                                     }
                                     .frame(width: 70, alignment: .leading)
@@ -1314,10 +1314,10 @@ struct TenantSheetHost: View {
                                     .foregroundColor(AppTheme.sidebarActive)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(r.cnName.isEmpty ? r.name : r.cnName)
-                                        .font(.system(size: 13, weight: .medium))
+                                        .font(.system(size: 14, weight: .medium))
                                         .foregroundColor(primaryText)
                                     Text("\(r.key) · \(r.name)")
-                                        .font(.system(size: 11))
+                                        .font(.system(size: 13))
                                         .foregroundColor(mutedText)
                                 }
                                 Spacer()
@@ -1344,7 +1344,7 @@ struct TenantSheetHost: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Text(model.aiStatus)
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: 13, weight: .medium))
                         .foregroundColor(mutedText)
                     Spacer()
                     Toggle("上下文", isOn: $model.aiUseHistory)
@@ -1371,7 +1371,7 @@ struct TenantSheetHost: View {
                             HStack(alignment: .top) {
                                 if line.role == "user" { Spacer(minLength: 40) }
                                 Text(line.text)
-                                    .font(.system(size: 12))
+                                    .font(.system(size: 14))
                                     .foregroundColor(primaryText)
                                     .padding(10)
                                     .background(
@@ -1430,7 +1430,7 @@ struct TenantSheetHost: View {
     private var keyFileRow: some View {
         HStack(spacing: 10) {
             Text(model.addKeyFileURL?.lastPathComponent ?? "未选择私钥文件")
-                .font(.system(size: 13))
+                .font(.system(size: 14))
                 .foregroundColor(model.addKeyFileURL == nil ? mutedText : primaryText)
                 .lineLimit(1)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -1438,7 +1438,7 @@ struct TenantSheetHost: View {
                 .frame(height: 36)
                 .background(
                     RoundedRectangle(cornerRadius: 6)
-                        .fill(dark ? Color(hex: "161820") : Color.white)
+                        .fill(AppTheme.cardBg(dark))
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 6)
@@ -1457,19 +1457,19 @@ struct TenantSheetHost: View {
 
     private func sectionLabel(_ title: String) -> some View {
         Text(title)
-            .font(.system(size: 12, weight: .medium))
+            .font(.system(size: 13, weight: .medium))
             .foregroundColor(mutedText)
     }
 
     private func sectionTitle(_ title: String) -> some View {
         Text(title)
-            .font(.system(size: 13, weight: .semibold))
+            .font(.system(size: 14, weight: .semibold))
             .foregroundColor(primaryText)
     }
 
     private func hint(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 12))
+            .font(.system(size: 13))
             .foregroundColor(mutedText)
     }
 
@@ -1524,7 +1524,7 @@ struct TenantSheetHost: View {
 
     private func tableCell(_ text: String, width: CGFloat?, bold: Bool = false, muted: Bool = false) -> some View {
         Text(text)
-            .font(.system(size: 12, weight: bold ? .semibold : .regular))
+            .font(.system(size: 13, weight: bold ? .semibold : .regular))
             .foregroundColor(muted ? mutedText : primaryText)
             .lineLimit(2)
             .frame(width: width, alignment: .leading)
@@ -1542,7 +1542,7 @@ struct TenantSheetHost: View {
                 .font(.system(size: 20, weight: .bold))
                 .foregroundColor(primaryText)
             Text(title)
-                .font(.system(size: 11, weight: .medium))
+                .font(.system(size: 13, weight: .medium))
                 .foregroundColor(mutedText)
         }
         .frame(maxWidth: .infinity)
@@ -1578,7 +1578,7 @@ struct TenantSheetHost: View {
         ) {
             VStack(alignment: .leading, spacing: 12) {
                 Text("选择已有代理，或直接新建并绑定到该租户（其它租户也可共用）。")
-                    .font(.system(size: 12))
+                    .font(.system(size: 13))
                     .foregroundColor(mutedText)
 
                 // 模式切换
@@ -1601,7 +1601,7 @@ struct TenantSheetHost: View {
                         Spacer()
                         ProgressView().scaleEffect(0.85)
                         Text("加载中…")
-                            .font(.system(size: 12))
+                            .font(.system(size: 13))
                             .foregroundColor(mutedText)
                         Spacer()
                     }
@@ -1618,7 +1618,7 @@ struct TenantSheetHost: View {
                             }
                             if model.proxyQuickItems.isEmpty {
                                 Text("暂无代理，可切换到「新建并绑定」")
-                                    .font(.system(size: 12))
+                                    .font(.system(size: 13))
                                     .foregroundColor(mutedText)
                                     .padding(.vertical, 20)
                                     .frame(maxWidth: .infinity)
@@ -1652,7 +1652,7 @@ struct TenantSheetHost: View {
     private func proxyModeChip(title: String, active: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(active ? Color.white : primaryText)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 7)
@@ -1776,11 +1776,11 @@ struct TenantSheetHost: View {
                     .frame(width: 12, height: 12)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(primaryText)
                         .lineLimit(1)
                     Text(meta)
-                        .font(.system(size: 11))
+                        .font(.system(size: 13))
                         .foregroundColor(mutedText)
                         .lineLimit(2)
                 }

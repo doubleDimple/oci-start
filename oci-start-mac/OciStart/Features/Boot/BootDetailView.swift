@@ -56,6 +56,11 @@ struct BootDetailView: View {
 
     private var toolbar: some View {
         HStack(spacing: 8) {
+            Text(detailSubtitle)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(AppTheme.textSecondary(dark))
+                .lineLimit(1)
+                .frame(maxWidth: 240, alignment: .leading)
             AppButton(title: "返回列表", systemImage: "chevron.left", kind: .secondary) {
                 model.closeDetail()
             }
@@ -83,18 +88,18 @@ struct BootDetailView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 Text("子任务")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(primaryText)
                 Text("\(model.detailItems.count)")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(mutedText)
                     .padding(.horizontal, 7)
                     .padding(.vertical, 2)
-                    .background(AppTheme.sidebarHover(dark).opacity(0.65))
+                    .background(AppTheme.hover(dark).opacity(0.65))
                     .cornerRadius(6)
                 Spacer(minLength: 0)
                 Text("启动 · 日志 · 修改 · 删除")
-                    .font(.system(size: 11))
+                    .font(.system(size: 13))
                     .foregroundColor(mutedText)
             }
 
@@ -103,7 +108,7 @@ struct BootDetailView: View {
                     Spacer()
                     ProgressView().scaleEffect(0.8)
                     Text("加载中…")
-                        .font(.system(size: 12))
+                        .font(.system(size: 13))
                         .foregroundColor(mutedText)
                     Spacer()
                 }
@@ -148,7 +153,7 @@ struct BootDetailView: View {
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(AppTheme.sidebarActive)
                 Text(bootLogHeaderTitle)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(primaryText)
                     .lineLimit(1)
 
@@ -164,7 +169,7 @@ struct BootDetailView: View {
                     if model.bootLogLoadingHistory {
                         ProgressView().scaleEffect(0.55)
                         Text("加载历史…")
-                            .font(.system(size: 11))
+                            .font(.system(size: 13))
                             .foregroundColor(mutedText)
                     }
                 }
@@ -174,7 +179,7 @@ struct BootDetailView: View {
                 if model.bootLogTaskId > 0 {
                     Toggle(isOn: $model.bootLogAutoScroll) {
                         Text("自动滚动")
-                            .font(.system(size: 11))
+                            .font(.system(size: 14))
                     }
                     .toggleStyle(SwitchToggleStyle())
                     AppButton(title: "清空", systemImage: "trash", kind: .secondary) {
@@ -201,9 +206,9 @@ struct BootDetailView: View {
                             VStack(spacing: 8) {
                                 Image(systemName: "text.alignleft")
                                     .font(.system(size: 22, weight: .light))
-                                    .foregroundColor(mutedText.opacity(0.7))
+                                    .foregroundColor(mutedText)
                                 Text("点击子任务的「开机日志」在此查看实时日志")
-                                    .font(.system(size: 12))
+                                    .font(.system(size: 13))
                                     .foregroundColor(mutedText)
                             }
                             .frame(maxWidth: .infinity)
@@ -212,9 +217,9 @@ struct BootDetailView: View {
                             VStack(spacing: 8) {
                                 Image(systemName: "hourglass")
                                     .font(.system(size: 22, weight: .light))
-                                    .foregroundColor(mutedText.opacity(0.7))
+                                    .foregroundColor(mutedText)
                                 Text("暂无日志，等待 TaskId=\(model.bootLogTaskId) 的推送…")
-                                    .font(.system(size: 12))
+                                    .font(.system(size: 13))
                                     .foregroundColor(mutedText)
                             }
                             .frame(maxWidth: .infinity)
@@ -266,7 +271,7 @@ struct BootDetailView: View {
 
     private var cardBackground: some View {
         RoundedRectangle(cornerRadius: 12)
-            .fill(AppTheme.sidebarBg(dark))
+            .fill(AppTheme.cardBg(dark))
     }
 
     private func bootLogColor(_ tone: BootLogLine.BootLogTone) -> Color {
@@ -283,7 +288,7 @@ struct BootDetailView: View {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundColor(Color(hex: "f0881a"))
             Text(text)
-                .font(.system(size: 12))
+                .font(.system(size: 14))
                 .foregroundColor(primaryText)
                 .lineLimit(2)
             Spacer(minLength: 0)
@@ -312,7 +317,7 @@ struct BootDetailCardView: View {
             HStack(alignment: .center, spacing: 10) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(detail.osText)
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(primaryText)
                         .lineLimit(1)
                     Text(detail.configText)
@@ -386,7 +391,7 @@ struct BootDetailCardView: View {
     private var passwordChip: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text("密码")
-                .font(.system(size: 10, weight: .medium))
+                .font(.system(size: 13, weight: .medium))
                 .foregroundColor(mutedText)
             HStack(spacing: 4) {
                 Text(passwordDisplay)
@@ -428,10 +433,10 @@ struct BootDetailCardView: View {
     private func metricChip(_ label: String, _ value: String, accent: Color? = nil) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
-                .font(.system(size: 10, weight: .medium))
+                .font(.system(size: 13, weight: .medium))
                 .foregroundColor(mutedText)
             Text(value)
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(accent ?? primaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)

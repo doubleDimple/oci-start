@@ -15,22 +15,23 @@ struct MfaBackupView: View {
             title: "MFA 备份",
             subtitle: "TOTP 密钥托管 · 动态验证码 · 导出",
             systemImage: "lock.shield",
+            layout: .workspace,
             toolbar: { toolbar },
             content: {
                 VStack(spacing: 0) {
                     if let err = model.errorText, !err.isEmpty {
                         errorBanner(err)
-                            .padding(.horizontal, 16)
+                            .padding(.horizontal, AppTheme.pagePadding)
                             .padding(.top, 12)
                     }
                     FilterBar {
                         SearchField(text: $model.searchText, placeholder: "搜索名称 / 发行方")
                         Spacer()
                         Text("刷新倒计时 \(model.countdown)s")
-                            .font(.system(size: 11))
-                            .foregroundColor(AppTheme.sidebarText(dark))
+                            .font(.system(size: 13))
+                            .foregroundColor(AppTheme.textSecondary(dark))
                     }
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, 8)
                     .padding(.top, 12)
 
                     if model.filtered.isEmpty && !model.isLoading {
@@ -49,7 +50,7 @@ struct MfaBackupView: View {
                                     keyCard(item)
                                 }
                             }
-                            .padding(16)
+                            .padding(AppTheme.pagePadding)
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
@@ -115,9 +116,9 @@ struct MfaBackupView: View {
                 HStack(spacing: 8) {
                     Text(item.keyName)
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
+                        .foregroundColor(AppTheme.textPrimary(dark))
                     Text(item.issuer)
-                        .font(.system(size: 11))
+                        .font(.system(size: 14))
                         .padding(.horizontal, 8)
                         .padding(.vertical, 2)
                         .background(Color(hex: "4a9eff").opacity(0.15))
@@ -127,7 +128,7 @@ struct MfaBackupView: View {
                 Button(action: { model.toggleSecret(item) }) {
                     Text(item.revealSecret ? item.secretKey : "••••••••••••")
                         .font(.system(size: 11, design: .monospaced))
-                        .foregroundColor(AppTheme.sidebarText(dark))
+                        .foregroundColor(AppTheme.textSecondary(dark))
                 }
                 .buttonStyle(PlainButtonStyle())
             }
@@ -138,12 +139,12 @@ struct MfaBackupView: View {
                 Button(action: { model.copyOtp(item.otpCode) }) {
                     Text(item.otpCode)
                         .font(.system(size: 22, weight: .bold, design: .monospaced))
-                        .foregroundColor(dark ? Color.white : Color.primary)
+                        .foregroundColor(AppTheme.textPrimary(dark))
                 }
                 .buttonStyle(PlainButtonStyle())
                 Text("点击复制 · \(model.countdown)s")
-                    .font(.system(size: 10))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .font(.system(size: 13))
+                    .foregroundColor(AppTheme.textSecondary(dark))
             }
             .frame(minWidth: 100)
 
@@ -155,7 +156,7 @@ struct MfaBackupView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 14)
-                .fill(AppTheme.sidebarBg(dark))
+                .fill(AppTheme.cardBg(dark))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 14)
@@ -168,7 +169,7 @@ struct MfaBackupView: View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundColor(Color(hex: "f85149"))
-            Text(text).font(.system(size: 12))
+            Text(text).font(.system(size: 14))
             Spacer()
             Button("重试") { Task { await model.reload() } }
                 .buttonStyle(PlainButtonStyle())
@@ -229,8 +230,8 @@ private struct MfaAddSheet: View {
                         )
                     }
                     Text("也可后续扩展二维码导入；当前支持手动填写密钥。")
-                        .font(.system(size: 11))
-                        .foregroundColor(AppTheme.sidebarText(appearance.isDarkEffective))
+                        .font(.system(size: 14))
+                        .foregroundColor(AppTheme.textSecondary(appearance.isDarkEffective))
                 }
             }
         )

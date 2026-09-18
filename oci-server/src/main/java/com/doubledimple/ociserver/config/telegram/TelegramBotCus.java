@@ -242,14 +242,9 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
                 log.info("已发送欢迎消息到聊天: chatId:{}", chatId);
             }
         } catch (TelegramApiException e) {
-            if (e.getMessage().contains("Connection refused") ||
-                    e.getMessage().contains("timeout")) {
-                log.warn("网络连接问题，欢迎消息发送失败: {}", e.getMessage());
-            } else {
-                log.error("发送欢迎消息失败: {}", e.getMessage());
-            }
+            log.warn("Telegram 欢迎消息发送未确认");
         } catch (Exception e) {
-            log.warn("发送欢迎消息时发生未知错误: {}", e.getMessage());
+            log.warn("Telegram 欢迎消息发送未确认");
         }
     }
 

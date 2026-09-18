@@ -19,8 +19,9 @@ final class MainShellViewController: NSViewController {
     private var detail: ContentHostViewController!
     private var divider: NSView!
 
-    private let topHeight: CGFloat = 56
-    private let sidebarWidth: CGFloat = 196
+    private let topHeight: CGFloat = AppTheme.topBarHeight
+    private let sidebarWidth: CGFloat = AppTheme.sidebarWidth
+    private let collapsedSidebarWidth: CGFloat = AppTheme.sidebarCollapsedWidth
     private let dividerWidth: CGFloat = 1
 
     init(session: AppSession, navigation: NavigationState, appearance: AppearanceController = .shared) {
@@ -51,7 +52,7 @@ final class MainShellViewController: NSViewController {
             .environmentObject(appearance)
             .environmentObject(header)
             .environmentObject(chrome)
-            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 56, maxHeight: 56)
+            .frame(minWidth: 0, maxWidth: .infinity, minHeight: topHeight, maxHeight: topHeight)
         topHost = NSHostingController(rootView: AnyView(top))
 
         let sidebarRoot = SidebarView()
@@ -65,7 +66,7 @@ final class MainShellViewController: NSViewController {
 
         divider = NSView()
         divider.wantsLayer = true
-        divider.layer?.backgroundColor = NSColor.separatorColor.cgColor
+        divider.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.08).cgColor
 
         addChild(topHost)
         addChild(sidebarHost)
@@ -139,20 +140,18 @@ final class MainShellViewController: NSViewController {
         guard b.width > 1, b.height > 1 else { return }
 
         let collapsed = navigation.sidebarCollapsed
-        let sideW: CGFloat = collapsed ? 0 : sidebarWidth
+        let sideW: CGFloat = collapsed ? collapsedSidebarWidth : sidebarWidth
         let bodyH = max(0, b.height - topHeight)
         let bodyY: CGFloat = 0
         let topY = b.height - topHeight
 
-        topHost.view.frame = NSRect(x: 0, y: topY, width: b.width, height: topHeight)
-        sidebarHost.view.frame = NSRect(x: 0, y: bodyY, width: sideW, height: bodyH)
-        sidebarHost.view.isHidden = collapsed
+        let detailX = sideW + dividerWidth
+        topHost.view.frame = NSRect(x: detailX, y: topY, width: max(0, b.width - detailX), height: topHeight)
+        sidebarHost.view.frame = NSRect(x: 0, y: bodyY, width: sideW, height: b.height)
 
         let divX = sideW
-        divider.frame = NSRect(x: divX, y: bodyY, width: collapsed ? 0 : dividerWidth, height: bodyH)
-        divider.isHidden = collapsed
+        divider.frame = NSRect(x: divX, y: bodyY, width: dividerWidth, height: b.height)
 
-        let detailX = collapsed ? 0 : (sideW + dividerWidth)
         detail.view.frame = NSRect(x: detailX, y: bodyY, width: max(0, b.width - detailX), height: bodyH)
 
         dropdownHost?.frame = b

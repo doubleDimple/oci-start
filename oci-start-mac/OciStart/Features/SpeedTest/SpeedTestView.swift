@@ -17,6 +17,7 @@ struct SpeedTestView: View {
             title: "全球链路监控",
             subtitle: "出口 IP · 区域延迟探测 · Top5 优选",
             systemImage: "globe",
+            layout: .workspace,
             toolbar: { toolbar },
             content: {
                 ScrollView {
@@ -33,7 +34,7 @@ struct SpeedTestView: View {
 
                         regionSection
                     }
-                    .padding(16)
+                    .padding(AppTheme.pagePadding)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -79,7 +80,7 @@ struct SpeedTestView: View {
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.system(size: 12))
             Text(text)
-                .font(.system(size: 12))
+                .font(.system(size: 14))
             Spacer(minLength: 8)
             AppButton(title: "重试", kind: .secondary) {
                 Task { await model.refresh() }
@@ -134,12 +135,12 @@ struct SpeedTestView: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(label)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(AppTheme.textSecondary(dark))
                     .lineLimit(1)
                 Text(value)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(AppTheme.textPrimary(dark))
                     .lineLimit(2)
                     .minimumScaleFactor(0.75)
                     .fixedSize(horizontal: false, vertical: true)
@@ -149,7 +150,7 @@ struct SpeedTestView: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity, minHeight: 68, alignment: .leading)
-        .background(AppTheme.sidebarBg(dark))
+        .background(AppTheme.cardBg(dark))
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
@@ -166,15 +167,15 @@ struct SpeedTestView: View {
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(SpeedTestTheme.success)
                 Text("延迟 Top 5（< 150ms）")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(AppTheme.textPrimary(dark))
                 Spacer(minLength: 0)
                 Text("\(model.top5.count)")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(AppTheme.textSecondary(dark))
                     .padding(.horizontal, 8)
                     .padding(.vertical, 2)
-                    .background(AppTheme.sidebarHover(dark))
+                    .background(AppTheme.hover(dark))
                     .cornerRadius(8)
             }
 
@@ -187,10 +188,10 @@ struct SpeedTestView: View {
                 ForEach(Array(model.top5.enumerated()), id: \.element.id) { index, item in
                     HStack(spacing: 6) {
                         Text("#\(index + 1)")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(.system(size: 14, weight: .bold))
                             .foregroundColor(SpeedTestTheme.success.opacity(0.85))
                         Text(item.name)
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(.system(size: 14, weight: .semibold))
                             .lineLimit(1)
                         Text("\(item.ms)ms")
                             .font(Font.system(size: 12, weight: .bold).monospacedDigit())
@@ -210,7 +211,7 @@ struct SpeedTestView: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(AppTheme.sidebarBg(dark))
+        .background(AppTheme.cardBg(dark))
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
@@ -224,21 +225,21 @@ struct SpeedTestView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 Text("区域节点")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(AppTheme.textPrimary(dark))
                 Text("\(model.regions.count)")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(AppTheme.textSecondary(dark))
                     .padding(.horizontal, 8)
                     .padding(.vertical, 2)
-                    .background(AppTheme.sidebarHover(dark))
+                    .background(AppTheme.hover(dark))
                     .cornerRadius(8)
                 if model.isTesting {
                     HStack(spacing: 6) {
                         ProgressView().scaleEffect(0.55)
                         Text("探测中")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(AppTheme.sidebarText(dark))
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(AppTheme.textSecondary(dark))
                     }
                 }
                 Spacer(minLength: 0)
@@ -253,7 +254,7 @@ struct SpeedTestView: View {
                     action: { Task { await model.refresh() } }
                 )
                 .frame(minHeight: 180)
-                .background(AppTheme.sidebarBg(dark))
+                .background(AppTheme.cardBg(dark))
                 .cornerRadius(12)
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
@@ -287,16 +288,16 @@ struct SpeedTestView: View {
         return VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 Text(region.simpleName)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(AppTheme.textPrimary(dark))
                     .lineLimit(1)
                 Spacer(minLength: 4)
                 Text(region.code)
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(AppTheme.textSecondary(dark))
                     .padding(.horizontal, 7)
                     .padding(.vertical, 2)
-                    .background(AppTheme.sidebarHover(dark))
+                    .background(AppTheme.hover(dark))
                     .cornerRadius(6)
             }
 
@@ -311,7 +312,7 @@ struct SpeedTestView: View {
                             .font(Font.system(size: state == .timeout ? 15 : 26, weight: .bold).monospacedDigit())
                             .foregroundColor(
                                 state == .timeout
-                                    ? AppTheme.sidebarText(dark)
+                                    ? AppTheme.textSecondary(dark)
                                     : SpeedTestTheme.toneColor(tone, dark: dark)
                             )
                             .lineLimit(1)
@@ -320,8 +321,8 @@ struct SpeedTestView: View {
                 }
                 if case .ok = state {
                     Text("ms")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(AppTheme.sidebarText(dark))
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(AppTheme.textSecondary(dark))
                 }
                 Spacer(minLength: 0)
             }
@@ -341,7 +342,7 @@ struct SpeedTestView: View {
             .frame(height: 5)
         }
         .padding(14)
-        .background(AppTheme.sidebarBg(dark))
+        .background(AppTheme.cardBg(dark))
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)

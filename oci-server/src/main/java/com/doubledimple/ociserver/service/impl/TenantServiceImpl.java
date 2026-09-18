@@ -1962,7 +1962,7 @@ public class TenantServiceImpl implements TenantService {
 
     @Override
     public List<Tenant> getParentTenants() {
-        Page<Tenant> byParenIdIsNullOrParenId = tenantRepository.findByParenIdIsNullOrParenIdAndCloudType(0L, 1, PageRequest.of(0, 1000));
+        Page<Tenant> byParenIdIsNullOrParenId = tenantRepository.findParentTenant(1, PageRequest.of(0, 1000));
 
         if (byParenIdIsNullOrParenId == null || byParenIdIsNullOrParenId.isEmpty()) {
             return new ArrayList<>();

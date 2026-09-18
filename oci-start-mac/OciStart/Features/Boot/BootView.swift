@@ -17,7 +17,7 @@ struct BootView: View {
     private let wTenant: CGFloat = 108
     private let wRemark: CGFloat = 80
     private let wRegion: CGFloat = 84
-    private let wArch: CGFloat = 52
+    private let wArch: CGFloat = 60
     private let wStatus: CGFloat = 68
     private let wNum: CGFloat = 48
     private let wTime: CGFloat = 100
@@ -29,10 +29,6 @@ struct BootView: View {
         wIndex + wTenant + wRemark + wRegion + wArch + wStatus
             + wNum * 7 + wTime + wAction + hPad * 2 + minFlex
     }
-
-    private var activeCount: Int { model.rows.filter(\.openBootFlag).count }
-    private var idleCount: Int { model.rows.count - activeCount }
-    private var execSum: Int64 { model.rows.reduce(0) { $0 + $1.executingCount } }
 
     var body: some View {
         Group {
@@ -65,28 +61,26 @@ struct BootView: View {
     }
 
     private var listPage: some View {
-        PageScaffold(
-            title: "开机管理",
-            subtitle: filterSubtitle,
-            systemImage: "play.circle",
-            toolbar: { toolbar },
-            content: {
-                VStack(spacing: 0) {
-                    filterBar
-                    if let err = model.errorText, !err.isEmpty { errorBanner(err) }
-                    summaryBar
-                    listBody
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 12)
-                    PaginationBar(state: $model.pageState) {
-                        model.onPageChange()
+        GeometryReader { proxy in
+            PageScaffold(
+                title: "开机管理",
+                subtitle: filterSubtitle,
+                systemImage: "play.circle",
+                content: {
+                    VStack(spacing: 0) {
+                        filterBar(width: proxy.size.width - AppTheme.pagePadding * 2)
+                        if let err = model.errorText, !err.isEmpty { errorBanner(err) }
+                        listBody
+                        PaginationBar(state: $model.pageState) {
+                            model.onPageChange()
+                        }
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .appLoading(model.isLoading && !model.rows.isEmpty)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .appLoading(model.isLoading && !model.rows.isEmpty)
-            }
-        )
-        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+            )
+            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+        }
     }
 
     private var filterSubtitle: String {
@@ -131,9 +125,11 @@ struct BootView: View {
 
     // MARK: - Filter
 
-    private var filterBar: some View {
-        FilterBar(
-            leading: {
+    private func filterBar(width: CGFloat) -> some View {
+        AdaptiveListToolbar(
+            compactBelow: 1160,
+            availableWidth: width,
+            filters: {
                 HStack(spacing: 10) {
                     SelectMenu(
                         options: model.parentTenants.map {
@@ -144,7 +140,7 @@ struct BootView: View {
                             set: { model.onParentChanged($0) }
                         ),
                         placeholder: "选择租户…",
-                        width: 200,
+                        width: 160,
                         allowClear: true,
                         searchable: true
                     )
@@ -157,14 +153,12 @@ struct BootView: View {
                             set: { model.onRegionChanged($0) }
                         ),
                         placeholder: model.selectedParentId.isEmpty ? "先选租户" : "选择区域…",
-                        width: 200,
+                        width: 160,
                         enabled: !model.selectedParentId.isEmpty,
                         allowClear: true,
                         searchable: true
                     )
                 }
-            },
-            trailing: {
                 HStack(spacing: 8) {
                     if model.hasActiveFilter {
                         AppButton(title: "重置", systemImage: "xmark", kind: .secondary) {
@@ -174,68 +168,23 @@ struct BootView: View {
                     AppButton(
                         title: "查询",
                         systemImage: "magnifyingglass",
-                        kind: .primary,
+                        kind: .secondary,
                         enabled: model.canQuery || model.hasActiveFilter
                     ) {
                         model.applyFilter()
                     }
                 }
-            }
+            },
+            actions: { toolbar }
         )
     }
 
-    // MARK: - Summary
-
-    private var summaryBar: some View {
-        HStack(spacing: 10) {
-            summaryChip(icon: "square.stack.3d.up", title: "本页", value: "\(model.rows.count)", accent: AppTheme.sidebarActive)
-            summaryChip(icon: "bolt.circle.fill", title: "有任务", value: "\(activeCount)", accent: Color(hex: "3fb950"))
-            summaryChip(icon: "moon.circle", title: "无任务", value: "\(idleCount)", accent: Color(hex: "8b949e"))
-            summaryChip(icon: "arrow.triangle.2.circlepath", title: "执行中", value: "\(execSum)", accent: Color(hex: "f0881a"))
-            Spacer(minLength: 0)
-            Text("快捷：启动 · 停止 · 详情 · 更多")
-                .font(.system(size: 11))
-                .foregroundColor(AppTheme.sidebarText(dark).opacity(0.85))
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-    }
-
-    private func summaryChip(icon: String, title: String, value: String, accent: Color) -> some View {
-        HStack(spacing: 8) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(accent.opacity(0.15))
-                    .frame(width: 28, height: 28)
-                Image(systemName: icon)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(accent)
-            }
-            VStack(alignment: .leading, spacing: 1) {
-                Text(title)
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(AppTheme.sidebarText(dark))
-                Text(value)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(AppTheme.sidebarBg(dark))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(AppTheme.border(dark).opacity(0.55), lineWidth: 1)
-        )
-    }
+    // MARK: - Error
 
     private func errorBanner(_ text: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
-            Text(text).font(.system(size: 12))
+            Text(text).font(.system(size: 14))
             Spacer()
             Button("重试") { Task { await model.reload() } }
                 .buttonStyle(PlainButtonStyle())
@@ -258,13 +207,12 @@ struct BootView: View {
                 Spacer()
                 ProgressView()
                 Text("加载开机任务…")
-                    .font(.system(size: 12))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .font(.system(size: 13))
+                    .foregroundColor(AppTheme.textSecondary(dark))
                 Spacer()
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(tableCardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
         } else if model.rows.isEmpty {
             EmptyStateView(
                 icon: "play.circle",
@@ -277,7 +225,6 @@ struct BootView: View {
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(tableCardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
         } else {
             GeometryReader { geo in
                 let totalW = max(geo.size.width, fixedColsWidth)
@@ -321,19 +268,13 @@ struct BootView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            // 背景圆角单独画，避免 clipShape/cornerRadius 裁掉右侧操作按钮
+            // Keep row actions outside clipping; the shared scaffold owns the card.
             .background(tableCardBackground)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(AppTheme.border(dark).opacity(0.55), lineWidth: 1)
-            )
-            .shadow(color: Color.black.opacity(dark ? 0.22 : 0.06), radius: 8, x: 0, y: 2)
         }
     }
 
     private var tableCardBackground: some View {
-        RoundedRectangle(cornerRadius: 12)
-            .fill(AppTheme.sidebarBg(dark))
+        AppTheme.cardBg(dark)
     }
 
     private func headerRow(
@@ -368,7 +309,7 @@ struct BootView: View {
         .padding(.horizontal, hPad)
         .padding(.vertical, 10)
         .frame(width: width, alignment: .leading)
-        .background(AppTheme.sidebarHover(dark).opacity(0.65))
+        .background(AppTheme.inputBg(dark))
         .overlay(
             Rectangle().frame(height: 1).foregroundColor(AppTheme.border(dark).opacity(0.5)),
             alignment: .bottom
@@ -437,7 +378,7 @@ struct BootView: View {
             return AppTheme.sidebarActive.opacity(dark ? 0.12 : 0.08)
         }
         return index % 2 == 1
-            ? Color(hex: "63b3ed").opacity(dark ? 0.05 : 0.07)
+            ? AppTheme.hover(dark)
             : Color.clear
     }
 
@@ -445,8 +386,8 @@ struct BootView: View {
 
     private func colHeader(_ title: String, _ width: CGFloat, align: Alignment = .leading) -> some View {
         Text(title)
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundColor(AppTheme.sidebarText(dark))
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundColor(AppTheme.textSecondary(dark))
             .lineLimit(1)
             .frame(width: width, alignment: align)
             .clipped()
@@ -454,11 +395,11 @@ struct BootView: View {
 
     private func cellText(_ text: String, _ width: CGFloat, muted: Bool = false) -> some View {
         Text(text)
-            .font(.system(size: 12))
+            .font(.system(size: 14))
             .foregroundColor(
                 muted
-                    ? AppTheme.sidebarText(dark)
-                    : (dark ? Color.white.opacity(0.9) : Color.primary)
+                    ? AppTheme.textSecondary(dark)
+                    : (AppTheme.textPrimary(dark))
             )
             .lineLimit(1)
             .truncationMode(.tail)
@@ -469,9 +410,9 @@ struct BootView: View {
 
     private func numCell(_ n: Int64, _ width: CGFloat, accent: Color? = nil) -> some View {
         Text(formatNum(n))
-            .font(.system(size: 12, weight: accent != nil ? .semibold : .regular, design: .monospaced))
+            .font(.system(size: 14, weight: accent != nil ? .semibold : .regular, design: .monospaced))
             .foregroundColor(
-                accent ?? (dark ? Color.white.opacity(0.88) : Color.primary)
+                accent ?? (AppTheme.textPrimary(dark))
             )
             .lineLimit(1)
             .frame(width: width, alignment: .leading)
@@ -480,8 +421,8 @@ struct BootView: View {
 
     private func successCell(_ n: Int, _ width: CGFloat) -> some View {
         Text(formatNum(Int64(n)))
-            .font(.system(size: 12, weight: n > 0 ? .semibold : .regular, design: .monospaced))
-            .foregroundColor(n > 0 ? Color(hex: "3fb950") : (dark ? Color.white.opacity(0.88) : Color.primary))
+            .font(.system(size: 14, weight: n > 0 ? .semibold : .regular, design: .monospaced))
+            .foregroundColor(n > 0 ? Color(hex: "3fb950") : (AppTheme.textPrimary(dark)))
             .lineLimit(1)
             .frame(width: width, alignment: .leading)
             .clipped()
@@ -492,8 +433,8 @@ struct BootView: View {
             withAnimation(.easeInOut(duration: 0.15)) { model.namesHidden.toggle() }
         }) {
             Text(model.namesHidden ? item.maskedTenant : item.displayTenant)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(AppTheme.textPrimary(dark))
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .frame(width: width, alignment: .leading)
@@ -509,8 +450,8 @@ struct BootView: View {
         let isARM = t.uppercased().contains("ARM")
         let c = isARM ? Color(hex: "a371f7") : Color(hex: "58a6ff")
         return Text(t)
-            .font(.system(size: 10, weight: .bold, design: .monospaced))
-            .foregroundColor(t == "—" ? AppTheme.sidebarText(dark) : c)
+            .font(.system(size: 12, weight: .semibold, design: .monospaced))
+            .foregroundColor(t == "—" ? AppTheme.textSecondary(dark) : c)
             .padding(.horizontal, t == "—" ? 0 : 7)
             .padding(.vertical, t == "—" ? 0 : 2)
             .background(
@@ -585,7 +526,7 @@ enum BootActionPanel {
 // MARK: - 窗内操作菜单（对齐实例列表，扁平两列 + 悬停）
 
 private enum BootActionMenuLayout {
-    static let width: CGFloat = 300
+    static let width: CGFloat = 340
     static let vPad: CGFloat = 12
     static let titleH: CGFloat = 18
     static let gridGap: CGFloat = 8
@@ -730,8 +671,8 @@ struct BootActionMenuContent: View {
         VStack(alignment: .leading, spacing: 8) {
             if !title.isEmpty {
                 Text(title)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(AppTheme.textSecondary(dark))
                     .lineLimit(1)
                     .padding(.horizontal, 2)
             }
@@ -761,14 +702,14 @@ struct BootActionMenuContent: View {
                     .font(.system(size: 11, weight: .semibold))
                     .frame(width: 14)
                 Text(act.title)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: 14, weight: .medium))
                     .lineLimit(1)
                 Spacer(minLength: 0)
             }
             .foregroundColor(
                 act.isDanger
                     ? Color(hex: "f85149")
-                    : (dark ? Color.white.opacity(0.92) : Color.primary)
+                    : (AppTheme.textPrimary(dark))
             )
             .padding(.horizontal, 10)
             .padding(.vertical, 9)

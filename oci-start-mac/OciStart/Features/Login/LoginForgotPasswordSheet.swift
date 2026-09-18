@@ -9,11 +9,13 @@ struct LoginForgotPasswordSheet: View {
     var onNext: () -> Void
     var onBack: () -> Void
 
+    private var english: Bool { model.locale == .enUS }
+
     var body: some View {
         ZStack {
             Color.black.opacity(dark ? 0.65 : 0.45)
                 .edgesIgnoringSafeArea(.all)
-                .onTapGesture { onClose() }
+                .onTapGesture { if !model.resetBusy { onClose() } }
 
             VStack(spacing: 0) {
                 header
@@ -36,21 +38,22 @@ struct LoginForgotPasswordSheet: View {
                 }
                 actions
             }
-            .frame(width: 560)
+            .frame(width: 460)
             .background(LoginPalette.card(dark))
-            .cornerRadius(24)
+            .cornerRadius(14)
             .overlay(
-                RoundedRectangle(cornerRadius: 24)
+                RoundedRectangle(cornerRadius: 14)
                     .stroke(LoginPalette.line(dark).opacity(0.8), lineWidth: 1)
             )
             .shadow(color: Color.black.opacity(dark ? 0.5 : 0.18), radius: 30, y: 12)
         }
+        .onExitCommand { if !model.resetBusy { onClose() } }
     }
 
     private var header: some View {
         HStack {
-            Text("重置密码")
-                .font(.system(size: 16, weight: .heavy))
+            Text(english ? "Reset password" : "重置密码")
+                .font(.system(size: 18, weight: .semibold))
                 .foregroundColor(LoginPalette.text(dark))
             Spacer()
             Button(action: onClose) {
@@ -62,20 +65,22 @@ struct LoginForgotPasswordSheet: View {
                     .clipShape(Circle())
             }
             .buttonStyle(PlainButtonStyle())
+            .disabled(model.resetBusy)
+            .accessibilityLabel(english ? "Close" : "关闭")
         }
         .padding(.horizontal, 22)
         .padding(.vertical, 16)
-        .background(LoginPalette.panel(dark).opacity(0.55))
+        .background(LoginPalette.card(dark))
         .overlay(Rectangle().fill(LoginPalette.line(dark)).frame(height: 1), alignment: .bottom)
     }
 
     private var stepIndicator: some View {
         HStack(spacing: 0) {
-            stepDot(1, "验证身份")
+            stepDot(1, english ? "Verify" : "验证身份")
             stepLine(active: model.resetStep >= 2)
-            stepDot(2, "重置密码")
+            stepDot(2, english ? "Reset" : "重置密码")
             stepLine(active: model.resetStep >= 3)
-            stepDot(3, "完成")
+            stepDot(3, english ? "Done" : "完成")
         }
     }
 
@@ -104,7 +109,7 @@ struct LoginForgotPasswordSheet: View {
                 }
             }
             Text(title)
-                .font(.system(size: 11, weight: .semibold))
+                .font(.system(size: 12, weight: .medium))
                 .foregroundColor(active || done ? LoginPalette.text(dark) : LoginPalette.muted(dark))
         }
         .frame(maxWidth: .infinity)
@@ -123,7 +128,7 @@ struct LoginForgotPasswordSheet: View {
         switch model.resetStep {
         case 1:
             VStack(alignment: .leading, spacing: 14) {
-                Text("输入用户名并获取验证码，完成身份验证。")
+                Text(english ? "Enter your username and request a verification code." : "输入用户名并获取验证码，完成身份验证。")
                     .font(.system(size: 13))
                     .foregroundColor(LoginPalette.muted(dark))
                     .padding(12)
@@ -132,21 +137,21 @@ struct LoginForgotPasswordSheet: View {
                     .cornerRadius(10)
 
                 LoginField(
-                    title: "用户名",
-                    placeholder: "请输入用户名",
+                    title: english ? "Username" : "用户名",
+                    placeholder: english ? "Enter username" : "请输入用户名",
                     text: $model.resetUsername,
                     dark: dark,
                     enabled: !model.resetBusy
                 )
 
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("验证码")
+                    Text(english ? "Verification code" : "验证码")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(LoginPalette.text(dark))
                     HStack(alignment: .center, spacing: 12) {
                         LoginField(
                             title: "",
-                            placeholder: "消息验证码",
+                            placeholder: english ? "Verification code" : "消息验证码",
                             text: $model.resetCode,
                             dark: dark,
                             enabled: !model.resetBusy
@@ -154,13 +159,13 @@ struct LoginForgotPasswordSheet: View {
                         LoginFieldActionButton(
                             title: model.resetCodeCountdown > 0
                                 ? "\(model.resetCodeCountdown)s"
-                                : (model.resetSendingCode ? "发送中" : "发送验证码"),
+                                : (model.resetSendingCode ? (english ? "Sending" : "发送中") : (english ? "Send code" : "发送验证码")),
                             loading: model.resetSendingCode,
                             enabled: !model.resetBusy
                                 && model.resetCodeCountdown == 0
                                 && !model.resetUsername.trimmingCharacters(in: .whitespaces).isEmpty,
                             dark: dark,
-                            minWidth: 118,
+                            minWidth: 100,
                             action: onSendCode
                         )
                     }
@@ -169,7 +174,7 @@ struct LoginForgotPasswordSheet: View {
             }
         case 2:
             VStack(alignment: .leading, spacing: 14) {
-                Text("确认后将为账号生成新密码（与 Web 端一致）。")
+                Text(english ? "Confirm to generate a new password for this account." : "确认后将为此账号生成新密码。")
                     .font(.system(size: 13))
                     .foregroundColor(LoginPalette.muted(dark))
                     .padding(12)
@@ -177,11 +182,11 @@ struct LoginForgotPasswordSheet: View {
                     .background(LoginPalette.panel(dark).opacity(0.6))
                     .cornerRadius(10)
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("账号")
+                    Text(english ? "Account" : "账号")
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(LoginPalette.muted(dark))
                     Text(model.resetUsername)
-                        .font(.system(size: 15, weight: .bold))
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(LoginPalette.text(dark))
                 }
                 .padding(14)
@@ -194,11 +199,11 @@ struct LoginForgotPasswordSheet: View {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 42))
                     .foregroundColor(Color(hex: "22c55e"))
-                Text("密码重置成功")
-                    .font(.system(size: 16, weight: .heavy))
+                Text(english ? "Password reset" : "密码重置成功")
+                    .font(.system(size: 18, weight: .semibold))
                     .foregroundColor(LoginPalette.text(dark))
                 Text(model.resetSuccessDetail.isEmpty
-                     ? "请使用新密码登录（详见服务端返回信息）"
+                     ? (english ? "Check your configured notification channel for the new password." : "请查看已配置的通知渠道，使用新密码登录。")
                      : model.resetSuccessDetail)
                     .font(.system(size: 13))
                     .foregroundColor(LoginPalette.muted(dark))
@@ -210,7 +215,7 @@ struct LoginForgotPasswordSheet: View {
     }
 
     private var actions: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 10) {
             Button(action: {
                 if model.resetStep == 1 || model.resetStep == 3 {
                     onClose()
@@ -218,19 +223,20 @@ struct LoginForgotPasswordSheet: View {
                     onBack()
                 }
             }) {
-                Text(model.resetStep == 3 ? "完成" : (model.resetStep == 1 ? "取消" : "上一步"))
-                    .font(.system(size: 15, weight: .bold))
+                Text(model.resetStep == 3 ? (english ? "Done" : "完成") : (model.resetStep == 1 ? (english ? "Cancel" : "取消") : (english ? "Back" : "上一步")))
+                    .font(.system(size: 14, weight: .semibold))
                     .frame(maxWidth: .infinity)
-                    .frame(height: 52)
+                    .frame(height: 42)
                     .foregroundColor(LoginPalette.text(dark))
                     .background(LoginPalette.oauthBg(dark))
-                    .cornerRadius(999)
+                    .cornerRadius(8)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 999)
+                        RoundedRectangle(cornerRadius: 8)
                             .stroke(LoginPalette.oauthBorder(dark), lineWidth: 1)
                     )
             }
             .buttonStyle(PlainButtonStyle())
+            .disabled(model.resetBusy)
 
             if model.resetStep < 3 {
                 Button(action: onNext) {
@@ -238,14 +244,14 @@ struct LoginForgotPasswordSheet: View {
                         if model.resetBusy {
                             ProgressView().scaleEffect(0.7)
                         }
-                        Text(model.resetStep == 1 ? "下一步" : "确认重置")
-                            .font(.system(size: 15, weight: .bold))
+                        Text(model.resetStep == 1 ? (english ? "Continue" : "下一步") : (english ? "Reset password" : "确认重置"))
+                            .font(.system(size: 14, weight: .semibold))
                     }
                     .frame(maxWidth: .infinity)
-                    .frame(height: 52)
+                    .frame(height: 42)
                     .foregroundColor(.white)
                     .background(LoginPalette.primary(dark))
-                    .cornerRadius(999)
+                    .cornerRadius(8)
                 }
                 .buttonStyle(PlainButtonStyle())
                 .disabled(model.resetBusy)
@@ -254,7 +260,7 @@ struct LoginForgotPasswordSheet: View {
         }
         .padding(.horizontal, 22)
         .padding(.vertical, 16)
-        .background(LoginPalette.panel(dark).opacity(0.45))
+        .background(LoginPalette.card(dark))
         .overlay(Rectangle().fill(LoginPalette.line(dark)).frame(height: 1), alignment: .top)
     }
 }

@@ -257,7 +257,7 @@ echo " Step 1/6  构建 Spring Boot JAR"
 echo "══════════════════════════════════════════"
 # --also-make 会自动先构建 oci-server 依赖的所有兄弟模块
 cd "$REPO_ROOT"
-mvn "${MVN_SETTINGS_ARGS[@]}" clean install -DskipTests -q --also-make -pl oci-server
+mvn "${MVN_SETTINGS_ARGS[@]}" -Pweb clean install -DskipTests -q --also-make -pl oci-server
 JAR_PATH="$SERVER_DIR/target/${JAR_FINAL_NAME}.jar"
 if [ ! -f "$JAR_PATH" ]; then
     echo "❌ JAR 未找到: $JAR_PATH"

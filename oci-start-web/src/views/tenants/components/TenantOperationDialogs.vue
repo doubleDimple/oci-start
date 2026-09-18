@@ -1,8 +1,10 @@
 <script setup lang="ts">
+import PageErrorNotice from '@/components/PageErrorNotice.vue'
 import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { tenantGet, tenantPost } from '@/api/tenant'
+import { checkSession } from '@/utils/session'
 
 type Tenant = Record<string, any>
 interface CheckResult {
@@ -252,7 +254,7 @@ async function submit() {
       await ElMessageBox.confirm(
         props.action === 'transfer' ? t('tenantOperations.transfer.confirmMessage') : t('tenantOperations.traffic.confirmMessage', { threshold: traffic.threshold ?? 0 }),
         t(props.action === 'transfer' ? 'tenantOperations.actions.confirmTransfer' : 'tenantOperations.traffic.confirmTitle'),
-        { confirmButtonText: t('tenantOperations.actions.confirm'), cancelButtonText: t('tenantOperations.actions.cancel'), type: 'warning' },
+        { customClass: 'tenant-operation-confirm', confirmButtonText: t('tenantOperations.actions.confirm'), cancelButtonText: t('tenantOperations.actions.cancel'), type: 'warning' },
       )
       if (current !== generation) return
     }
@@ -347,7 +349,8 @@ function startCheck() {
     }
   })
   source.addEventListener('error', event => {
-    if (current !== generation || checkState.value !== 'running') return
+    if (current !== generation || eventSource !== source || checkState.value !== 'running') return
+    void checkSession()
     stopStream()
     checkState.value = 'error'
     error.value = String((event as MessageEvent).data || 'tenantOperations.errors.stream')
@@ -369,8 +372,9 @@ onBeforeUnmount(cleanup)
     </template>
 
     <div class="operation-body" :aria-busy="loading || saving">
-      <el-alert v-if="error" :title="errorText" type="error" :closable="false" show-icon class="operation-error" role="alert" />
-      <div v-if="loadFailed" class="retry-row"><el-button @click="loadConfiguration">{{ t('tenantOperations.actions.reload') }}</el-button></div>
+      <el-alert v-if="['tenantOperations.errors.proxyHost', 'tenantOperations.errors.proxyPort', 'tenantOperations.errors.threshold', 'tenantOperations.errors.invalidJson', 'tenantOperations.errors.missingTenant'].includes(error)" :title="errorText" type="error" :closable="false" show-icon class="operation-error" role="alert" />
+      <PageErrorNotice v-else-if="error"><p>{{ errorText }}</p><el-button v-if="loadFailed" @click="loadConfiguration">{{ t('tenantOperations.actions.reload') }}</el-button></PageErrorNotice>
+      <div v-if="loadFailed && !error" class="retry-row"><el-button @click="loadConfiguration">{{ t('tenantOperations.actions.reload') }}</el-button></div>
       <el-skeleton v-if="loading" :rows="4" animated />
 
       <template v-else-if="action === 'proxy'">
@@ -396,8 +400,8 @@ onBeforeUnmount(cleanup)
           <el-form v-else key="create" label-position="top" :disabled="saving || loadFailed" class="operation-form" @submit.prevent="submit">
             <el-form-item :label="t('tenantOperations.proxy.customName')"><el-input v-model="proxy.customName" maxlength="128" :placeholder="t('tenantOperations.proxy.namePlaceholder')" /></el-form-item>
             <div class="form-grid">
-              <el-form-item :label="t('tenantOperations.proxy.type')"><el-select v-model="proxy.proxyType"><el-option :label="t('tenantOperations.proxy.http')" value="HTTP" /><el-option :label="t('tenantOperations.proxy.https')" value="HTTPS" /></el-select></el-form-item>
-              <el-form-item :label="t('tenantOperations.proxy.policy')"><el-select v-model="proxy.forceProxy"><el-option :label="t('tenantOperations.proxy.optional')" :value="false" /><el-option :label="t('tenantOperations.proxy.forced')" :value="true" /></el-select></el-form-item>
+              <el-form-item :label="t('tenantOperations.proxy.type')"><el-select v-model="proxy.proxyType" popper-class="tenant-operation-select"><el-option :label="t('tenantOperations.proxy.http')" value="HTTP" /><el-option :label="t('tenantOperations.proxy.https')" value="HTTPS" /></el-select></el-form-item>
+              <el-form-item :label="t('tenantOperations.proxy.policy')"><el-select v-model="proxy.forceProxy" popper-class="tenant-operation-select"><el-option :label="t('tenantOperations.proxy.optional')" :value="false" /><el-option :label="t('tenantOperations.proxy.forced')" :value="true" /></el-select></el-form-item>
               <el-form-item :label="t('tenantOperations.proxy.host')" required><el-input v-model="proxy.proxyHost" :placeholder="t('tenantOperations.proxy.hostPlaceholder')" /></el-form-item>
               <el-form-item :label="t('tenantOperations.proxy.port')" required><el-input-number v-model="proxy.proxyPort" :min="1" :max="65535" :precision="0" :controls="false" :placeholder="t('tenantOperations.proxy.portPlaceholder')" /></el-form-item>
               <el-form-item :label="t('tenantOperations.proxy.username')"><el-input v-model="proxy.proxyUsername" :placeholder="t('tenantOperations.proxy.optionalPlaceholder')" autocomplete="off" /></el-form-item>
@@ -471,13 +475,16 @@ onBeforeUnmount(cleanup)
 </template>
 
 <style scoped>
-:global(.tenant-operation-dialog) { max-width: calc(100vw - 32px); padding: 26px; font-size: var(--font-size-body); }
+:global(.tenant-operation-dialog) { max-width: calc(100vw - 32px); padding: 26px; font-family: var(--sans); font-size: var(--font-size-body); color: var(--text-primary); }
+:global(.tenant-operation-confirm) { font-family: var(--sans); --el-messagebox-title-color: var(--text-primary); --el-messagebox-content-color: var(--text-primary); --el-messagebox-font-size: var(--font-size-dialog-title); --el-messagebox-content-font-size: var(--font-size-body); }
+:global(.tenant-operation-confirm .el-message-box__title) { font-weight: 600; }
+:global(.tenant-operation-select.el-popper) { font-family: var(--sans); font-size: var(--font-size-body); }
 :global(.tenant-operation-dialog .el-button), :global(.tenant-operation-dialog .el-input__inner), :global(.tenant-operation-dialog .el-select__wrapper), :global(.tenant-operation-dialog .el-form-item__label), :global(.tenant-operation-dialog .el-radio__label), :global(.tenant-operation-dialog .el-checkbox__label) { font-size: var(--font-size-body); }
 :global(.tenant-operation-dialog .el-alert__title) { font-size: var(--font-size-body); }
 :global(.tenant-operation-dialog .el-alert__description), :global(.tenant-operation-dialog .el-form-item__error) { font-size: var(--font-size-secondary); }
 :global(.tenant-operation-dialog .el-dialog__body) { max-height: calc(100dvh - 250px); overflow-y: auto; overscroll-behavior: contain; }
 .operation-heading { padding: 5px 24px 6px 0; }
-.operation-eyebrow { color: var(--brand); font-size: var(--font-size-caption); font-weight: 600; letter-spacing: .04em; }
+.operation-eyebrow { color: var(--brand); font-size: var(--font-size-secondary); font-weight: 600; letter-spacing: .04em; }
 .operation-heading h2 { margin: 8px 0 0; font-size: var(--font-size-dialog-title); line-height: 1.3; font-weight: 600; letter-spacing: -.03em; }
 .operation-heading p { margin: 9px 0 0; color: var(--text-secondary); font-size: var(--font-size-secondary); overflow-wrap: anywhere; }
 .operation-body { min-height: 150px; color: var(--text-primary); font-size: var(--font-size-body); }
@@ -499,11 +506,11 @@ onBeforeUnmount(cleanup)
 .choice-copy { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 5px; }
 .choice-copy strong { font-size: var(--font-size-body); font-weight: 600; overflow-wrap: anywhere; }
 .choice-copy small { color: var(--text-secondary); font-size: var(--font-size-secondary); line-height: 1.55; overflow-wrap: anywhere; }
-.connection-status { white-space: nowrap; color: var(--text-muted); font-size: var(--font-size-caption); }
+.connection-status { white-space: nowrap; color: var(--text-secondary); font-size: var(--font-size-caption); }
 .connection-status.available { color: var(--status-ok); }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
 .operation-form :deep(.el-form-item) { margin-bottom: 16px; }
-.operation-form :deep(.el-form-item__label) { font-size: var(--font-size-body); color: var(--text-secondary); }
+.operation-form :deep(.el-form-item__label) { font-family: var(--sans); font-size: var(--font-size-body); color: var(--text-primary); }
 .operation-form :deep(.el-input-number), .operation-form :deep(.el-select) { width: 100%; }
 .operation-form :deep(.el-input-number .el-input__inner) { text-align: left; }
 .setting-row { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 16px 0; }
@@ -512,7 +519,7 @@ onBeforeUnmount(cleanup)
 .setting-row p { color: var(--text-secondary); font-size: var(--font-size-secondary); margin: 6px 0 0; line-height: 1.6; }
 .setting-row :deep(.el-switch) { flex-shrink: 0; }
 .threshold-field { margin-top: 10px; padding: 20px; border-radius: 14px; background: var(--bg-search); }
-.field-hint { display: block; margin-top: 6px; font-size: var(--font-size-secondary); color: var(--text-muted); }
+.field-hint { display: block; margin-top: 6px; font-size: var(--font-size-secondary); color: var(--text-secondary); }
 .file-input { display: none; }
 .file-drop { width: 100%; min-height: 230px; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 10px; padding: 24px; border: 1px dashed var(--border-strong); border-radius: 18px; background: var(--bg-search); color: var(--text-primary); font: inherit; cursor: pointer; transition: transform .25s, background .25s, border-color .25s; }
 .file-drop:hover, .file-drop.dragging { border-color: var(--brand); background: var(--status-ok-bg); }
@@ -529,10 +536,10 @@ onBeforeUnmount(cleanup)
 .export-scope strong { font-size: var(--font-size-body); font-weight: 600; }
 .export-scope p { font-size: var(--font-size-secondary); color: var(--text-secondary); margin: 7px 0 0; line-height: 1.65; }
 .verification-field { margin-top: 24px; }
-.verification-field label { display: block; margin-bottom: 10px; font-size: var(--font-size-body); color: var(--text-secondary); }
+.verification-field label { display: block; margin-bottom: 10px; font-size: var(--font-size-body); color: var(--text-primary); }
 .verification-field :deep(.el-input__inner) { height: 46px; font-size: var(--font-size-body); letter-spacing: .16em; font-variant-numeric: tabular-nums; }
 .verification-field :deep(.el-input__inner::placeholder) { font-size: var(--font-size-body); letter-spacing: 0; }
-.verification-hint { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 10px; color: var(--text-muted); font-size: var(--font-size-secondary); }
+.verification-hint { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 10px; color: var(--text-secondary); font-size: var(--font-size-secondary); }
 .verification-hint > .el-button { flex-shrink: 0; }
 .check-intro { text-align: center; padding: 20px 28px; }
 .check-intro > span { display: block; width: 48px; height: 48px; margin: 0 auto 22px; color: var(--brand); }
@@ -550,9 +557,9 @@ onBeforeUnmount(cleanup)
 .check-summary .unhealthy strong { color: var(--status-danger); }
 .inactive-accounts { margin-top: 16px; padding: 14px; background: var(--status-danger-bg); border-radius: 12px; color: var(--text-primary); display: flex; flex-wrap: wrap; gap: 8px 12px; font-size: var(--font-size-body); overflow-wrap: anywhere; }
 .inactive-accounts strong { width: 100%; font-weight: 600; color: var(--status-danger); }
-.check-log { max-height: 260px; min-height: 130px; overflow: auto; overscroll-behavior: contain; margin-top: 20px; padding: 16px; border: 1px solid var(--border); border-radius: 14px; background: var(--bg-search); font-family: var(--mono); font-size: var(--font-size-secondary); line-height: 1.9; }
+.check-log { max-height: 260px; min-height: 130px; overflow: auto; overscroll-behavior: contain; margin-top: 20px; padding: 16px; border: 1px solid var(--border); border-radius: 14px; background: var(--bg-search); color: var(--text-primary); font-family: var(--mono); font-size: var(--font-size-body); line-height: 1.9; }
 .check-log p { margin: 0 0 4px; overflow-wrap: anywhere; white-space: pre-wrap; }
-.waiting-line { color: var(--text-muted); }
+.waiting-line { color: var(--text-secondary); font-family: var(--sans); font-size: var(--font-size-secondary); }
 .operation-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px; padding-top: 6px; }
 .operation-footer :deep(.el-button) { min-width: 92px; max-width: 100%; margin-left: 0; border-radius: var(--r-pill); min-height: 38px; height: auto; padding-block: 9px; white-space: normal; line-height: 1.3; }
 .operation-body button:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }

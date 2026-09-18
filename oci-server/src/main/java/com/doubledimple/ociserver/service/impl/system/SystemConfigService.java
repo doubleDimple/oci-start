@@ -21,6 +21,7 @@ import com.doubledimple.ociserver.pojo.request.ProxyConfig;
 import com.doubledimple.ociserver.pojo.request.ProxyConfigRequest;
 import com.doubledimple.ociserver.pojo.response.ApiTokenResponse;
 import com.doubledimple.ociserver.service.message.factory.MessageFactory;
+import com.doubledimple.ociserver.service.message.NotificationTestSender;
 import com.doubledimple.ociserver.pojo.request.BarkConfig;
 import com.doubledimple.ociserver.pojo.request.BarkConfigRequest;
 import com.doubledimple.ociserver.pojo.request.DingTalkConfig;
@@ -48,12 +49,15 @@ import org.springframework.transaction.annotation.Transactional;
 import javax.annotation.Resource;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
+import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -76,6 +80,9 @@ public class SystemConfigService {
     @Resource
     @Lazy
     private MessageFactory messageFactory;
+
+    @Resource
+    private NotificationTestSender notificationTestSender;
 
     @Resource
     @Lazy
@@ -106,7 +113,12 @@ public class SystemConfigService {
     }
 
     public void updateTelegramConfig(TelegramConfigRequest request) {
-        saveOrUpdateConfig("telegram.bot.token", request.getBotToken());
+        String token = Boolean.TRUE.equals(request.getKeepBotToken())
+                ? getTelegramConfig().getBotToken() : request.getBotToken();
+        if (request.isEnabled() && (StringUtils.isBlank(token) || StringUtils.isBlank(request.getChatId()))) {
+            throw new IllegalArgumentException("启用 Telegram 需要完整配置");
+        }
+        if (!Boolean.TRUE.equals(request.getKeepBotToken())) saveOrUpdateConfig("telegram.bot.token", token);
         saveOrUpdateConfig("telegram.chat.id", request.getChatId());
         saveOrUpdateConfig("telegram.chat.chatName", request.getChatName());
 
@@ -138,8 +150,17 @@ public class SystemConfigService {
     }
 
     public void updateGithubConfig(GithubConfigRequest request) {
+        String secret = Boolean.TRUE.equals(request.getKeepSecret())
+                ? getGithubConfig().getClientSecret() : request.getClientSecret();
+        if (request.isEnabled() && (StringUtils.isBlank(request.getGithubId())
+                || StringUtils.isBlank(request.getClientId()) || StringUtils.isBlank(secret)
+                || StringUtils.isBlank(request.getRedirectUri()))) {
+            throw new IllegalArgumentException("启用 GitHub 时，用户 ID、Client ID、Client Secret 和回调地址不能为空");
+        }
         saveOrUpdateConfig("github.client.id", request.getClientId());
-        saveOrUpdateConfig("github.client.secret", request.getClientSecret());
+        if (!Boolean.TRUE.equals(request.getKeepSecret())) {
+            saveOrUpdateConfig("github.client.secret", secret);
+        }
         saveOrUpdateConfig("github.redirect.uri", request.getRedirectUri());
         saveOrUpdateConfig("github.myself.githubId", request.getGithubId());
         saveOrUpdateConfig("github.myself.userName", request.getUserName());
@@ -152,8 +173,14 @@ public class SystemConfigService {
     }
 
     public void updateDingTalkConfig(DingTalkConfigRequest request) {
-        saveOrUpdateConfig("dingtalk.webhook", request.getWebhook());
-        saveOrUpdateConfig("dingtalk.secret", request.getSecret());
+        DingTalkConfig current = getDingTalkConfig();
+        String webhook = Boolean.TRUE.equals(request.getKeepWebhook()) ? current.getWebhook() : request.getWebhook();
+        String secret = Boolean.TRUE.equals(request.getKeepSecret()) ? current.getSecret() : request.getSecret();
+        if (request.isEnabled() && (StringUtils.isBlank(webhook) || StringUtils.isBlank(secret))) {
+            throw new IllegalArgumentException("启用钉钉需要完整配置");
+        }
+        if (!Boolean.TRUE.equals(request.getKeepWebhook())) saveOrUpdateConfig("dingtalk.webhook", webhook);
+        if (!Boolean.TRUE.equals(request.getKeepSecret())) saveOrUpdateConfig("dingtalk.secret", secret);
 
         SystemConfig enabled = systemConfigRepository.findByKey("dingtalk.enabled")
                 .orElse(new SystemConfig());
@@ -197,19 +224,11 @@ public class SystemConfigService {
     }
 
     public void sendDingTalkMessage(String s) {
-        try {
-            messageFactory.getType(MessageEnum.DING_DING).sendMessageTemplateTest(s);
-        } catch (Exception e) {
-            log.error("发送消息错误,原因为:{}", e.getMessage(),e);
-        }
+        notificationTestSender.dingTalk(getDingTalkConfig(), s);
     }
 
     public void testTgTalk(String s) {
-        try {
-            messageFactory.getType(MessageEnum.TELEGRAM).sendMessageTemplateTest(s);
-        } catch (Exception e) {
-            log.error("发送消息错误,原因为:{}", e.getMessage(),e);
-        }
+        notificationTestSender.telegram(getTelegramConfig(), s);
     }
 
     public TaskConfig getTaskConfig() {
@@ -254,6 +273,9 @@ public class SystemConfigService {
         if (request.getExecuteHour() < 0 || request.getExecuteHour() > 23) {
             throw new IllegalArgumentException("执行时间必须在0-23之间");
         }
+        if (Boolean.TRUE.equals(request.getKeepNotificationSecret()) && Boolean.TRUE.equals(request.getClearNotificationSecret())) {
+            throw new IllegalArgumentException("不能同时保留和清除通知密钥");
+        }
 
         // 保存enabled状态
         SystemConfig enabled = systemConfigRepository.findByKey("task.enabled")
@@ -266,8 +288,12 @@ public class SystemConfigService {
         saveOrUpdateConfig("task.execute.hour", String.valueOf(request.getExecuteHour()));
 
         // 保存通知秘钥
-        if (request.getNotificationSecret() != null && !request.getNotificationSecret().trim().isEmpty()) {
-            saveOrUpdateConfig("task.notification.secret", request.getNotificationSecret().trim());
+        if (!Boolean.TRUE.equals(request.getKeepNotificationSecret())) {
+            if (Boolean.TRUE.equals(request.getClearNotificationSecret())) {
+                saveOrUpdateConfig("task.notification.secret", "");
+            } else if (request.getNotificationSecret() != null && !request.getNotificationSecret().trim().isEmpty()) {
+                saveOrUpdateConfig("task.notification.secret", request.getNotificationSecret().trim());
+            }
         }
         //保存是否启用账号测活
         saveOrUpdateConfig("task.enable.account-check", request.isEnableAccountCheck() ? "1" : "0");
@@ -461,8 +487,12 @@ public class SystemConfigService {
     }
 
     public void updateBarkConfig(BarkConfigRequest request) {
+        String key = Boolean.TRUE.equals(request.getKeepDeviceKey()) ? getBarkConfig().getDeviceKey() : request.getDeviceKey();
+        if (request.isEnabled() && (StringUtils.isBlank(request.getUrl()) || StringUtils.isBlank(key))) {
+            throw new IllegalArgumentException("启用 Bark 需要完整配置");
+        }
         saveOrUpdateConfig("bark.url", request.getUrl());
-        saveOrUpdateConfig("bark.device.key", request.getDeviceKey());
+        if (!Boolean.TRUE.equals(request.getKeepDeviceKey())) saveOrUpdateConfig("bark.device.key", key);
 
         SystemConfig enabled = systemConfigRepository.findByKey("bark.enabled")
                 .orElse(new SystemConfig());
@@ -472,11 +502,7 @@ public class SystemConfigService {
     }
 
     public void testBark(String message) {
-        try {
-            messageFactory.getType(MessageEnum.BARK).sendMessageTemplateTest(message);
-        } catch (Exception e) {
-            log.error("发送Bark测试消息失败", e);
-        }
+        notificationTestSender.bark(getBarkConfig(), message);
     }
 
     public CloudflareConfig getCloudflareConfig() {
@@ -571,13 +597,16 @@ public class SystemConfigService {
     }
 
     public void updateMfaConfig(MfaConfigRequest request) {
-        // 保存应用名称
-        saveOrUpdateConfig("mfa.issuer", request.getIssuer());
         MfaConfig mfaConfig = getMfaConfig();
-        if (request.isEnabled()) {
-            if (mfaConfig.getSecretKey() == null){
-                generateMfaSecretAndQR(request.getIssuer());
+        String issuer = normalizeMfaIssuer(request.getIssuer());
+        saveOrUpdateConfig("mfa.issuer", issuer);
+        if (StringUtils.isNotBlank(mfaConfig.getSecretKey())) {
+            // Changing the label must never invalidate already enrolled authenticators.
+            if (!issuer.equals(mfaConfig.getIssuer()) || StringUtils.isBlank(mfaConfig.getQrCode())) {
+                saveOrUpdateConfig("mfa.qr.code", generateMfaQr(issuer, mfaConfig.getSecretKey()));
             }
+        } else if (request.isEnabled()) {
+            generateMfaSecretAndQR(issuer);
         }
 
         // 保存启用状态
@@ -600,23 +629,26 @@ public class SystemConfigService {
     }
 
     private void generateMfaSecretAndQR(String issuer) {
+        String secretKey = generateRandomSecretKey();
+        String qrCodeBase64 = generateMfaQr(normalizeMfaIssuer(issuer), secretKey);
+        saveOrUpdateConfig("mfa.secret.key", secretKey);
+        saveOrUpdateConfig("mfa.qr.code", qrCodeBase64);
+    }
+
+    private String normalizeMfaIssuer(String issuer) {
+        return StringUtils.isBlank(issuer) ? "OCI-Start Verify" : issuer.trim();
+    }
+
+    private String generateMfaQr(String issuer, String secretKey) {
         try {
-            // 生成32位随机密钥
-            String secretKey = generateRandomSecretKey();
-
-            // 生成OTP URL
-            String otpAuthUri = String.format("otpauth://totp/%s:admin?secret=%s&issuer=%s",
-                    issuer, secretKey, issuer);
-
-            // 生成二维码
-            String qrCodeBase64 = qrCodeService.generateQRCodeImage(otpAuthUri);
-
-            // 保存到数据库
-            saveOrUpdateConfig("mfa.secret.key", secretKey);
-            saveOrUpdateConfig("mfa.qr.code", qrCodeBase64);
-
+            String label = URLEncoder.encode(issuer + ":admin", StandardCharsets.UTF_8.name()).replace("+", "%20");
+            String encodedIssuer = URLEncoder.encode(issuer, StandardCharsets.UTF_8.name()).replace("+", "%20");
+            String encodedSecret = URLEncoder.encode(secretKey, StandardCharsets.UTF_8.name()).replace("+", "%20");
+            return qrCodeService.generateQRCodeImage("otpauth://totp/" + label
+                    + "?secret=" + encodedSecret + "&issuer=" + encodedIssuer);
         } catch (Exception e) {
-            log.error("生成MFA密钥和二维码失败", e);
+            // A QR exception may contain its input URI; never attach credential-bearing causes.
+            log.error("生成MFA二维码失败");
             throw new RuntimeException("生成MFA配置失败");
         }
     }
@@ -658,8 +690,13 @@ public class SystemConfigService {
     }
 
     public void updateFeishuConfig(FeishuConfigRequest request) {
-        saveOrUpdateConfig("feishu.webhook", request.getWebhook());
-        saveOrUpdateConfig("feishu.secret", request.getSecret());
+        FeishuConfig current = getFeishuConfig();
+        String webhook = Boolean.TRUE.equals(request.getKeepWebhook()) ? current.getWebhook() : request.getWebhook();
+        if (request.isEnabled() && StringUtils.isBlank(webhook)) {
+            throw new IllegalArgumentException("启用飞书需要 Webhook");
+        }
+        if (!Boolean.TRUE.equals(request.getKeepWebhook())) saveOrUpdateConfig("feishu.webhook", webhook);
+        if (!Boolean.TRUE.equals(request.getKeepSecret())) saveOrUpdateConfig("feishu.secret", request.getSecret());
 
         SystemConfig enabled = systemConfigRepository.findByKey("feishu.enabled")
                 .orElse(new SystemConfig());
@@ -669,11 +706,7 @@ public class SystemConfigService {
     }
 
     public void sendFeishuMessage(String message) {
-        try {
-            messageFactory.getType(MessageEnum.FEISHU).sendMessageTemplateTest(message);
-        } catch (Exception e) {
-            log.error("发送飞书消息错误,原因为:{}", e.getMessage(), e);
-        }
+        notificationTestSender.feishu(getFeishuConfig(), message);
     }
 
     /**
@@ -733,7 +766,9 @@ public class SystemConfigService {
         saveOrUpdateConfig("proxy.port", String.valueOf(request.getPort()));
         // username / password 可选,留空也存(代表清除认证)
         saveOrUpdateConfig("proxy.username", request.getUsername() == null ? "" : request.getUsername());
-        saveOrUpdateConfig("proxy.password", request.getPassword() == null ? "" : request.getPassword());
+        if (!Boolean.TRUE.equals(request.getKeepPassword())) {
+            saveOrUpdateConfig("proxy.password", request.getPassword() == null ? "" : request.getPassword());
+        }
 
         log.info("代理配置已更新: enabled={}, type={}, host={}, port={}, hasAuth={}",
                 request.isEnabled(), request.getType(), request.getHost(), request.getPort(),
@@ -744,17 +779,14 @@ public class SystemConfigService {
      * 测试代理连接
      */
     public boolean testProxyConnection(ProxyConfigRequest request) {
-        try {
-            log.info("测试代理连接: {}:{}", request.getHost(), request.getPort());
-
-            // 简单的网络连接测试
-            java.net.Socket socket = new java.net.Socket();
+        if (StringUtils.isBlank(request.getHost()) || request.getPort() < 1 || request.getPort() > 65535) {
+            return false;
+        }
+        try (java.net.Socket socket = new java.net.Socket()) {
+            // Only TCP reachability, not proxy protocol, authentication or destination access.
             socket.connect(new java.net.InetSocketAddress(request.getHost(), request.getPort()), 5000);
-            socket.close();
-
             return true;
         } catch (Exception e) {
-            log.error("代理连接测试失败: {}", e.getMessage());
             return false;
         }
     }
@@ -795,16 +827,22 @@ public class SystemConfigService {
      * 获取API Token配置
      */
     public ApiTokenConfig getApiTokenConfig() {
-        ApiTokenConfig config = new ApiTokenConfig();
+        return apiTokenConfigFrom(systemConfigRepository.findAllByKeyStartingWith("api.token."));
+    }
 
-        Optional<SystemConfig> enabled = systemConfigRepository.findByKey("api.token.enabled");
-        Optional<SystemConfig> tokenName = systemConfigRepository.findByKey("api.token.name");
-        Optional<SystemConfig> tokenValue = systemConfigRepository.findByKey("api.token.value");
-        Optional<SystemConfig> expirationDays = systemConfigRepository.findByKey("api.token.expiration.days");
-        Optional<SystemConfig> description = systemConfigRepository.findByKey("api.token.description");
-        Optional<SystemConfig> createdAt = systemConfigRepository.findByKey("api.token.created.at");
-        Optional<SystemConfig> expiresAt = systemConfigRepository.findByKey("api.token.expires.at");
-        Optional<SystemConfig> allowSwagger = systemConfigRepository.findByKey("api.token.allow.swagger");
+    /** Decode one database snapshot, avoiding independently committed configuration reads. */
+    public static ApiTokenConfig apiTokenConfigFrom(List<SystemConfig> rows) {
+        ApiTokenConfig config = new ApiTokenConfig();
+        Map<String, SystemConfig> values = new HashMap<>();
+        for (SystemConfig row : rows) values.put(row.getKey(), row);
+        Optional<SystemConfig> enabled = Optional.ofNullable(values.get("api.token.enabled"));
+        Optional<SystemConfig> tokenName = Optional.ofNullable(values.get("api.token.name"));
+        Optional<SystemConfig> tokenValue = Optional.ofNullable(values.get("api.token.value"));
+        Optional<SystemConfig> expirationDays = Optional.ofNullable(values.get("api.token.expiration.days"));
+        Optional<SystemConfig> description = Optional.ofNullable(values.get("api.token.description"));
+        Optional<SystemConfig> createdAt = Optional.ofNullable(values.get("api.token.created.at"));
+        Optional<SystemConfig> expiresAt = Optional.ofNullable(values.get("api.token.expires.at"));
+        Optional<SystemConfig> allowSwagger = Optional.ofNullable(values.get("api.token.allow.swagger"));
 
         config.setEnabled(enabled.map(SystemConfig::isEnabled).orElse(false));
         config.setTokenName(tokenName.map(SystemConfig::getValue).orElse(""));
@@ -815,10 +853,10 @@ public class SystemConfigService {
         config.setAllowSwaggerAccess(allowSwagger.map(SystemConfig::isEnabled).orElse(true));
 
         // 解析时间字段
-        if (createdAt.isPresent() && !createdAt.get().getValue().isEmpty()) {
+        if (createdAt.isPresent() && StringUtils.isNotEmpty(createdAt.get().getValue())) {
             config.setCreatedAt(LocalDateTime.parse(createdAt.get().getValue()));
         }
-        if (expiresAt.isPresent() && !expiresAt.get().getValue().isEmpty()) {
+        if (expiresAt.isPresent() && StringUtils.isNotEmpty(expiresAt.get().getValue())) {
             config.setExpiresAt(LocalDateTime.parse(expiresAt.get().getValue()));
         }
 
@@ -878,8 +916,7 @@ public class SystemConfigService {
         response.setAllowSwaggerAccess(request.isAllowSwaggerAccess());
         response.setDaysUntilExpiration(request.getExpirationDays());
 
-        log.info("API Token配置已更新: name={}, expirationDays={}",
-                request.getTokenName(), request.getExpirationDays());
+        log.info("API Token配置已更新");
 
         return response;
     }
@@ -888,7 +925,7 @@ public class SystemConfigService {
      * 验证API Token
      */
     public boolean validateApiToken(String token) {
-        if (StringUtils.isEmpty(token) || !token.startsWith("oci-start_api_")) {
+        if (StringUtils.isEmpty(token) || token.length() > 1000 || !token.startsWith("oci-start_api_")) {
             return false;
         }
 
@@ -898,13 +935,14 @@ public class SystemConfigService {
                 return false;
             }
 
-            if (!token.equals(config.getTokenValue())) {
+            if (StringUtils.isEmpty(config.getTokenValue()) || !MessageDigest.isEqual(token.getBytes(StandardCharsets.UTF_8),
+                    config.getTokenValue().getBytes(StandardCharsets.UTF_8))) {
                 return false;
             }
 
             // 验证签名
             String tokenBody = token.substring(14); // 移除 "oci-start_api_"
-            String[] parts = tokenBody.split("\\.");
+            String[] parts = tokenBody.split("\\.", -1);
             if (parts.length != 2) {
                 return false;
             }
@@ -913,8 +951,9 @@ public class SystemConfigService {
             String providedSignature = parts[1];
 
             // 重新计算签名
-            String secretKey = getOrCreateApiSecretKey();
-            String payload = new String(Base64.getUrlDecoder().decode(payloadBase64));
+            String secretKey = systemConfigRepository.findByKey("api.token.secret.key").map(SystemConfig::getValue).orElse("");
+            if (StringUtils.isEmpty(secretKey)) return false;
+            String payload = new String(Base64.getUrlDecoder().decode(payloadBase64), StandardCharsets.UTF_8);
 
             Mac mac = Mac.getInstance("HmacSHA256");
             SecretKeySpec secretKeySpec = new SecretKeySpec(secretKey.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
@@ -923,20 +962,20 @@ public class SystemConfigService {
             byte[] expectedSignature = mac.doFinal(payload.getBytes(StandardCharsets.UTF_8));
             String expectedSignatureBase64 = Base64.getUrlEncoder().withoutPadding().encodeToString(expectedSignature);
 
-            if (!expectedSignatureBase64.equals(providedSignature)) {
+            if (!MessageDigest.isEqual(expectedSignatureBase64.getBytes(StandardCharsets.US_ASCII),
+                    providedSignature.getBytes(StandardCharsets.US_ASCII))) {
                 return false;
             }
 
             // 检查配置过期时间
-            if (config.getExpiresAt() != null && config.getExpiresAt().isBefore(LocalDateTime.now())) {
-                log.warn("API Token 已过期: {}", config.getTokenName());
+            if (config.getExpiresAt() == null || !config.getExpiresAt().atZone(java.time.ZoneId.systemDefault()).toInstant().isAfter(java.time.Instant.now())) {
                 return false;
             }
 
             return true;
 
         } catch (Exception e) {
-            log.warn("Token 验证失败: {}", e.getMessage());
+            log.warn("Token 验证失败");
             return false;
         }
     }
@@ -981,11 +1020,11 @@ public class SystemConfigService {
             byte[] signature = mac.doFinal(payload.getBytes(StandardCharsets.UTF_8));
             String signatureBase64 = Base64.getUrlEncoder().withoutPadding().encodeToString(signature);
 
-            return "oci-start_api_" + Base64.getUrlEncoder().withoutPadding().encodeToString(payload.getBytes()) + "." + signatureBase64;
+            return "oci-start_api_" + Base64.getUrlEncoder().withoutPadding().encodeToString(payload.getBytes(StandardCharsets.UTF_8)) + "." + signatureBase64;
 
         } catch (Exception e) {
-            log.error("生成 API Token 失败", e);
-            throw new RuntimeException("Token 生成失败", e);
+            log.error("生成 API Token 失败");
+            throw new RuntimeException("Token 生成失败");
         }
     }
 
@@ -1059,9 +1098,18 @@ public class SystemConfigService {
     }
 
     public void updateGoogleConfig(GoogleConfigRequest request) {
+        String secret = Boolean.TRUE.equals(request.getKeepSecret())
+                ? getGoogleConfig().getClientSecret() : request.getClientSecret();
+        if (request.isEnabled() && (StringUtils.isBlank(request.getEmail())
+                || StringUtils.isBlank(request.getClientId()) || StringUtils.isBlank(secret)
+                || StringUtils.isBlank(request.getRedirectUri()))) {
+            throw new IllegalArgumentException("启用 Google 时，邮箱、Client ID、Client Secret 和回调地址不能为空");
+        }
         saveOrUpdateConfig("google.client.id", request.getClientId());
         saveOrUpdateConfig("google.client.email", request.getEmail());
-        saveOrUpdateConfig("google.client.secret", request.getClientSecret());
+        if (!Boolean.TRUE.equals(request.getKeepSecret())) {
+            saveOrUpdateConfig("google.client.secret", secret);
+        }
         saveOrUpdateConfig("google.redirect.uri", request.getRedirectUri());
         SystemConfig enabled = systemConfigRepository.findByKey("google.enabled")
                 .orElse(new SystemConfig());
@@ -1100,17 +1148,21 @@ public class SystemConfigService {
      * 更新 Turnstile 配置
      */
     public void updateTurnstileConfig(TurnstileConfigRequest request) {
+        String secret = Boolean.TRUE.equals(request.getKeepSecret())
+                ? getTurnstileConfig().getSecretKey() : request.getSecretKey();
         if (request.isEnabled()) {
             if (StringUtils.isBlank(request.getSiteKey())) {
                 throw new IllegalArgumentException("启用 Turnstile 时，Site Key 不能为空");
             }
-            if (StringUtils.isBlank(request.getSecretKey())) {
+            if (StringUtils.isBlank(secret)) {
                 throw new IllegalArgumentException("启用 Turnstile 时，Secret Key 不能为空");
             }
         }
 
         saveOrUpdateConfig("turnstile.site.key", request.getSiteKey() != null ? request.getSiteKey() : "");
-        saveOrUpdateConfig("turnstile.secret.key", request.getSecretKey() != null ? request.getSecretKey() : "");
+        if (!Boolean.TRUE.equals(request.getKeepSecret())) {
+            saveOrUpdateConfig("turnstile.secret.key", secret != null ? secret : "");
+        }
 
         SystemConfig enabled = systemConfigRepository.findByKey("turnstile.enabled")
                 .orElse(new SystemConfig());

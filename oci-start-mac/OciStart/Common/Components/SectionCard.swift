@@ -12,17 +12,17 @@ struct SectionCard<Content: View>: View {
         VStack(alignment: .leading, spacing: 10) {
             if let title = title {
                 Text(title)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
+                    .font(.system(size: AppTheme.sectionSize, weight: .semibold))
+                    .foregroundColor(AppTheme.textPrimary(dark))
             }
             content()
         }
-        .padding(14)
+        .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(AppTheme.sidebarBg(dark))
-        .cornerRadius(10)
+        .background(AppTheme.cardBg(dark))
+        .cornerRadius(AppTheme.cardRadius)
         .overlay(
-            RoundedRectangle(cornerRadius: 10)
+            RoundedRectangle(cornerRadius: AppTheme.cardRadius)
                 .stroke(AppTheme.border(dark).opacity(0.7), lineWidth: 1)
         )
     }

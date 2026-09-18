@@ -24,6 +24,11 @@ export default {
       noTenantsHint: '通过右上角 API 导入，连接并管理你的云账号。',
       viewAll: '查看全部租户', loading: '正在读取租户…', range: '显示 {start}–{end}，共 {total} 个租户',
     },
+    mobile: {
+      details: '租户信息', openDetails: '查看 {name} 的详情', regions: '区域与实例',
+      unavailable: '未在当前列表中找到该租户',
+      unavailableHint: '租户可能已移除或列表已更新，请返回列表重新选择。',
+    },
     proxy: { forced: '强制代理', bound: '已绑定代理', configure: '配置代理' },
     actions: {
       chat: 'AI 对话', boot: '添加开机', update: '更新账号', regions: '租户详情', subscribe: '区域订阅',
@@ -77,6 +82,11 @@ export default {
       noMatchesHint: 'Try another name or clear the search to see all tenants.',
       noTenantsHint: 'Use API import at the top right to connect and manage your cloud accounts.',
       viewAll: 'View all tenants', loading: 'Loading tenants…', range: 'Showing {start}–{end} of {total} tenants',
+    },
+    mobile: {
+      details: 'Tenant information', openDetails: 'View details for {name}', regions: 'Regions & instances',
+      unavailable: 'The tenant is not in this list',
+      unavailableHint: 'The tenant may have been removed or the list has changed. Return to the list and select it again.',
     },
     proxy: { forced: 'Proxy required', bound: 'Proxy assigned', configure: 'Configure proxy' },
     actions: {

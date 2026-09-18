@@ -1,5 +1,45 @@
 import regionGlobe from './regions/globe'
+import emailManagement from './email/management'
+import emailCompose from './email/compose'
+import storageManagement from './storage/management'
+import storageUpload from './storage/upload'
+import storagePreview from './storage/preview'
+import tenantSecurity from './tenants/security'
+import tenantRegions from './tenants/regions'
+import tenantAudit from './tenants/audit'
+import ociCost from './cost/oci'
+import tenantTraffic from './monitor/traffic'
+import metrics from './monitor/metrics'
+import domainProviders from './settings/domainProviders'
+import cloudflareDns from './dns/cloudflare'
+import edgeoneDns from './dns/edgeone'
+import vps from './vps/list'
+import vpsDetails from './vps/resourceDetails'
+import networkQuality from './settings/networkQuality'
+import systemLogs from './settings/systemLogs'
+import securitySettings from './settings/securitySettings'
+import vpnProxy from './settings/vpnProxy'
+import notificationSettings from './settings/notificationSettings'
+import memos from './settings/memos'
+import migration from './settings/migration'
+import mfaBackup from './settings/mfaBackup'
+import apiTokens from './settings/apiTokens'
+import aiChat from './ai/chat'
+import aiModels from './ai/models'
+import delayTest from './tools/delayTest'
+import openLogs from './boot/logs'
+import instances from './instances/list'
+import tenantInstances from './instances/tenantInstances'
+import sshTerminal from './terminal/ssh'
+import sftp from './terminal/sftp'
+import vnc from './terminal/vnc'
+import vnic from './network/vnic'
+import vnicActions from './network/vnicActions'
+import instanceOperations from './instances/operations'
+import instanceNetwork from './instances/network'
+import gcpInstances from './instances/gcp'
 import ociBoot from './boot/oci'
+import bootTasks from './boot/tasks'
 import regionPage from './regions/page'
 import tenant from './tenants/list'
 import tenantIdentity from './tenants/identity'
@@ -11,13 +51,63 @@ import { headerZh } from './header'
 import { headerMessagesZh } from './headerMessages'
 import { headerAssetsZh } from './headerAssets'
 import { headerVersionZh } from './headerVersion'
+import { mobileTenantToolsMessages } from './mobileTenantTools'
+import { mobileShellMessages } from './mobileShell'
+import { mobileRecordsMessages } from './mobileRecords'
 
 export default {
+  mobileRecords: mobileRecordsMessages.zh,
+  mobileTenantTools: mobileTenantToolsMessages.zh,
+  mobileShell: mobileShellMessages.zh,
+  pageLoading: { loading: '加载中…', failed: '页面加载失败', retry: '重新加载' },
+  pageError: { title: '错误详情', open: '出现错误，点击查看详情', close: '关闭错误详情' },
+  pagePagination: { label: '分页', previous: '上一页', next: '下一页', pageSize: '每页条数', perPage: '{count}条/页' },
+  emailManagement: emailManagement.zh,
+  emailCompose: emailCompose.zh,
+  storageManagement: storageManagement.zh,
+  storageUpload: storageUpload.zh,
+  storagePreview: storagePreview.zh,
+  pageBack: '返回',
+  tenantSecurity: tenantSecurity.zh,
+  tenantRegions: tenantRegions.zh,
+  tenantAudit: tenantAudit.zh,
+  ociCost: ociCost.zh,
+  tenantTraffic: tenantTraffic.zh,
+  metrics: metrics.zh,
+  domainProviders: domainProviders.zh,
+  cloudflareDns: cloudflareDns.zh,
+  edgeoneDns: edgeoneDns.zh,
+  vps: vps.zh,
+  vpsDetails: vpsDetails.zh,
+  networkQuality: networkQuality.zh,
+  systemLogs: systemLogs.zh,
+  securitySettings: securitySettings.zh,
+  vpnProxy: vpnProxy.zh,
+  notificationSettings: notificationSettings.zh,
+  memo: memos.zh,
+  migration: migration.zh,
+  mfaBackup: mfaBackup.zh,
+  apiTokens: apiTokens.zh,
+  aiChat: aiChat.zh,
+  aiModels: aiModels.zh,
+  delayTest: delayTest.zh,
+  openLogs: openLogs.zh,
+  instances: instances.zh,
+  tenantInstances: tenantInstances.zh,
+  sshTerminal: sshTerminal.zh,
+  sftp: sftp.zh,
+  vnc: vnc.zh,
+  vnic: vnic.zh,
+  vnicActions: vnicActions.zh,
+  instanceOperations: instanceOperations.zh,
+  instanceNetwork: instanceNetwork.zh,
+  gcpInstances: gcpInstances.zh,
   header: headerZh,
   headerMessages: headerMessagesZh,
   headerAssets: headerAssetsZh,
   headerVersion: headerVersionZh,
   ociBoot: ociBoot.zh,
+  bootTasks: bootTasks.zh,
   regionGlobe: regionGlobe.zh,
   regionPage: regionPage.zh,
   tenant: tenant.zh,
@@ -48,13 +138,14 @@ export default {
   chrome: {
     title: '外观',
     sidebar: '侧栏背景',
-    page: '内容区背景',
+    page: '内容区配色',
     reset: '恢复默认',
   },
   cloudSwitch: '切换云厂商',
   noMenu: '无匹配菜单',
   comingSoon: '即将推出',
   dashboard: {
+    yearUnit: '年', dayUnit: '天', hourUnit: '时', minuteUnit: '分',
     pageTitle: '系统监控',
     loading: '加载中...',
     apiTotal: '总API数',
@@ -141,7 +232,7 @@ export default {
     storage: 'OCI 对象存储',
     boot: 'OCI 开机管理',
     ai: 'OCI AI 管理',
-    speed: '延迟测试',
+    speed: 'OCI延迟测试',
     openLog: 'OCI 开机日志',
     gcpAccounts: 'GCP 账号管理',
     gcpInstances: 'GCP 实例管理',

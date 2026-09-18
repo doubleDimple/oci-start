@@ -1,5 +1,5 @@
 /* Short, interruptible feedback; pages never depend on animation to become visible. */
-:where(button, a, input, select, textarea, [role='button']):focus-visible {
+:where(button, a, input:not(.el-input__inner):not(.el-select__input):not(.el-range-input), select, textarea, [role='button']):focus-visible {
   outline: 2px solid var(--brand);
   outline-offset: 3px;
 }
@@ -16,17 +16,7 @@
 .el-input__wrapper, .el-select__wrapper {
   transition: background-color 160ms ease, box-shadow 160ms ease;
 }
-.el-input__wrapper.is-focus, .el-select__wrapper.is-focused {
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand) 55%, transparent);
-}
 .el-table .el-table__row > td { transition: background-color 140ms ease; }
-
-.page-view-enter-active {
-  transition: opacity 260ms ease, transform 260ms cubic-bezier(.22, 1, .36, 1);
-}
-.page-view-leave-active { transition: opacity 100ms ease; }
-.page-view-enter-from { opacity: 0; transform: translateY(6px); }
-.page-view-leave-to { opacity: 0; }
 
 .el-dialog {
   --el-dialog-padding-primary: 26px;
@@ -84,7 +74,6 @@
     transition-duration: .01ms !important;
     scroll-behavior: auto !important;
   }
-  .page-view-enter-from { transform: none; }
   .el-overlay.dialog-fade-enter-active .el-dialog,
   .el-overlay.dialog-fade-leave-active .el-dialog,
   .el-overlay.fade-in-linear-enter-active .el-message-box,

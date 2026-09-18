@@ -13,9 +13,12 @@
   },
   "dependencies": {
     "axios": "^1.7.7",
+    "dompurify": "^3.4.15",
     "echarts": "^6.0.0",
     "element-plus": "^2.8.7",
     "gsap": "^3.15.0",
+    "highlight.js": "^11.12.0",
+    "marked": "^18.0.13",
     "pinia": "^2.2.6",
     "vue": "^3.5.13",
     "vue-i18n": "^10.0.4",

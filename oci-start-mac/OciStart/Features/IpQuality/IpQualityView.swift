@@ -18,6 +18,7 @@ struct IpQualityView: View {
             title: "质量管理",
             subtitle: "IP 质量检测开关 · 三网 VPS SSH 探测节点",
             systemImage: "shield",
+            layout: .workspace,
             toolbar: { toolbar },
             content: {
                 ScrollView {
@@ -38,7 +39,7 @@ struct IpQualityView: View {
                             }
                         }
                     }
-                    .padding(16)
+                    .padding(AppTheme.pagePadding)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -91,8 +92,8 @@ struct IpQualityView: View {
                 )
             }
             Text("按设定小时周期执行 IP 质量检测任务")
-                .font(.system(size: 11))
-                .foregroundColor(AppTheme.sidebarText(dark))
+                .font(.system(size: 13))
+                .foregroundColor(AppTheme.textSecondary(dark))
         } footer: {
             AppButton(
                 title: "保存配置",
@@ -211,7 +212,7 @@ struct IpQualityView: View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundColor(Color(hex: "f85149"))
-            Text(text).font(.system(size: 12))
+            Text(text).font(.system(size: 14))
             Spacer()
             Button("重试") { Task { await model.reload() } }
                 .buttonStyle(PlainButtonStyle())

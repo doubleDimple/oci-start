@@ -15,8 +15,8 @@ struct DataList<Header: View, Content: View>: View {
                 header()
             }
             .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .background(AppTheme.sidebarHover(dark).opacity(0.65))
+            .padding(.vertical, 12)
+            .background(AppTheme.hover(dark).opacity(0.65))
             .overlay(
                 Rectangle()
                     .frame(height: 1)
@@ -54,7 +54,8 @@ struct DataListRow<Content: View>: View {
                 content()
             }
             .padding(.horizontal, 14)
-            .padding(.vertical, 10)
+            .padding(.vertical, 12)
+            .frame(minHeight: 48)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
                 isSelected
@@ -84,8 +85,8 @@ struct DataListColumnHeader: View {
 
     var body: some View {
         Text(title)
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundColor(AppTheme.sidebarText(dark))
+            .font(.system(size: AppTheme.bodySize, weight: .semibold))
+            .foregroundColor(AppTheme.textSecondary(dark))
             .frame(width: width, alignment: alignment)
             .frame(maxWidth: width == nil ? .infinity : nil, alignment: alignment)
     }

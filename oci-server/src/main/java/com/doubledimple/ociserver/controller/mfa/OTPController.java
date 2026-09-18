@@ -13,16 +13,13 @@ import com.doubledimple.ociserver.utils.google.GoogleAuthMigrationParser;
 import com.google.zxing.BinaryBitmap;
 import com.google.zxing.MultiFormatReader;
 import com.google.zxing.Result;
-import com.google.zxing.WriterException;
 import com.google.zxing.client.j2se.BufferedImageLuminanceSource;
 import com.google.zxing.common.HybridBinarizer;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import com.doubledimple.ociserver.config.context.UserContext;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -44,7 +41,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
-
 /**
  * @author doubleDimple
  * @date 2024:10:05日 01:00
@@ -61,29 +57,6 @@ public class OTPController  extends BaseController {
 
     @Resource
     private OTPKeyRepository otpKeyRepository;
-
-    // 显示主页（PC）
-    @GetMapping("/mfa/page")
-    public String mfa(Model model) throws IOException, WriterException {
-        List<OTPKey> otpKeys = otpService.getAllKeys();
-        if (otpKeys.size() > 0){
-            model.addAttribute("otpKeys", otpKeys);
-        }
-        model.addAttribute("activePage", "api-mfa");
-        return "mfa";
-    }
-
-    // 移动端 MFA 页面
-    @GetMapping("/m/mfa")
-    public String mobileMfa(Model model) {
-        List<OTPKey> otpKeys = otpService.getAllKeys();
-        if (otpKeys != null && !otpKeys.isEmpty()) {
-            model.addAttribute("otpKeys", otpKeys);
-        }
-        model.addAttribute("activePage", "mfa");
-        model.addAttribute("currentUsername", UserContext.getUsername());
-        return "mobile/mfa";
-    }
 
     /**
      * 聚合返回 MFA 密钥列表（Mac / 原生客户端用）
@@ -110,9 +83,9 @@ public class OTPController  extends BaseController {
             body.put("data", list);
             return ResponseEntity.ok(body);
         } catch (Exception e) {
-            log.error("获取 MFA 密钥列表失败", e);
+            log.error("获取 MFA 密钥列表失败");
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(e.getMessage());
+                    .body("获取 MFA 密钥列表失败");
         }
     }
 
@@ -132,7 +105,6 @@ public class OTPController  extends BaseController {
         // 摄像头扫码直接传入 URL 文本（otpauth:// 或 otpauth-migration://）
         if (StringUtils.isNotBlank(qrUrl)) {
             String url = qrUrl.trim();
-            log.info("qrUrl text is: {}", url);
             if (url.startsWith("otpauth-migration://")) {
                 List<GoogleAuthMigrationParser.OtpParameters> otpParameters = GoogleAuthMigrationParser.parseUri(url);
                 List<OTPKey> otpKeys = new ArrayList<>();
@@ -179,7 +151,6 @@ public class OTPController  extends BaseController {
 
             // 解析 otpauth:// URI
             String qrContent = result.getText();
-            log.info("qrCode text is: {}",qrContent);
             if (qrContent.startsWith("otpauth://")) {
                 URI uri = new URI(qrContent);
                 String query = uri.getQuery();
@@ -276,18 +247,27 @@ public class OTPController  extends BaseController {
         return new OtpResponse2("OK");
     }
 
-
     @GetMapping("/export-data")
     public void exportToCSV(HttpServletResponse response) throws IOException {
-        response.setContentType("text/csv");
+        response.setContentType("text/csv;charset=UTF-8");
+        response.setHeader("Cache-Control", "no-store");
         response.setHeader("Content-Disposition", "attachment; filename=\"otp_keys.csv\"");
         PrintWriter writer = response.getWriter();
         writer.println("Key Name,Issuer,Secret Key,Created Date");
 
         List<OTPKey> otpKeys = otpService.getAllKeys();
         for (OTPKey otpKey : otpKeys) {
-            writer.printf("%s,%s,%s,%s%n", otpKey.getKeyName(), otpKey.getIssuer(), otpKey.getSecretKey(),otpKey.getCreateTime());
+            writer.printf("%s,%s,%s,%s%n", csvCell(otpKey.getKeyName()), csvCell(otpKey.getIssuer()),
+                    csvCell(otpKey.getSecretKey()), csvCell(otpKey.getCreateTime() == null ? "" : otpKey.getCreateTime().toString()));
         }
         writer.flush();
+    }
+
+    private static String csvCell(String raw) {
+        String value = raw == null ? "" : raw;
+        String leading = value.trim();
+        if (!leading.isEmpty() && "=+-@".indexOf(leading.charAt(0)) >= 0
+                || value.startsWith("\t") || value.startsWith("\r") || value.startsWith("\n")) value = "'" + value;
+        return "\"" + value.replace("\"", "\"\"") + "\"";
     }
 }

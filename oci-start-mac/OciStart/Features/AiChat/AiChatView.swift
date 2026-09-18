@@ -16,10 +16,10 @@ struct AiChatView: View {
 
     /// 主色强调
     private var accent: Color { AppTheme.sidebarActive }
-    private var indigo: Color { Color(hex: "6366f1") }
-    private var surface: Color { AppTheme.sidebarBg(dark) }
+    private var indigo: Color { AppTheme.sidebarActive }
+    private var surface: Color { AppTheme.cardBg(dark) }
     private var page: Color { AppTheme.pageBg(dark) }
-    private var muted: Color { AppTheme.sidebarText(dark) }
+    private var muted: Color { AppTheme.textSecondary(dark) }
 
     /// 内容区左右边距（消息流 / 输入框随内容区全宽伸缩）
     private var stageHPad: CGFloat { 20 }
@@ -88,10 +88,10 @@ struct AiChatView: View {
                     }
                     VStack(alignment: .leading, spacing: 2) {
                         Text("OCI AI")
-                            .font(.system(size: 15, weight: .bold))
-                            .foregroundColor(dark ? Color.white.opacity(0.95) : Color.primary)
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(AppTheme.textPrimary(dark))
                         Text("智能助手 · 按租户对话")
-                            .font(.system(size: 11))
+                            .font(.system(size: 13))
                             .foregroundColor(muted)
                     }
                     Spacer(minLength: 0)
@@ -131,12 +131,12 @@ struct AiChatView: View {
             // Section label
             HStack {
                 Text("租户会话")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(muted)
                     .textCase(.uppercase)
                 Spacer()
                 Text("\(model.filteredTenants.count)")
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
                     .foregroundColor(accent)
                     .padding(.horizontal, 7)
                     .padding(.vertical, 2)
@@ -149,7 +149,7 @@ struct AiChatView: View {
                 VStack(spacing: 10) {
                     ProgressView()
                     Text("加载租户…")
-                        .font(.system(size: 12))
+                        .font(.system(size: 13))
                         .foregroundColor(muted)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -157,9 +157,9 @@ struct AiChatView: View {
                 VStack(spacing: 10) {
                     Image(systemName: "person.crop.circle.badge.questionmark")
                         .font(.system(size: 28, weight: .light))
-                        .foregroundColor(muted.opacity(0.5))
+                        .foregroundColor(muted)
                     Text("暂无匹配租户")
-                        .font(.system(size: 12))
+                        .font(.system(size: 13))
                         .foregroundColor(muted)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -180,10 +180,10 @@ struct AiChatView: View {
                 Image(systemName: "info.circle")
                     .font(.system(size: 10))
                 Text("从租户列表点 AI 可直达本页")
-                    .font(.system(size: 10))
+                    .font(.system(size: 14))
                     .lineLimit(1)
             }
-            .foregroundColor(muted.opacity(0.75))
+            .foregroundColor(muted)
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -229,19 +229,19 @@ struct AiChatView: View {
                         )
                         .frame(width: 36, height: 36)
                     Text(String(t.name.prefix(1)).uppercased())
-                        .font(.system(size: 13, weight: .bold))
+                        .font(.system(size: 14, weight: .bold))
                         .foregroundColor(selected ? .white : muted)
                 }
                 VStack(alignment: .leading, spacing: 3) {
                     Text(t.name)
-                        .font(.system(size: 12.5, weight: .semibold))
-                        .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
+                        .font(.system(size: 14.5, weight: .semibold))
+                        .foregroundColor(AppTheme.textPrimary(dark))
                         .lineLimit(1)
                     HStack(spacing: 4) {
                         Image(systemName: "mappin.circle.fill")
                             .font(.system(size: 9))
                         Text(t.region.isEmpty ? "未知区域" : t.region)
-                            .font(.system(size: 10.5))
+                            .font(.system(size: 14.5))
                             .lineLimit(1)
                     }
                     .foregroundColor(muted)
@@ -312,7 +312,7 @@ struct AiChatView: View {
                         .font(.system(size: 13, weight: .semibold))
                     if !showTenantRail {
                         Text("租户")
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(.system(size: 14, weight: .semibold))
                     }
                 }
                 .foregroundColor(showTenantRail ? accent : muted)
@@ -354,7 +354,7 @@ struct AiChatView: View {
                         HStack(spacing: 4) {
                             Text(model.selectedTenant?.name ?? "未选择租户")
                                 .font(.system(size: 14, weight: .semibold))
-                                .foregroundColor(dark ? Color.white.opacity(0.94) : Color.primary)
+                                .foregroundColor(AppTheme.textPrimary(dark))
                                 .lineLimit(1)
                             Image(systemName: "chevron.down")
                                 .font(.system(size: 9, weight: .bold))
@@ -375,7 +375,7 @@ struct AiChatView: View {
                 HStack(spacing: 6) {
                     ProgressView().scaleEffect(0.65)
                     Text("加载模型…")
-                        .font(.system(size: 11))
+                        .font(.system(size: 13))
                         .foregroundColor(muted)
                 }
                 .padding(.horizontal, 10)
@@ -415,7 +415,7 @@ struct AiChatView: View {
                 )
             } else if model.selectedTenantId != nil {
                 Text("暂无可用模型")
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.system(size: 14, weight: .medium))
                     .foregroundColor(Color(hex: "f59e0b"))
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
@@ -452,7 +452,7 @@ struct AiChatView: View {
                 .frame(width: 6, height: 6)
                 .shadow(color: statusColor.opacity(0.6), radius: 3)
             Text(model.statusText)
-                .font(.system(size: 11, weight: .medium))
+                .font(.system(size: 12, weight: .medium))
                 .foregroundColor(muted)
                 .lineLimit(1)
         }
@@ -472,7 +472,7 @@ struct AiChatView: View {
                 Image(systemName: model.useHistory ? "bubble.left.and.bubble.right.fill" : "bubble.left")
                     .font(.system(size: 10, weight: .semibold))
                 Text("上下文")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
             }
             .foregroundColor(model.useHistory ? accent : muted)
             .padding(.horizontal, 10)
@@ -587,7 +587,7 @@ struct AiChatView: View {
             VStack(spacing: 8) {
                 Text("有什么可以帮你的？")
                     .font(.system(size: 22, weight: .bold))
-                    .foregroundColor(dark ? Color.white.opacity(0.94) : Color.primary)
+                    .foregroundColor(AppTheme.textPrimary(dark))
                 Text(model.selectedTenant.map { "正在与 \($0.name) 的 OCI AI 模型对话" }
                      ?? "从左侧选择一个租户，开始智能对话")
                     .font(.system(size: 13))
@@ -613,8 +613,8 @@ struct AiChatView: View {
             model.send()
         } label: {
             Text(title)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(dark ? Color.white.opacity(0.85) : Color.primary.opacity(0.85))
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(AppTheme.textPrimary(dark))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
                 .background(
@@ -651,8 +651,8 @@ struct AiChatView: View {
     private func userBubble(_ msg: AiChatMessage) -> some View {
         VStack(alignment: .trailing, spacing: 4) {
             Text(msg.text)
-                .font(.system(size: 13.5))
-                .foregroundColor(dark ? Color.white.opacity(0.95) : Color.primary)
+                .font(.system(size: 14.5))
+                .foregroundColor(AppTheme.textPrimary(dark))
                 .lineSpacing(3)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 9)
@@ -661,8 +661,8 @@ struct AiChatView: View {
                         .fill(dark ? Color.white.opacity(0.12) : Color(hex: "f3f4f6"))
                 )
             Text(timeString(msg.createdAt))
-                .font(.system(size: 10))
-                .foregroundColor(muted.opacity(0.75))
+                .font(.system(size: 13))
+                .foregroundColor(muted)
         }
         .frame(maxWidth: 480, alignment: .trailing)
     }
@@ -676,7 +676,7 @@ struct AiChatView: View {
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(Color(hex: "d97706"))
                     Text(msg.text)
-                        .font(.system(size: 13))
+                        .font(.system(size: 14))
                         .foregroundColor(Color(hex: "d97706"))
                         .lineSpacing(3)
                 }
@@ -689,18 +689,18 @@ struct AiChatView: View {
             } else {
                 Text(msg.text)
                     .font(.system(size: 14))
-                    .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
+                    .foregroundColor(AppTheme.textPrimary(dark))
                     .lineSpacing(4)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             HStack(spacing: 10) {
                 Text(timeString(msg.createdAt))
-                    .font(.system(size: 10))
-                    .foregroundColor(muted.opacity(0.75))
+                    .font(.system(size: 13))
+                    .foregroundColor(muted)
                 if msg.isStreaming {
                     Text("生成中")
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(accent)
                 }
                 if msg.role == .assistant, !msg.isStreaming {
@@ -711,7 +711,7 @@ struct AiChatView: View {
                     } label: {
                         Image(systemName: "doc.on.doc")
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(muted.opacity(0.7))
+                            .foregroundColor(muted)
                     }
                     .buttonStyle(PlainButtonStyle())
                     .help("复制本条")
@@ -743,7 +743,7 @@ struct AiChatView: View {
                     Image(systemName: "exclamationmark.circle.fill")
                         .foregroundColor(Color(hex: "f85149"))
                     Text(err)
-                        .font(.system(size: 11))
+                        .font(.system(size: 14))
                         .foregroundColor(Color(hex: "f85149"))
                     Spacer()
                 }
@@ -755,7 +755,7 @@ struct AiChatView: View {
                     if model.input.isEmpty {
                         Text("畅所欲问…")
                             .font(.system(size: 14))
-                            .foregroundColor(muted.opacity(0.55))
+                            .foregroundColor(muted)
                             .padding(.leading, 4)
                             .allowsHitTesting(false)
                     }
@@ -769,8 +769,8 @@ struct AiChatView: View {
                         Circle()
                             .fill(
                                 canSend
-                                    ? Color.primary.opacity(dark ? 0.92 : 0.88)
-                                    : muted.opacity(0.22)
+                                    ? AppTheme.textPrimary(dark)
+                                    : muted
                             )
                             .frame(width: 30, height: 30)
                         if model.isSending {
@@ -780,7 +780,7 @@ struct AiChatView: View {
                         } else {
                             Image(systemName: "arrow.up")
                                 .font(.system(size: 12, weight: .bold))
-                                .foregroundColor(canSend ? (dark ? .black : .white) : muted.opacity(0.7))
+                                .foregroundColor(canSend ? (dark ? .black : .white) : muted)
                         }
                     }
                 }
@@ -801,8 +801,8 @@ struct AiChatView: View {
             .frame(maxWidth: .infinity)
 
             Text(composerHint)
-                .font(.system(size: 10))
-                .foregroundColor(muted.opacity(0.55))
+                .font(.system(size: 13))
+                .foregroundColor(muted)
                 .frame(maxWidth: .infinity)
         }
     }

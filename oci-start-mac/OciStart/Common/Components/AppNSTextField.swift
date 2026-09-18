@@ -89,7 +89,7 @@ struct AppNSTextField: NSViewRepresentable {
     }
 
     private func applyStyle(_ field: NSTextField) {
-        field.textColor = nsHex(dark ? "cdd9e5" : "2c3e50")
+        field.textColor = NSColor(AppTheme.textPrimary(dark))
         field.placeholderAttributedString = placeholderAttr()
         field.focusRingType = .none
         field.drawsBackground = false
@@ -104,20 +104,10 @@ struct AppNSTextField: NSViewRepresentable {
         NSAttributedString(
             string: placeholder,
             attributes: [
-                .foregroundColor: nsHex(dark ? "768390" : "999999"),
+                .foregroundColor: NSColor(AppTheme.textMuted(dark)),
                 .font: NSFont.systemFont(ofSize: fontSize, weight: .regular)
             ]
         )
-    }
-
-    private func nsHex(_ hex: String) -> NSColor {
-        let h = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
-        var int: UInt64 = 0
-        Scanner(string: h).scanHexInt64(&int)
-        let r = CGFloat((int >> 16) & 0xFF) / 255
-        let g = CGFloat((int >> 8) & 0xFF) / 255
-        let b = CGFloat(int & 0xFF) / 255
-        return NSColor(calibratedRed: r, green: g, blue: b, alpha: 1)
     }
 
     final class Coordinator: NSObject, NSTextFieldDelegate {

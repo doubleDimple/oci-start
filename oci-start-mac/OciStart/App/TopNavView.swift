@@ -1,7 +1,7 @@
 import SwiftUI
 import AppKit
 
-/// Web-parity top bar (`header.ftl` + `header.js`).
+/// Content-only top bar aligned with the Vue console.
 /// Dropdown panels are rendered by `TopNavDropdownOverlay` (in-window), not system popover.
 struct TopNavView: View {
     @EnvironmentObject private var session: AppSession
@@ -10,6 +10,7 @@ struct TopNavView: View {
     @EnvironmentObject private var header: HeaderViewModel
     @EnvironmentObject private var chrome: TopNavChromeState
     @Environment(\.colorScheme) private var colorScheme
+    @State private var hoveredTool: String?
 
     private var dark: Bool { appearance.isDarkEffective || colorScheme == .dark }
 
@@ -17,19 +18,22 @@ struct TopNavView: View {
         HStack(spacing: 0) {
             HStack(spacing: 12) {
                 sidebarToggle
-                brand
-                pageTrail
+                SearchField(
+                    text: $navigation.searchText,
+                    placeholder: "搜索菜单…",
+                    maxWidth: 320
+                )
+                .accessibilityLabel("搜索菜单")
             }
-            .layoutPriority(1)
 
             Spacer(minLength: 12)
 
             trailingActions
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, AppTheme.pagePadding)
         .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
-        .frame(height: 56)
-        .background(AppTheme.topNavBg(dark))
+        .frame(height: AppTheme.topBarHeight)
+        .background(AppTheme.cardBg(dark))
         .overlay(
             Rectangle()
                 .frame(height: 1)
@@ -38,6 +42,9 @@ struct TopNavView: View {
         )
         .onAppear { header.start() }
         .onDisappear { header.stop() }
+        .onChange(of: navigation.searchText) { query in
+            if !query.isEmpty { navigation.sidebarCollapsed = false }
+        }
         // 消息中心改为右侧滑出抽屉（见 TopNavDropdownOverlay），不再用居中 sheet
         .sheet(isPresented: $header.showAsset) {
             AssetAnalysisSheet(header: header, dark: dark)
@@ -61,49 +68,21 @@ struct TopNavView: View {
             chrome.close()
             navigation.sidebarCollapsed.toggle()
         }) {
-            Image(systemName: navigation.sidebarCollapsed ? "sidebar.left" : "sidebar.leading")
-                .font(.system(size: 14, weight: .semibold))
+            Image(systemName: "sidebar.left")
+                .font(.system(size: AppTheme.bodySize, weight: .semibold))
                 .foregroundColor(AppTheme.navIcon(dark))
                 .frame(width: 36, height: 36)
-                .background(circleBg(highlight: navigation.sidebarCollapsed))
+                .background(circleBg(highlight: navigation.sidebarCollapsed, tool: "sidebar"))
         }
         .buttonStyle(PlainButtonStyle())
         .help(navigation.sidebarCollapsed ? "展开侧栏（⌘⌥S）" : "收起侧栏（⌘⌥S）")
-    }
-
-    private var brand: some View {
-        Button(action: {
-            chrome.close()
-            navigation.select(.dashboard)
-        }) {
-            Text(session.siteName)
-                .font(.system(size: 22, weight: .semibold))
-                .foregroundColor(AppTheme.brand(dark))
-                .tracking(0.8)
-        }
-        .buttonStyle(PlainButtonStyle())
-        .help("回到系统监控")
-    }
-
-    private var pageTrail: some View {
-        HStack(spacing: 6) {
-            if let item = NavigationCatalog.item(for: navigation.selected) {
-                Text("·")
-                    .foregroundColor(AppTheme.navIcon(dark).opacity(0.35))
-                Image(systemName: item.systemImage)
-                    .font(.system(size: 11))
-                Text(item.title)
-                    .font(.system(size: 13, weight: .medium))
-            }
-        }
-        .foregroundColor(AppTheme.navIcon(dark).opacity(0.85))
-        .lineLimit(1)
+        .onHover { hoveredTool = $0 ? "sidebar" : nil }
     }
 
     // MARK: - Right
 
     private var trailingActions: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             if header.version.needUpdate {
                 updateButton
             }
@@ -138,23 +117,23 @@ struct TopNavView: View {
                 Image(systemName: header.updatePhase.isActive ? "arrow.triangle.2.circlepath" : "arrow.up.circle.fill")
                 Text(header.updatePhase.isActive
                      ? "升级中…"
-                     : "发现 Mac 新版本 (\(header.version.latestDisplay))")
-                    .font(.system(size: 12, weight: .bold))
+                     : "Mac 新版本")
+                    .font(.system(size: AppTheme.secondarySize, weight: .semibold))
             }
-            .foregroundColor(dark ? Color.white : Color(hex: "dc2626"))
+            .foregroundColor(AppTheme.brand(dark))
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
             .background(
                 Capsule()
-                    .fill(Color.red.opacity(dark ? 0.15 : 0.08))
+                    .fill(AppTheme.brand(dark).opacity(0.1))
             )
             .overlay(
-                Capsule().stroke(Color.red.opacity(0.35), lineWidth: 1)
+                Capsule().stroke(AppTheme.brand(dark).opacity(0.25), lineWidth: 1)
             )
         }
         .buttonStyle(PlainButtonStyle())
         .disabled(header.updatePhase.isActive)
-        .help("下载 macOS 安装包（DMG），替换应用程序后重启")
+        .help("下载 Mac \(header.version.latestDisplay) 安装包（DMG），替换应用程序后重启")
     }
 
     private var languageButton: some View {
@@ -163,13 +142,15 @@ struct TopNavView: View {
             chrome.toggle(.language)
         }) {
             Image(systemName: "globe")
-                .font(.system(size: 14, weight: .medium))
+                .font(.system(size: AppTheme.bodySize, weight: .medium))
                 .foregroundColor(AppTheme.navIcon(dark))
                 .frame(width: 36, height: 36)
-                .background(circleBg(highlight: chrome.open == .language))
+                .background(circleBg(highlight: chrome.open == .language, tool: "language"))
         }
         .buttonStyle(PlainButtonStyle())
         .help("语言")
+        .accessibilityLabel("语言")
+        .onHover { hoveredTool = $0 ? "language" : nil }
     }
 
     private var messageButton: some View {
@@ -178,24 +159,26 @@ struct TopNavView: View {
             header.toggleMessages()
         }) {
             ZStack(alignment: .topTrailing) {
-                Image(systemName: "bell.fill")
-                    .font(.system(size: 14, weight: .medium))
+                Image(systemName: "bell")
+                    .font(.system(size: AppTheme.bodySize, weight: .medium))
                     .foregroundColor(AppTheme.navIcon(dark))
                     .frame(width: 36, height: 36)
-                    .background(circleBg(highlight: header.showMessages))
+                    .background(circleBg(highlight: header.showMessages, tool: "messages"))
                 if header.unreadCount > 0 {
                     Text(header.unreadCount > 99 ? "99+" : "\(header.unreadCount)")
                         .font(.system(size: 9, weight: .bold))
                         .foregroundColor(.white)
                         .padding(.horizontal, 4)
                         .frame(minWidth: 16, minHeight: 16)
-                        .background(Capsule().fill(Color(hex: "ff4d4f")))
+                        .background(Capsule().fill(AppTheme.danger))
                         .offset(x: 4, y: -2)
                 }
             }
         }
         .buttonStyle(PlainButtonStyle())
         .help("消息中心")
+        .accessibilityLabel("消息中心")
+        .onHover { hoveredTool = $0 ? "messages" : nil }
     }
 
     private var userButton: some View {
@@ -203,36 +186,30 @@ struct TopNavView: View {
             header.closeMessages()
             chrome.toggle(.user)
         }) {
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 ZStack {
                     Circle()
-                        .fill(AppTheme.brand(dark).opacity(0.25))
+                        .fill(AppTheme.brand(dark).opacity(0.12))
                         .frame(width: 30, height: 30)
                     Text(avatarLetter)
-                        .font(.system(size: 12, weight: .bold))
+                        .font(.system(size: AppTheme.bodySize, weight: .semibold))
                         .foregroundColor(AppTheme.brand(dark))
-                }
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(session.username.isEmpty ? "Admin" : session.username)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(AppTheme.navIcon(dark))
-                    Text(session.cloudProviderName)
-                        .font(.system(size: 10))
-                        .foregroundColor(AppTheme.navIcon(dark).opacity(0.7))
                 }
                 Image(systemName: "chevron.down")
                     .font(.system(size: 9, weight: .bold))
-                    .foregroundColor(AppTheme.navIcon(dark).opacity(0.7))
+                    .foregroundColor(AppTheme.textSecondary(dark))
                     .rotationEffect(.degrees(chrome.open == .user ? 180 : 0))
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
+            .frame(width: 60, height: 36)
             .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.white.opacity(dark ? 0.06 : 0.35))
+                Capsule()
+                    .fill(chrome.open == .user || hoveredTool == "user" ? AppTheme.hover(dark) : .clear)
             )
         }
         .buttonStyle(PlainButtonStyle())
+        .help("账户：\(session.username.isEmpty ? "Admin" : session.username)")
+        .accessibilityLabel("账户菜单")
+        .onHover { hoveredTool = $0 ? "user" : nil }
     }
 
     private var themeIcon: String {
@@ -252,21 +229,23 @@ struct TopNavView: View {
     private func iconButton(systemName: String, help: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
-                .font(.system(size: 14, weight: .medium))
+                .font(.system(size: AppTheme.bodySize, weight: .medium))
                 .foregroundColor(AppTheme.navIcon(dark))
                 .frame(width: 36, height: 36)
-                .background(circleBg(highlight: false))
+                .background(circleBg(highlight: false, tool: systemName))
         }
         .buttonStyle(PlainButtonStyle())
         .help(help)
+        .accessibilityLabel(help)
+        .onHover { hoveredTool = $0 ? systemName : nil }
     }
 
-    private func circleBg(highlight: Bool) -> some View {
+    private func circleBg(highlight: Bool, tool: String) -> some View {
         Circle()
             .fill(
                 highlight
-                    ? AppTheme.sidebarActive.opacity(0.22)
-                    : Color.white.opacity(dark ? 0.06 : 0.22)
+                    ? AppTheme.brand(dark).opacity(0.12)
+                    : (hoveredTool == tool ? AppTheme.hover(dark) : Color.clear)
             )
     }
 }
@@ -283,6 +262,7 @@ struct UserDropdownPanel: View {
     var onCloud: (Int, String) -> Void
     var onAbout: () -> Void
     var onLogout: () -> Void
+    @State private var hoveredRow: String?
 
     private var welcome: String {
         username.isEmpty ? "欢迎" : "欢迎，\(username)"
@@ -293,11 +273,11 @@ struct UserDropdownPanel: View {
     }
 
     private var textPrimary: Color {
-        dark ? Color.white.opacity(0.92) : Color(hex: "111827")
+        AppTheme.textPrimary(dark)
     }
 
     private var textMuted: Color {
-        dark ? Color.white.opacity(0.5) : Color(hex: "6b7280")
+        AppTheme.textMuted(dark)
     }
 
     var body: some View {
@@ -308,11 +288,11 @@ struct UserDropdownPanel: View {
         }
         .padding(.bottom, 6)
         .frame(width: 240)
-        .background(dark ? Color(hex: "2a2f36") : Color.white)
-        .cornerRadius(10)
+        .background(AppTheme.cardBg(dark))
+        .cornerRadius(16)
         .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(dark ? Color.white.opacity(0.08) : Color.black.opacity(0.08), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(AppTheme.border(dark), lineWidth: 1)
         )
     }
 
@@ -320,7 +300,7 @@ struct UserDropdownPanel: View {
         VStack(alignment: .leading, spacing: 0) {
             headerBlock
             thinLine
-            menuRow(icon: "chart.pie.fill", color: Color(hex: "FFD700"), title: "云资产报告", action: onAsset)
+            menuRow(icon: "chart.pie.fill", color: AppTheme.brand(dark), title: "云资产报告", action: onAsset)
             thinLine
         }
     }
@@ -339,21 +319,21 @@ struct UserDropdownPanel: View {
         VStack(alignment: .leading, spacing: 0) {
             thinLine
             menuRow(icon: "info.circle", color: textMuted, title: "关于 OCI Start", action: onAbout)
-            menuRow(icon: "arrow.right.square", color: Color(hex: "f85149"), title: "退出登录", action: onLogout)
+            menuRow(icon: "arrow.right.square", color: AppTheme.danger, title: "退出登录", action: onLogout)
         }
     }
 
     private var headerBlock: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(welcome)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: AppTheme.bodySize, weight: .semibold))
                 .foregroundColor(textPrimary)
             Text(levelName)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundColor(Color(hex: "b45309"))
+                .font(.system(size: AppTheme.secondarySize, weight: .medium))
+                .foregroundColor(AppTheme.brand(dark))
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3)
-                .background(Capsule().fill(Color(hex: "FFD700").opacity(0.18)))
+                .background(Capsule().fill(AppTheme.brand(dark).opacity(0.18)))
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
@@ -361,14 +341,14 @@ struct UserDropdownPanel: View {
 
     private var thinLine: some View {
         Rectangle()
-            .fill(dark ? Color.white.opacity(0.08) : Color.black.opacity(0.08))
+            .fill(AppTheme.border(dark))
             .frame(height: 1)
             .padding(.vertical, 4)
     }
 
     private func sectionLabel(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 11, weight: .semibold))
+            .font(.system(size: AppTheme.secondarySize, weight: .semibold))
             .foregroundColor(textMuted)
             .padding(.horizontal, 14)
             .padding(.top, 6)
@@ -387,19 +367,21 @@ struct UserDropdownPanel: View {
         Button(action: action) {
             HStack(spacing: 10) {
                 Image(systemName: icon)
-                    .font(.system(size: 12))
+                    .font(.system(size: AppTheme.captionSize))
                     .foregroundColor(color)
                     .frame(width: 16)
                 Text(title)
-                    .font(.system(size: 13))
+                    .font(.system(size: AppTheme.bodySize))
                     .foregroundColor(textPrimary)
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 9)
+            .background(hoveredRow == title ? AppTheme.hover(dark) : .clear)
             .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())
+        .onHover { hoveredRow = $0 ? title : nil }
     }
 }
 
@@ -414,7 +396,7 @@ private struct AssetAnalysisSheet: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Text("云资产报告")
-                    .font(.system(size: 16, weight: .bold))
+                    .font(.system(size: AppTheme.dialogTitleSize, weight: .semibold))
                 Spacer()
                 Button(action: { presentationMode.wrappedValue.dismiss() }) {
                     Image(systemName: "xmark.circle.fill")
@@ -439,29 +421,29 @@ private struct AssetAnalysisSheet: View {
                 HStack(alignment: .center, spacing: 0) {
                     VStack(spacing: 10) {
                         Text("ACCOUNT LEVEL")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundColor(AppTheme.sidebarText(dark))
+                            .font(.system(size: AppTheme.captionSize, weight: .semibold))
+                            .foregroundColor(AppTheme.textSecondary(dark))
                         HStack(spacing: 6) {
                             Image(systemName: cfg.icon)
                             Text(a.levelTitle.isEmpty ? cfg.name : a.levelTitle)
-                                .font(.system(size: 13, weight: .bold))
+                                .font(.system(size: AppTheme.bodySize, weight: .bold))
                         }
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
-                        .background(Capsule().fill(Color(hex: "FFD700").opacity(0.2)))
+                        .background(Capsule().fill(AppTheme.brand(dark).opacity(0.2)))
                         Text("Scale: Lvl.\(lvl)")
-                            .font(.system(size: 11))
-                            .foregroundColor(AppTheme.sidebarText(dark))
+                            .font(.system(size: AppTheme.secondarySize))
+                            .foregroundColor(AppTheme.textSecondary(dark))
                     }
                     .frame(width: 180)
                     .padding(16)
-                    .background(dark ? Color(hex: "1e2124") : Color(hex: "f8f9fa"))
+                    .background(AppTheme.inputBg(dark))
 
                     HStack(spacing: 0) {
                         metric("账号总数", "\(a.totalCount)", nil)
-                        metric("升级账号", "\(a.upgradeCount)", Color(hex: "2196f3"))
+                        metric("升级账号", "\(a.upgradeCount)", AppTheme.info)
                         metric("免费额度", "\(a.freeCount)", nil)
-                        metric("账户费用", a.totalCost, Color(hex: "1abc9c"))
+                        metric("账户费用", a.totalCost, AppTheme.brand(dark))
                     }
                     .frame(maxWidth: .infinity)
                 }
@@ -490,17 +472,17 @@ private struct AssetAnalysisSheet: View {
             }
         }
         .frame(width: 720, height: 360)
-        .background(dark ? Color(hex: "22262b") : Color.white)
+        .background(AppTheme.cardBg(dark))
     }
 
     private func metric(_ title: String, _ value: String, _ color: Color?) -> some View {
         VStack(spacing: 8) {
             Text(title)
-                .font(.system(size: 12))
-                .foregroundColor(AppTheme.sidebarText(dark))
+                .font(.system(size: AppTheme.captionSize))
+                .foregroundColor(AppTheme.textSecondary(dark))
             Text(value)
                 .font(.system(size: 22, weight: .semibold))
-                .foregroundColor(color ?? (dark ? Color.white.opacity(0.9) : Color.primary))
+                .foregroundColor(color ?? AppTheme.textPrimary(dark))
         }
         .frame(maxWidth: .infinity)
     }
@@ -530,15 +512,15 @@ private struct AboutSheet: View {
         header.version.latestDisplay
     }
 
-    private var surface: Color { dark ? Color(hex: "1e2430") : Color.white }
-    private var surface2: Color { dark ? Color(hex: "252d3d") : Color(hex: "f8fafc") }
-    private var border: Color { dark ? Color(hex: "2e3a4e") : Color(hex: "edf2f7") }
-    private var textPrimary: Color { dark ? Color(hex: "e2e8f0") : Color(hex: "0f172a") }
-    private var textMuted: Color { dark ? Color(hex: "6b7fa3") : Color(hex: "94a3b8") }
-    private var textSecondary: Color { dark ? Color(hex: "94a3b8") : Color(hex: "475569") }
-    private var donateBg: Color { dark ? Color(hex: "161e2e") : Color(hex: "f1f5f9") }
-    private var cardBg: Color { dark ? Color(hex: "252d3d") : Color.white }
-    private var pillBg: Color { dark ? Color(hex: "2e3a4e") : Color(hex: "f1f5f9") }
+    private var surface: Color { AppTheme.cardBg(dark) }
+    private var surface2: Color { AppTheme.inputBg(dark) }
+    private var border: Color { AppTheme.border(dark) }
+    private var textPrimary: Color { AppTheme.textPrimary(dark) }
+    private var textMuted: Color { AppTheme.textMuted(dark) }
+    private var textSecondary: Color { AppTheme.textSecondary(dark) }
+    private var donateBg: Color { AppTheme.pageBg(dark) }
+    private var cardBg: Color { AppTheme.cardBg(dark) }
+    private var pillBg: Color { AppTheme.hover(dark) }
 
     var body: some View {
         ZStack {
@@ -560,10 +542,10 @@ private struct AboutSheet: View {
                     Spacer()
                     Button(action: { presentationMode.wrappedValue.dismiss() }) {
                         Image(systemName: "xmark")
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(.system(size: AppTheme.bodySize, weight: .semibold))
                             .foregroundColor(textSecondary)
                             .frame(width: 32, height: 32)
-                            .background(Circle().fill(dark ? Color(hex: "2a3144") : Color(hex: "f1f5f9")))
+                            .background(Circle().fill(AppTheme.hover(dark)))
                     }
                     .buttonStyle(PlainButtonStyle())
                     .help("关闭")
@@ -602,26 +584,26 @@ private struct AboutSheet: View {
                         .fill(
                             LinearGradient(
                                 gradient: Gradient(colors: [
-                                    Color(hex: "e0f2fe"),
-                                    Color(hex: "bae6fd")
+                                    AppTheme.brand(dark).opacity(0.16),
+                                    AppTheme.brand(dark).opacity(0.08)
                                 ]),
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
                         )
-                    Image(systemName: "paperplane.fill")
+                    Image(systemName: "leaf.fill")
                         .font(.system(size: 26, weight: .semibold))
-                        .foregroundColor(Color(hex: "0ea5e9"))
+                        .foregroundColor(AppTheme.brand(dark))
                 }
                 .frame(width: 64, height: 64)
-                .shadow(color: Color(hex: "0ea5e9").opacity(0.25), radius: 8, x: 0, y: 4)
+                .shadow(color: AppTheme.brand(dark).opacity(0.25), radius: 8, x: 0, y: 4)
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Oci-Start")
-                        .font(.system(size: 22, weight: .heavy))
+                        .font(.system(size: 22, weight: .semibold))
                         .foregroundColor(textPrimary)
                     Text("Created by doubleDimple")
-                        .font(.system(size: 12))
+                        .font(.system(size: AppTheme.secondarySize))
                         .foregroundColor(textMuted)
                 }
             }
@@ -631,7 +613,7 @@ private struct AboutSheet: View {
                 HStack(spacing: 0) {
                     versionItem(label: "当前 Mac", value: currentVersion, showTag: true)
                     Rectangle()
-                        .fill(dark ? Color(hex: "2e3a4e") : Color(hex: "e2e8f0"))
+                        .fill(AppTheme.border(dark))
                         .frame(width: 1, height: 36)
                         .padding(.horizontal, 18)
                     versionItem(label: "最新 Mac", value: latestVersion, showTag: false)
@@ -651,14 +633,14 @@ private struct AboutSheet: View {
                     Button(action: { header.requestUpdate() }) {
                         HStack(spacing: 6) {
                             Image(systemName: "arrow.down.circle.fill")
-                                .font(.system(size: 11, weight: .semibold))
+                                .font(.system(size: AppTheme.secondarySize, weight: .semibold))
                             Text("下载 Mac 安装包")
-                                .font(.system(size: 12, weight: .semibold))
+                                .font(.system(size: AppTheme.bodySize, weight: .semibold))
                         }
                         .foregroundColor(.white)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 7)
-                        .background(RoundedRectangle(cornerRadius: 8).fill(Color(hex: "dc2626")))
+                        .background(RoundedRectangle(cornerRadius: 8).fill(AppTheme.brand(dark)))
                     }
                     .buttonStyle(PlainButtonStyle())
                     .disabled(header.updatePhase.isActive)
@@ -674,15 +656,15 @@ private struct AboutSheet: View {
     private func versionItem(label: String, value: String, showTag: Bool) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
-                .font(.system(size: 10, weight: .bold))
+                .font(.system(size: AppTheme.captionSize, weight: .bold))
                 .foregroundColor(textMuted)
             HStack(spacing: 6) {
                 Text(value)
-                    .font(.system(size: 15, weight: .heavy, design: .monospaced))
+                    .font(.system(size: 15, weight: .semibold, design: .monospaced))
                     .foregroundColor(textPrimary)
                 if showTag {
                     Text(header.version.needUpdate ? "可更新" : "最新")
-                        .font(.system(size: 9, weight: .bold))
+                        .font(.system(size: AppTheme.captionSize, weight: .bold))
                         .foregroundColor(header.version.needUpdate
                             ? (dark ? Color(hex: "fbbf24") : Color(hex: "854d0e"))
                             : (dark ? Color(hex: "4ade80") : Color(hex: "166534")))
@@ -717,9 +699,9 @@ private struct AboutSheet: View {
         }) {
             HStack(spacing: 8) {
                 Image(systemName: icon)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: AppTheme.bodySize, weight: .semibold))
                 Text(title)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: AppTheme.bodySize, weight: .medium))
             }
             .foregroundColor(textSecondary)
             .frame(maxWidth: .infinity)
@@ -729,7 +711,7 @@ private struct AboutSheet: View {
                     .fill(dark ? surface2 : Color.white)
                     .overlay(
                         RoundedRectangle(cornerRadius: 10)
-                            .stroke(dark ? border : Color(hex: "e2e8f0"), lineWidth: 1)
+                            .stroke(border, lineWidth: 1)
                     )
             )
         }
@@ -743,15 +725,15 @@ private struct AboutSheet: View {
             HStack {
                 HStack(spacing: 6) {
                     Text("请作者喝杯咖啡")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(dark ? Color(hex: "cbd5e1") : Color(hex: "334155"))
+                        .font(.system(size: AppTheme.sectionSize, weight: .semibold))
+                        .foregroundColor(AppTheme.textPrimary(dark))
                     Image(systemName: "heart.fill")
-                        .font(.system(size: 12))
+                        .font(.system(size: AppTheme.captionSize))
                         .foregroundColor(Color(hex: "f43f5e"))
                 }
                 Spacer()
                 Text("点击二维码可放大预览")
-                    .font(.system(size: 11))
+                    .font(.system(size: AppTheme.secondarySize))
                     .foregroundColor(textMuted)
             }
 
@@ -781,7 +763,7 @@ private struct AboutSheet: View {
         .background(
             LinearGradient(
                 gradient: Gradient(colors: [
-                    dark ? Color(hex: "1a2133") : Color(hex: "f8fafc"),
+                    AppTheme.inputBg(dark),
                     donateBg
                 ]),
                 startPoint: .top,
@@ -809,23 +791,23 @@ private struct AboutSheet: View {
                     Image(systemName: titleIcon)
                         .foregroundColor(titleColor)
                     Text(title)
-                        .font(.system(size: 13, weight: .bold))
+                        .font(.system(size: AppTheme.bodySize, weight: .semibold))
                         .foregroundColor(textPrimary)
                 }
                 if let subtitle = subtitle {
                     Text(subtitle)
-                        .font(.system(size: 11))
+                        .font(.system(size: AppTheme.secondarySize))
                         .foregroundColor(textMuted)
                 }
                 if showCopy {
                     Button(action: copyTRC20) {
                         HStack(spacing: 5) {
                             Image(systemName: copied ? "checkmark" : "doc.on.doc")
-                                .font(.system(size: 10, weight: .semibold))
+                                .font(.system(size: AppTheme.captionSize, weight: .semibold))
                             Text(copied ? "已复制" : "TRC20 复制地址")
-                                .font(.system(size: 11, weight: .medium))
+                                .font(.system(size: AppTheme.secondarySize, weight: .medium))
                         }
-                        .foregroundColor(copied ? Color(hex: "10b981") : textSecondary)
+                        .foregroundColor(copied ? AppTheme.brand(dark) : textSecondary)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
                         .background(
@@ -875,7 +857,7 @@ private struct AboutRemoteQR: View {
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 10)
-                .fill(dark ? Color(hex: "1e2430") : Color(hex: "f8fafc"))
+                .fill(AppTheme.inputBg(dark))
             if let image = image {
                 Image(nsImage: image)
                     .resizable()
@@ -969,16 +951,16 @@ private struct VersionUpdateProgressSheet: View {
                 .font(.system(size: 32, weight: .medium))
                 .foregroundColor(failed
                                  ? Color(hex: "f59e0b")
-                                 : (finished ? Color(hex: "10b981") : Color(hex: "1890ff")))
+                                 : AppTheme.brand(dark))
 
             Text(title)
-                .font(.system(size: 16, weight: .bold))
-                .foregroundColor(dark ? Color.white.opacity(0.92) : Color(hex: "0f172a"))
+                .font(.system(size: AppTheme.dialogTitleSize, weight: .semibold))
+                .foregroundColor(AppTheme.textPrimary(dark))
 
             Text(detail)
-                .font(.system(size: 13))
+                .font(.system(size: AppTheme.secondarySize))
                 .multilineTextAlignment(.center)
-                .foregroundColor(dark ? Color.white.opacity(0.55) : Color(hex: "64748b"))
+                .foregroundColor(AppTheme.textSecondary(dark))
                 .fixedSize(horizontal: false, vertical: true)
 
             if case .downloading(let p) = header.updatePhase {
@@ -1004,6 +986,6 @@ private struct VersionUpdateProgressSheet: View {
         }
         .padding(28)
         .frame(width: 400, height: 300)
-        .background(dark ? Color(hex: "1e2430") : Color.white)
+        .background(AppTheme.cardBg(dark))
     }
 }

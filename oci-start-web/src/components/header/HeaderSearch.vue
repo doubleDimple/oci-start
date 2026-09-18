@@ -4,6 +4,8 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { MENU, type NavItem } from '@/nav/menu'
 import { useShellStore } from '@/stores/shell'
+import { useRoutePreload } from '@/composables/useRoutePreload'
+import { navigateWithFeedback } from '@/utils/navigation'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -21,6 +23,11 @@ const results = computed(() => {
     .map(item => ({ ...item, group: t(group.labelKey) })))
 })
 const showResults = computed(() => expanded.value && !!shell.menuQuery.trim())
+const { prepare: preparePage, cancelIntent: cancelPagePreparation } = useRoutePreload()
+watch(() => showResults.value ? results.value[active.value]?.href : undefined, href => {
+  if (href) preparePage(href)
+  else cancelPagePreparation()
+})
 
 watch(results, () => { active.value = 0 })
 watch(() => router.currentRoute.value.fullPath, () => { expanded.value = false })
@@ -35,7 +42,7 @@ function open(item: NavItem) {
   shell.menuQuery = ''
   input.value?.blur()
   if (item.newTab) window.open(router.resolve(item.href).href, '_blank', 'noopener')
-  else void router.push(item.href)
+  else void navigateWithFeedback(router, item.href)
 }
 
 async function onKey(event: KeyboardEvent) {

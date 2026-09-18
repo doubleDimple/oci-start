@@ -1,0 +1,27 @@
+/** Legacy phone bookmarks use the same Vue pages and data as the main console. */
+export const mobileAliases: Record<string, string> = {
+  'tenants/list': '/m/tenants',
+  'tenants/regionList': '/m/regions',
+  'tenants/auditPage': '/m/audit-log',
+  'tenants/regionSubList': '/m/region-sub',
+  'tenants/addSpeed': '/m/import',
+  'tenants/bootPage': '/m/add-boot',
+  'boot/fullBootList': '/m/boot',
+  'oci/list': '/m/oci-instances',
+  // The old mobile Instances tab is the live resource/probe view.
+  'vps/instances/list': '/m/instances',
+  'delayTest': '/m/speedtest',
+  'boot/dashboard': '/m/monitor',
+  'resource/list': '/m/arm-regions',
+  'dns/cloudflare': '/m/cloudflare',
+  'system/settings': '/m/settings',
+  'system/notifySettings': '/m/notify-settings',
+  'monitor/homePage': '/m/traffic',
+  'cost/costPage': '/m/cost',
+  'system/memPage': '/m/memo',
+  'mfa/page': '/m/mfa',
+  'oci/vnic/manage': '/m/vnic/manage',
+  'system/logs': '/m/logs',
+  'system/openLogs': '/m/open-logs',
+  'instanceDetail/bootList': '/m/tenant-instances',
+}

@@ -101,11 +101,11 @@ struct EdgeOneView: View {
                         Image(systemName: m.systemImage)
                             .font(.system(size: 11, weight: .semibold))
                         Text(m.title)
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(.system(size: 14, weight: .semibold))
                     }
                     .foregroundColor(model.mode == m
                                      ? .white
-                                     : (dark ? Color.white.opacity(0.75) : Color(hex: "1e2f42")))
+                                     : (AppTheme.textPrimary(dark)))
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
                     .background(
@@ -122,7 +122,7 @@ struct EdgeOneView: View {
         .padding(4)
         .background(
             RoundedRectangle(cornerRadius: 10)
-                .fill(AppTheme.sidebarBg(dark).opacity(0.85))
+                .fill(AppTheme.cardBg(dark).opacity(0.85))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 10)
@@ -136,8 +136,8 @@ struct EdgeOneView: View {
         FilterBar {
             HStack(spacing: 10) {
                 Text("域名")
-                    .font(.system(size: 12))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .font(.system(size: 13))
+                    .foregroundColor(AppTheme.textSecondary(dark))
                 SelectMenu(
                     options: model.zoneOptions,
                     selection: Binding(
@@ -327,8 +327,8 @@ struct EdgeOneView: View {
 
     private func cell(_ text: String, width: CGFloat?) -> some View {
         Text(text.isEmpty ? "—" : text)
-            .font(.system(size: 12))
-            .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
+            .font(.system(size: 14))
+            .foregroundColor(AppTheme.textPrimary(dark))
             .lineLimit(1)
             .truncationMode(.middle)
             .frame(width: width, alignment: .leading)
@@ -352,7 +352,7 @@ struct EdgeOneView: View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundColor(Color(hex: "f85149"))
-            Text(text).font(.system(size: 12))
+            Text(text).font(.system(size: 14))
             Spacer()
             Button("密钥配置") { model.openConfig() }
                 .buttonStyle(PlainButtonStyle())

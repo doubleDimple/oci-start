@@ -15,9 +15,7 @@ import com.doubledimple.ociserver.service.EmailService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -25,7 +23,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import javax.annotation.Resource;
-import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
 import java.util.List;
 
@@ -43,15 +40,6 @@ public class EmailController extends BaseController{
 
     @Resource
     private EmailService emailService;
-
-    /**
-     * 邮箱管理页面
-     */
-    @GetMapping("/management")
-    public String listUsers(HttpServletRequest request, Model model) {
-        model.addAttribute("activePage", "oci-email-management");
-        return "email";
-    }
 
     /**
      * 收件人列表(支持分页)
@@ -183,7 +171,6 @@ public class EmailController extends BaseController{
         }
     }
 
-
     //发送邮件
     @PostMapping("/send")
     @ResponseBody
@@ -196,7 +183,6 @@ public class EmailController extends BaseController{
             return ApiResponse.error("发送邮件失败请稍后再试 ");
         }
     }
-
 
     /**
     * @Description: 批量删除邮箱发送记录

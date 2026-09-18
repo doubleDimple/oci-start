@@ -29,7 +29,7 @@ New-Item -ItemType Directory -Force -Path $BuildDir, $CacheDir, $PublishDir | Ou
 Write-Host "==> Maven package oci-server"
 Push-Location $RepoRoot
 try {
-    mvn -pl oci-server -am package -DskipTests
+    mvn -Pweb -pl oci-server -am clean package -DskipTests
 } finally {
     Pop-Location
 }

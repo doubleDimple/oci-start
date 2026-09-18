@@ -1,6 +1,7 @@
 import axios, { type AxiosRequestConfig, type InternalAxiosRequestConfig } from 'axios'
 import { ElMessage } from 'element-plus'
 import { startProgress, doneProgress } from '@/utils/progress'
+import { handleSessionResponse, sessionExpired } from '@/utils/session'
 
 declare module 'axios' {
   export interface AxiosRequestConfig {
@@ -56,6 +57,7 @@ function shouldSuppress(cfg?: InternalAxiosRequestConfig | AxiosRequestConfig): 
 }
 
 request.interceptors.request.use((cfg) => {
+  if (sessionExpired.value) throw new axios.CanceledError('Session expired')
   if (!shouldSuppress(cfg)) startProgress()
   cfg.headers.set('X-Requested-With', 'XMLHttpRequest')
   cfg.headers.set('Accept', 'application/json')
@@ -66,23 +68,21 @@ request.interceptors.response.use(
   (resp) => {
     if (!shouldSuppress(resp.config)) doneProgress()
     const body = resp.data
-    if (body && typeof body === 'object' && String((body as { code?: unknown }).code) === '401') {
-      window.location.href = '/login'
+    if (handleSessionResponse({ status: resp.status, url: resp.request?.responseURL, body })) {
       return Promise.reject(body)
     }
     const problem = payloadFailed(body)
     if (problem) {
-      if (!shouldSuppress(resp.config)) ElMessage.error(problem)
+      if (!sessionExpired.value && !shouldSuppress(resp.config)) ElMessage.error(problem)
       return Promise.reject(body)
     }
     return body
   },
   (err) => {
-    if (!shouldSuppress(err?.config)) doneProgress()
-    const status = err?.response?.status
-    if (status === 401) {
-      window.location.href = '/login'
-    } else if (!shouldSuppress(err?.config)) {
+    if (err?.config && !shouldSuppress(err.config)) doneProgress()
+    const authFailure = handleSessionResponse({ status: err?.response?.status,
+      url: err?.response?.request?.responseURL, body: err?.response?.data })
+    if (!authFailure && !sessionExpired.value && !axios.isCancel(err) && !shouldSuppress(err?.config)) {
       const data = err?.response?.data
       ElMessage.error(pickMessage(data, err.message || '网络异常'))
     }

@@ -23,11 +23,17 @@ public sealed class AuthService
         bool rememberMe = true,
         CancellationToken ct = default)
     {
-        var html = await _api.GetHtmlAsync("/login", ct).ConfigureAwait(false);
-        var pub = RsaHelper.ExtractPublicKeyFromLoginHtml(html);
-        var encrypted = pub != null
-            ? (RsaHelper.Encrypt(password, pub) ?? password)
-            : password;
+        var config = await _api.GetLoginBootstrapAsync(ct).ConfigureAwait(false);
+        if (config.TurnstileEnabled)
+            throw ApiError.Server("服务器已启用人机验证，请在浏览器中登录。");
+        string encrypted;
+        if (config.PublicKey != null)
+            encrypted = RsaHelper.Encrypt(password, config.PublicKey)
+                ?? throw ApiError.Server("登录公钥无效，请重试。");
+        else if (config.UsesLegacyHtml)
+            encrypted = password;
+        else
+            throw ApiError.InvalidResponse();
 
         var fields = new Dictionary<string, string>
         {
@@ -77,25 +83,18 @@ public sealed class AuthService
     {
         try
         {
-            var data = await _api.GetJsonAsync("/boot/dashboard-stats", ct: ct).ConfigureAwait(false);
-            return data.Length > 0;
-        }
-        catch (ApiError e) when (e.ErrorKind == ApiError.Kind.Unauthorized)
-        {
-            return false;
+            var data = await _api.GetJsonAsync("/api/userInfo", ct: ct).ConfigureAwait(false);
+            var body = JsonUtil.Obj(data);
+            if (body == null || !body.TryGetValue("success", out var success)
+                || success.ValueKind != JsonValueKind.True || JsonUtil.Int(body, "code") != 200
+                || !body.TryGetValue("data", out var user) || user.ValueKind != JsonValueKind.Object)
+                return false;
+            return user.TryGetProperty("username", out var username)
+                && username.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(username.GetString());
         }
         catch
         {
-            try
-            {
-                var html = await _api.GetHtmlAsync("/index", ct).ConfigureAwait(false);
-                return !html.Contains("/login", StringComparison.OrdinalIgnoreCase)
-                       || html.Contains("dashboard", StringComparison.OrdinalIgnoreCase);
-            }
-            catch
-            {
-                return false;
-            }
+            return false;
         }
     }
 }

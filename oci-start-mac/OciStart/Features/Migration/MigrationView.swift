@@ -16,6 +16,7 @@ struct MigrationView: View {
             title: "数据迁移",
             subtitle: "加密导出备份 · 导入恢复",
             systemImage: "arrow.left.and.right",
+            layout: .workspace,
             toolbar: { EmptyView() },
             content: {
                 ScrollView {
@@ -30,11 +31,11 @@ struct MigrationView: View {
                         }
                         if let status = model.statusText, !status.isEmpty {
                             Text(status)
-                                .font(.system(size: 12))
-                                .foregroundColor(AppTheme.sidebarText(dark))
+                                .font(.system(size: 13))
+                                .foregroundColor(AppTheme.textSecondary(dark))
                         }
                     }
-                    .padding(16)
+                    .padding(AppTheme.pagePadding)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -81,11 +82,11 @@ struct MigrationView: View {
             FormFieldRow(label: "备份文件") {
                 HStack(spacing: 8) {
                     Text(model.selectedFileName ?? "未选择文件")
-                        .font(.system(size: 12))
+                        .font(.system(size: 14))
                         .foregroundColor(
                             model.selectedFileName == nil
-                                ? AppTheme.sidebarText(dark)
-                                : (dark ? Color.white.opacity(0.9) : Color.primary)
+                                ? AppTheme.textSecondary(dark)
+                                : (AppTheme.textPrimary(dark))
                         )
                         .lineLimit(1)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -108,8 +109,8 @@ struct MigrationView: View {
                 )
             }
             Text("导入会覆盖当前库中相关数据，操作前请确认已备份。")
-                .font(.system(size: 11))
-                .foregroundColor(AppTheme.sidebarText(dark))
+                .font(.system(size: 13))
+                .foregroundColor(AppTheme.textSecondary(dark))
                 .fixedSize(horizontal: false, vertical: true)
         } footer: {
             AppButton(
@@ -130,8 +131,8 @@ struct MigrationView: View {
                 .foregroundColor(Color(hex: "4a9eff"))
                 .frame(width: 16)
             Text(text)
-                .font(.system(size: 12))
-                .foregroundColor(AppTheme.sidebarText(dark))
+                .font(.system(size: 13))
+                .foregroundColor(AppTheme.textSecondary(dark))
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -139,7 +140,7 @@ struct MigrationView: View {
     private func masterKeyBanner(_ key: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("最近一次导出的 Master Key")
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(size: 14, weight: .semibold))
             Text(key)
                 .font(.system(size: 12, design: .monospaced))
             HStack {
@@ -150,7 +151,7 @@ struct MigrationView: View {
                 }
             }
         }
-        .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
+        .foregroundColor(AppTheme.textPrimary(dark))
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(

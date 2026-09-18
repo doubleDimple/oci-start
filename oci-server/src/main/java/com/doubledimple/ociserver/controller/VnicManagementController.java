@@ -8,18 +8,15 @@ import com.doubledimple.ociserver.pojo.request.IpVnicSwitchRequest;
 import com.doubledimple.ociserver.service.TenantService;
 import com.doubledimple.ociserver.service.oracle.OracleInstanceService;
 import com.doubledimple.ociserver.service.oracle.VnicService;
-import com.doubledimple.ociserver.utils.oracle.OciNetworkUtils;
 import com.doubledimple.ociserver.utils.oracle.OciUtils;
 import com.doubledimple.ociserver.utils.oracle.vnic.BatchVnicCreationResult;
 import com.doubledimple.ociserver.utils.oracle.vnic.Ipv6CreationResult;
 import com.doubledimple.ociserver.utils.oracle.vnic.VnicCreationResult;
 import com.doubledimple.ociserver.utils.oracle.vnic.VnicManagementUtils;
-import com.oracle.bmc.auth.SimpleAuthenticationDetailsProvider;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -58,32 +55,6 @@ public class VnicManagementController  extends BaseController{
     @Lazy
     VnicService vnicService;
 
-    /**
-     * 显示VNIC管理页面
-     */
-    @GetMapping("/manage")
-    public String vnicManagePage(@RequestParam("instanceId") String instanceId, Model model) {
-        try {
-            log.info("访问VNIC管理页面，实例ID: {}", instanceId);
-
-            // 只传递必要的参数，页面会异步加载数据
-            model.addAttribute("instanceId", instanceId);
-            model.addAttribute("activePage", "api-management");
-
-            // 初始化空数据，避免模板报错
-            model.addAttribute("vnicList", java.util.Collections.emptyList());
-            model.addAttribute("primaryVnic", new VnicCreationResult());
-            model.addAttribute("secondaryVnics", java.util.Collections.emptyList());
-
-            return "oci_network_manage";
-
-        } catch (Exception e) {
-            log.error("显示VNIC管理页面失败: " + e.getMessage(), e);
-            model.addAttribute("error", "加载页面失败: " + e.getMessage());
-            return "error";
-        }
-    }
-
     @GetMapping("/loadData")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> loadVnicData(@RequestParam("instanceId") String instanceId) {
@@ -102,7 +73,7 @@ public class VnicManagementController  extends BaseController{
             }
 
             // API获取实例的所有VNIC信息
-            List<VnicCreationResult> vnicList = VnicManagementUtils.getInstanceVnics(
+            List<VnicCreationResult> vnicList = VnicManagementUtils.getInstanceVnicsStrict(
                     tenant, instanceId,instanceDetails.getCompartmentId());
 
             // 从vnicList中解析主VNIC和辅助VNIC
@@ -191,7 +162,6 @@ public class VnicManagementController  extends BaseController{
                 response.put("message", result.getSummary());
                 return ResponseEntity.badRequest().body(response);
             }
-
 
             if (result.isAllSuccessful()) {
                 return ResponseEntity.ok(response);
@@ -425,7 +395,7 @@ public class VnicManagementController  extends BaseController{
             }
 
             // API获取实例的所有VNIC信息
-            List<VnicCreationResult> vnicList = VnicManagementUtils.getInstanceVnics(
+            List<VnicCreationResult> vnicList = VnicManagementUtils.getInstanceVnicsStrict(
                     tenant, instanceId,instanceDetails.getCompartmentId());
 
             // 从vnicList中解析主VNIC和辅助VNIC
@@ -496,7 +466,6 @@ public class VnicManagementController  extends BaseController{
         return statistics;
     }
 
-
     @PostMapping("/changeSpecIp")
     public ResponseEntity<?> changeSpecIp(@RequestBody IpVnicSwitchRequest ipVnicSwitchRequest){
         InstanceDetails byInstanceId = oracleInstanceDetailRepository.findByInstanceId(ipVnicSwitchRequest.getInstanceId());
@@ -517,7 +486,6 @@ public class VnicManagementController  extends BaseController{
         String instanceId = (String) request.get("instanceId");
         return vnicService.configureLoadBalancer(instanceId);
     }
-
 
     /**
      * 还原网络配置

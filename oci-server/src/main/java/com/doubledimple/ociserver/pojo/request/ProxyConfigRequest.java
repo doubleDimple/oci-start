@@ -10,4 +10,5 @@ public class ProxyConfigRequest {
     private int port;
     private String username;
     private String password;
+    private Boolean keepPassword;
 }

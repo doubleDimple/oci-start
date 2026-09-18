@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, getCurrentInstance, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, type CSSProperties } from 'vue'
 import { useI18n } from 'vue-i18n'
+import PageErrorNotice from '@/components/PageErrorNotice.vue'
 import GhostBtn from '@/components/GhostBtn.vue'
+import PagePagination from '@/components/PagePagination.vue'
 import {
   deleteHeaderMessage, getHeaderMessage, getHeaderMessages, getHeaderUnreadCount,
   headerMessagesError, readAllHeaderMessages, type HeaderMessage,
@@ -184,6 +186,7 @@ function changePage(direction: number) {
   void loadPage(target)
   void refreshUnread()
 }
+function selectPage(value: number) { changePage(value - page.value) }
 function markCachedRead(businessId: string) {
   const previous = rows.value.find(row => row.businessId === businessId)
   rows.value = rows.value.map(row => row.businessId === businessId ? { ...row, readStatus: 1 as const } : row)
@@ -294,14 +297,18 @@ function retryAction() {
 }
 function outsidePointer(event: PointerEvent) {
   const target = event.target
+  if (target instanceof Element && target.closest('.header-message-error-popover')) return
   if (target instanceof Node && !trigger.value?.contains(target) && !panel.value?.contains(target)) closePanel()
 }
 function outsideFocus(event: FocusEvent) {
   const target = event.target
+  if (target instanceof Element && target.closest('.header-message-error-popover')) return
   if (target instanceof Node && !trigger.value?.contains(target) && !panel.value?.contains(target)) closePanel()
 }
 function escapePanel(event: KeyboardEvent) {
   if (!panelOpen.value || event.key !== 'Escape') return
+  const target = event.target
+  if (target instanceof Element && target.closest('.header-message-error-popover')) return
   event.preventDefault()
   event.stopPropagation()
   closePanel(true)
@@ -344,16 +351,16 @@ defineExpose({ close: () => closePanel() })
   <Teleport to="body">
     <Transition name="header-message-panel">
       <section v-if="panelOpen" :id="panelId" ref="panel" class="message-panel" :style="panelStyle" role="dialog" :aria-label="t('headerMessages.title')" tabindex="-1">
-        <header class="message-panel-header">
+        <header class="message-panel-header" data-page-error-anchor>
           <div class="panel-heading"><strong>{{ t('headerMessages.title') }}</strong><span>{{ unread === null ? t('headerMessages.countUnavailable') : t('headerMessages.unreadCount', { count: formatNumber(unread) }) }}</span></div>
           <button class="message-text-button" type="button" :disabled="busy || !canMarkAll" @click="runAction('all')">{{ t(`headerMessages.${action === 'all' ? 'markingRead' : 'allRead'}`) }}</button>
           <button class="message-icon-button" type="button" :title="t('headerMessages.close')" :aria-label="t('headerMessages.close')" @click="closePanel(true)"><i class="i-mdi-close" aria-hidden="true" /></button>
         </header>
 
         <div class="message-panel-scroll" :aria-busy="listLoading || busy || undefined">
-          <div v-if="unreadError" class="message-feedback" role="alert"><div><strong>{{ t('headerMessages.unreadFailed') }}</strong><p>{{ headerMessagesError(unreadError) }}</p></div><button class="message-text-button" type="button" :disabled="unreadLoading || busy" @click="refreshUnread">{{ t('headerMessages.retry') }}</button></div>
-          <div v-if="actionError" class="message-feedback" role="alert"><div><strong>{{ t('headerMessages.actionFailed') }}</strong><p>{{ headerMessagesError(actionError.error) }}</p></div><button class="message-text-button" type="button" :disabled="busy" @click="retryAction">{{ t('headerMessages.retry') }}</button></div>
-          <div v-if="listError" class="message-feedback" role="alert"><div><strong>{{ t('headerMessages.listFailed') }}</strong><p>{{ headerMessagesError(listError) }}</p></div><button class="message-text-button" type="button" :disabled="listLoading || busy" @click="loadPage(requestedPage)">{{ t('headerMessages.retry') }}</button></div>
+          <PageErrorNotice v-if="unreadError" :title="t('headerMessages.unreadFailed')" popper-class="header-message-error-popover"><p>{{ headerMessagesError(unreadError) }}</p><button type="button" :disabled="unreadLoading || busy" @click="refreshUnread">{{ t('headerMessages.retry') }}</button></PageErrorNotice>
+          <PageErrorNotice v-if="actionError" :title="t('headerMessages.actionFailed')" popper-class="header-message-error-popover"><p>{{ headerMessagesError(actionError.error) }}</p><button type="button" :disabled="busy" @click="retryAction">{{ t('headerMessages.retry') }}</button></PageErrorNotice>
+          <PageErrorNotice v-if="listError" :title="t('headerMessages.listFailed')" popper-class="header-message-error-popover"><p>{{ headerMessagesError(listError) }}</p><button type="button" :disabled="listLoading || busy" @click="loadPage(requestedPage)">{{ t('headerMessages.retry') }}</button></PageErrorNotice>
           <div v-if="listLoading" class="message-loading" role="status"><i class="i-mdi-loading message-spin" aria-hidden="true" />{{ t(loaded ? 'headerMessages.refreshing' : 'headerMessages.loading') }}</div>
           <ul v-if="rows.length" class="message-list">
             <li v-for="message in rows" :key="message.businessId" :class="{ 'is-unread': message.readStatus === 0 }">
@@ -368,9 +375,10 @@ defineExpose({ close: () => closePanel() })
         </div>
 
         <footer class="message-panel-footer">
-          <button class="message-icon-button" type="button" :disabled="listLoading || busy" :title="t('headerMessages.refresh')" :aria-label="t('headerMessages.refresh')" @click="refreshPanel"><i class="i-mdi-refresh" aria-hidden="true" /></button>
-          <span :title="t('headerMessages.total', { count: formatNumber(totalElements) })">{{ t('headerMessages.page', { current: formatNumber(page), total: formatNumber(Math.max(1, totalPages)) }) }}</span>
-          <div class="message-pagination"><button class="message-icon-button" type="button" :disabled="listLoading || busy || page <= 1" :title="t('headerMessages.previous')" :aria-label="t('headerMessages.previous')" @click="changePage(-1)"><i class="i-mdi-chevron-left" aria-hidden="true" /></button><button class="message-icon-button" type="button" :disabled="listLoading || busy || page >= totalPages" :title="t('headerMessages.next')" :aria-label="t('headerMessages.next')" @click="changePage(1)"><i class="i-mdi-chevron-right" aria-hidden="true" /></button></div>
+          <PagePagination :current-page="page" :page-size="5" :page-count="Math.max(1, totalPages)" :disabled="listLoading || busy" embedded @current-change="selectPage">
+            <button class="message-icon-button" type="button" :disabled="listLoading || busy" :title="t('headerMessages.refresh')" :aria-label="t('headerMessages.refresh')" @click="refreshPanel"><i class="i-mdi-refresh" aria-hidden="true" /></button>
+            <span>{{ t('headerMessages.total', { count: formatNumber(totalElements) }) }}</span>
+          </PagePagination>
         </footer>
       </section>
     </Transition>
@@ -379,8 +387,8 @@ defineExpose({ close: () => closePanel() })
   <el-dialog v-model="detailOpen" :title="detail ? subject(detail) : t('headerMessages.detail')" width="min(640px, calc(100vw - 24px))" align-center append-to-body class="header-message-dialog" @close="detailClosing" @closed="detailClosed">
     <div class="message-detail" :aria-busy="detailLoading || busy || undefined">
       <div v-if="detailLoading" class="message-loading" role="status"><i class="i-mdi-loading message-spin" aria-hidden="true" />{{ t('headerMessages.detailLoading') }}</div>
-      <div v-if="detailError" class="message-feedback" role="alert"><div><strong>{{ t('headerMessages.detailFailed') }}</strong><p>{{ headerMessagesError(detailError) }}</p></div><button class="message-text-button" type="button" :disabled="detailLoading || busy" @click="readDetail">{{ t('headerMessages.retry') }}</button></div>
-      <div v-if="actionError && actionError.businessId === detailId" class="message-feedback" role="alert"><div><strong>{{ t('headerMessages.actionFailed') }}</strong><p>{{ headerMessagesError(actionError.error) }}</p></div><button class="message-text-button" type="button" :disabled="busy" @click="retryAction">{{ t('headerMessages.retry') }}</button></div>
+      <PageErrorNotice v-if="detailError" :title="t('headerMessages.detailFailed')"><p>{{ headerMessagesError(detailError) }}</p><button type="button" :disabled="detailLoading || busy" @click="readDetail">{{ t('headerMessages.retry') }}</button></PageErrorNotice>
+      <PageErrorNotice v-if="actionError && actionError.businessId === detailId" :title="t('headerMessages.actionFailed')"><p>{{ headerMessagesError(actionError.error) }}</p><button type="button" :disabled="busy" @click="retryAction">{{ t('headerMessages.retry') }}</button></PageErrorNotice>
       <template v-if="detail">
         <div class="detail-meta"><time :datetime="detail.createTime || undefined">{{ messageTime(detail.createTime) }}</time><span class="message-type">{{ messageType(detail) }}</span></div>
         <div class="message-body">{{ detail.content || t('headerMessages.noContent') }}</div>
@@ -399,7 +407,8 @@ defineExpose({ close: () => closePanel() })
 .message-badge { position: absolute; top: -3px; right: -5px; display: grid; place-items: center; min-width: 19px; height: 19px; padding: 0 4px; border: 2px solid var(--bg-card); border-radius: var(--r-pill); background: var(--status-danger); color: #fff; font: 600 var(--font-size-caption)/1 var(--sans); font-variant-numeric: tabular-nums; }
 .count-warning { position: absolute; top: 3px; right: 3px; width: 6px; height: 6px; border-radius: 50%; background: var(--status-warn); }
 .message-panel { position: fixed; z-index: 2200; display: flex; flex-direction: column; width: min(392px, calc(100vw - 24px)); overflow: hidden; border: 1px solid var(--border); border-radius: 16px; background: var(--bg-card); color: var(--text-primary); box-shadow: 0 16px 48px color-mix(in srgb, var(--text-primary) 14%, transparent), var(--shadow-card); font: var(--font-size-body)/1.5 var(--sans); outline: none; }
-.message-panel-header { display: flex; align-items: center; flex: none; gap: 9px; padding: 13px 12px 13px 16px; border-bottom: 1px solid var(--border); }
+.message-panel-header { display: flex; align-items: center; flex-wrap: wrap; flex: none; gap: 9px; padding: 13px 12px 13px 16px; border-bottom: 1px solid var(--border); }
+:global(.el-popover.header-message-error-popover) { z-index: 2210 !important; }
 .panel-heading { display: flex; flex: 1; flex-direction: column; min-width: 0; gap: 2px; }
 .panel-heading strong { font-size: var(--font-size-body); font-weight: 600; }
 .panel-heading > span { color: var(--text-muted); font-size: var(--font-size-secondary); }
@@ -426,14 +435,8 @@ button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 .message-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-top: 6px; color: var(--text-muted); font-size: var(--font-size-secondary); }
 .message-type { display: inline-block; max-width: 100%; padding: 1px 6px; border-radius: 5px; background: var(--bg-search); color: var(--text-secondary); font-size: var(--font-size-caption); overflow-wrap: anywhere; }
 .message-panel-footer { display: flex; align-items: center; justify-content: space-between; flex: none; gap: 8px; padding: 8px 10px; border-top: 1px solid var(--border); color: var(--text-muted); font-size: var(--font-size-secondary); font-variant-numeric: tabular-nums; }
-.message-pagination { display: flex; align-items: center; gap: 3px; }
 .message-loading { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 18px 16px; color: var(--text-secondary); font-size: var(--font-size-secondary); }
 .message-loading > i { font-size: 18px; }
-.message-feedback { display: flex; align-items: flex-start; gap: 10px; margin: 10px; padding: 11px 12px; border-radius: 10px; background: var(--status-danger-bg); color: var(--status-danger); font-size: var(--font-size-secondary); }
-.message-feedback > div { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-.message-feedback strong { font-size: var(--font-size-body); font-weight: 500; }
-.message-feedback p { margin: 4px 0 0; line-height: 1.6; }
-.message-feedback .message-text-button { color: inherit; }
 .message-empty { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 32px 20px; text-align: center; color: var(--text-secondary); }
 .message-empty > i { color: var(--text-muted); font-size: 30px; }
 .message-empty strong { color: var(--text-primary); font-size: var(--font-size-body); font-weight: 500; }

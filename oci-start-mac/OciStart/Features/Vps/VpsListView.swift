@@ -33,15 +33,16 @@ struct VpsListView: View {
             title: "VPS 监控看板",
             subtitle: "共 \(model.totalCount) 台 · 在线 \(model.onlineCount) · 离线 \(model.offlineCount)",
             systemImage: "desktopcomputer",
+            layout: .workspace,
             toolbar: { toolbar },
             content: {
                 VStack(spacing: 0) {
                     if let err = model.errorText, !err.isEmpty {
                         Text(err)
-                            .font(.system(size: 12))
+                            .font(.system(size: 14))
                             .foregroundColor(Color(hex: "f85149"))
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 16)
+                            .padding(.horizontal, AppTheme.pagePadding)
                             .padding(.top, 10)
                     }
                     ScrollView {
@@ -50,7 +51,7 @@ struct VpsListView: View {
                             controlBar
                             cardGrid
                         }
-                        .padding(16)
+                        .padding(AppTheme.pagePadding)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -134,11 +135,11 @@ struct VpsListView: View {
         let content = HStack {
             VStack(alignment: .leading, spacing: 6) {
                 Text(title)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(AppTheme.textSecondary(dark))
                 Text(value)
                     .font(.system(size: 26, weight: .bold, design: .rounded))
-                    .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
+                    .foregroundColor(AppTheme.textPrimary(dark))
             }
             Spacer()
             Image(systemName: icon)
@@ -149,7 +150,7 @@ struct VpsListView: View {
         .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(AppTheme.sidebarBg(dark))
+                .fill(AppTheme.cardBg(dark))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 12)
@@ -182,8 +183,8 @@ struct VpsListView: View {
                 Image(systemName: "chart.line.uptrend.xyaxis")
                     .foregroundColor(AppTheme.sidebarActive)
                 Text("监控面板")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(AppTheme.textPrimary(dark))
             }
             Spacer(minLength: 8)
             SearchField(text: $model.searchText, placeholder: "搜索 IP、地区、租户…")
@@ -203,7 +204,7 @@ struct VpsListView: View {
         .padding(12)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(AppTheme.sidebarBg(dark).opacity(0.85))
+                .fill(AppTheme.cardBg(dark).opacity(0.85))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 12)
@@ -223,16 +224,16 @@ struct VpsListView: View {
                 Image(systemName: systemImage)
                     .font(.system(size: 11, weight: .semibold))
                 Text(title)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: 14, weight: .medium))
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 7)
-            .foregroundColor(active ? AppTheme.sidebarActive : AppTheme.sidebarText(dark))
+            .foregroundColor(active ? AppTheme.sidebarActive : AppTheme.textSecondary(dark))
             .background(
                 RoundedRectangle(cornerRadius: 8)
                     .fill(active
                           ? AppTheme.sidebarActive.opacity(0.14)
-                          : (dark ? Color(hex: "2c3136") : Color(hex: "eef2f6")))
+                          : (AppTheme.inputBg(dark)))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
@@ -253,7 +254,7 @@ struct VpsListView: View {
                     moreItem("停止自动 Ping", "stop.fill", Color(hex: "ef4444")) { model.disablePing() }
                     moreItem("手动 Ping 检测", "scope", AppTheme.sidebarActive) { model.manualPing() }
                     Divider().opacity(0.4)
-                    moreItem("刷新列表", "arrow.clockwise", AppTheme.sidebarText(dark)) {
+                    moreItem("刷新列表", "arrow.clockwise", AppTheme.textSecondary(dark)) {
                         model.closeMoreMenu()
                         Task { await model.reload() }
                     }
@@ -262,7 +263,7 @@ struct VpsListView: View {
                 .frame(width: 180, alignment: .leading)
                 .background(
                     RoundedRectangle(cornerRadius: 10)
-                        .fill(AppTheme.sidebarBg(dark))
+                        .fill(AppTheme.cardBg(dark))
                         .shadow(color: Color.black.opacity(0.18), radius: 12, y: 4)
                 )
                 .overlay(
@@ -287,8 +288,8 @@ struct VpsListView: View {
                     .foregroundColor(color)
                     .frame(width: 14)
                 Text(title)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(AppTheme.textPrimary(dark))
                 Spacer()
             }
             .padding(.horizontal, 10)
@@ -367,7 +368,7 @@ private struct VpsServerCard: View {
         }
         .background(
             RoundedRectangle(cornerRadius: 14)
-                .fill(AppTheme.sidebarBg(dark))
+                .fill(AppTheme.cardBg(dark))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 14)
@@ -393,11 +394,11 @@ private struct VpsServerCard: View {
                         HStack(spacing: 6) {
                             Text(showIP ? card.displayIP : card.maskedIP)
                                 .font(.system(size: 14, weight: .semibold, design: .monospaced))
-                                .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
+                                .foregroundColor(AppTheme.textPrimary(dark))
                                 .lineLimit(1)
                             Image(systemName: showIP ? "eye" : "eye.slash")
                                 .font(.system(size: 10))
-                                .foregroundColor(AppTheme.sidebarText(dark))
+                                .foregroundColor(AppTheme.textSecondary(dark))
                         }
                     }
                     .buttonStyle(PlainButtonStyle())
@@ -419,7 +420,7 @@ private struct VpsServerCard: View {
     private var cloudIcon: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 10)
-                .fill(AppTheme.sidebarHover(dark).opacity(0.9))
+                .fill(AppTheme.hover(dark).opacity(0.9))
                 .frame(width: 40, height: 40)
             Image(systemName: cloudSF)
                 .font(.system(size: 16, weight: .medium))
@@ -466,11 +467,11 @@ private struct VpsServerCard: View {
             switch card.archClass {
             case "arm": return Color(hex: "a78bfa")
             case "amd": return Color(hex: "60a5fa")
-            default: return AppTheme.sidebarText(dark)
+            default: return AppTheme.textSecondary(dark)
             }
         }()
         return Text(a)
-            .font(.system(size: 10, weight: .semibold))
+            .font(.system(size: 14, weight: .semibold))
             .foregroundColor(color)
             .padding(.horizontal, 7)
             .padding(.vertical, 3)
@@ -494,10 +495,10 @@ private struct VpsServerCard: View {
                     .font(.system(size: 9))
             }
             Text(text)
-                .font(.system(size: 10, weight: .medium))
+                .font(.system(size: 14, weight: .medium))
                 .lineLimit(1)
         }
-        .foregroundColor(color ?? AppTheme.sidebarText(dark))
+        .foregroundColor(color ?? AppTheme.textSecondary(dark))
         .padding(.horizontal, 7)
         .padding(.vertical, 3)
         .background(
@@ -541,12 +542,12 @@ private struct VpsServerCard: View {
         return VStack(spacing: 3) {
             HStack {
                 Text(title)
-                    .font(.system(size: 11))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .font(.system(size: 13))
+                    .foregroundColor(AppTheme.textSecondary(dark))
                 Spacer()
                 Text(String(format: "%.0f%%", p))
                     .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                    .foregroundColor(dark ? Color.white.opacity(0.85) : Color.primary)
+                    .foregroundColor(AppTheme.textPrimary(dark))
             }
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
@@ -571,7 +572,7 @@ private struct VpsServerCard: View {
             Spacer()
             if card.monitorWarning {
                 Text("探针超时")
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(Color(hex: "f59e0b"))
             }
         }

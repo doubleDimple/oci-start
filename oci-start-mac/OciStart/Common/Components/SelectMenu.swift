@@ -115,13 +115,13 @@ private struct SelectMenuPanelView: View {
 
     private var dark: Bool { state.dark }
     private var accent: Color {
-        dark ? Color(hex: "4d9eff") : Color(hex: "2563eb")
+        AppTheme.sidebarActive
     }
     private var panelBg: Color {
-        dark ? Color(hex: "22262b") : Color.white
+        AppTheme.cardBg(dark)
     }
     private var softDivider: Color {
-        dark ? Color(hex: "31363d") : Color(hex: "e8eef5")
+        AppTheme.border(dark)
     }
 
     private var filteredOptions: [SelectOption] {
@@ -159,7 +159,7 @@ private struct SelectMenuPanelView: View {
 
                     if filteredOptions.isEmpty {
                         Text("无匹配项")
-                            .font(.system(size: 12))
+                            .font(.system(size: AppTheme.bodySize))
                             .foregroundColor(AppInputStyle.placeholder(dark))
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)
@@ -201,7 +201,7 @@ private struct SelectMenuPanelView: View {
                 .foregroundColor(AppInputStyle.icon(dark))
             TextField("搜索…", text: $state.searchText)
                 .textFieldStyle(PlainTextFieldStyle())
-                .font(.system(size: 12))
+                .font(.system(size: AppTheme.bodySize))
                 .foregroundColor(AppInputStyle.text(dark))
             if !state.searchText.isEmpty {
                 Button(action: { state.searchText = "" }) {
@@ -214,7 +214,7 @@ private struct SelectMenuPanelView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        .background(dark ? Color(hex: "292d32") : Color(hex: "f8fafc"))
+        .background(AppTheme.inputBg(dark))
     }
 
     private func row(
@@ -244,12 +244,12 @@ private struct SelectMenuPanelView: View {
             HStack(spacing: 8) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .font(.system(size: 13, weight: (selected && !muted) ? .semibold : .regular))
+                        .font(.system(size: AppTheme.bodySize, weight: (selected && !muted) ? .semibold : .regular))
                         .foregroundColor(titleColor)
                         .lineLimit(1)
                     if let subtitle = subtitle, !subtitle.isEmpty {
                         Text(subtitle)
-                            .font(.system(size: 11))
+                            .font(.system(size: AppTheme.secondarySize))
                             .foregroundColor(AppInputStyle.placeholder(dark))
                             .lineLimit(1)
                     }
@@ -487,7 +487,7 @@ struct SelectMenu: View {
     @StateObject private var panelState = SelectMenuPanelState()
 
     private var accent: Color {
-        dark ? Color(hex: "4d9eff") : Color(hex: "2563eb")
+        AppTheme.sidebarActive
     }
 
     private var resolvedWidth: CGFloat { width ?? 160 }

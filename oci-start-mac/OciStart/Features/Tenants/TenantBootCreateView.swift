@@ -57,6 +57,7 @@ struct TenantBootCreateView: View {
             title: "创建开机任务",
             subtitle: tenant.map { "\($0.displayName) · \($0.region.isEmpty ? "—" : $0.region)" },
             systemImage: "play.circle.fill",
+            layout: .workspace,
             toolbar: { toolbar },
             content: {
                 ScrollView {
@@ -77,7 +78,7 @@ struct TenantBootCreateView: View {
                             imageCard
                         }
                     }
-                    .padding(16)
+                    .padding(AppTheme.pagePadding)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -94,11 +95,11 @@ struct TenantBootCreateView: View {
                 .foregroundColor(Color(hex: "f85149"))
             VStack(alignment: .leading, spacing: 4) {
                 Text("API 开机风控警告")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(Color(hex: "f85149"))
                 Text("Oracle 已加强对 API 开机的风控。通过 API 创建实例极大概率触发风控，可能导致账号受限。保存任务前会再次弹框确认。")
-                    .font(.system(size: 12))
-                    .foregroundColor(dark ? Color.white.opacity(0.85) : Color.primary)
+                    .font(.system(size: 14))
+                    .foregroundColor(AppTheme.textPrimary(dark))
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
@@ -119,6 +120,13 @@ struct TenantBootCreateView: View {
 
     private var toolbar: some View {
         HStack(spacing: 8) {
+            if let selectedTenant = tenant {
+                Text("创建开机任务 · \(selectedTenant.displayName) · \(selectedTenant.region.isEmpty ? "—" : selectedTenant.region)")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(AppTheme.textSecondary(dark))
+                    .lineLimit(1)
+                    .frame(maxWidth: 220, alignment: .leading)
+            }
             AppButton(title: "返回列表", systemImage: "chevron.left", kind: .secondary) {
                 model.closeBootCreate()
             }
@@ -178,8 +186,8 @@ struct TenantBootCreateView: View {
                 }
             } else {
                 Text("使用当前租户区域")
-                    .font(.system(size: 11))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .font(.system(size: 13))
+                    .foregroundColor(AppTheme.textSecondary(dark))
             }
         } footer: {
             StatusBadge(
@@ -211,12 +219,12 @@ struct TenantBootCreateView: View {
         }) {
             VStack(spacing: 2) {
                 Text(arch)
-                    .font(.system(size: 13, weight: .bold))
+                    .font(.system(size: 14, weight: .bold))
                 Text(subtitle)
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.system(size: 14, weight: .medium))
                     .opacity(0.8)
             }
-            .foregroundColor(active ? .white : AppTheme.sidebarText(dark))
+            .foregroundColor(active ? .white : AppTheme.textSecondary(dark))
             .frame(maxWidth: .infinity)
             .padding(.vertical, 10)
             .background(
@@ -255,8 +263,8 @@ struct TenantBootCreateView: View {
             }
         } footer: {
             Text("已选 \(selectedLabel)")
-                .font(.system(size: 11))
-                .foregroundColor(AppTheme.sidebarText(dark))
+                .font(.system(size: 13))
+                .foregroundColor(AppTheme.textSecondary(dark))
         }
     }
 
@@ -284,8 +292,8 @@ struct TenantBootCreateView: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 6) {
                     Text(tpl.label)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(active ? accent : (dark ? Color.white.opacity(0.92) : Color.primary))
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(active ? accent : (AppTheme.textPrimary(dark)))
                         .lineLimit(1)
                     Spacer(minLength: 2)
                     if active {
@@ -296,12 +304,12 @@ struct TenantBootCreateView: View {
                 }
 
                 Text("\(tpl.ocpu)C · \(tpl.memory)G · \(tpl.disk)G")
-                    .font(.system(size: 11))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .font(.system(size: 13))
+                    .foregroundColor(AppTheme.textSecondary(dark))
                     .lineLimit(1)
 
                 Text(tpl.tag)
-                    .font(.system(size: 10, weight: .bold))
+                    .font(.system(size: 14, weight: .bold))
                     .foregroundColor(tagColor)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
@@ -356,8 +364,8 @@ struct TenantBootCreateView: View {
                             leadingSystemImage: "timer"
                         )
                         Text("秒")
-                            .font(.system(size: 12))
-                            .foregroundColor(AppTheme.sidebarText(dark))
+                            .font(.system(size: 13))
+                            .foregroundColor(AppTheme.textSecondary(dark))
                     }
                 }
             }
@@ -380,8 +388,8 @@ struct TenantBootCreateView: View {
                             leadingSystemImage: "clock"
                         )
                         Text("起始-结束小时，仅该时段内抢机")
-                            .font(.system(size: 11))
-                            .foregroundColor(AppTheme.sidebarText(dark))
+                            .font(.system(size: 13))
+                            .foregroundColor(AppTheme.textSecondary(dark))
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
@@ -389,8 +397,8 @@ struct TenantBootCreateView: View {
             }
         } footer: {
             Text("可改规格后保存")
-                .font(.system(size: 11))
-                .foregroundColor(AppTheme.sidebarText(dark))
+                .font(.system(size: 13))
+                .foregroundColor(AppTheme.textSecondary(dark))
         }
     }
 
@@ -425,11 +433,11 @@ struct TenantBootCreateView: View {
                             ProgressView().scaleEffect(0.65)
                         } else {
                             Image(systemName: "exclamationmark.circle")
-                                .foregroundColor(AppTheme.sidebarText(dark))
+                                .foregroundColor(AppTheme.textSecondary(dark))
                         }
                         Text(model.bootImages.isEmpty ? "加载镜像中…" : "暂无可用镜像")
-                            .font(.system(size: 12))
-                            .foregroundColor(AppTheme.sidebarText(dark))
+                            .font(.system(size: 13))
+                            .foregroundColor(AppTheme.textSecondary(dark))
                     }
                     .frame(height: AppInputStyle.height)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -478,8 +486,8 @@ struct TenantBootCreateView: View {
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundColor(
                         model.bootImageId.isEmpty
-                            ? AppTheme.sidebarText(dark)
-                            : (dark ? Color.white.opacity(0.9) : Color.primary)
+                            ? AppTheme.textSecondary(dark)
+                            : (AppTheme.textPrimary(dark))
                     )
                     .lineLimit(3)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -508,8 +516,8 @@ struct TenantBootCreateView: View {
     private func numField(_ label: String, text: Binding<String>) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(label)
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundColor(AppTheme.sidebarText(dark))
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(AppTheme.textSecondary(dark))
             AppTextField(text: text, placeholder: "0")
         }
         .frame(maxWidth: .infinity)
@@ -519,8 +527,8 @@ struct TenantBootCreateView: View {
         let active = binding.wrappedValue == value
         return Button(action: { binding.wrappedValue = value }) {
             Text(label)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(active ? .white : AppTheme.sidebarText(dark))
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(active ? .white : AppTheme.textSecondary(dark))
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
                 .background(

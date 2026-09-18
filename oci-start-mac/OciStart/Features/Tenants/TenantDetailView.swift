@@ -60,6 +60,7 @@ struct TenantDetailView: View {
                 return "\($0.displayName) · \(region)"
             },
             systemImage: "key.fill",
+            layout: .workspace,
             toolbar: { toolbar },
             content: {
                 VStack(spacing: 0) {
@@ -68,8 +69,8 @@ struct TenantDetailView: View {
                     }
                     summaryBar
                     listBody
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 16)
+                        .padding(.horizontal, AppTheme.pagePadding)
+                        .padding(.bottom, AppTheme.pagePadding)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -82,6 +83,13 @@ struct TenantDetailView: View {
 
     private var toolbar: some View {
         HStack(spacing: 8) {
+            if let selectedTenant = parent {
+                Text("租户详情 · \(model.detailNamesHidden ? selectedTenant.maskedName : selectedTenant.displayName) · \(selectedTenant.region.isEmpty ? "—" : selectedTenant.region)")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(AppTheme.textSecondary(dark))
+                    .lineLimit(1)
+                    .frame(maxWidth: 220, alignment: .leading)
+            }
             AppButton(title: "返回列表", systemImage: "chevron.left", kind: .secondary) {
                 model.closeDetail()
             }
@@ -138,10 +146,10 @@ struct TenantDetailView: View {
             )
             Spacer(minLength: 0)
             Text("行内快捷：同步 · 开机 · 实例 · 更多")
-                .font(.system(size: 11))
-                .foregroundColor(AppTheme.sidebarText(dark).opacity(0.85))
+                .font(.system(size: 13))
+                .foregroundColor(AppTheme.textSecondary(dark))
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, AppTheme.pagePadding)
         .padding(.vertical, 12)
     }
 
@@ -157,18 +165,18 @@ struct TenantDetailView: View {
             }
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(AppTheme.textSecondary(dark))
                 Text(value)
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
+                    .foregroundColor(AppTheme.textPrimary(dark))
             }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .background(
             RoundedRectangle(cornerRadius: 10)
-                .fill(AppTheme.sidebarBg(dark))
+                .fill(AppTheme.cardBg(dark))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 10)
@@ -179,7 +187,7 @@ struct TenantDetailView: View {
     private func errorBanner(_ text: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
-            Text(text).font(.system(size: 12))
+            Text(text).font(.system(size: 14))
             Spacer()
             Button("重试") { Task { await model.reloadDetail() } }
                 .buttonStyle(PlainButtonStyle())
@@ -189,7 +197,7 @@ struct TenantDetailView: View {
         .padding(12)
         .background(Color(hex: "f85149").opacity(0.1))
         .cornerRadius(10)
-        .padding(.horizontal, 16)
+        .padding(.horizontal, AppTheme.pagePadding)
         .padding(.top, 4)
     }
 
@@ -202,8 +210,8 @@ struct TenantDetailView: View {
                 Spacer()
                 ProgressView()
                 Text("加载区域列表…")
-                    .font(.system(size: 12))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .font(.system(size: 13))
+                    .foregroundColor(AppTheme.textSecondary(dark))
                 Spacer()
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -281,7 +289,7 @@ struct TenantDetailView: View {
 
     private var tableCardBackground: some View {
         RoundedRectangle(cornerRadius: 12)
-            .fill(AppTheme.sidebarBg(dark))
+            .fill(AppTheme.cardBg(dark))
     }
 
     private func headerRow(
@@ -304,7 +312,7 @@ struct TenantDetailView: View {
         .padding(.horizontal, hPad)
         .padding(.vertical, 10)
         .frame(width: width, alignment: .leading)
-        .background(AppTheme.sidebarHover(dark).opacity(0.65))
+        .background(AppTheme.hover(dark).opacity(0.65))
         .overlay(
             Rectangle().frame(height: 1).foregroundColor(AppTheme.border(dark).opacity(0.5)),
             alignment: .bottom
@@ -358,7 +366,7 @@ struct TenantDetailView: View {
             return AppTheme.sidebarActive.opacity(dark ? 0.12 : 0.08)
         }
         return index % 2 == 1
-            ? AppTheme.sidebarHover(dark).opacity(0.18)
+            ? AppTheme.hover(dark).opacity(0.18)
             : Color.clear
     }
 
@@ -370,8 +378,8 @@ struct TenantDetailView: View {
             }
         }) {
             Text(shown ? item.displayName : item.maskedName)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(AppTheme.textPrimary(dark))
                 // 始终单行，禁止换行
                 .lineLimit(1)
                 .truncationMode(.tail)
@@ -400,7 +408,7 @@ struct TenantDetailView: View {
         Button(action: { model.openInstancesList(item) }) {
             HStack(spacing: 4) {
                 Text(item.region.isEmpty ? "—" : item.region)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(AppTheme.sidebarActive)
                     .lineLimit(1)
                 Image(systemName: "arrow.up.right")
@@ -416,15 +424,15 @@ struct TenantDetailView: View {
 
     private func homeBadge(_ item: TenantItem) -> some View {
         Text(item.isHomeRegion ? "是" : "否")
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundColor(item.isHomeRegion ? AppTheme.sidebarActive : AppTheme.sidebarText(dark))
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundColor(item.isHomeRegion ? AppTheme.sidebarActive : AppTheme.textSecondary(dark))
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
             .background(
                 Capsule().fill(
                     item.isHomeRegion
                         ? AppTheme.sidebarActive.opacity(0.15)
-                        : AppTheme.sidebarHover(dark).opacity(0.5)
+                        : AppTheme.hover(dark).opacity(0.5)
                 )
             )
     }
@@ -485,13 +493,13 @@ struct TenantDetailView: View {
         Button(action: action) {
             Image(systemName: systemImage)
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(accent ? .white : (dark ? Color.white.opacity(0.9) : Color.primary))
+                .foregroundColor(accent ? .white : (AppTheme.textPrimary(dark)))
                 .frame(width: 28, height: 26)
                 .background(
                     RoundedRectangle(cornerRadius: 7)
                         .fill(accent
                               ? AppTheme.sidebarActive
-                              : (dark ? Color(hex: "2c3136") : Color(hex: "eef2f6")))
+                              : (AppTheme.inputBg(dark)))
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 7)
@@ -504,15 +512,15 @@ struct TenantDetailView: View {
 
     private func colHeader(_ title: String, _ w: CGFloat, align: Alignment = .leading) -> some View {
         Text(title)
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundColor(AppTheme.sidebarText(dark))
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundColor(AppTheme.textSecondary(dark))
             .frame(width: w, alignment: align)
     }
 
     private func cell(_ text: String, _ w: CGFloat, muted: Bool = false) -> some View {
         Text(text)
-            .font(.system(size: 12))
-            .foregroundColor(muted ? AppTheme.sidebarText(dark) : (dark ? Color.white.opacity(0.9) : Color.primary))
+            .font(.system(size: 13))
+            .foregroundColor(muted ? AppTheme.textSecondary(dark) : (AppTheme.textPrimary(dark)))
             .lineLimit(1)
             .frame(width: w, alignment: .leading)
     }

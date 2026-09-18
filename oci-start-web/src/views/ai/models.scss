@@ -1,0 +1,70 @@
+.ai-models-page {
+  display: flex; flex-direction: column; width: 100%; height: 100%; min-width: 0; min-height: 0;
+  overflow: hidden; border: 1px solid var(--border); border-radius: var(--r-card); background: var(--bg-card);
+  box-shadow: var(--shadow-card); color: var(--text-primary); font: var(--font-size-body)/1.47 var(--sans);
+  .ai-models-toolbar { display: flex; flex: none; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px 18px; border-bottom: 1px solid var(--border); }
+  .ai-models-tenant { width: min(340px, 100%); }
+  .ai-models-toolbar > .btn:last-child { margin-left: auto; }
+  .btn { min-height: 36px; padding: 7px 12px; }
+  .ai-models-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); flex: 1; min-height: 0; min-width: 0; }
+  .ai-models-panel { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+  .ai-models-panel + .ai-models-panel { border-left: 1px solid var(--border); }
+  .ai-models-panel-header { display: flex; flex: none; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 16px 18px 12px; }
+  h2 { margin: 0; font-size: var(--font-size-section); font-weight: 600; }
+  .ai-models-panel-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+  .ai-models-toolbar-actions { display: flex; flex: none; align-items: center; gap: 8px; margin-left: auto; }
+  .ai-models-linked { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+  .ai-models-note { margin: 0; color: var(--text-secondary); font-size: var(--font-size-secondary); line-height: 1.5; }
+  .ai-models-scope { flex: none; padding: 0 18px 12px; border-bottom: 1px solid var(--border); }
+  .ai-models-list { flex: 1; min-height: 180px; min-width: 0; overflow: auto; }
+  .ai-models-row { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: 10px 16px; padding: 16px 18px; border-bottom: 1px solid var(--border); }
+  .ai-models-row:hover { background: var(--bg-hover); }
+  .ai-models-row-main { display: grid; flex: 1; min-width: 130px; gap: 5px; }
+  .ai-models-name { margin: 0; color: var(--text-primary); font-size: var(--font-size-body); font-weight: 600; overflow-wrap: anywhere; }
+  .ai-models-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 10px; color: var(--text-secondary); font-size: var(--font-size-secondary); overflow-wrap: anywhere; }
+  .ai-models-provider { padding: 2px 7px; border: 1px solid var(--border); border-radius: var(--r-pill); color: var(--text-primary); font-size: var(--font-size-caption); }
+  .ai-models-row-actions { display: flex; align-items: center; gap: 6px; }
+  .ai-models-status { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; color: var(--text-primary); font-size: var(--font-size-caption); }
+  .ai-models-status::before { width: 6px; height: 6px; border-radius: 50%; background: var(--border-strong); content: ''; }
+  .ai-models-status.enabled::before { background: var(--status-ok); }
+  .ai-models-status.unknown::before { background: var(--status-warn); }
+  .ai-models-icon { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 34px; height: 34px; box-sizing: border-box; border: 1px solid transparent; border-radius: var(--r-pill); background: transparent; color: var(--text-primary); cursor: pointer; }
+  .ai-models-icon > i { font-size: 18px; }
+  .ai-models-icon:not(:disabled):hover { background: var(--bg-search); border-color: var(--border); }
+  .ai-models-icon.danger { color: var(--status-danger); }
+  button:disabled { opacity: .6; cursor: default; }
+  button:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+  .ai-models-empty { display: flex; align-items: center; justify-content: center; min-height: 180px; margin: 0; padding: 30px 18px; color: var(--text-secondary); text-align: center; }
+  .ai-models-read-error { display: flex; flex: none; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: 10px; margin: 12px 18px; padding: 10px 12px; border-radius: var(--r-sm); background: var(--status-danger-bg); color: var(--status-danger); overflow-wrap: anywhere; }
+  .ai-models-read-error > span { flex: 1; min-width: 100px; }
+}
+.ai-models-action-dialog {
+  max-width: calc(100vw - 28px); color: var(--text-primary); font: var(--font-size-body)/1.5 var(--sans);
+  .el-dialog__title { font: 600 var(--font-size-dialog-title)/1.4 var(--sans); }
+  .el-dialog__body { max-height: 70vh; overflow: auto; }
+  .el-dialog__footer { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; border-top: 1px solid var(--border); }
+  .ai-models-action-hint { margin: 0 0 14px; overflow-wrap: anywhere; }
+  .ai-models-action-context { display: grid; gap: 5px; padding: 12px; margin-bottom: 14px; border-radius: var(--r-sm); background: var(--bg-search); overflow-wrap: anywhere; }
+  .ai-models-action-context > strong { font-weight: 600; }
+  .ai-models-action-context > span, .ai-models-action-note { color: var(--text-secondary); font-size: var(--font-size-secondary); }
+  .ai-models-action-note { margin: 8px 0 0; overflow-wrap: anywhere; }
+  .ai-models-action-error, .ai-models-action-warning { margin: 12px 0 0; padding: 10px 12px; border-radius: var(--r-sm); overflow-wrap: anywhere; }
+  .ai-models-action-error { background: var(--status-danger-bg); color: var(--status-danger); }
+  .ai-models-action-warning { background: var(--status-warn-bg); color: var(--status-warn); }
+  .ai-models-danger { display: inline-flex; align-items: center; justify-content: center; min-height: 40px; padding: 9px 16px; border: 0; border-radius: var(--r-pill); background: var(--status-danger); color: var(--nav-active-fg); font: 600 var(--font-size-body)/22px var(--sans); cursor: pointer; }
+  .ai-models-danger:disabled { opacity: .6; cursor: default; }
+  .ai-models-danger:focus-visible { outline: 2px solid var(--status-danger); outline-offset: 3px; }
+}
+@media (max-width: 900px) {
+  .ai-models-page { overflow: auto; }
+  .ai-models-page .ai-models-grid { display: flex; flex: none; flex-direction: column; }
+  .ai-models-page .ai-models-panel { min-height: 360px; }
+  .ai-models-page .ai-models-panel + .ai-models-panel { border-left: 0; border-top: 1px solid var(--border); }
+  .ai-models-page .ai-models-list { max-height: 460px; }
+}
+@media (max-width: 600px) {
+  .ai-models-page .ai-models-toolbar, .ai-models-page .ai-models-panel-header, .ai-models-page .ai-models-row { padding-inline: 12px; }
+  .ai-models-page .ai-models-tenant { flex: 1; min-width: 150px; }
+  .ai-models-page .ai-models-panel-tools { flex-basis: 100%; }
+  .ai-models-page .ai-models-scope { padding-inline: 12px; }
+}

@@ -11,4 +11,6 @@ public class DingTalkConfigRequest {
     private boolean enabled;
     private String webhook;
     private String secret;
+    private Boolean keepWebhook;
+    private Boolean keepSecret;
 }

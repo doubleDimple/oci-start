@@ -15,11 +15,11 @@ struct TenantCostView: View {
     private var storageColor: Color { Color(hex: "ff9f40") }
     private var networkColor: Color { Color(hex: "1abc9c") }
     private var otherColor: Color { Color(hex: "6b7280") }
-    private var surface: Color { dark ? Color(hex: "1a1d27") : Color.white }
-    private var cardBorder: Color { dark ? Color(hex: "2a2d3a") : Color(hex: "e2e8f0") }
-    private var primaryText: Color { dark ? Color(hex: "e2e8f0") : Color(hex: "222222") }
-    private var secondaryText: Color { dark ? Color(hex: "8892a4") : Color(hex: "555555") }
-    private var pageBg: Color { dark ? Color(hex: "0f1117") : Color(hex: "f3f6fa") }
+    private var surface: Color { AppTheme.cardBg(dark) }
+    private var cardBorder: Color { AppTheme.border(dark) }
+    private var primaryText: Color { AppTheme.textPrimary(dark) }
+    private var secondaryText: Color { AppTheme.textSecondary(dark) }
+    private var pageBg: Color { AppTheme.pageBg(dark) }
 
     private let wDay: CGFloat = 110
     private let wType: CGFloat = 120
@@ -33,6 +33,7 @@ struct TenantCostView: View {
             title: "费用统计",
             subtitle: tenant.map { $0.displayName },
             systemImage: "creditcard",
+            layout: .workspace,
             toolbar: { toolbar },
             content: { mainContent }
         )
@@ -43,6 +44,13 @@ struct TenantCostView: View {
 
     private var toolbar: some View {
         HStack(spacing: 8) {
+            if let selectedTenant = tenant {
+                Text("费用统计 · \(selectedTenant.displayName)")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(AppTheme.textSecondary(dark))
+                    .lineLimit(1)
+                    .frame(maxWidth: 220, alignment: .leading)
+            }
             AppButton(title: "返回列表", systemImage: "chevron.left", kind: .secondary) {
                 model.closeCost()
             }
@@ -69,7 +77,7 @@ struct TenantCostView: View {
                 trendCard
                 detailTable
             }
-            .padding(16)
+            .padding(AppTheme.pagePadding)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .background(pageBg)
@@ -82,7 +90,7 @@ struct TenantCostView: View {
         HStack(alignment: .center, spacing: 14) {
             HStack(spacing: 8) {
                 Text("时间范围：")
-                    .font(.system(size: 13))
+                    .font(.system(size: 14))
                     .foregroundColor(secondaryText)
                 presetBtn("今天", value: "today")
                 presetBtn("本月", value: "month")
@@ -93,13 +101,13 @@ struct TenantCostView: View {
                 HStack(spacing: 8) {
                     dateField(text: $model.costStart)
                     Text("至")
-                        .font(.system(size: 12))
+                        .font(.system(size: 14))
                         .foregroundColor(secondaryText)
                     dateField(text: $model.costEnd)
                 }
             } else {
                 Text("\(model.costStart)  ~  \(model.costEnd)")
-                    .font(.system(size: 12))
+                    .font(.system(size: 14))
                     .foregroundColor(secondaryText)
             }
 
@@ -111,13 +119,13 @@ struct TenantCostView: View {
                     Image(systemName: "magnifyingglass")
                         .font(.system(size: 11, weight: .semibold))
                     Text("查询")
-                        .font(.system(size: 13, weight: .medium))
+                        .font(.system(size: 14, weight: .medium))
                 }
                 .foregroundColor(.white)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
                 .background(accentGreen)
-                .cornerRadius(4)
+                .cornerRadius(AppTheme.controlRadius)
             }
             .buttonStyle(PlainButtonStyle())
 
@@ -133,16 +141,16 @@ struct TenantCostView: View {
         let active = model.costTimePreset == value
         return Button(action: { model.applyCostPreset(value) }) {
             Text(title)
-                .font(.system(size: 12, weight: .medium))
+                .font(.system(size: 14, weight: .medium))
                 .foregroundColor(active ? .white : accentGreen)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .background(active ? accentGreen : Color.clear)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 4)
+                    RoundedRectangle(cornerRadius: AppTheme.controlRadius)
                         .stroke(accentGreen, lineWidth: 1)
                 )
-                .cornerRadius(4)
+                .cornerRadius(AppTheme.controlRadius)
         }
         .buttonStyle(PlainButtonStyle())
     }
@@ -405,12 +413,12 @@ struct TenantCostView: View {
         .padding(.horizontal, hPad)
         .padding(.vertical, 9)
         .frame(width: width, alignment: .leading)
-        .background(AppTheme.sidebarHover(dark).opacity(0.65))
+        .background(AppTheme.hover(dark).opacity(0.65))
     }
 
     private func costRow(index: Int, item: TenantCostItem, wSku: CGFloat, wRes: CGFloat, width: CGFloat) -> some View {
         let positive = item.cost > 0
-        let stripe = index % 2 == 1 ? AppTheme.sidebarHover(dark).opacity(0.18) : Color.clear
+        let stripe = index % 2 == 1 ? AppTheme.hover(dark).opacity(0.18) : Color.clear
         return HStack(spacing: 0) {
             cell(item.day.isEmpty ? "—" : item.day, wDay, muted: true)
             cell(item.resourceType.isEmpty ? "—" : item.resourceType, wType)
@@ -435,7 +443,7 @@ struct TenantCostView: View {
     private func colHeader(_ title: String, _ w: CGFloat, align: Alignment = .leading) -> some View {
         Text(title)
             .font(.system(size: 11, weight: .semibold))
-            .foregroundColor(AppTheme.sidebarText(dark))
+            .foregroundColor(AppTheme.textSecondary(dark))
             .frame(width: w, alignment: align)
     }
 

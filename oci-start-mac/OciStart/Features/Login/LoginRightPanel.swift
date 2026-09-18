@@ -1,8 +1,9 @@
 import SwiftUI
 import AppKit
 
-/// Right form panel — structure mirrors web `.form-panel .login-card`.
+/// Compact native form using the Vue login spacing and controls.
 struct LoginRightPanel: View {
+    @EnvironmentObject private var appearance: AppearanceController
     @ObservedObject var model: LoginFormModel
     var dark: Bool
     @ObservedObject var backend: BackendController
@@ -37,178 +38,115 @@ struct LoginRightPanel: View {
     }
 
     var body: some View {
-        ZStack {
-            if showBootLoading {
-                bootLoadingView
-                    .transition(.opacity)
-            } else if let fail = localBootFailed {
-                bootFailedView(fail)
-                    .transition(.opacity)
-            } else {
-                formScroll
-                    .transition(.opacity.combined(with: .offset(y: 6)))
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .animation(.easeInOut(duration: 0.28), value: showBootLoading)
-        .animation(.easeInOut(duration: 0.28), value: localBootFailed != nil)
-        .animation(.easeInOut(duration: 0.22), value: model.modeActivated)
-        .background(Color.clear)
-    }
-
-    // MARK: - Minimal boot states
-
-    private var bootLoadingView: some View {
         VStack(spacing: 0) {
             topChipBar
-                .padding(.horizontal, 56)
-                .padding(.top, 48)
-            deploymentModeSwitcher
-                .padding(.horizontal, 56)
-                .padding(.top, 28)
-            Spacer(minLength: 0)
-            VStack(spacing: 14) {
-                ProgressView()
-                    .progressViewStyle(CircularProgressViewStyle())
-                    .scaleEffect(1.55)
-                Text(model.locale == .enUS ? "Starting local backend…" : "正在启动本机服务…")
-                    .font(.system(size: 13))
-                    .foregroundColor(LoginPalette.muted(dark))
-                Text(model.locale == .enUS
-                     ? "Switch to Remote if you already deployed a server"
-                     : "若已远程部署，可切换到「已远程部署」")
-                    .font(.system(size: 12))
-                    .foregroundColor(LoginPalette.muted(dark).opacity(0.9))
-                    .multilineTextAlignment(.center)
+                .padding(.horizontal, 46)
+                .padding(.top, 26)
+                .padding(.bottom, 18)
+            GeometryReader { geo in
+                ScrollView(.vertical) {
+                    formContent
+                        .padding(.horizontal, 46)
+                        .padding(.vertical, 22)
+                        .frame(maxWidth: 400)
+                        .frame(maxWidth: .infinity)
+                        .frame(minHeight: geo.size.height, alignment: .center)
+                }
             }
-            Spacer(minLength: 0)
-            Color.clear.frame(height: 48 + 28)
+            Text(model.locale == .enUS
+                 ? (model.allowRegister ? "Create an account to get started." : "Need access? Contact your administrator.")
+                 : (model.allowRegister ? "还没有账号？可以在上方创建账号。" : "需要访问权限？请联系管理员。"))
+                .font(.system(size: 12))
+                .foregroundColor(LoginPalette.muted(dark))
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
+                .padding(.top, 14)
+                .padding(.bottom, 30)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(LoginPalette.card(dark))
+        .animation(.easeInOut(duration: 0.2), value: showBootLoading)
+        .animation(.easeInOut(duration: 0.2), value: localBootFailed != nil)
+    }
+
+    private var formContent: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            brand.padding(.bottom, 28)
+            deploymentModeSwitcher.padding(.bottom, 22)
+            if !model.modeActivated && !model.hasPersistedChoice {
+                pickModeHint
+            }
+            if showBootLoading {
+                bootLoadingView
+            } else if let message = localBootFailed {
+                bootFailedView(message)
+            } else if model.modeActivated {
+                if model.allowRegister {
+                    tabs.padding(.bottom, 22)
+                }
+                if model.isRemoteServer {
+                    serverRow.padding(.bottom, 14)
+                }
+                statusStrip.padding(.bottom, 14)
+                ZStack {
+                    Group {
+                        if model.tab == .login { loginFields } else { registerFields }
+                    }
+                    .opacity(model.isLoadingMeta ? 0.45 : 1)
+                    .allowsHitTesting(!model.isLoadingMeta)
+                    if model.isLoadingMeta {
+                        ProgressView().progressViewStyle(CircularProgressViewStyle())
+                    }
+                }
+                if let error = model.errorText {
+                    Text(error)
+                        .font(.system(size: 13))
+                        .foregroundColor(Color(hex: dark ? "ff7a7a" : "c94a4a"))
+                        .padding(.top, 12)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if let info = model.infoText {
+                    Text(info)
+                        .font(.system(size: 13))
+                        .foregroundColor(LoginPalette.muted(dark))
+                        .padding(.top, 8)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+    }
+
+    private var bootLoadingView: some View {
+        VStack(spacing: 14) {
+            ProgressView().progressViewStyle(CircularProgressViewStyle())
+            Text(model.locale == .enUS ? "Starting local service…" : "正在启动本机服务…")
+                .font(.system(size: 14))
+            Text(model.locale == .enUS
+                 ? "You can also connect to a remote server."
+                 : "也可切换到远程部署，连接已有服务。")
+                .font(.system(size: 13))
+                .foregroundColor(LoginPalette.muted(dark))
+                .multilineTextAlignment(.center)
+        }
+        .foregroundColor(LoginPalette.text(dark))
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 36)
     }
 
     private func bootFailedView(_ message: String) -> some View {
-        VStack(spacing: 0) {
-            topChipBar
-                .padding(.horizontal, 56)
-                .padding(.top, 48)
-            deploymentModeSwitcher
-                .padding(.horizontal, 56)
-                .padding(.top, 28)
-            Spacer(minLength: 0)
-            VStack(spacing: 14) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.system(size: 28, weight: .medium))
-                    .foregroundColor(Color(hex: "f59e0b"))
-                Text(model.locale == .enUS ? "Service failed to start" : "服务启动失败")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(LoginPalette.text(dark))
-                Text(message)
-                    .font(.system(size: 12))
-                    .foregroundColor(LoginPalette.muted(dark))
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 360)
-                Text(model.locale == .enUS
-                     ? "Or switch to Remote and connect an existing server"
-                     : "也可切换到「已远程部署」连接已有服务")
-                    .font(.system(size: 12))
-                    .foregroundColor(LoginPalette.muted(dark))
-                    .multilineTextAlignment(.center)
+        VStack(alignment: .leading, spacing: 12) {
+            Label(model.locale == .enUS ? "Service failed to start" : "服务启动失败",
+                  systemImage: "exclamationmark.circle")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(Color(hex: dark ? "ff7a7a" : "c94a4a"))
+            Text(message)
+                .font(.system(size: 13))
+                .foregroundColor(LoginPalette.muted(dark))
+                .fixedSize(horizontal: false, vertical: true)
+            LoginPillButton(title: model.locale == .enUS ? "Try again" : "重新启动", dark: dark) {
+                Task { await backend.start() }
             }
-            .padding(.horizontal, 56)
-            Spacer(minLength: 0)
-            Color.clear.frame(height: 48 + 28)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    // MARK: - Form
-
-    private var formScroll: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                topChipBar
-                    .padding(.bottom, 28)
-
-                brand
-                    .padding(.bottom, 34)
-
-                deploymentModeSwitcher
-                    .padding(.bottom, 22)
-
-                if !model.modeActivated && !model.hasPersistedChoice {
-                    pickModeHint
-                        .padding(.bottom, 8)
-                        .transition(.opacity)
-                }
-
-                if model.modeActivated {
-                    if model.allowRegister {
-                        tabs
-                            .padding(.bottom, 26)
-                            .transition(.opacity.combined(with: .move(edge: .top)))
-                    }
-
-                    if model.isRemoteServer {
-                        serverRow
-                            .padding(.bottom, 14)
-                            .transition(.opacity.combined(with: .move(edge: .top)))
-                    }
-
-                    statusStrip
-                        .padding(.bottom, 14)
-
-                    ZStack {
-                        Group {
-                            if model.tab == .login {
-                                loginFields
-                            } else {
-                                registerFields
-                            }
-                        }
-                        .opacity(model.isLoadingMeta ? 0.45 : 1)
-                        .allowsHitTesting(!model.isLoadingMeta)
-                        .animation(.easeOut(duration: 0.2), value: model.isLoadingMeta)
-
-                        if model.isLoadingMeta {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle())
-                                .scaleEffect(1.05)
-                                .transition(.opacity)
-                        }
-                    }
-                    .animation(.easeOut(duration: 0.18), value: model.isLoadingMeta)
-
-                    if let e = model.errorText {
-                        Text(e)
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(Color(hex: "ef4444"))
-                            .padding(.top, 12)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .transition(.opacity)
-                    }
-                    if let info = model.infoText {
-                        Text(info)
-                            .font(.system(size: 13))
-                            .foregroundColor(LoginPalette.muted(dark))
-                            .padding(.top, 8)
-                            .transition(.opacity)
-                    }
-                }
-            }
-            .padding(.horizontal, 56)
-            .padding(.top, 48)
-            .padding(.bottom, 40)
-            .frame(maxWidth: 520, alignment: .leading)
-            .frame(maxWidth: .infinity, alignment: .center)
-            .animation(.easeInOut(duration: 0.22), value: model.deploymentMode)
-            .animation(.easeInOut(duration: 0.22), value: model.modeActivated)
-            .animation(.easeInOut(duration: 0.22), value: model.allowRegister)
-            .animation(.easeInOut(duration: 0.22), value: model.tab)
-            .animation(.easeInOut(duration: 0.2), value: model.errorText)
-            .animation(.easeInOut(duration: 0.2), value: model.infoText)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.vertical, 20)
     }
 
     private var pickModeHint: some View {
@@ -230,22 +168,27 @@ struct LoginRightPanel: View {
     // MARK: - Top: locale
 
     private var topChipBar: some View {
-        HStack(spacing: 10) {
-            HStack(spacing: 0) {
-                langItem(.zhCN, "中文")
-                Text("|")
-                    .font(.system(size: 12))
-                    .foregroundColor(LoginPalette.line(dark))
-                    .padding(.horizontal, 6)
-                langItem(.enUS, "English")
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(LoginPalette.chipBg(dark))
-            .cornerRadius(999)
-            .shadow(color: Color.black.opacity(dark ? 0.3 : 0.08), radius: 10, y: 4)
-
+        HStack(spacing: 4) {
             Spacer()
+            langItem(.zhCN, "中文")
+            Text("/")
+                .font(.system(size: 12))
+                .foregroundColor(LoginPalette.muted(dark))
+                .padding(.horizontal, 4)
+            langItem(.enUS, "EN")
+            Button(action: { appearance.mode = dark ? .light : .dark }) {
+                Image(systemName: dark ? "sun.max" : "moon")
+                    .font(.system(size: 14))
+                    .foregroundColor(LoginPalette.muted(dark))
+                    .frame(width: 30, height: 30)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(PlainButtonStyle())
+            .help(model.locale == .enUS
+                  ? (dark ? "Switch to light appearance" : "Switch to dark appearance")
+                  : (dark ? "切换浅色外观" : "切换深色外观"))
+            .accessibilityLabel(model.locale == .enUS ? "Toggle appearance" : "切换外观")
+            .padding(.leading, 6)
         }
     }
 
@@ -254,16 +197,16 @@ struct LoginRightPanel: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 Text(model.locale == .enUS ? "Deployment" : "部署方式")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 13, weight: .medium))
                     .foregroundColor(LoginPalette.text(dark))
                 if !model.modeActivated && !model.hasPersistedChoice {
                     Text(model.locale == .enUS ? "required" : "首次必选")
-                        .font(.system(size: 11, weight: .medium))
+                        .font(.system(size: 12, weight: .medium))
                         .foregroundColor(LoginPalette.primary(dark))
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
                         .background(LoginPalette.tabActiveBg(dark))
-                        .cornerRadius(999)
+                        .cornerRadius(8)
                 }
                 Spacer(minLength: 0)
             }
@@ -294,11 +237,11 @@ struct LoginRightPanel: View {
                     Image(systemName: mode == .local ? "laptopcomputer" : "cloud")
                         .font(.system(size: 11, weight: .semibold))
                     Text(title)
-                        .font(.system(size: 13, weight: .bold))
+                        .font(.system(size: 13, weight: .medium))
                 }
                 .foregroundColor(selected ? LoginPalette.tabActiveText(dark) : LoginPalette.text(dark))
                 Text(subtitle)
-                    .font(.system(size: 11))
+                    .font(.system(size: 12))
                     .foregroundColor(selected ? LoginPalette.tabActiveText(dark).opacity(0.85) : LoginPalette.muted(dark))
                     .lineLimit(1)
             }
@@ -306,11 +249,11 @@ struct LoginRightPanel: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
             .background(
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: 8)
                     .fill(selected ? LoginPalette.tabActiveBg(dark) : LoginPalette.chipBg(dark))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: 8)
                     .stroke(
                         selected
                             ? LoginPalette.primary(dark).opacity(dark ? 0.45 : 0.2)
@@ -330,33 +273,20 @@ struct LoginRightPanel: View {
             onLocale(loc)
         }) {
             Text(title)
-                .font(.system(size: 13, weight: active ? .bold : .regular))
+                .font(.system(size: 13, weight: active ? .medium : .regular))
                 .foregroundColor(active ? LoginPalette.text(dark) : LoginPalette.muted(dark))
         }
         .buttonStyle(PlainButtonStyle())
     }
 
     private var brand: some View {
-        HStack(spacing: 12) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(LoginPalette.primary(dark))
-                    .frame(width: 38, height: 38)
-                Text("OS")
-                    .font(.system(size: 16, weight: .black))
-                    .foregroundColor(.white)
-                    .tracking(0.4)
-            }
-            VStack(alignment: .leading, spacing: 6) {
-                Text("OCI-START")
-                    .font(.system(size: 22, weight: .heavy))
-                    .foregroundColor(LoginPalette.text(dark))
-                    .tracking(0.2)
-                Text(model.locale == .enUS ? "Welcome back" : "欢迎回来")
-                    .font(.system(size: 13))
-                    .foregroundColor(LoginPalette.muted(dark))
-                    .tracking(0.2)
-            }
+        VStack(alignment: .leading, spacing: 9) {
+            Text(model.locale == .enUS ? "Welcome back" : "欢迎回来")
+                .font(.system(size: 26, weight: .semibold))
+                .foregroundColor(LoginPalette.text(dark))
+            Text(model.locale == .enUS ? "Sign in to your OCI-START workspace." : "登录你的 OCI-START 工作台。")
+                .font(.system(size: 14))
+                .foregroundColor(LoginPalette.muted(dark))
         }
     }
 
@@ -381,12 +311,12 @@ struct LoginRightPanel: View {
     private func tabBtn(_ title: String, selected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 14, weight: selected ? .bold : .medium))
+                .font(.system(size: 13, weight: selected ? .medium : .regular))
                 .foregroundColor(selected ? LoginPalette.tabActiveText(dark) : LoginPalette.text(dark))
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
                 .background(selected ? LoginPalette.tabActiveBg(dark) : Color.clear)
-                .cornerRadius(999)
+                .cornerRadius(8)
         }
         .buttonStyle(PlainButtonStyle())
     }
@@ -395,9 +325,9 @@ struct LoginRightPanel: View {
     private var serverRow: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(model.locale == .enUS ? "Server URL" : "服务器地址")
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: 13, weight: .medium))
                 .foregroundColor(LoginPalette.text(dark))
-            HStack(alignment: .center, spacing: 12) {
+            HStack(alignment: .center, spacing: 8) {
                 LoginField(
                     title: "",
                     placeholder: "https://your-host:port",
@@ -415,7 +345,7 @@ struct LoginRightPanel: View {
                     enabled: !model.serverURL.trimmingCharacters(in: .whitespaces).isEmpty
                         && !model.serverURL.trimmingCharacters(in: .whitespaces).hasSuffix("://"),
                     dark: dark,
-                    minWidth: 96,
+                    minWidth: 70,
                     action: onServerCommit
                 )
             }
@@ -474,9 +404,9 @@ struct LoginRightPanel: View {
             }
             if let detail = detail, !detail.isEmpty {
                 Text(detail)
-                    .font(.system(size: 11))
+                    .font(.system(size: 12))
                     .foregroundColor(Color(hex: "ef4444").opacity(0.85))
-                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
                     .padding(.leading, 20)
             }
         }
@@ -487,7 +417,7 @@ struct LoginRightPanel: View {
     // MARK: - Login / Register
 
     private var loginFields: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: 17) {
             LoginField(
                 title: model.locale == .enUS ? "Username" : "用户名",
                 placeholder: model.locale == .enUS ? "Enter username" : "请输入用户名",
@@ -532,7 +462,7 @@ struct LoginRightPanel: View {
 
             metaRow
                 .padding(.top, 2)
-                .padding(.bottom, 14)
+                .padding(.bottom, 6)
 
             LoginPillButton(
                 title: loginButtonTitle,
@@ -562,10 +492,10 @@ struct LoginRightPanel: View {
     }
 
     private var registerFields: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: 17) {
             LoginField(
                 title: model.locale == .enUS ? "Username" : "用户名",
-                placeholder: "请输入用户名",
+                placeholder: model.locale == .enUS ? "Enter username" : "请输入用户名",
                 text: $model.username,
                 dark: dark,
                 enabled: formReady && !model.isLoadingMeta,
@@ -573,7 +503,7 @@ struct LoginRightPanel: View {
             )
             LoginField(
                 title: model.locale == .enUS ? "Password" : "密码",
-                placeholder: "请输入密码",
+                placeholder: model.locale == .enUS ? "Enter password" : "请输入密码",
                 text: $model.password,
                 secure: true,
                 dark: dark,
@@ -583,7 +513,7 @@ struct LoginRightPanel: View {
             )
             LoginField(
                 title: model.locale == .enUS ? "Confirm password" : "确认密码",
-                placeholder: "再次输入密码",
+                placeholder: model.locale == .enUS ? "Repeat password" : "再次输入密码",
                 text: $model.confirmPassword,
                 secure: true,
                 dark: dark,
@@ -608,7 +538,7 @@ struct LoginRightPanel: View {
     private var verifyChoice: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(model.locale == .enUS ? "Verification" : "验证方式")
-                .font(.system(size: 15, weight: .heavy))
+                .font(.system(size: 13, weight: .medium))
                 .foregroundColor(LoginPalette.text(dark))
             HStack(spacing: 8) {
                 tabBtn(model.locale == .enUS ? "Message code" : "消息验证码",
@@ -628,9 +558,9 @@ struct LoginRightPanel: View {
     private var messageCodeRow: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(model.locale == .enUS ? "Verification code" : "验证码")
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: 13, weight: .medium))
                 .foregroundColor(LoginPalette.text(dark))
-            HStack(alignment: .center, spacing: 12) {
+            HStack(alignment: .center, spacing: 8) {
                 LoginField(
                     title: "",
                     placeholder: model.locale == .enUS ? "Code" : "消息验证码",
@@ -652,7 +582,7 @@ struct LoginRightPanel: View {
                         && model.codeCountdown == 0
                         && !model.username.trimmingCharacters(in: .whitespaces).isEmpty,
                     dark: dark,
-                    minWidth: 118,
+                    minWidth: 100,
                     action: onSendCode
                 )
             }
@@ -668,7 +598,7 @@ struct LoginRightPanel: View {
                         .font(.system(size: 15))
                         .foregroundColor(model.rememberMe ? LoginPalette.primary(dark) : LoginPalette.muted(dark))
                     Text(model.locale == .enUS ? "Remember me" : "记住我")
-                        .font(.system(size: 14, weight: .bold))
+                        .font(.system(size: 13, weight: .regular))
                         .foregroundColor(LoginPalette.text(dark))
                 }
             }

@@ -12,6 +12,7 @@ struct AiModelsView: View {
             title: "OCI AI 管理",
             subtitle: "可用模型与已配置模型",
             systemImage: "sparkles",
+            layout: .workspace,
             toolbar: {
                 HStack(spacing: 8) {
                     AppButton(title: "全部启用", kind: .secondary) { model.batchEnable(true) }
@@ -27,18 +28,19 @@ struct AiModelsView: View {
             content: {
                 VStack(spacing: 0) {
                     filterBar
+                        .padding(.horizontal, 8)
                     if let err = model.errorText, !err.isEmpty {
                         Text(err)
-                            .font(.system(size: 12))
+                            .font(.system(size: 14))
                             .foregroundColor(Color(hex: "f85149"))
-                            .padding(.horizontal, 16)
+                            .padding(.horizontal, AppTheme.pagePadding)
                             .padding(.top, 8)
                     }
                     HStack(alignment: .top, spacing: 14) {
                         availablePanel
                         configuredPanel
                     }
-                    .padding(16)
+                    .padding(AppTheme.pagePadding)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
@@ -56,8 +58,8 @@ struct AiModelsView: View {
             leading: {
                 HStack(spacing: 10) {
                     Text("租户")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(AppTheme.sidebarText(dark))
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(AppTheme.textSecondary(dark))
                     SelectMenu(
                         options: model.tenants.map { SelectOption(id: $0.id, title: $0.name) },
                         selection: Binding(
@@ -74,7 +76,7 @@ struct AiModelsView: View {
             trailing: {
                 Toggle(isOn: $model.linkTenantFilter) {
                     Text("仅显示当前租户配置")
-                        .font(.system(size: 12))
+                        .font(.system(size: 14))
                 }
                 .toggleStyle(SwitchToggleStyle(tint: AppTheme.sidebarActive))
             }
@@ -129,24 +131,24 @@ struct AiModelsView: View {
         return HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(m.name.isEmpty ? m.id : m.name)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(AppTheme.textPrimary(dark))
                     .lineLimit(1)
                 Text(m.provider.isEmpty ? "OCI" : m.provider)
-                    .font(.system(size: 11))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .font(.system(size: 13))
+                    .foregroundColor(AppTheme.textSecondary(dark))
             }
             Spacer()
             if added {
                 Text("已添加")
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.system(size: 14, weight: .medium))
                     .foregroundColor(Color(hex: "3fb950"))
             } else {
                 AppButton(title: "添加", kind: .primary) { model.addModel(m) }
             }
         }
         .padding(12)
-        .background(RoundedRectangle(cornerRadius: 10).fill(AppTheme.sidebarBg(dark)))
+        .background(RoundedRectangle(cornerRadius: 10).fill(AppTheme.cardBg(dark)))
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(AppTheme.border(dark).opacity(0.55), lineWidth: 1))
     }
 
@@ -154,11 +156,11 @@ struct AiModelsView: View {
         HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(c.modelName.isEmpty ? c.modelId : c.modelName)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .lineLimit(1)
                 Text("租户 \(c.tenantId.isEmpty ? "—" : c.tenantId)")
-                    .font(.system(size: 11))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .font(.system(size: 13))
+                    .foregroundColor(AppTheme.textSecondary(dark))
             }
             Spacer()
             StatusBadge(text: c.enabled ? "启用" : "禁用", tone: c.enabled ? .success : .neutral)
@@ -166,7 +168,7 @@ struct AiModelsView: View {
             AppButton(title: "删除", kind: .danger) { model.delete(c) }
         }
         .padding(12)
-        .background(RoundedRectangle(cornerRadius: 10).fill(AppTheme.sidebarBg(dark)))
+        .background(RoundedRectangle(cornerRadius: 10).fill(AppTheme.cardBg(dark)))
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(AppTheme.border(dark).opacity(0.55), lineWidth: 1))
     }
 
@@ -176,17 +178,17 @@ struct AiModelsView: View {
                 Image(systemName: icon)
                     .foregroundColor(AppTheme.sidebarActive)
                 Text(title)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                 Spacer()
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
-            .background(AppTheme.sidebarHover(dark).opacity(0.55))
+            .background(AppTheme.hover(dark).opacity(0.55))
             content()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(RoundedRectangle(cornerRadius: 12).fill(AppTheme.sidebarBg(dark)))
+        .background(RoundedRectangle(cornerRadius: 12).fill(AppTheme.cardBg(dark)))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(AppTheme.border(dark).opacity(0.55), lineWidth: 1))
     }
 }

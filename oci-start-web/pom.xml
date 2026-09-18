@@ -11,6 +11,7 @@
     </parent>
 
     <artifactId>oci-start-web</artifactId>
+    <packaging>pom</packaging>
     <name>oci-start-web</name>
     <description>Web 控制台：Vue 3 源码，Maven -P web 时 pnpm build 写入 oci-server/static</description>
 
@@ -39,7 +40,7 @@
                             <goal>pnpm</goal>
                         </goals>
                         <configuration>
-                            <arguments>install --frozen-lockfile=false</arguments>
+                            <arguments>install --frozen-lockfile</arguments>
                         </configuration>
                     </execution>
                     <execution>
@@ -49,7 +50,7 @@
                         </goals>
                         <phase>generate-resources</phase>
                         <configuration>
-                            <arguments>run build:maven</arguments>
+                            <arguments>run build</arguments>
                         </configuration>
                     </execution>
                 </executions>

@@ -1,37 +1,43 @@
 import SwiftUI
 import AppKit
 
-/// Visual tokens aligned with Web `header.css` / sidebar (dark default).
+/// Native counterpart of `oci-start-web/src/styles/tokens.css`.
+/// Sidebar colors are deliberately independent of the content appearance.
 enum AppTheme {
-    // Web dark
-    static let topNavBgDark = Color(hex: "1f1f1f")
-    static let sidebarBgDark = Color(hex: "1e2124")
-    static let sidebarHoverDark = Color(hex: "292d30")
-    static let sidebarTextDark = Color(hex: "a9b7c6")
-    static let sidebarActive = Color(hex: "1abc9c")
-    static let brandGold = Color(hex: "FFD700")
-    static let pageBgDark = Color(hex: "1a1d21")
-    static let borderDark = Color(hex: "383c40")
+    static let sidebarWidth: CGFloat = 220
+    static let sidebarCollapsedWidth: CGFloat = 76
+    static let topBarHeight: CGFloat = 56
+    static let pagePadding: CGFloat = 24
+    static let cardRadius: CGFloat = 18
+    static let controlRadius: CGFloat = 12
+    static let bodySize: CGFloat = 14
+    static let secondarySize: CGFloat = 13
+    static let captionSize: CGFloat = 12
+    static let sectionSize: CGFloat = 16
+    static let dialogTitleSize: CGFloat = 18
 
-    // Web light
-    static let topNavBgLight = Color(hex: "d0dae6")
-    static let sidebarBgLight = Color(hex: "e4eaf2")
-    static let sidebarHoverLight = Color(hex: "d6dfe9")
-    static let sidebarTextLight = Color(hex: "374a61")
-    static let brandBrown = Color(hex: "b45309")
-    static let pageBgLight = Color(hex: "f0f4f8")
-    static let borderLight = Color(hex: "b8c8d8")
+    static let sidebarActive = Color(hex: "1b8a6a")
+    static let brandHover = Color(hex: "157456")
+    static let brandDeep = Color(hex: "0d4d3f")
+    static let success = Color(hex: "1b8a6a")
+    static let info = Color(hex: "0071e3")
+    static let danger = Color(hex: "e24b4a")
+    static func warning(_ dark: Bool) -> Color { Color(hex: dark ? "f5b861" : "b45309") }
 
-    static func topNavBg(_ dark: Bool) -> Color { dark ? topNavBgDark : topNavBgLight }
-    static func sidebarBg(_ dark: Bool) -> Color { dark ? sidebarBgDark : sidebarBgLight }
-    static func sidebarHover(_ dark: Bool) -> Color { dark ? sidebarHoverDark : sidebarHoverLight }
-    static func sidebarText(_ dark: Bool) -> Color { dark ? sidebarTextDark : sidebarTextLight }
-    static func brand(_ dark: Bool) -> Color { dark ? brandGold : brandBrown }
-    static func pageBg(_ dark: Bool) -> Color { dark ? pageBgDark : pageBgLight }
-    static func border(_ dark: Bool) -> Color { dark ? borderDark : borderLight }
-    static func navIcon(_ dark: Bool) -> Color {
-        dark ? Color.white.opacity(0.9) : Color(hex: "1e2f42")
-    }
+    static func topNavBg(_ dark: Bool) -> Color { cardBg(dark) }
+    static func sidebarBg(_ dark: Bool) -> Color { Color(hex: dark ? "000000" : "1d1d1f") }
+    static func sidebarHover(_ dark: Bool) -> Color { Color(hex: "2c2c2e") }
+    static func sidebarText(_ dark: Bool) -> Color { Color(hex: "a1a1a6") }
+    static func brand(_ dark: Bool) -> Color { sidebarActive }
+    static func pageBg(_ dark: Bool) -> Color { Color(hex: dark ? "000000" : "f5f5f7") }
+    static func cardBg(_ dark: Bool) -> Color { Color(hex: dark ? "1d1d1f" : "ffffff") }
+    static func inputBg(_ dark: Bool) -> Color { Color(hex: dark ? "2c2c2e" : "f5f5f7") }
+    static func hover(_ dark: Bool) -> Color { inputBg(dark) }
+    static func border(_ dark: Bool) -> Color { Color(hex: dark ? "424245" : "d2d2d7") }
+    static func textPrimary(_ dark: Bool) -> Color { Color(hex: dark ? "f5f5f7" : "000000") }
+    static func textSecondary(_ dark: Bool) -> Color { Color(hex: dark ? "d2d2d7" : "000000") }
+    static func textMuted(_ dark: Bool) -> Color { Color(hex: dark ? "b5b5bd" : "000000") }
+    static func navIcon(_ dark: Bool) -> Color { textPrimary(dark) }
 }
 
 extension Color {
@@ -85,8 +91,8 @@ final class AppearanceController: ObservableObject {
     }
 
     private init() {
-        let raw = UserDefaults.standard.string(forKey: "appAppearance") ?? AppAppearanceMode.dark.rawValue
-        mode = AppAppearanceMode(rawValue: raw) ?? .dark
+        let raw = UserDefaults.standard.string(forKey: "appAppearance") ?? AppAppearanceMode.system.rawValue
+        mode = AppAppearanceMode(rawValue: raw) ?? .system
         apply()
     }
 

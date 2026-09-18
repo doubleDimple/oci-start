@@ -1,10 +1,16 @@
 <script setup lang="ts">
+import PageErrorNotice from '@/components/PageErrorNotice.vue'
+import PageBackButton from '@/components/PageBackButton.vue'
+import PagePagination from '@/components/PagePagination.vue'
 import { computed, onBeforeUnmount, reactive, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import PrimaryBtn from '@/components/PrimaryBtn.vue'
 import GhostBtn from '@/components/GhostBtn.vue'
+import MobileRecordList from '@/components/MobileRecordList.vue'
+import MobileRecordCard from '@/components/MobileRecordCard.vue'
+import { useCompactViewport } from '@/composables/useCompactViewport'
 import { usePageMotion } from '@/composables/usePageMotion'
 import { regionCityName } from '@/views/regions/regionCoords'
 import {
@@ -20,6 +26,7 @@ interface RegionRow { key: string; name: string; location: string; status: strin
 const tabs: Tab[] = ['subscribed', 'available']
 const route = useRoute()
 const router = useRouter()
+const compact = useCompactViewport()
 const { t, locale } = useI18n()
 const root = ref<HTMLElement | null>(null)
 const scrollArea = ref<HTMLElement | null>(null)
@@ -276,6 +283,14 @@ function cancelRequests() {
   subscriptionController?.abort()
   subscriptionController = undefined
 }
+function restoreListState() {
+  activeTab.value = route.query.subscriptionTab === 'available' ? 'available' : 'subscribed'
+  search.value = typeof route.query.subscriptionSearch === 'string' ? route.query.subscriptionSearch : ''
+  statusFilter.value = typeof route.query.subscriptionStatus === 'string' ? route.query.subscriptionStatus : ''
+  const size = Number(route.query.subscriptionSize), number = Number(route.query.subscriptionPage)
+  pageSize.value = [10, 20, 50].includes(size) ? size : 20
+  page.value = Number.isSafeInteger(number) && number > 0 ? number : 1
+}
 watch(tenantId, () => {
   cancelRequests()
   subscribedRows.value = []
@@ -287,9 +302,7 @@ watch(tenantId, () => {
   checking.value = new Set()
   checkErrors.value = {}
   detailKey.value = ''
-  activeTab.value = 'subscribed'
-  clearFilters()
-  page.value = 1
+  restoreListState()
   dialogOpen.value = false
   dialogStage.value = 'confirm'
   submitting.value = false
@@ -298,8 +311,20 @@ watch(tenantId, () => {
   submitError.value = null
   if (tenantId.value) void refreshAll()
 }, { immediate: true })
-watch([search, statusFilter, pageSize], () => { page.value = 1 })
-watch(() => filteredRows.value.length, length => { page.value = Math.min(page.value, Math.max(1, Math.ceil(length / pageSize.value))) })
+watch([search, statusFilter, pageSize], () => { page.value = 1 }, { flush: 'sync' })
+watch([() => filteredRows.value.length, () => loaded[activeTab.value]], ([length, ready]) => { if (ready) page.value = Math.min(page.value, Math.max(1, Math.ceil(length / pageSize.value))) })
+watch(() => [route.query.subscriptionTab, route.query.subscriptionSearch, route.query.subscriptionStatus, route.query.subscriptionSize, route.query.subscriptionPage], () => {
+  restoreListState()
+  if (activeTab.value === 'available' && !loaded.available && !loading.available) void loadSource('available')
+})
+watch([activeTab, search, statusFilter, pageSize, page], () => {
+  if (!compact.value) return
+  const state = { subscriptionTab: activeTab.value === 'available' ? 'available' : undefined,
+    subscriptionSearch: search.value || undefined, subscriptionStatus: statusFilter.value || undefined,
+    subscriptionSize: pageSize.value === 20 ? undefined : String(pageSize.value), subscriptionPage: page.value > 1 ? String(page.value) : undefined }
+  if (Object.entries(state).every(([key, value]) => route.query[key] === value)) return
+  void router.replace({ query: { ...route.query, ...state, mobileRecord: undefined }, hash: route.hash })
+}, { flush: 'post' })
 watch([activeTab, page, pageSize, search, statusFilter], () => {
   if (scrollArea.value) scrollArea.value.scrollTop = 0
 }, { flush: 'post' })
@@ -311,7 +336,7 @@ onBeforeUnmount(cancelRequests)
   <div ref="root" class="tenants-page subscription-page">
     <section class="tenant-card" data-motion-enter>
       <div class="list-toolbar">
-        <button class="toolbar-button" type="button" :aria-label="t('tenantSubscription.back')" :title="t('tenantSubscription.back')" @click="goBack"><i class="i-mdi-arrow-left" aria-hidden="true" /></button>
+        <PageBackButton :title="t('tenantSubscription.back')" @click="goBack" />
         <div class="subscription-tabs" role="tablist" :aria-label="t('tenantSubscription.tabsLabel')" @keydown="moveTab">
           <button v-for="tab in tabs" :id="`subscription-tab-${tab}`" :key="tab" type="button" role="tab" :aria-selected="activeTab === tab" aria-controls="subscription-panel" :tabindex="activeTab === tab ? 0 : -1" @click="selectTab(tab)">
             {{ t(`tenantSubscription.${tab}`) }}<span>{{ tabCount(tab) }}</span>
@@ -326,7 +351,7 @@ onBeforeUnmount(cancelRequests)
           <el-option :label="t('tenantSubscription.allStatuses')" value="" />
           <el-option v-for="status in statusOptions" :key="status" :label="statusLabel(status)" :value="status" />
         </el-select>
-        <div class="toolbar-actions">
+        <div class="toolbar-actions" data-page-error-anchor>
           <button class="toolbar-button" type="button" :disabled="isRefreshing || !tenantId" :aria-label="t('tenantSubscription.refresh')" :title="t('tenantSubscription.refresh')" @click="refreshAll()"><i class="i-mdi-refresh" :class="{ 'subscription-spin': isRefreshing }" aria-hidden="true" /></button>
           <PrimaryBtn v-if="activeTab === 'subscribed'" class="tenant-import" :disabled="!tenantId || submitting" @click="selectTab('available')"><i class="i-mdi-plus" aria-hidden="true" />{{ t('tenantSubscription.subscribeNew') }}</PrimaryBtn>
           <PrimaryBtn v-else class="tenant-import" :disabled="!selectedCount || loading.available || !tenantId || submitting" @click="openSubscribe([...selected])">{{ t('tenantSubscription.subscribeSelected', { count: count(selectedCount) }) }}</PrimaryBtn>
@@ -342,11 +367,10 @@ onBeforeUnmount(cancelRequests)
         <span>{{ t('tenantSubscription.selection', { count: count(selectedCount) }) }}</span>
         <button type="button" :disabled="submitting" @click="selected = new Set()">{{ t('tenantSubscription.clearSelection') }}</button>
       </div>
-      <div v-if="activeError" class="list-error" role="alert">
-        <i class="i-mdi-alert-circle-outline" aria-hidden="true" />
+      <PageErrorNotice v-if="activeError">
         <div><strong>{{ t('tenantSubscription.loadFailed') }}</strong><p>{{ subscriptionError(activeError) }}</p><p v-if="loaded[activeTab]">{{ t('tenantSubscription.retainedData') }}</p></div>
         <GhostBtn :loading="loading[activeTab]" @click="loadSource(activeTab)">{{ t('tenantSubscription.retry') }}</GhostBtn>
-      </div>
+      </PageErrorNotice>
 
       <div id="subscription-panel" class="table-stage" role="tabpanel" :aria-labelledby="`subscription-tab-${activeTab}`" :aria-busy="loading[activeTab]" tabindex="0">
         <div v-if="loading[activeTab]" class="refresh-track" aria-hidden="true"><span /></div>
@@ -354,10 +378,21 @@ onBeforeUnmount(cancelRequests)
           <div v-if="!tenantId" class="tenant-empty">
             <span class="empty-icon"><i class="i-mdi-account-alert-outline" aria-hidden="true" /></span>
             <h3>{{ t('tenantSubscription.invalidTenant') }}</h3><p>{{ t('tenantSubscription.invalidTenantHint') }}</p>
-            <GhostBtn @click="goBack">{{ t('tenantSubscription.back') }}</GhostBtn>
           </div>
           <template v-else>
-            <table v-if="pageRows.length || (loading[activeTab] && !loaded[activeTab])" class="tenant-table subscription-table" :aria-label="t(`tenantSubscription.${activeTab}`)">
+            <template v-if="compact">
+              <label v-if="activeTab === 'available'" class="subscription-mobile-select"><input type="checkbox" :checked="allPageSelected" :indeterminate="somePageSelected" :disabled="!pageRows.length || submitting || loading.available" @change="togglePage(($event.target as HTMLInputElement).checked)" /><span>{{ t('tenantSubscription.selectPage') }}</span></label>
+              <MobileRecordList drilldown :list-id="`subscription-${tenantId}-${activeTab}`" :record-keys="pageRows.map(row => row.key)" :loading="loading[activeTab]">
+                <MobileRecordCard v-for="row in pageRows" :key="`${activeTab}-${row.key}`" :record-key="row.key" :summary-title="row.location || row.name" :summary-meta="`${row.name} · ${row.key}`" :summary-status="activeTab === 'subscribed' ? statusLabel(row.status) : selected.has(row.key) ? t('tenantSubscription.selection', { count: count(1) }) : ''" :summary-tone="row.status === 'READY' || selected.has(row.key) ? 'success' : row.status === 'FAILED' ? 'danger' : row.status === 'IN_PROGRESS' ? 'warning' : 'neutral'">
+                  <template #identity><h2 class="mobile-record-title">{{ row.name }}</h2><span class="mobile-record-subtitle">{{ row.location }}</span></template>
+                  <template v-if="activeTab === 'available'" #actions><label class="subscription-mobile-select"><input type="checkbox" :checked="selected.has(row.key)" :disabled="submitting || loading.available" :aria-label="t('tenantSubscription.selectRegion', { region: row.name })" @change="toggleRow(row.key, ($event.target as HTMLInputElement).checked)" /></label></template>
+                  <dl class="mobile-record-fields"><div><dt>{{ t('tenantSubscription.regionKey') }}</dt><dd>{{ row.key }}</dd></div><div><dt>{{ t('tenantSubscription.location') }}</dt><dd>{{ row.location }}</dd></div><template v-if="activeTab === 'subscribed'"><div><dt>{{ t('tenantSubscription.status') }}</dt><dd>{{ statusLabel(row.status) }}<span class="mobile-record-subtitle">{{ row.status }}</span></dd></div><div><dt>{{ t('tenantSubscription.homeRegion') }}</dt><dd>{{ t(`tenantSubscription.${row.home ? 'home' : 'secondary'}`) }}</dd></div></template></dl>
+                  <PageErrorNotice v-if="checkErrors[row.key]">{{ t('tenantSubscription.checkFailed') }} · {{ subscriptionError(checkErrors[row.key]) }}</PageErrorNotice>
+                  <template #footer><template v-if="activeTab === 'subscribed'"><button v-if="row.status !== 'READY'" type="button" class="mobile-record-button" :disabled="checking.has(row.key) || loading.subscribed" :aria-busy="checking.has(row.key)" @click="checkStatus(row.key)"><i class="i-mdi-refresh" :class="{ 'subscription-spin': checking.has(row.key) }" aria-hidden="true" />{{ t('tenantSubscription.checkStatus') }}</button><button type="button" class="mobile-record-button" @click="detailKey = row.key"><i class="i-mdi-information-outline" aria-hidden="true" />{{ t('tenantSubscription.details') }}</button></template><button v-else type="button" class="mobile-record-button" :disabled="submitting || loading.available" @click="openSubscribe([row.key])"><i class="i-mdi-plus" aria-hidden="true" />{{ t('tenantSubscription.subscribe') }}</button></template>
+                </MobileRecordCard>
+              </MobileRecordList>
+            </template>
+            <table v-else-if="pageRows.length || (loading[activeTab] && !loaded[activeTab])" class="tenant-table subscription-table" :aria-label="t(`tenantSubscription.${activeTab}`)">
               <thead><tr>
                 <th v-if="activeTab === 'available'" scope="col" class="checkbox-column"><input type="checkbox" :checked="allPageSelected" :indeterminate="somePageSelected" :disabled="!pageRows.length || submitting || loading.available" :aria-label="t('tenantSubscription.selectPage')" @change="togglePage(($event.target as HTMLInputElement).checked)" /></th>
                 <th scope="col" class="key-column">{{ t('tenantSubscription.regionKey') }}</th>
@@ -377,7 +412,7 @@ onBeforeUnmount(cancelRequests)
                   <td>
                     <button v-if="activeTab === 'subscribed'" class="cell-link" type="button" @click="detailKey = row.key">{{ row.name }}</button><span v-else class="region-code">{{ row.name }}</span>
                     <span v-if="activeTab === 'subscribed' && row.location !== row.name" class="cell-secondary">{{ row.location }}</span>
-                    <span v-if="checkErrors[row.key]" class="check-error" role="alert">{{ t('tenantSubscription.checkFailed') }} · {{ subscriptionError(checkErrors[row.key]) }}</span>
+                    <PageErrorNotice v-if="checkErrors[row.key]" :title="row.name">{{ t('tenantSubscription.checkFailed') }} · {{ subscriptionError(checkErrors[row.key]) }}</PageErrorNotice>
                   </td>
                   <td v-if="activeTab === 'subscribed'"><span class="tenant-status" :class="`subscription-status-${statusTone(row.status)}`" :title="row.status">{{ statusLabel(row.status) }}</span></td>
                   <td v-if="activeTab === 'subscribed'"><span :class="row.home ? 'home-region' : 'secondary-region'"><i v-if="row.home" class="i-mdi-home-outline" aria-hidden="true" />{{ t(`tenantSubscription.${row.home ? 'home' : 'secondary'}`) }}</span></td>
@@ -392,7 +427,7 @@ onBeforeUnmount(cancelRequests)
                 </tr>
               </tbody>
             </table>
-            <div v-else-if="!activeError" class="tenant-empty">
+            <div v-if="!pageRows.length && !loading[activeTab] && !activeError" class="tenant-empty">
               <span class="empty-icon"><i :class="search || statusFilter ? 'i-mdi-magnify' : 'i-mdi-earth'" aria-hidden="true" /></span>
               <h3>{{ t(`tenantSubscription.${search || statusFilter ? 'noMatches' : activeTab === 'subscribed' ? 'emptySubscribed' : 'emptyAvailable'}`) }}</h3>
               <p>{{ t(`tenantSubscription.${search || statusFilter ? 'noMatchesHint' : activeTab === 'subscribed' ? 'emptySubscribedHint' : 'emptyAvailableHint'}`) }}</p>
@@ -404,16 +439,15 @@ onBeforeUnmount(cancelRequests)
         <span v-if="loading[activeTab]" class="sr-only" role="status">{{ t('tenantSubscription.loading') }}</span>
       </div>
 
-      <footer class="list-footer">
+      <PagePagination v-model:current-page="page" v-model:page-size="pageSize" :total="filteredRows.length" :page-sizes="[10, 20, 50]" :disabled="!filteredRows.length">
         <div class="footer-context">
           <span v-if="tenantId" class="tenant-context" :title="t('tenantSubscription.tenantContext', { id: tenantId })">{{ t('tenantSubscription.tenantContext', { id: tenantId }) }}</span>
           <span v-if="search || statusFilter">{{ t('tenantSubscription.matches', { count: count(filteredRows.length) }) }}</span>
           <span v-else-if="summary">{{ t('tenantSubscription.summaryCount', { total: count(summary.totalRegions), subscribed: count(summary.subscribedRegions), available: count(summary.unsubscribedRegions) }) }}</span>
           <span v-else-if="loaded[activeTab]">{{ t('tenantSubscription.footerCount', { count: count(rows.length) }) }}</span>
-          <button v-if="errors.summary" type="button" class="summary-retry" :disabled="loading.summary" :title="subscriptionError(errors.summary)" @click="loadSource('summary')"><i class="i-mdi-refresh" aria-hidden="true" />{{ t('tenantSubscription.summaryFailed') }} · {{ t('tenantSubscription.retry') }}</button>
+          <PageErrorNotice v-if="errors.summary"><p>{{ t('tenantSubscription.summaryFailed') }} · {{ subscriptionError(errors.summary) }}</p><GhostBtn :disabled="loading.summary" @click="loadSource('summary')"><i class="i-mdi-refresh" aria-hidden="true" />{{ t('tenantSubscription.retry') }}</GhostBtn></PageErrorNotice>
         </div>
-        <el-pagination v-if="filteredRows.length" v-model:current-page="page" v-model:page-size="pageSize" background :total="filteredRows.length" :page-sizes="[10, 20, 50]" :pager-count="5" layout="sizes, prev, pager, next" />
-      </footer>
+      </PagePagination>
     </section>
 
     <el-dialog :model-value="Boolean(detail)" :title="t('tenantSubscription.detailsTitle')" width="min(460px, calc(100vw - 32px))" class="subscription-dialog" @close="detailKey = ''">
@@ -425,7 +459,7 @@ onBeforeUnmount(cancelRequests)
           <div><dt>{{ t('tenantSubscription.status') }}</dt><dd><span class="tenant-status" :class="`subscription-status-${statusTone(detail.status)}`">{{ statusLabel(detail.status) }}</span><small class="raw-status">{{ detail.status }}</small></dd></div>
           <div><dt>{{ t('tenantSubscription.homeRegion') }}</dt><dd>{{ t(`tenantSubscription.${detail.isHomeRegion ? 'home' : 'secondary'}`) }}</dd></div>
         </dl>
-        <p v-if="checkErrors[detail.regionKey]" class="dialog-error" role="alert">{{ subscriptionError(checkErrors[detail.regionKey]) }}</p>
+        <PageErrorNotice v-if="checkErrors[detail.regionKey]">{{ subscriptionError(checkErrors[detail.regionKey]) }}</PageErrorNotice>
       </template>
       <template #footer><div class="dialog-actions">
         <GhostBtn @click="detailKey = ''">{{ t('tenantSubscription.close') }}</GhostBtn>
@@ -444,11 +478,12 @@ onBeforeUnmount(cancelRequests)
           <i :class="dialogStage === 'pending' ? 'i-mdi-loading subscription-spin' : result && !failedCount ? 'i-mdi-check-circle-outline' : 'i-mdi-information-outline'" aria-hidden="true" />
           <div><strong>{{ dialogStage === 'pending' ? t('tenantSubscription.submitting') : resultHeading }}</strong><p v-if="dialogStage === 'pending'">{{ t('tenantSubscription.pendingHint') }}</p><p v-else-if="!result">{{ t('tenantSubscription.resultUnknownHint') }}</p></div>
         </div>
-        <p v-if="submitError" class="dialog-error" role="alert">{{ subscriptionError(submitError) }}</p>
+        <PageErrorNotice v-if="submitError">{{ subscriptionError(submitError) }}</PageErrorNotice>
         <ul class="subscription-results">
           <li v-for="row in draft" :key="row.key">
             <div class="result-region"><span class="region-key">{{ row.key }}</span><span>{{ row.name }}</span><span class="result-state" :class="resultDetails.get(row.key)?.success ? 'result-success' : resultDetails.has(row.key) ? 'result-failed' : ''">{{ t(`tenantSubscription.${dialogStage === 'pending' ? 'resultPending' : resultDetails.has(row.key) ? resultDetails.get(row.key)?.success ? 'resultSuccess' : 'resultFailed' : 'noResult'}`) }}</span></div>
-            <p v-if="resultDetails.get(row.key)?.message">{{ resultDetails.get(row.key)?.message }}</p>
+            <PageErrorNotice v-if="resultDetails.get(row.key)?.message && resultDetails.get(row.key)?.success === false" :title="row.name">{{ resultDetails.get(row.key)?.message }}</PageErrorNotice>
+            <p v-else-if="resultDetails.get(row.key)?.message">{{ resultDetails.get(row.key)?.message }}</p>
           </li>
         </ul>
         <p v-if="refreshIncomplete" class="dialog-hint" role="status">{{ t('tenantSubscription.refreshIncomplete') }}</p>
@@ -462,3 +497,8 @@ onBeforeUnmount(cancelRequests)
 </template>
 
 <style scoped lang="scss" src="./region-subscription.scss"></style>
+<style scoped>
+.subscription-mobile-select { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding: 8px 12px; color: var(--text-primary); font-size: var(--font-size-body); }
+.subscription-mobile-select input { width: 18px; height: 18px; margin: 0; accent-color: var(--brand); }
+.subscription-mobile-select input:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+</style>

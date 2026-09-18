@@ -43,11 +43,11 @@ struct TenantsView: View {
                 minNameShownFloor, minDefShown, minRegionShown)
     }
 
-    /// 按最长租户名单行估算名称列宽（约 12pt 等宽字符）
+    /// 按 14pt 列表正文估算完整租户名单行宽度。
     private func estimatedNameWidth(for items: [TenantItem], floor: CGFloat) -> CGFloat {
         let longest = items.map(\.displayName).max(by: { $0.count < $1.count }) ?? ""
         // 中文偏宽、英文偏窄，取折中系数
-        let estimated = CGFloat(longest.count) * 8.0 + 12
+        let estimated = CGFloat(longest.count) * 9.5 + 12
         return max(floor, min(estimated, 720))
     }
 
@@ -117,25 +117,24 @@ struct TenantsView: View {
     }
 
     private var listPage: some View {
-        PageScaffold(
-            title: "租户管理",
-            subtitle: "OCI API 配置与账号列表",
-            systemImage: "person.2",
-            toolbar: { toolbar },
-            content: {
-                VStack(spacing: 0) {
-                    filterBar
-                    if let err = model.errorText, !err.isEmpty { errorBanner(err) }
-                    listBody
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 12)
-                    PaginationBar(state: $model.pageState) {
-                        Task { await model.reload() }
+        GeometryReader { proxy in
+            PageScaffold(
+                title: "租户管理",
+                subtitle: "OCI API 配置与账号列表",
+                systemImage: "person.2",
+                content: {
+                    VStack(spacing: 0) {
+                        filterBar(width: proxy.size.width - AppTheme.pagePadding * 2)
+                        if let err = model.errorText, !err.isEmpty { errorBanner(err) }
+                        listBody
+                        PaginationBar(state: $model.pageState) {
+                            Task { await model.reload() }
+                        }
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-        )
+            )
+        }
     }
 
     // MARK: - Toolbar
@@ -167,18 +166,21 @@ struct TenantsView: View {
         }
     }
 
-    private var filterBar: some View {
-        FilterBar(
-            leading: {
+    private func filterBar(width: CGFloat) -> some View {
+        AdaptiveListToolbar(
+            compactBelow: 920,
+            availableWidth: width,
+            filters: {
                 SearchField(
                     text: $model.searchText,
                     placeholder: "搜索租户名称…",
                     onSubmit: { model.onSearchSubmit() },
-                    maxWidth: 320
+                    maxWidth: 220
                 )
                 .onChange(of: model.searchText) { _ in model.onSearchChanged() }
             },
-            trailing: {
+            actions: {
+                toolbar
                 if model.isLoading {
                     ProgressView().scaleEffect(0.7).frame(width: 20, height: AppInputStyle.height)
                 } else {
@@ -192,7 +194,7 @@ struct TenantsView: View {
     private func errorBanner(_ text: String) -> some View {
         HStack {
             Image(systemName: "exclamationmark.triangle.fill")
-            Text(text).font(.system(size: 12))
+            Text(text).font(.system(size: 14))
             Spacer()
             Button("重试") { Task { await model.reload() } }.buttonStyle(PlainButtonStyle())
         }
@@ -223,8 +225,8 @@ struct TenantsView: View {
                 Spacer()
                 ProgressView()
                 Text("加载中…")
-                    .font(.system(size: 12))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .font(.system(size: 13))
+                    .foregroundColor(AppTheme.textSecondary(dark))
                 Spacer()
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -278,17 +280,11 @@ struct TenantsView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(tableCardBackground)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(AppTheme.border(dark).opacity(0.55), lineWidth: 1)
-            )
-            .shadow(color: Color.black.opacity(dark ? 0.22 : 0.06), radius: 8, x: 0, y: 2)
         }
     }
 
     private var tableCardBackground: some View {
-        RoundedRectangle(cornerRadius: 12)
-            .fill(AppTheme.sidebarBg(dark))
+        AppTheme.cardBg(dark)
     }
 
     private func headerRow(cols: TenantColWidths, width: CGFloat) -> some View {
@@ -297,7 +293,7 @@ struct TenantsView: View {
                 // 对齐 Web：盾牌图标表头（绑定代理）
                 Image(systemName: "shield.fill")
                     .font(.system(size: 11))
-                    .foregroundColor(AppTheme.sidebarText(dark).opacity(0.55))
+                    .foregroundColor(AppTheme.textSecondary(dark))
                     .frame(width: cols.proxy, alignment: .center)
                     .help("绑定代理")
                 colHeader("名称", cols.name)
@@ -319,7 +315,7 @@ struct TenantsView: View {
         .padding(.horizontal, cols.hPad)
         .padding(.vertical, 9)
         .frame(width: width, alignment: .leading)
-        .background(AppTheme.sidebarHover(dark).opacity(0.65))
+        .background(AppTheme.inputBg(dark))
         .overlay(
             Rectangle().frame(height: 1).foregroundColor(AppTheme.border(dark).opacity(0.5)),
             alignment: .bottom
@@ -358,7 +354,7 @@ struct TenantsView: View {
         )
         .background(
             (index % 2 == 1)
-                ? AppTheme.sidebarHover(dark).opacity(0.18)
+                ? AppTheme.hover(dark).opacity(0.18)
                 : Color.clear
         )
     }
@@ -394,8 +390,8 @@ struct TenantsView: View {
         let shown = !model.namesHidden
         return Button(action: { model.namesHidden.toggle() }) {
             Text(shown ? item.displayName : item.maskedName)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(AppTheme.textPrimary(dark))
                 // 始终单行；展开时靠加宽名称列完整显示，禁止换行
                 .lineLimit(1)
                 .truncationMode(.tail)
@@ -409,7 +405,7 @@ struct TenantsView: View {
     private func defNameCell(_ item: TenantItem, width: CGFloat) -> some View {
         Button(action: { model.openEditName(item) }) {
             Text(item.defNameText)
-                .font(.system(size: 12))
+                .font(.system(size: 14))
                 .foregroundColor(AppTheme.sidebarActive)
                 .lineLimit(1)
                 .frame(width: width, alignment: .leading)
@@ -420,7 +416,7 @@ struct TenantsView: View {
     private func costCell(_ item: TenantItem, width: CGFloat) -> some View {
         Button(action: { model.openEditCost(item) }) {
             Text(item.costText)
-                .font(.system(size: 12))
+                .font(.system(size: 14))
                 .foregroundColor(AppTheme.sidebarActive)
                 .lineLimit(1)
                 .frame(width: width, alignment: .leading)
@@ -433,7 +429,7 @@ struct TenantsView: View {
         if item.accountTypeName != "未知", !item.accountTypeName.isEmpty {
             Button(action: { model.activeSheet = .accountDetail(item) }) {
                 Text(item.typeText)
-                    .font(.system(size: 12))
+                    .font(.system(size: 14))
                     .foregroundColor(AppTheme.sidebarActive)
                     .lineLimit(1)
                     .frame(width: width, alignment: .leading)
@@ -449,7 +445,7 @@ struct TenantsView: View {
         if item.cloudType == 1 {
             Button(action: { model.openBoot(item) }) {
                 Text("创建")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.white)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
@@ -472,15 +468,15 @@ struct TenantsView: View {
 
     private func colHeader(_ title: String, _ w: CGFloat, align: Alignment = .leading) -> some View {
         Text(title)
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundColor(AppTheme.sidebarText(dark))
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundColor(AppTheme.textSecondary(dark))
             .frame(width: w, alignment: align)
     }
 
     private func cell(_ text: String, _ w: CGFloat, bold: Bool = false, muted: Bool = false) -> some View {
         Text(text)
-            .font(.system(size: 12, weight: bold ? .semibold : .regular))
-            .foregroundColor(muted ? AppTheme.sidebarText(dark) : (dark ? Color.white.opacity(0.9) : Color.primary))
+            .font(.system(size: muted ? 13 : 14, weight: bold ? .semibold : .regular))
+            .foregroundColor(muted ? AppTheme.textSecondary(dark) : (AppTheme.textPrimary(dark)))
             .lineLimit(1)
             .frame(width: w, alignment: .leading)
     }
@@ -495,7 +491,7 @@ private struct TenantColWidths {
 // MARK: - AppKit ellipsis + 窗内浮层（绝不使用 NSPopover，保证在应用窗口内）
 
 private enum TenantActionMenuLayout {
-    static let width: CGFloat = 300
+    static let width: CGFloat = 340
     static let vPad: CGFloat = 12
     static let titleH: CGFloat = 18
     static let gridGap: CGFloat = 8
@@ -871,8 +867,8 @@ struct TenantActionMenuContent: View {
         VStack(alignment: .leading, spacing: 8) {
             if !title.isEmpty {
                 Text(title)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(AppTheme.textSecondary(dark))
                     .lineLimit(1)
                     .padding(.horizontal, 2)
             }
@@ -891,11 +887,11 @@ struct TenantActionMenuContent: View {
                                     .font(.system(size: 11, weight: .semibold))
                                     .frame(width: 14)
                                 Text(act.title)
-                                    .font(.system(size: 12, weight: .medium))
+                                    .font(.system(size: 14, weight: .medium))
                                     .lineLimit(1)
                                 Spacer(minLength: 0)
                             }
-                            .foregroundColor(act.isDanger ? Color(hex: "f85149") : (dark ? Color.white.opacity(0.9) : Color.primary))
+                            .foregroundColor(act.isDanger ? Color(hex: "f85149") : (AppTheme.textPrimary(dark)))
                             .padding(.horizontal, 10)
                             .padding(.vertical, 9)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -903,7 +899,7 @@ struct TenantActionMenuContent: View {
                                 RoundedRectangle(cornerRadius: 8)
                                     .fill(act.isDanger
                                           ? Color(hex: "f85149").opacity(0.1)
-                                          : AppTheme.sidebarHover(dark).opacity(dark ? 0.55 : 0.7))
+                                          : AppTheme.hover(dark).opacity(dark ? 0.55 : 0.7))
                             )
                             .overlay(
                                 RoundedRectangle(cornerRadius: 8)

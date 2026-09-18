@@ -1,6 +1,5 @@
 package com.doubledimple.ociserver.controller;
 
-import cn.hutool.json.JSONUtil;
 import com.doubledimple.dao.entity.CloudSshConn;
 import com.doubledimple.dao.entity.InstanceDetails;
 import com.doubledimple.dao.entity.Tenant;
@@ -12,7 +11,6 @@ import com.doubledimple.ociserver.pojo.request.SysImageBackupRequest;
 import com.doubledimple.ociserver.service.QuickDdService;
 import com.doubledimple.ociserver.service.oracle.OracleInstanceService;
 import com.doubledimple.ociserver.pojo.request.IpSwitchRequest;
-import com.doubledimple.ociserver.pojo.request.ServerMetricsDTO;
 import com.doubledimple.ociserver.pojo.request.UpdateConfigRequest;
 import com.doubledimple.ociserver.pojo.request.UpdateNameRequest;
 import com.doubledimple.ociserver.pojo.request.UpdateRemarkRequest;
@@ -29,19 +27,14 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import javax.annotation.Resource;
-import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.*;
-
-import static com.doubledimple.ociserver.utils.DesktopUtils.isMobileRequest;
-
 
 /**
  * @author doubleDimple
@@ -51,7 +44,6 @@ import static com.doubledimple.ociserver.utils.DesktopUtils.isMobileRequest;
 @RequestMapping("/oci")
 @Slf4j
 public class OciController  extends BaseController{
-
 
     @Resource
     OracleInstanceService oracleInstanceService;
@@ -74,38 +66,13 @@ public class OciController  extends BaseController{
     @Resource
     TenantRepository tenantRepository;
 
-    @GetMapping("/list")
-    public String listUsers(@RequestParam(defaultValue = "10") int size,
-                            @RequestParam(defaultValue = "0") int page,
-                            @RequestParam(required = false) String tenantId,
-                            HttpServletRequest request,
-                            Model model) {
-        Page<InstanceDetailsRes> userPage;
-        int adjustedPage = page;
-        userPage = oracleInstanceService.getAllInstances(page, size,tenantId);
-
-
-        log.debug("oci 获取到的数据是:{}", JSONUtil.parse(userPage.getContent()));
-        model.addAttribute("instanceDetailsRes", userPage.getContent());
-        model.addAttribute("currentPage", adjustedPage);
-        model.addAttribute("totalPages", userPage.getTotalPages());
-        model.addAttribute("totalElements", userPage.getTotalElements());
-        model.addAttribute("size", size);
-        model.addAttribute("activePage", "api-ociMachineList");
-        if (tenantId != null) {
-            model.addAttribute("selectedInstanceId", tenantId);
-        }
-        return "oci_machine_list";
-
-    }
-
     @GetMapping("/list/json")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> listJson(
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(required = false) String tenantId) {
-        Page<InstanceDetailsRes> userPage = oracleInstanceService.getAllInstances(page, size, tenantId);
+        Page<InstanceDetailsRes> userPage = oracleInstanceService.getOciInstances(page, size, tenantId);
         Map<String, Object> result = new HashMap<>();
         result.put("content", userPage.getContent());
         result.put("currentPage", page);
@@ -206,75 +173,15 @@ public class OciController  extends BaseController{
         return StringUtils.isBlank(s) ? "-" : s;
     }
 
-    /**
-     * 显示SSH终端页面
-     * @param instanceId 实例ID
-     */
-    @GetMapping("/terminal")
-    public String showTerminal(@RequestParam String instanceId, Model model) {
-        // 获取实例详情
-        InstanceDetails instanceByInstanceId = oracleInstanceService.getInstanceById(Long.valueOf(instanceId));
-        if (instanceByInstanceId == null) {
-            throw new RuntimeException("实例不存在");
-        }
-
-        // 添加实例信息到模型
-        model.addAttribute("instance", instanceByInstanceId);
-            model.addAttribute("instanceId", instanceId);
-        model.addAttribute("instanceIp", instanceByInstanceId.getPublicIps());  // 公网IP
-        model.addAttribute("instanceName", instanceByInstanceId.getDisplayName());  // 实例名称
-
-        // 设置侧边栏激活菜单
-        model.addAttribute("activePage", "api-management");
-
-        return "ssh_terminal";
-    }
-    /**
-    * @Description: 实例救援页面
-    * @Param: [java.lang.String, org.springframework.ui.Model]
-    * @return: java.lang.String
-    * @Author doubleDimple
-    * @Date: 4/16/25 2:51 PM
-    */
-    @GetMapping("/sysHelp")
-    public String sysHelp(@RequestParam String instanceId, Model model) {
-        // 获取实例详情
-        InstanceDetails instanceByInstanceId = oracleInstanceService.getInstanceById(Long.valueOf(instanceId));
-        if (instanceByInstanceId == null) {
-            throw new RuntimeException("实例不存在");
-        }
-
-        // 添加实例信息到模型
-        model.addAttribute("instance", instanceByInstanceId);
-        model.addAttribute("instanceId", instanceId);
-        model.addAttribute("instanceIp", instanceByInstanceId.getPublicIps());  // 公网IP
-        model.addAttribute("instanceName", instanceByInstanceId.getDisplayName());  // 实例名称
-
-        // 设置侧边栏激活菜单
-        model.addAttribute("activePage", "api-management");
-
-        return "sys_help";
-    }
-
-    @GetMapping("/metricsPage")
-    public String metricsPage(Model model) {
-        List<ServerMetricsDTO> servers = metricsService.getAllServerMetrics();
-        model.addAttribute("servers", servers);
-        model.addAttribute("activePage", "api-metricsPage");
-        return "metrics_page2";
-    }
-
     @GetMapping("/changeIp")
     public ResponseEntity<?> changeIp(@RequestParam("tenantId") Long instanceDetailId){
         return oracleInstanceService.changePublicIp(instanceDetailId);
     }
 
-
     @PostMapping("/changeSpecIp")
     public ResponseEntity<?> changeSpecIp(@RequestBody IpSwitchRequest ipSwitchRequest){
         return oracleInstanceService.switchToSpecificIpRange(ipSwitchRequest);
     }
-
 
     /**
     * 系统备份
@@ -283,7 +190,6 @@ public class OciController  extends BaseController{
     public ResponseEntity<?> sysImageBackUp(@RequestBody SysImageBackupRequest sysImageBackupRequest){
         return oracleInstanceService.sysImageBackUp(sysImageBackupRequest);
     }
-
 
     @PostMapping("/enableIpv6")
     @ResponseBody
@@ -307,7 +213,6 @@ public class OciController  extends BaseController{
         return result;
 
     }
-
 
     /**
      * 生成并发送验证码
@@ -414,7 +319,6 @@ public class OciController  extends BaseController{
                     .body(ApiResponse.error("配置更新失败：" + e.getMessage()));
         }
     }
-
 
     /**
     * @Description: 修改实例名称

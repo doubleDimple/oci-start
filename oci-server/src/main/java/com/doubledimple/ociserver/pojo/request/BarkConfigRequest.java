@@ -13,5 +13,6 @@ import lombok.Data;
 public class BarkConfigRequest {
     private String url;
     private String deviceKey;
+    private Boolean keepDeviceKey;
     private boolean enabled;
 }

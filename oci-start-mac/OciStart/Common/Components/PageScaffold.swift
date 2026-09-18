@@ -1,10 +1,15 @@
 import SwiftUI
 
-/// Standard page chrome: title header + optional toolbar + content + optional footer (pagination).
+/// List pages share a single card; module grids and immersive tools keep a page surface.
+enum PageScaffoldLayout {
+    case card, workspace
+}
+
 struct PageScaffold<Toolbar: View, Content: View, Footer: View>: View {
     let title: String
     var subtitle: String? = nil
     var systemImage: String? = nil
+    var layout: PageScaffoldLayout = .card
     @ViewBuilder var toolbar: () -> Toolbar
     @ViewBuilder var content: () -> Content
     @ViewBuilder var footer: () -> Footer
@@ -15,54 +20,39 @@ struct PageScaffold<Toolbar: View, Content: View, Footer: View>: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            header
+            if Toolbar.self != EmptyView.self {
+                HStack(spacing: 10) {
+                    Spacer(minLength: 0)
+                    toolbar()
+                }
+                .padding(.horizontal, layout == .card ? 20 : AppTheme.pagePadding)
+                .padding(.vertical, 12)
+            }
             content()
                 .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
             footer()
         }
+        .font(.system(size: AppTheme.bodySize))
+        .foregroundColor(AppTheme.textPrimary(dark))
+        .accentColor(AppTheme.sidebarActive)
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+        .background(layout == .card ? AppTheme.cardBg(dark) : AppTheme.pageBg(dark))
+        .cornerRadius(layout == .card ? AppTheme.cardRadius : 0)
+        .shadow(color: Color.black.opacity(layout == .card && !dark ? 0.04 : 0), radius: 6, y: 2)
+        .padding(layout == .card ? AppTheme.pagePadding : 0)
         .background(AppTheme.pageBg(dark))
-    }
-
-    private var header: some View {
-        HStack(alignment: .center, spacing: 12) {
-            if let systemImage = systemImage {
-                Image(systemName: systemImage)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(AppTheme.sidebarActive)
-            }
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
-                if let subtitle = subtitle {
-                    Text(subtitle)
-                        .font(.system(size: 12))
-                        .foregroundColor(AppTheme.sidebarText(dark))
-                }
-            }
-            Spacer()
-            toolbar()
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(AppTheme.sidebarBg(dark).opacity(0.4))
-        .overlay(
-            Rectangle()
-                .frame(height: 1)
-                .foregroundColor(AppTheme.border(dark).opacity(0.55)),
-            alignment: .bottom
-        )
+        .accessibilityIdentifier("page.\(title)")
     }
 }
 
 extension PageScaffold where Toolbar == EmptyView, Footer == EmptyView {
-    init(title: String, subtitle: String? = nil, systemImage: String? = nil,
+    init(title: String, subtitle: String? = nil, systemImage: String? = nil, layout: PageScaffoldLayout = .card,
          @ViewBuilder content: @escaping () -> Content) {
         self.init(
             title: title,
             subtitle: subtitle,
             systemImage: systemImage,
+            layout: layout,
             toolbar: { EmptyView() },
             content: content,
             footer: { EmptyView() }
@@ -71,13 +61,14 @@ extension PageScaffold where Toolbar == EmptyView, Footer == EmptyView {
 }
 
 extension PageScaffold where Footer == EmptyView {
-    init(title: String, subtitle: String? = nil, systemImage: String? = nil,
+    init(title: String, subtitle: String? = nil, systemImage: String? = nil, layout: PageScaffoldLayout = .card,
          @ViewBuilder toolbar: @escaping () -> Toolbar,
          @ViewBuilder content: @escaping () -> Content) {
         self.init(
             title: title,
             subtitle: subtitle,
             systemImage: systemImage,
+            layout: layout,
             toolbar: toolbar,
             content: content,
             footer: { EmptyView() }

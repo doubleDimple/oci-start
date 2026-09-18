@@ -1,8 +1,16 @@
 <script setup lang="ts">
+import { ElTableColumn as BaseTableColumn } from 'element-plus'
+import PageErrorNotice from '@/components/PageErrorNotice.vue'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useI18n } from 'vue-i18n'
+import { useRoute } from 'vue-router'
 import PrimaryBtn from '@/components/PrimaryBtn.vue'
 import GhostBtn from '@/components/GhostBtn.vue'
+import PagePagination from '@/components/PagePagination.vue'
+import MobileRecordCard from '@/components/MobileRecordCard.vue'
+import MobileRecordList from '@/components/MobileRecordList.vue'
+import { useCompactViewport } from '@/composables/useCompactViewport'
 import request from '@/api/request'
 import {
   tenantCsrfToken,
@@ -14,6 +22,7 @@ import {
 } from '@/api/tenant'
 
 interface SecurityRule {
+  id?: string
   type?: string
   protocol: string | number
   source?: string
@@ -24,6 +33,9 @@ type Direction = 'ingress' | 'egress'
 
 const props = defineProps<{ tenant: TenantRow }>()
 const emit = defineEmits<{ close: []; changed: [] }>()
+const { t, n } = useI18n()
+const compact = useCompactViewport()
+const route = useRoute()
 const direction = ref<Direction>('ingress')
 const rules = ref<SecurityRule[]>([])
 const page = ref(1)
@@ -40,7 +52,8 @@ let readVersion = 0
 let disposed = false
 
 const needsPorts = computed(() => form.protocol === 'tcp' || form.protocol === 'udp')
-const addressLabel = computed(() => direction.value === 'ingress' ? '来源 CIDR' : '目标 CIDR')
+const addressLabel = computed(() => t(`tenantSecurity.${direction.value === 'ingress' ? 'source' : 'destination'}`))
+function renderError(value: string) { return value.startsWith('tenantSecurity.') ? t(value, { field: addressLabel.value }) : value }
 const pageRules = computed(() => {
   const offset = (page.value - 1) * pageSize.value
   // Mutation IDs use the index in the complete response, never the page index.
@@ -49,6 +62,8 @@ const pageRules = computed(() => {
     ruleIndex: offset + index,
   }))
 })
+const mobileListId = computed(() => `region-security-${props.tenant.id}-${direction.value}`)
+const mobileRules = computed(() => typeof route.query.mobileRecord === 'string' && route.query.mobileRecord.startsWith(`${mobileListId.value}:`) ? rules.value.map((rule, ruleIndex) => ({ ...rule, ruleIndex })) : pageRules.value)
 
 function messageFor(cause: unknown) {
   const response = (cause as { response?: { data?: unknown } })?.response?.data
@@ -61,14 +76,15 @@ function protocolValue(protocol: SecurityRule['protocol']) {
 
 function protocolLabel(protocol: SecurityRule['protocol']) {
   const value = protocolValue(protocol)
-  return value === 'all' ? '所有协议' : value.toUpperCase()
+  return value === 'all' ? t('tenantSecurity.allProtocols') : value === '58' ? 'ICMPv6' : value.toUpperCase()
 }
 
 function portsLabel(rule: SecurityRule) {
   const value = protocolValue(rule.protocol)
-  if (value === 'icmp') return rule.icmpType ? `ICMP ${rule.icmpType}` : '—'
-  if (value === 'all') return '全部'
-  return !rule.ports || ['null', 'N/A'].includes(rule.ports) ? '—' : rule.ports
+  if (value === 'icmp' || value === '58') return rule.icmpType ? `${protocolLabel(value)} ${rule.icmpType}` : '—'
+  if (value === 'all') return t('tenantSecurity.allPorts')
+  if (value === 'tcp' || value === 'udp') return !rule.ports || ['null', 'N/A'].includes(rule.ports) ? t('tenantSecurity.allPorts') : rule.ports
+  return rule.ports || '—'
 }
 
 function clearEditor() {
@@ -93,7 +109,7 @@ async function loadRules() {
       { signal: controller.signal },
     )
     if (disposed || version !== readVersion) return
-    if (!Array.isArray(result)) throw new Error('安全规则返回格式异常，请刷新重试')
+    if (!Array.isArray(result)) throw new Error('tenantSecurity.invalidResponse')
     rules.value = result
     page.value = Math.min(page.value, Math.max(1, Math.ceil(result.length / pageSize.value)))
   } catch (cause) {
@@ -108,9 +124,10 @@ async function loadRules() {
 async function confirmDiscard() {
   if (!editor.value) return true
   try {
-    await ElMessageBox.confirm('尚未保存的规则修改将被舍弃。', '放弃修改？', {
-      confirmButtonText: '放弃修改',
-      cancelButtonText: '继续编辑',
+    await ElMessageBox.confirm(t('tenantSecurity.discardMessage'), t('tenantSecurity.discardTitle'), {
+      customClass: 'tenant-region-security-confirm',
+      confirmButtonText: t('tenantSecurity.discard'),
+      cancelButtonText: t('tenantSecurity.keepEditing'),
       type: 'warning',
       closeOnClickModal: false,
     })
@@ -158,13 +175,13 @@ async function cancelEdit() {
 }
 
 function validateForm() {
-  if (!form.source.trim()) return `请填写${addressLabel.value}`
-  if (!needsPorts.value) return ''
+  if (!form.source.trim()) return 'tenantSecurity.sourceRequired'
+  if (!needsPorts.value || !form.ports.trim()) return ''
   const match = form.ports.trim().match(/^(\d{1,5})(?:\s*-\s*(\d{1,5}))?$/)
-  if (!match) return '填写一个端口或连续范围，例如 443 或 8000-8080；不连续端口请分别添加规则。'
+  if (!match) return 'tenantSecurity.portFormat'
   const min = Number(match[1])
   const max = Number(match[2] || match[1])
-  return min < 0 || max > 65535 || min > max ? '端口须在 0–65535 之间，范围起点不能大于终点。' : ''
+  return min < 0 || max > 65535 || min > max ? 'tenantSecurity.portRange' : ''
 }
 
 async function saveRule() {
@@ -174,6 +191,7 @@ async function saveRule() {
   busy.value = true
   const wasEditing = editIndex.value !== null
   const payload = {
+    id: wasEditing ? rules.value[editIndex.value!]?.id : undefined,
     tenantId: props.tenant.id,
     type: direction.value,
     protocol: form.protocol,
@@ -183,21 +201,21 @@ async function saveRule() {
   try {
     if (wasEditing) {
       // Keep the legacy edit contract; do not replace it with a destructive delete/add.
-      await tenantPut(`/tenants/security-rules/${props.tenant.id}_${editIndex.value}_${direction.value}`, payload)
+      await tenantPut(`/tenants/security-rules/${props.tenant.id}_${editIndex.value}_${direction.value}`, payload, { timeout: 0 })
     } else {
       await tenantPost('/tenants/security-rules', payload)
     }
     if (disposed) return
     clearEditor()
-    ElMessage.success(wasEditing ? '安全规则已保存' : '安全规则已添加')
+    ElMessage.success(wasEditing ? t('tenantSecurity.saved') : t('tenantSecurity.added'))
     emit('changed')
     await loadRules()
   } catch (cause) {
     if (disposed) return
     const status = (cause as { response?: { status?: number } })?.response?.status
     formError.value = wasEditing && (status === 404 || status === 405)
-      ? '当前服务暂不支持编辑安全规则，修改尚未保存。'
-      : messageFor(cause)
+      ? 'tenantSecurity.unsupported'
+      : status === 409 ? 'tenantSecurity.conflict' : messageFor(cause)
   } finally {
     if (!disposed) busy.value = false
   }
@@ -209,9 +227,9 @@ async function deleteRule(rule: SecurityRule & { ruleIndex: number }) {
   const id = `${props.tenant.id}_${rule.ruleIndex}_${direction.value}`
   try {
     await ElMessageBox.confirm(
-      `删除 ${protocolLabel(rule.protocol)} · ${rule.source || '当前地址'} 的${direction.value === 'ingress' ? '入站' : '出站'}规则？依赖此规则的网络连接可能中断。`,
-      '删除安全规则',
-      { confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning', closeOnClickModal: false },
+      t('tenantSecurity.deleteMessage', { protocol: protocolLabel(rule.protocol), address: rule.source || t('tenantSecurity.currentAddress'), direction: t(`tenantSecurity.${direction.value}`) }),
+      t('tenantSecurity.deleteTitle'),
+      { customClass: 'tenant-region-security-confirm', confirmButtonText: t('tenantSecurity.delete'), cancelButtonText: t('tenantSecurity.cancel'), type: 'warning', closeOnClickModal: false },
     )
   } catch {
     busy.value = false
@@ -226,11 +244,11 @@ async function deleteRule(rule: SecurityRule & { ruleIndex: number }) {
       headers: { [csrfHeader]: tenantCsrfToken() },
     })
     if (disposed) return
-    ElMessage.success('安全规则已删除')
+    ElMessage.success(t('tenantSecurity.deleted'))
     emit('changed')
     await loadRules()
   } catch (cause) {
-    if (!disposed) ElMessage.error(messageFor(cause))
+    if (!disposed) ElMessage.error(renderError(messageFor(cause)))
   } finally {
     if (!disposed) busy.value = false
   }
@@ -255,7 +273,7 @@ watch(() => props.tenant.id, () => {
   readController?.abort()
   clearEditor()
   rules.value = []
-  direction.value = 'ingress'
+  direction.value = compact.value && typeof route.query.mobileRecord === 'string' && route.query.mobileRecord.startsWith(`region-security-${props.tenant.id}-egress:`) ? 'egress' : 'ingress'
   page.value = 1
   void loadRules()
 }, { immediate: true })
@@ -270,12 +288,15 @@ onBeforeUnmount(() => {
   readVersion++
   readController?.abort()
 })
+
+// Column slots cannot infer the parent table’s row type.
+const ElTableColumn = BaseTableColumn<SecurityRule & { ruleIndex: number }>
 </script>
 
 <template>
   <el-dialog
     :model-value="true"
-    title="安全规则"
+    :title="t('tenantSecurity.title')"
     width="min(860px, calc(100vw - 32px))"
     align-center
     class="region-security-dialog"
@@ -287,25 +308,25 @@ onBeforeUnmount(() => {
   >
     <div class="security-content">
       <div class="security-toolbar">
-        <div class="security-direction" role="group" aria-label="规则方向">
-          <button type="button" :class="{ active: direction === 'ingress' }" :aria-pressed="direction === 'ingress'" :disabled="busy" @click="changeDirection('ingress')">入站规则</button>
-          <button type="button" :class="{ active: direction === 'egress' }" :aria-pressed="direction === 'egress'" :disabled="busy" @click="changeDirection('egress')">出站规则</button>
+        <div class="security-direction" role="group" :aria-label="t('tenantSecurity.direction')">
+          <button type="button" :class="{ active: direction === 'ingress' }" :aria-pressed="direction === 'ingress'" :disabled="busy" @click="changeDirection('ingress')">{{ t('tenantSecurity.ingress') }}</button>
+          <button type="button" :class="{ active: direction === 'egress' }" :aria-pressed="direction === 'egress'" :disabled="busy" @click="changeDirection('egress')">{{ t('tenantSecurity.egress') }}</button>
         </div>
         <div class="security-actions">
-          <GhostBtn :loading="loading" :disabled="busy || editor" @click="loadRules">刷新</GhostBtn>
-          <PrimaryBtn v-if="!editor" :disabled="busy || loading || !!error" @click="addRule"><i class="i-mdi-plus" aria-hidden="true" />添加规则</PrimaryBtn>
+          <GhostBtn :loading="loading" :disabled="busy || editor" @click="loadRules">{{ t('tenantSecurity.refresh') }}</GhostBtn>
+          <PrimaryBtn v-if="!editor" :disabled="busy || loading || !!error" @click="addRule"><i class="i-mdi-plus" aria-hidden="true" />{{ t('tenantSecurity.addRule') }}</PrimaryBtn>
         </div>
       </div>
 
       <form v-if="editor" class="security-editor" @submit.prevent="saveRule">
         <div class="security-fields">
           <label>
-            <span>协议</span>
-            <el-select v-model="form.protocol" :disabled="busy" aria-label="协议">
+            <span>{{ t('tenantSecurity.protocol') }}</span>
+            <el-select v-model="form.protocol" popper-class="tenant-region-security-select" :disabled="busy" :aria-label="t('tenantSecurity.protocol')">
               <el-option label="TCP" value="tcp" />
               <el-option label="UDP" value="udp" />
               <el-option label="ICMP" value="icmp" />
-              <el-option label="所有协议" value="all" />
+              <el-option :label="t('tenantSecurity.allProtocols')" value="all" />
               <el-option v-if="!['tcp', 'udp', 'icmp', 'all'].includes(form.protocol)" :label="protocolLabel(form.protocol)" :value="form.protocol" />
             </el-select>
           </label>
@@ -314,50 +335,66 @@ onBeforeUnmount(() => {
             <el-input v-model="form.source" :disabled="busy" :aria-label="addressLabel" placeholder="0.0.0.0/0" autocomplete="off" />
           </label>
           <label>
-            <span>端口范围</span>
-            <el-input v-model="form.ports" :disabled="busy || !needsPorts" aria-label="端口范围" :placeholder="needsPorts ? '443 或 8000-8080' : '无需填写端口'" autocomplete="off" />
+            <span>{{ t('tenantSecurity.ports') }}</span>
+            <el-input v-model="form.ports" :disabled="busy || !needsPorts" :aria-label="t('tenantSecurity.ports')" :placeholder="t(needsPorts ? 'tenantSecurity.portsPlaceholder' : 'tenantSecurity.noPorts')" autocomplete="off" />
           </label>
         </div>
-        <p v-if="formError" class="security-error" role="alert">{{ formError }}</p>
+        <p v-if="['tenantSecurity.sourceRequired', 'tenantSecurity.portFormat', 'tenantSecurity.portRange'].includes(formError)" class="security-error" role="alert">{{ renderError(formError) }}</p>
+        <PageErrorNotice v-else-if="formError">{{ renderError(formError) }}</PageErrorNotice>
         <div class="security-editor-actions">
-          <GhostBtn :disabled="busy" @click="cancelEdit">取消</GhostBtn>
-          <PrimaryBtn :loading="busy" @click="saveRule">{{ editIndex === null ? '添加' : '保存' }}</PrimaryBtn>
+          <GhostBtn :disabled="busy" @click="cancelEdit">{{ t('tenantSecurity.cancel') }}</GhostBtn>
+          <PrimaryBtn :loading="busy" @click="saveRule">{{ t(editIndex === null ? 'tenantSecurity.add' : 'tenantSecurity.save') }}</PrimaryBtn>
         </div>
       </form>
 
-      <div v-if="error" class="security-error-panel" role="alert">
-        <p>{{ error }}</p>
-        <GhostBtn :loading="loading" @click="loadRules">重新加载</GhostBtn>
-      </div>
-      <el-table v-else v-loading="loading" :data="pageRules" row-key="ruleIndex" class="security-table" max-height="min(440px, 52vh)" empty-text="暂无安全规则">
-        <el-table-column label="#" width="54"><template #default="{ row }">{{ row.ruleIndex + 1 }}</template></el-table-column>
-        <el-table-column label="协议" min-width="100"><template #default="{ row }">{{ protocolLabel(row.protocol) }}</template></el-table-column>
+      <PageErrorNotice v-if="error">
+        <p>{{ renderError(error) }}</p>
+        <GhostBtn :loading="loading" @click="loadRules">{{ t('tenantSecurity.retry') }}</GhostBtn>
+      </PageErrorNotice>
+      <MobileRecordList v-else-if="compact" drilldown :list-id="mobileListId" :record-keys="rules.map((rule, index) => String(rule.id || index))" :loading="loading" class="security-mobile-list" :aria-busy="loading">
+        <MobileRecordCard v-for="rule in mobileRules" :key="rule.ruleIndex" :record-key="String(rule.id || rule.ruleIndex)" :summary-title="protocolLabel(rule.protocol)" :summary-meta="rule.source || '—'" :summary-status="portsLabel(rule)">
+          <template #identity><h3 class="mobile-record-title">{{ protocolLabel(rule.protocol) }} · {{ n(rule.ruleIndex + 1) }}</h3><span class="mobile-record-subtitle">{{ t(`tenantSecurity.${direction}`) }}</span></template>
+          <dl class="mobile-record-fields">
+            <div class="mobile-record-wide"><dt>{{ addressLabel }}</dt><dd>{{ rule.source || '—' }}</dd></div>
+            <div class="mobile-record-wide"><dt>{{ t('tenantSecurity.portsIcmp') }}</dt><dd>{{ portsLabel(rule) }}</dd></div>
+          </dl>
+          <template #footer>
+            <GhostBtn :disabled="busy || loading || editor" @click="editRule(rule)">{{ t('tenantSecurity.edit') }}</GhostBtn>
+            <GhostBtn danger :disabled="busy || loading || editor" @click="deleteRule(rule)">{{ t('tenantSecurity.delete') }}</GhostBtn>
+          </template>
+        </MobileRecordCard>
+        <p v-if="loading || !pageRules.length" class="security-mobile-empty" role="status">{{ t(loading ? 'pageLoading.loading' : 'tenantSecurity.empty') }}</p>
+      </MobileRecordList>
+      <el-table v-else v-loading="loading" :data="pageRules" row-key="ruleIndex" class="security-table" max-height="min(440px, 52vh)" :empty-text="t('tenantSecurity.empty')">
+        <el-table-column label="#" width="54"><template #default="{ row }">{{ n(row.ruleIndex + 1) }}</template></el-table-column>
+        <el-table-column :label="t('tenantSecurity.protocol')" min-width="100"><template #default="{ row }">{{ protocolLabel(row.protocol) }}</template></el-table-column>
         <el-table-column prop="source" :label="addressLabel" min-width="180" show-overflow-tooltip />
-        <el-table-column label="端口 / ICMP" min-width="130"><template #default="{ row }">{{ portsLabel(row) }}</template></el-table-column>
-        <el-table-column label="操作" width="112" fixed="right">
+        <el-table-column :label="t('tenantSecurity.portsIcmp')" min-width="130"><template #default="{ row }">{{ portsLabel(row) }}</template></el-table-column>
+        <el-table-column :label="t('tenantSecurity.actions')" width="112" fixed="right">
           <template #default="{ row }">
-            <el-button link :disabled="busy || loading || editor" @click="editRule(row)">编辑</el-button>
-            <el-button link type="danger" :disabled="busy || loading || editor" @click="deleteRule(row)">删除</el-button>
+            <el-button link :disabled="busy || loading || editor" @click="editRule(row)">{{ t('tenantSecurity.edit') }}</el-button>
+            <el-button link type="danger" :disabled="busy || loading || editor" @click="deleteRule(row)">{{ t('tenantSecurity.delete') }}</el-button>
           </template>
         </el-table-column>
       </el-table>
 
-      <div v-if="!error" class="security-pagination">
-        <span>{{ rules.length }} 条规则</span>
-        <el-pagination v-model:current-page="page" v-model:page-size="pageSize" :page-sizes="[5, 10, 20]" :total="rules.length" :disabled="busy || loading" layout="sizes, prev, pager, next" small />
-      </div>
+      <PagePagination v-if="!error" embedded class="security-pagination" v-model:current-page="page" v-model:page-size="pageSize" :page-sizes="[5, 10, 20]" :total="rules.length" :disabled="busy || loading">
+        <span>{{ t('tenantSecurity.count', { count: n(rules.length) }) }}</span>
+      </PagePagination>
     </div>
   </el-dialog>
 </template>
 
 <style scoped>
-.security-content { min-width: 0; font-size: var(--font-size-body); }
-:global(.region-security-dialog .el-dialog__title) { font-size: var(--font-size-dialog-title); }
+.security-content { min-width: 0; font-family: var(--sans); font-size: var(--font-size-body); color: var(--text-primary); }
+:global(.region-security-dialog) { font-family: var(--sans); font-size: var(--font-size-body); color: var(--text-primary); }
+:global(.region-security-dialog .el-dialog__title) { font-size: var(--font-size-dialog-title); font-weight: 600; color: var(--text-primary); }
+:global(.tenant-region-security-confirm) { font-family: var(--sans); --el-messagebox-title-color: var(--text-primary); --el-messagebox-content-color: var(--text-primary); --el-messagebox-font-size: var(--font-size-dialog-title); --el-messagebox-content-font-size: var(--font-size-body); }
+:global(.tenant-region-security-confirm .el-message-box__title) { font-weight: 600; }
+:global(.tenant-region-security-select.el-popper) { font-family: var(--sans); font-size: var(--font-size-body); }
 .security-content :deep(.el-button), .security-content :deep(.el-input__inner), .security-content :deep(.el-select__wrapper), .security-content :deep(.el-checkbox__label) { font-size: var(--font-size-body); }
-.security-content :deep(.el-pagination) { --el-pagination-font-size: var(--font-size-body); --el-pagination-font-size-small: var(--font-size-body); }
-.security-content :deep(.el-pagination .el-pager li) { font-size: var(--font-size-body); }
-.security-content :deep(.el-pagination__total), .security-content :deep(.el-pagination__jump), .security-content :deep(.el-empty__description p) { font-size: var(--font-size-secondary); }
-.security-toolbar, .security-actions, .security-editor-actions, .security-pagination { display: flex; align-items: center; gap: 8px; }
+.security-content :deep(.el-empty__description p) { font-size: var(--font-size-secondary); }
+.security-toolbar, .security-actions, .security-editor-actions { display: flex; align-items: center; gap: 8px; }
 .security-toolbar { justify-content: space-between; gap: 12px; margin-bottom: 14px; }
 .security-direction { display: inline-flex; padding: 3px; border-radius: var(--r-pill); background: var(--bg-hover); }
 .security-direction button { padding: 7px 13px; border: 0; border-radius: var(--r-pill); background: transparent; color: var(--text-secondary); font: inherit; font-size: var(--font-size-body); cursor: pointer; transition: background-color 180ms ease, color 180ms ease; white-space: nowrap; }
@@ -368,24 +405,26 @@ onBeforeUnmount(() => {
 .security-editor { margin-bottom: 14px; padding: 14px; border: 1px solid var(--border); border-radius: var(--r-sm); }
 .security-fields { display: grid; grid-template-columns: 140px minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
 .security-fields label { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.security-fields label > span { font-size: var(--font-size-body); color: var(--text-secondary); }
+.security-fields label > span { font-size: var(--font-size-body); color: var(--text-primary); }
 .security-editor-actions { justify-content: flex-end; margin-top: 12px; }
 .security-error { color: var(--status-danger); font-size: var(--font-size-secondary); margin: 10px 0 0; overflow-wrap: anywhere; }
 .security-error-panel { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 28px 16px; color: var(--status-danger); font-size: var(--font-size-secondary); text-align: center; overflow-wrap: anywhere; }
 .security-error-panel p { margin: 0; }
 .security-table { font-family: var(--sans); font-size: var(--font-size-body); }
-.security-table :deep(th.el-table__cell) { background: var(--bg-card); color: var(--text-secondary); font-size: var(--font-size-body); font-weight: 500; padding-block: 7px; }
+.security-table :deep(th.el-table__cell) { background: var(--bg-card); color: var(--text-secondary); font-size: var(--font-size-body); font-weight: 600; padding-block: 7px; }
 .security-table :deep(td.el-table__cell) { padding-block: 9px; }
 .security-table :deep(.el-button) { font-size: var(--font-size-body); }
-.security-pagination { justify-content: space-between; padding-top: 12px; }
-.security-pagination > span { color: var(--text-secondary); font-size: var(--font-size-secondary); white-space: nowrap; }
-@media (max-width: 620px) {
+.security-pagination { margin-top: 12px; }
+@media (max-width: 760px) {
+  :global(.region-security-dialog) { max-height: calc(100dvh - 32px); overflow-y: auto; }
+  .security-mobile-list { padding: 0; max-height: 48dvh; overflow-y: auto; overscroll-behavior: contain; }
+  .security-mobile-empty { display: grid; place-items: center; min-height: 88px; padding: 16px; margin: 0; text-align: center; line-height: 1.6; }
+  .security-mobile-list :deep(.btn), .security-actions :deep(.btn), .security-editor-actions :deep(.btn) { min-height: 44px; }
+  .security-direction { width: 100%; }
+  .security-direction button { flex: 1; min-height: 42px; white-space: normal; }
   .security-toolbar { flex-wrap: wrap; }
   .security-actions { margin-left: auto; }
   .security-fields { grid-template-columns: minmax(0, 1fr); }
-  .security-pagination { flex-wrap: wrap; }
-  .security-pagination :deep(.el-pagination) { max-width: 100%; gap: 3px; flex-wrap: wrap; }
-  .security-pagination :deep(.el-pagination__sizes) { margin-right: 4px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .security-direction button { transition: none; }

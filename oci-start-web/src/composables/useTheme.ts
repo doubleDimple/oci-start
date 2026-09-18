@@ -22,7 +22,8 @@ function readStored(): ThemePreference {
 
 function applyToDocument(name: ThemeName) {
   document.documentElement.setAttribute('data-theme', name)
-  document.documentElement.classList.toggle('dark', name === 'dark')
+  // Custom content colors can use a different brightness than the stored mode.
+  // applyChrome owns the effective content palette and Element Plus dark class.
   applyChrome()
 }
 

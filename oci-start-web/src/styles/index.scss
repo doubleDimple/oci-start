@@ -1,14 +1,38 @@
 /* Element Plus 贴到当前 token：圆角、字色、表格在亮/暗下都可读 */
 
+// Teleported dialogs and drawers must fit the same phone viewport as the console.
+@media (max-width: 760px) {
+  html:root {
+    .el-dialog {
+      align-self: flex-start;
+      max-width: calc(100vw - 24px);
+      max-height: calc(100dvh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+      margin-top: max(16px, env(safe-area-inset-top));
+      margin-bottom: max(16px, env(safe-area-inset-bottom));
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+    .el-dialog__header { padding-right: 34px; overflow-wrap: anywhere; }
+    .el-dialog__headerbtn { width: 44px; height: 44px; }
+    .el-dialog__footer { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
+    .el-drawer { max-width: 100vw; }
+    .el-message-box { max-width: calc(100vw - 24px); max-height: calc(100dvh - 32px); overflow-y: auto; }
+    .el-message-box__btns { flex-wrap: wrap; gap: 8px; }
+    .el-dropdown-menu__item { min-height: 40px; }
+    .el-dialog__footer .el-button, .el-message-box__btns .el-button { min-height: 40px; margin-left: 0; }
+  }
+}
+
 // Keep the shared theme above asynchronously loaded component styles.
-:root {
+html:root,
+html:root[data-content-theme] {
   .el-button {
     border-radius: var(--r-btn);
     font-weight: 600;
     font-family: var(--sans);
     font-size: var(--font-size-body);
   }
-  .el-button--primary {
+  .el-button--primary:not(.is-plain):not(.is-text):not(.is-link):not(.is-dashed) {
     --el-button-bg-color: var(--brand);
     --el-button-border-color: var(--brand);
     --el-button-hover-bg-color: var(--brand-hover);
@@ -30,14 +54,59 @@
     box-shadow: var(--shadow-card);
     background: var(--bg-card);
     color: var(--text-primary);
+    font-family: var(--sans);
+  }
+
+  // Page-specific native-control classes must not frame the component root as well as its wrapper.
+  .el-input:not(.el-input__wrapper),
+  .el-select:not(.el-select__wrapper) {
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
   }
 
   .el-input__wrapper,
   .el-select__wrapper {
+    // The wrapper owns the single control frame; its editable child never draws a second one.
+    border: 0 !important;
     border-radius: var(--r-pill);
     background: var(--bg-search);
-    box-shadow: none;
+    box-shadow: 0 0 0 1px var(--border) inset;
     color: var(--text-primary);
+  }
+  :where(.el-input:not(.is-disabled)) .el-input__wrapper:hover,
+  .el-select__wrapper:where(:not(.is-disabled)):hover {
+    box-shadow: 0 0 0 1px var(--border-strong) inset;
+  }
+  .el-input__wrapper.is-focus,
+  .el-input__wrapper:focus-within,
+  .el-select__wrapper.is-focused,
+  .el-select__wrapper:focus-within {
+    box-shadow: 0 0 0 2px var(--brand) inset;
+  }
+  .el-form-item.is-error .el-input__wrapper,
+  .el-form-item.is-error .el-select__wrapper,
+  .el-input[aria-invalid='true'] .el-input__wrapper,
+  .el-select[aria-invalid='true'] .el-select__wrapper {
+    box-shadow: 0 0 0 1px var(--status-danger) inset;
+  }
+  .el-input__inner,
+  .el-select__input,
+  .el-range-input {
+    // Scoped page rules can have more specificity than the theme. These structural resets are intentional.
+    min-height: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    outline: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+  .el-input__inner:focus-visible,
+  .el-select__input:focus-visible,
+  .el-range-input:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
   }
   .el-input__inner,
   .el-select__placeholder,
@@ -47,6 +116,14 @@
   }
   .el-input__inner::placeholder {
     color: var(--text-muted);
+  }
+  .el-input.is-disabled .el-input__wrapper,
+  .el-select__wrapper.is-disabled {
+    background: var(--el-disabled-bg-color);
+  }
+  .el-input.is-disabled .el-input__inner,
+  .el-select__wrapper.is-disabled .el-select__selected-item {
+    color: var(--el-disabled-text-color);
   }
 
   .el-tag {
@@ -66,9 +143,17 @@
     --el-messagebox-font-size: var(--font-size-dialog-title);
     --el-messagebox-content-font-size: var(--font-size-body);
     --el-messagebox-error-font-size: var(--font-size-secondary);
+    --el-messagebox-title-color: var(--text-primary);
+    --el-messagebox-content-color: var(--text-primary);
     border-radius: var(--r-card);
     background: var(--bg-card);
     color: var(--text-primary);
+    font-family: var(--sans);
+  }
+
+  .el-dialog__title,
+  .el-message-box__title {
+    font-weight: 600;
   }
 
   .el-pagination {
@@ -101,6 +186,28 @@
   .el-table .el-table__cell {
     color: var(--text-primary);
   }
+  .el-table td.el-table__fixed-right-patch,
+  .el-table th.el-table__fixed-right-patch {
+    background: var(--bg-card);
+  }
+
+  .el-picker-panel__shortcut.active {
+    background-color: var(--el-color-primary-light-9);
+  }
+
+  // Element's empty illustration otherwise keeps ten literal light-theme fills.
+  .el-empty {
+    --el-empty-fill-color-0: var(--bg-card);
+    --el-empty-fill-color-1: color-mix(in srgb, var(--bg-hover) 25%, var(--bg-card));
+    --el-empty-fill-color-2: color-mix(in srgb, var(--bg-hover) 45%, var(--bg-card));
+    --el-empty-fill-color-3: color-mix(in srgb, var(--bg-hover) 65%, var(--bg-card));
+    --el-empty-fill-color-4: var(--bg-hover);
+    --el-empty-fill-color-5: color-mix(in srgb, var(--bg-hover) 90%, var(--border));
+    --el-empty-fill-color-6: color-mix(in srgb, var(--bg-hover) 80%, var(--border));
+    --el-empty-fill-color-7: color-mix(in srgb, var(--bg-hover) 65%, var(--border));
+    --el-empty-fill-color-8: color-mix(in srgb, var(--bg-hover) 50%, var(--border));
+    --el-empty-fill-color-9: var(--border);
+  }
 
   .el-loading-mask {
     background-color: color-mix(in srgb, var(--bg-card) 72%, transparent);
@@ -108,22 +215,104 @@
 }
 
 // Small controls retain their geometry and the same readable text, even after lazy CSS loads.
-html:root {
+html:root,
+html:root[data-content-theme] {
+  :where(button, input, select, textarea) {
+    font-family: var(--sans);
+  }
+
+  .el-form-item {
+    --font-size: var(--font-size-body);
+  }
+
   .el-input,
   .el-textarea__inner,
   .el-select .el-select__wrapper,
   .el-form-item .el-form-item__label,
   .el-checkbox .el-checkbox__label,
+  .el-checkbox.el-checkbox--small .el-checkbox__label,
   .el-radio .el-radio__label,
+  .el-radio.el-radio--small .el-radio__label,
   .el-switch .el-switch__label,
   .el-select-dropdown__item,
   .el-dropdown-menu .el-dropdown-menu__item,
-  .el-tabs__item {
+  .el-tabs__item,
+  .el-message__content,
+  .el-date-editor .el-range-input,
+  .el-date-editor .el-range-separator,
+  .el-date-table,
+  .el-month-table,
+  .el-quarter-table,
+  .el-year-table,
+  .el-picker-panel__shortcut,
+  .el-picker-panel__btn,
+  .el-time-panel__btn,
+  .el-time-spinner__item,
+  .el-descriptions .el-descriptions__body .el-descriptions__table .el-descriptions__cell {
     font-size: var(--font-size-body);
   }
   .el-form-item__error,
   .el-input__count,
-  .el-textarea__count {
+  .el-textarea__count,
+  .el-select-group__title,
+  .el-select-dropdown__empty,
+  .el-select-dropdown__loading,
+  .el-upload__tip,
+  .el-date-table td.week {
     font-size: var(--font-size-secondary);
+  }
+
+  .el-input:not(.is-exceed) .el-input__count,
+  .el-textarea:not(.is-exceed) .el-input__count,
+  .el-input-group__append,
+  .el-input-group__prepend,
+  .el-select-group__title,
+  .el-upload__tip {
+    color: var(--text-secondary);
+  }
+
+  .el-select__placeholder.is-transparent {
+    color: var(--text-muted);
+  }
+
+  .el-popper {
+    font-family: var(--sans);
+    font-size: var(--font-size-secondary);
+  }
+
+  // Keep explicit dark tooltips readable without inverting them to a white panel
+  // when the surrounding content switches to dark text tokens.
+  .el-popper.is-dark {
+    --el-popper-bg-color-dark: var(--bg-tooltip);
+    color: var(--text-tooltip);
+    border-color: var(--border-strong);
+  }
+  .el-popper.is-dark > .el-popper__arrow::before {
+    border-color: var(--border-strong);
+  }
+
+  .el-popover.el-popper {
+    --el-popover-font-size: var(--font-size-body);
+    --el-popover-title-font-size: var(--font-size-section);
+    font-size: var(--font-size-body);
+  }
+
+  .el-popover__title,
+  .el-descriptions .el-descriptions__header .el-descriptions__title,
+  .el-date-picker__header-label,
+  .el-date-range-picker__header div,
+  .el-date-range-picker__header-label {
+    font-size: var(--font-size-section);
+    font-weight: 600;
+  }
+
+  .el-dialog__headerbtn .el-dialog__close,
+  .el-message-box__headerbtn .el-message-box__close {
+    color: var(--text-secondary);
+  }
+
+  .el-dialog__headerbtn:is(:hover, :focus) .el-dialog__close,
+  .el-message-box__headerbtn:is(:hover, :focus) .el-message-box__close {
+    color: var(--brand);
   }
 }

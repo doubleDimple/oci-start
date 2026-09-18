@@ -1,20 +1,17 @@
 package com.doubledimple.ociserver.controller;
 
 import com.doubledimple.dao.entity.Tenant;
-import com.doubledimple.ociai.chat.ChatAiService;
 import com.doubledimple.ociai.utils.OciAiChatUtils;
 import com.doubledimple.ociserver.service.TenantService;
+import com.oracle.bmc.generativeai.model.ModelCapability;
 import com.oracle.bmc.generativeai.model.ModelSummary;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import javax.annotation.Resource;
 import java.util.ArrayList;
@@ -38,37 +35,6 @@ public class AiChatController  extends BaseController{
 
     @Resource
     private OciAiChatUtils ociAiChatUtils;
-
-    /**
-     * 显示AI对话页面
-     *
-     * @param tenantId 租户ID
-     * @param model    模型对象
-     * @return AI对话页面
-     */
-    @GetMapping("/chat")
-    public String showChatPage(@RequestParam("tenantId") Long tenantId, Model model) {
-        try {
-            // 查找租户信息
-            Tenant tenant = tenantService.getById(tenantId);
-
-            model.addAttribute("tenant", tenant);
-            model.addAttribute("tenantId", tenantId);
-
-            // 设置页面标题
-            model.addAttribute("pageTitle", "AI对话 - " + (tenant.getDefName() != null ? tenant.getDefName() : tenant.getTenancyName()));
-            model.addAttribute("activePage", "api-management");
-
-            log.info("显示AI对话页面 - 租户ID: {}", tenantId);
-
-            return "chat";
-
-        } catch (Exception e) {
-            log.error("显示AI对话页面时发生错误: {}", e.getMessage(), e);
-            model.addAttribute("error", "加载AI对话页面时发生错误: " + e.getMessage());
-            return "error";
-        }
-    }
 
     /**
      * 异步获取可用的模型列表
@@ -96,6 +62,11 @@ public class AiChatController  extends BaseController{
             // 转换为简单的Map列表，避免Jackson序列化问题
             List<Map<String, Object>> modelList = new ArrayList<>();
             for (ModelSummary model : availableModels) {
+                // This route feeds chat selectors; the shared catalog also
+                // contains image-only models used by other AI configuration pages.
+                if (model.getCapabilities() == null || !model.getCapabilities().contains(ModelCapability.Chat)) {
+                    continue;
+                }
                 Map<String, Object> modelMap = new HashMap<>();
                 modelMap.put("id", model.getId());
                 modelMap.put("displayName", model.getDisplayName());

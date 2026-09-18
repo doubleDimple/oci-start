@@ -31,7 +31,7 @@
   .region-location { color: var(--text-secondary); }
   .home-region { display: inline-flex; align-items: center; gap: 5px; font-size: var(--font-size-body); color: var(--brand); }
   .home-region i { font-size: 16px; }
-  .secondary-region { font-size: var(--font-size-body); color: var(--text-muted); }
+  .secondary-region { font-size: var(--font-size-body); color: var(--text-secondary); }
   .subscribe-row {
     display: inline-flex; align-items: center; gap: 4px; min-height: 32px; padding: 5px 9px;
     border: 1px solid color-mix(in srgb, var(--brand) 18%, transparent); border-radius: 9px;
@@ -60,7 +60,9 @@
   .table-stage:focus-visible { outline-offset: -2px; }
   .tenant-search input::-webkit-search-cancel-button { display: none; }
 }
-.region-key { font-family: var(--mono, ui-monospace, monospace); font-size: var(--font-size-body); font-weight: 500; letter-spacing: .015em; }
+.region-key { font-family: var(--sans); font-size: var(--font-size-body); font-weight: 500; font-variant-numeric: tabular-nums; }
+.subscription-dialog { color: var(--text-primary); font-family: var(--sans); font-size: var(--font-size-body); }
+.subscription-dialog :deep(.el-dialog__title) { color: var(--text-primary); font-size: var(--font-size-dialog-title); font-weight: 600; }
 .tenant-status { display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px; border-radius: var(--r-pill); font-size: var(--font-size-caption); font-weight: 500; white-space: nowrap; }
 .subscription-status-ready { background: var(--status-ok-bg); color: var(--status-ok); }
 .subscription-status-progress { background: var(--status-warn-bg); color: var(--status-warn); }
@@ -111,7 +113,6 @@
     .tenant-search { order: 2; flex: 1 1 180px; width: auto; }
     .status-filter { order: 2; width: 130px; }
     .toolbar-actions { order: 3; }
-    .list-footer { padding: 10px 12px; }
     .footer-context { font-size: var(--font-size-secondary); }
     .operation-notice { margin-right: 12px; margin-left: 12px; }
   }

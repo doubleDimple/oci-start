@@ -835,13 +835,13 @@ struct InstanceConsoleView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("控制台 — \(item.displayName.isEmpty ? "实例" : item.displayName)")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
+                    .foregroundColor(AppTheme.textPrimary(dark))
                 Text(model.statusText)
                     .font(.system(size: 11))
                     .foregroundColor(
                         model.statusText.contains("已连接")
                             ? Color(hex: "3fb950")
-                            : AppTheme.sidebarText(dark)
+                            : AppTheme.textSecondary(dark)
                     )
             }
             Spacer()
@@ -855,7 +855,7 @@ struct InstanceConsoleView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(AppTheme.sidebarBg(dark))
+        .background(AppTheme.cardBg(dark))
         .overlay(
             Rectangle().frame(height: 1).foregroundColor(AppTheme.border(dark).opacity(0.55)),
             alignment: .bottom
@@ -866,11 +866,11 @@ struct InstanceConsoleView: View {
         HStack(spacing: 10) {
             Text("公网 IP：\(item.publicIps.isEmpty ? "—" : item.publicIps)")
                 .font(.system(size: 12))
-                .foregroundColor(AppTheme.sidebarText(dark))
+                .foregroundColor(AppTheme.textSecondary(dark))
             if let port = model.websockifyPort {
                 Text("websockify：\(port)")
                     .font(.system(size: 11, design: .monospaced))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .foregroundColor(AppTheme.textSecondary(dark))
             }
             Spacer()
             if model.needsWebsockifyInstall || model.isInstallingWebsockify {
@@ -905,14 +905,14 @@ struct InstanceConsoleView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
-        .background(AppTheme.sidebarBg(dark).opacity(0.65))
+        .background(AppTheme.cardBg(dark).opacity(0.65))
     }
 
     private var logPanel: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text("连接日志")
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(AppTheme.sidebarText(dark))
+                .foregroundColor(AppTheme.textSecondary(dark))
                 .padding(10)
             Divider().opacity(0.5)
             ScrollView {
@@ -926,14 +926,14 @@ struct InstanceConsoleView: View {
                     ForEach(Array(model.logLines.enumerated()), id: \.offset) { _, line in
                         Text(line)
                             .font(.system(size: 11, design: .monospaced))
-                            .foregroundColor(dark ? Color.white.opacity(0.85) : Color.primary.opacity(0.85))
+                            .foregroundColor(AppTheme.textPrimary(dark))
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
                 .padding(10)
             }
         }
-        .background(AppTheme.sidebarBg(dark))
+        .background(AppTheme.cardBg(dark))
         .overlay(
             Rectangle().frame(width: 1).foregroundColor(AppTheme.border(dark).opacity(0.55)),
             alignment: .leading

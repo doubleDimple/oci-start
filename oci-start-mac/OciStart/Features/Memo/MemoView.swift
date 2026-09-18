@@ -113,14 +113,14 @@ struct MemoView: View {
             minHeight: cardMinHeight
         ) {
             Text(item.content.isEmpty ? "（无正文）" : item.content)
-                .font(.system(size: 12))
-                .foregroundColor(dark ? Color.white.opacity(0.85) : Color.primary)
+                .font(.system(size: 14))
+                .foregroundColor(AppTheme.textPrimary(dark))
                 .lineLimit(6)
                 .frame(maxWidth: .infinity, alignment: .topLeading)
             if !item.updateTime.isEmpty {
                 Text("更新：\(item.updateTime)")
-                    .font(.system(size: 10))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .font(.system(size: 13))
+                    .foregroundColor(AppTheme.textSecondary(dark))
             }
         } footer: {
             HStack(spacing: 8) {
@@ -138,7 +138,7 @@ struct MemoView: View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundColor(Color(hex: "f85149"))
-            Text(text).font(.system(size: 12))
+            Text(text).font(.system(size: 14))
             Spacer()
             Button("重试") { Task { await model.reload() } }
                 .buttonStyle(PlainButtonStyle())

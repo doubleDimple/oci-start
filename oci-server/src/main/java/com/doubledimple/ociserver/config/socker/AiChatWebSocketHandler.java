@@ -3,6 +3,7 @@ package com.doubledimple.ociserver.config.socker;
 import com.doubledimple.dao.entity.Tenant;
 import com.doubledimple.dao.repository.TenantRepository;
 import com.doubledimple.ociai.utils.OciAiChatUtils;
+import com.doubledimple.ociai.utils.OciAiClientManager;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -382,40 +383,52 @@ public class AiChatWebSocketHandler extends TextWebSocketHandler {
      */
     private void handleInitMessage(WebSocketSession session, Map<String, Object> request) {
         String sessionId = session.getId();
-        Map<String, Object> tenantData = (Map<String, Object>) request.get("tenant");
-
-        if (tenantData == null) {
+        Object tenantValue = request.get("tenant");
+        if (!(tenantValue instanceof Map)) {
             sendMessage(session, createMessage("error", "缺少租户信息", "error"));
             return;
         }
 
-        // 使用线程池异步处理初始化
-        CompletableFuture.runAsync(() -> {
-            try {
-                Map<String, Object> response = new HashMap<>();
-                String modelId = (String) tenantData.get("modelId");
-                if (StringUtils.isBlank(modelId)){
-                    throw new RuntimeException("模型未选择");
-                }
-                Optional<Tenant> optional = tenantRepository.findById(Long.valueOf((String) tenantData.get("tenantId")));
-                Tenant tenant = optional.get();
-                sessionTenants.put(sessionId, tenant);
-                // 预热客户端连接
-                ociAiChatUtils.warmupClient(tenant);
-
-                // 检查AI服务是否可用
-                boolean isAvailable = ociAiChatUtils.isAiServiceAvailable(tenant,modelId);
-
-                response.put("type", "init");
-                response.put("status", isAvailable ? "success" : "failed");
-                response.put("message", isAvailable ? "初始化成功，AI服务已就绪" : "AI服务不可用");
-                sendMessage(session, response);
-
-            } catch (Exception e) {
-                log.error("初始化失败: sessionId={}", sessionId, e);
-                sendMessage(session, createMessage("error", "初始化失败: " + e.getMessage(), "error"));
+        // Initialization is local preparation, not an inference request or a
+        // proxy connectivity test. Do not queue it behind shared cloud tasks.
+        try {
+            Map<?, ?> tenantData = (Map<?, ?>) tenantValue;
+            Object modelValue = tenantData.get("modelId");
+            if (!(modelValue instanceof String) || StringUtils.isBlank((String) modelValue)) {
+                sendMessage(session, createMessage("error", "模型未选择", "error"));
+                return;
             }
-        }, taskExecutor);
+            Object tenantIdValue = tenantData.get("tenantId");
+            if (!(tenantIdValue instanceof String) || !((String) tenantIdValue).matches("[1-9][0-9]{0,18}")) {
+                sendMessage(session, createMessage("error", "租户参数无效", "error"));
+                return;
+            }
+            Long tenantId = Long.valueOf((String) tenantIdValue);
+            Tenant tenant = tenantRepository.findById(tenantId).orElse(null);
+            if (tenant == null) {
+                sendMessage(session, createMessage("error", "租户信息不存在", "error"));
+                return;
+            }
+            if (tenant.getCloudType() != 1 || StringUtils.isAnyBlank(tenant.getTenantId(),
+                    tenant.getTenancy(), tenant.getFingerprint(), tenant.getKeyFile(), tenant.getRegion())) {
+                sendMessage(session, createMessage("error", "租户认证配置不完整或不支持 OCI AI", "error"));
+                return;
+            }
+            // This builds only the local authentication parameters. It does not
+            // read the key supplier, construct a cloud client, or resolve/probe a proxy.
+            OciAiClientManager.buildAuthProvider(tenant);
+            if (!session.isOpen() || sessions.get(sessionId) != session) return;
+            sessionTenants.put(sessionId, tenant);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("type", "init");
+            response.put("status", "success");
+            response.put("message", "会话初始化完成");
+            sendMessage(session, response);
+        } catch (Exception e) {
+            log.error("初始化失败: sessionId={}", sessionId, e);
+            sendMessage(session, createMessage("error", "会话初始化失败，请检查租户配置", "error"));
+        }
     }
 
     /**

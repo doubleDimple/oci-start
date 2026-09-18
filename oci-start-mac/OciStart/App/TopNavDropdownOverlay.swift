@@ -8,11 +8,12 @@ struct TopNavDropdownOverlay: View {
     @EnvironmentObject private var session: AppSession
     @EnvironmentObject private var appearance: AppearanceController
 
-    private var dark: Bool { appearance.isDarkEffective }
+    @Environment(\.colorScheme) private var colorScheme
+    private var dark: Bool { appearance.isDarkEffective || colorScheme == .dark }
 
     /// Match MainShell top bar height
-    private let topBarHeight: CGFloat = 56
-    private let trailingPad: CGFloat = 16
+    private let topBarHeight: CGFloat = AppTheme.topBarHeight
+    private let trailingPad: CGFloat = AppTheme.pagePadding
     private let messagePanelWidth: CGFloat = 400
 
     private var anyOverlayOpen: Bool {
@@ -33,7 +34,7 @@ struct TopNavDropdownOverlay: View {
                 if chrome.open == .language && !header.showMessages {
                     languagePanel
                         .padding(.top, topBarHeight + 4)
-                        .padding(.trailing, trailingPad + 120)
+                        .padding(.trailing, trailingPad + 156)
                         .transition(.opacity)
                 }
 
@@ -86,8 +87,8 @@ struct TopNavDropdownOverlay: View {
     private var languagePanel: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text("语言")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(dark ? Color.white.opacity(0.45) : Color(hex: "6b7280"))
+                .font(.system(size: AppTheme.secondarySize, weight: .semibold))
+                .foregroundColor(AppTheme.textMuted(dark))
                 .padding(.horizontal, 12)
                 .padding(.top, 10)
                 .padding(.bottom, 4)
@@ -99,15 +100,15 @@ struct TopNavDropdownOverlay: View {
                 }) {
                     HStack {
                         Text(loc.title)
-                            .font(.system(size: 13))
+                            .font(.system(size: AppTheme.bodySize))
                         Spacer()
                         if header.locale == loc {
                             Image(systemName: "checkmark")
-                                .font(.system(size: 11, weight: .bold))
+                                .font(.system(size: AppTheme.secondarySize, weight: .bold))
                                 .foregroundColor(AppTheme.sidebarActive)
                         }
                     }
-                    .foregroundColor(dark ? Color.white.opacity(0.9) : Color(hex: "111827"))
+                    .foregroundColor(AppTheme.textPrimary(dark))
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
                     .contentShape(Rectangle())
@@ -117,11 +118,11 @@ struct TopNavDropdownOverlay: View {
         }
         .padding(.bottom, 8)
         .frame(width: 160, alignment: .leading)
-        .background(dark ? Color(hex: "2a2f36") : Color.white)
-        .cornerRadius(10)
+        .background(AppTheme.cardBg(dark))
+        .cornerRadius(16)
         .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(dark ? Color.white.opacity(0.08) : Color.black.opacity(0.08), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(AppTheme.border(dark), lineWidth: 1)
         )
         .shadow(color: Color.black.opacity(dark ? 0.45 : 0.18), radius: 16, y: 8)
     }
@@ -159,11 +160,11 @@ struct MessageCenterDrawerPanel: View {
     var dark: Bool
     var width: CGFloat
 
-    private var surface: Color { dark ? Color(hex: "1e2228") : Color.white }
-    private var surface2: Color { dark ? Color(hex: "262b32") : Color(hex: "f5f7fa") }
-    private var border: Color { dark ? Color.white.opacity(0.08) : Color.black.opacity(0.08) }
-    private var textPrimary: Color { dark ? Color.white.opacity(0.92) : Color(hex: "111827") }
-    private var textMuted: Color { dark ? Color.white.opacity(0.55) : Color(hex: "6b7280") }
+    private var surface: Color { AppTheme.cardBg(dark) }
+    private var surface2: Color { AppTheme.inputBg(dark) }
+    private var border: Color { AppTheme.border(dark) }
+    private var textPrimary: Color { AppTheme.textPrimary(dark) }
+    private var textMuted: Color { AppTheme.textMuted(dark) }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -191,19 +192,19 @@ struct MessageCenterDrawerPanel: View {
     private var listHeader: some View {
         HStack(spacing: 10) {
             Image(systemName: "bell.fill")
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: AppTheme.bodySize, weight: .semibold))
                 .foregroundColor(AppTheme.sidebarActive)
             VStack(alignment: .leading, spacing: 2) {
                 Text("消息中心")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: AppTheme.sectionSize, weight: .semibold))
                     .foregroundColor(textPrimary)
                 if header.unreadCount > 0 {
                     Text("\(header.unreadCount) 条未读")
-                        .font(.system(size: 11))
-                        .foregroundColor(Color(hex: "ff4d4f"))
+                        .font(.system(size: AppTheme.secondarySize))
+                        .foregroundColor(AppTheme.danger)
                 } else {
                     Text("全部已读")
-                        .font(.system(size: 11))
+                        .font(.system(size: AppTheme.secondarySize))
                         .foregroundColor(textMuted)
                 }
             }
@@ -212,7 +213,7 @@ struct MessageCenterDrawerPanel: View {
                 Task { await header.markAllRead() }
             }) {
                 Text("全部已读")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: AppTheme.secondarySize, weight: .semibold))
                     .foregroundColor(AppTheme.sidebarActive)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
@@ -241,7 +242,7 @@ struct MessageCenterDrawerPanel: View {
                     Spacer()
                     ProgressView()
                     Text("加载消息…")
-                        .font(.system(size: 12))
+                        .font(.system(size: AppTheme.captionSize))
                         .foregroundColor(textMuted)
                     Spacer()
                 }
@@ -253,7 +254,7 @@ struct MessageCenterDrawerPanel: View {
                         .font(.system(size: 28, weight: .light))
                         .foregroundColor(textMuted.opacity(0.7))
                     Text("暂无消息")
-                        .font(.system(size: 13, weight: .medium))
+                        .font(.system(size: AppTheme.bodySize, weight: .medium))
                         .foregroundColor(textMuted)
                     Spacer()
                 }
@@ -280,23 +281,23 @@ struct MessageCenterDrawerPanel: View {
         }) {
             HStack(alignment: .top, spacing: 10) {
                 Circle()
-                    .fill(msg.isUnread ? Color(hex: "ff4d4f") : Color.clear)
+                    .fill(msg.isUnread ? AppTheme.danger : Color.clear)
                     .frame(width: 8, height: 8)
                     .padding(.top, 6)
 
                 VStack(alignment: .leading, spacing: 5) {
                     Text(msg.subject.isEmpty ? "(无标题)" : msg.subject)
-                        .font(.system(size: 13, weight: msg.isUnread ? .semibold : .medium))
+                        .font(.system(size: AppTheme.bodySize, weight: msg.isUnread ? .semibold : .medium))
                         .foregroundColor(textPrimary)
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
                     HStack(spacing: 8) {
                         Text(msg.createTime)
-                            .font(.system(size: 11))
+                            .font(.system(size: AppTheme.secondarySize))
                             .foregroundColor(textMuted)
                         if !msg.messageType.isEmpty {
                             Text(msg.messageType)
-                                .font(.system(size: 10, weight: .medium))
+                                .font(.system(size: AppTheme.captionSize, weight: .medium))
                                 .foregroundColor(AppTheme.sidebarActive)
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
@@ -309,12 +310,12 @@ struct MessageCenterDrawerPanel: View {
                     Task { await header.deleteMessage(msg.businessId) }
                 }) {
                     Image(systemName: "trash")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(Color(hex: "f85149").opacity(0.85))
+                        .font(.system(size: AppTheme.secondarySize, weight: .medium))
+                        .foregroundColor(AppTheme.danger.opacity(0.85))
                         .frame(width: 28, height: 28)
                         .background(
                             RoundedRectangle(cornerRadius: 6)
-                                .fill(Color(hex: "f85149").opacity(0.08))
+                                .fill(AppTheme.danger.opacity(0.08))
                         )
                 }
                 .buttonStyle(PlainButtonStyle())
@@ -339,7 +340,7 @@ struct MessageCenterDrawerPanel: View {
                 Task { await header.loadMessages(page: p) }
             }) {
                 Image(systemName: "chevron.left")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: AppTheme.secondarySize, weight: .semibold))
                     .frame(width: 32, height: 28)
                     .background(RoundedRectangle(cornerRadius: 6).fill(surface2))
             }
@@ -348,7 +349,7 @@ struct MessageCenterDrawerPanel: View {
             .opacity(header.messagePage.pageNum <= 1 ? 0.4 : 1)
 
             Text("\(header.messagePage.pageNum) / \(max(header.messagePage.totalPages, 1))")
-                .font(.system(size: 12, weight: .medium))
+                .font(.system(size: AppTheme.captionSize, weight: .medium))
                 .foregroundColor(textMuted)
                 .frame(minWidth: 56)
 
@@ -357,7 +358,7 @@ struct MessageCenterDrawerPanel: View {
                 Task { await header.loadMessages(page: p) }
             }) {
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: AppTheme.secondarySize, weight: .semibold))
                     .frame(width: 32, height: 28)
                     .background(RoundedRectangle(cornerRadius: 6).fill(surface2))
             }
@@ -367,7 +368,7 @@ struct MessageCenterDrawerPanel: View {
 
             Spacer()
             Text("共 \(header.messagePage.totalElements) 条")
-                .font(.system(size: 11))
+                .font(.system(size: AppTheme.secondarySize))
                 .foregroundColor(textMuted)
         }
         .padding(.horizontal, 16)
@@ -386,9 +387,9 @@ struct MessageCenterDrawerPanel: View {
             Button(action: { header.backToMessageList() }) {
                 HStack(spacing: 4) {
                     Image(systemName: "chevron.left")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.system(size: AppTheme.captionSize, weight: .semibold))
                     Text("返回")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.system(size: AppTheme.captionSize, weight: .semibold))
                 }
                 .foregroundColor(AppTheme.sidebarActive)
                 .padding(.horizontal, 10)
@@ -398,7 +399,7 @@ struct MessageCenterDrawerPanel: View {
             .buttonStyle(PlainButtonStyle())
 
             Text("消息详情")
-                .font(.system(size: 15, weight: .semibold))
+                .font(.system(size: AppTheme.sectionSize, weight: .semibold))
                 .foregroundColor(textPrimary)
             Spacer()
             closeButton
@@ -416,7 +417,7 @@ struct MessageCenterDrawerPanel: View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 10) {
                 Text(msg.subject.isEmpty ? "(无标题)" : msg.subject)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: AppTheme.sectionSize, weight: .semibold))
                     .foregroundColor(textPrimary)
                     .fixedSize(horizontal: false, vertical: true)
 
@@ -430,7 +431,7 @@ struct MessageCenterDrawerPanel: View {
                             .foregroundColor(AppTheme.sidebarActive)
                     }
                 }
-                .font(.system(size: 12))
+                .font(.system(size: AppTheme.captionSize))
                 .foregroundColor(textMuted)
             }
             .padding(16)
@@ -441,7 +442,7 @@ struct MessageCenterDrawerPanel: View {
 
             ScrollView {
                 Text(msg.content.isEmpty ? "（无内容）" : msg.content)
-                    .font(.system(size: 13))
+                    .font(.system(size: AppTheme.bodySize))
                     .foregroundColor(textPrimary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(16)
@@ -460,13 +461,13 @@ struct MessageCenterDrawerPanel: View {
                         Image(systemName: "trash")
                         Text("删除")
                     }
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(Color(hex: "f85149"))
+                    .font(.system(size: AppTheme.captionSize, weight: .semibold))
+                    .foregroundColor(AppTheme.danger)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
                     .background(
                         RoundedRectangle(cornerRadius: 8)
-                            .fill(Color(hex: "f85149").opacity(0.1))
+                            .fill(AppTheme.danger.opacity(0.1))
                     )
                 }
                 .buttonStyle(PlainButtonStyle())
@@ -475,7 +476,7 @@ struct MessageCenterDrawerPanel: View {
 
                 Button(action: { header.backToMessageList() }) {
                     Text("返回列表")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.system(size: AppTheme.captionSize, weight: .semibold))
                         .foregroundColor(.white)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
@@ -494,7 +495,7 @@ struct MessageCenterDrawerPanel: View {
     private var closeButton: some View {
         Button(action: { header.closeMessages() }) {
             Image(systemName: "xmark")
-                .font(.system(size: 11, weight: .bold))
+                .font(.system(size: AppTheme.secondarySize, weight: .bold))
                 .foregroundColor(textMuted)
                 .frame(width: 28, height: 28)
                 .background(Circle().fill(surface2))

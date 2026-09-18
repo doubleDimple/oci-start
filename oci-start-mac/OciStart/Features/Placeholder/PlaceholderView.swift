@@ -16,6 +16,7 @@ struct PlaceholderView: View {
             title: title,
             subtitle: "原生占位 · 业务功能开发中",
             systemImage: NavigationCatalog.item(for: nav)?.systemImage ?? "hammer",
+            layout: .workspace,
             toolbar: {
                 AppButton(title: "刷新", systemImage: "arrow.clockwise", kind: .secondary) {
                     NotificationCenter.default.post(name: .ociReloadCurrentPage, object: nil)
@@ -40,7 +41,7 @@ struct PlaceholderView: View {
                     .frame(maxWidth: 520)
                     .background(
                         RoundedRectangle(cornerRadius: 12)
-                            .fill(AppTheme.sidebarBg(dark))
+                            .fill(AppTheme.cardBg(dark))
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
@@ -50,7 +51,7 @@ struct PlaceholderView: View {
                     Spacer()
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding(16)
+                .padding(AppTheme.pagePadding)
             }
         )
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)

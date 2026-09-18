@@ -1,40 +1,29 @@
 package com.doubledimple.ociserver.controller.index;
 
-import com.doubledimple.ocicommon.cache.CacheConstants;
 import com.doubledimple.ocicommon.cache.CacheService;
-import com.doubledimple.ocicommon.enums.CloudTypeEnum;
 import com.doubledimple.ocicommon.param.ApiResponse;
 import com.doubledimple.ocicommon.param.InstallAppNotify;
 import com.doubledimple.ocicommon.param.OpenRegionNotify;
 import com.doubledimple.ociserver.config.task.VersionCheckTask;
 import com.doubledimple.ociserver.controller.BaseController;
-import com.doubledimple.ociserver.pojo.response.OciIpRange;
 import com.doubledimple.ociserver.service.InstallAppService;
 import com.doubledimple.ociserver.service.OpenApiService;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
-import org.springframework.core.io.ClassPathResource;
-import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import javax.annotation.Resource;
-import javax.servlet.http.HttpServletRequest;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static com.doubledimple.ocicommon.cache.CacheConstants.ALL_IP_RANGES_KEY;
 import static com.doubledimple.ocicommon.cache.CacheConstants.BOOT_COUNT_KEY;
 import static com.doubledimple.ocicommon.cache.CacheConstants.GITHUB_STARS_KEY;
-
 
 /**
  * @version 1.0.0
@@ -63,30 +52,6 @@ public class IndexController  extends BaseController {
     @Lazy
     CacheService cacheService;
 
-
-    @GetMapping("/main")
-    public String mainLayout(@RequestParam(required = false) String path,
-                             @RequestParam(required = false) String active,
-                             Model model) {
-        model.addAttribute("initialPath", path != null ? path : "/boot/dashboard");
-        model.addAttribute("activePage", active != null ? active : "api-dashboard");
-        if (new ClassPathResource("static/index.html").exists()) {
-            return "forward:/index.html";
-        }
-        return "layout";
-    }
-
-    /**
-     * 租户列表
-     */
-    @GetMapping("/index")
-    public String listUsers(HttpServletRequest request,
-                            Model model) {
-
-        model.addAttribute("cloudType", CloudTypeEnum.ORACLE_CLOUD.getType());
-        return "index";
-    }
-
     //异步获取面板开机统计
     @GetMapping("/bootOpenCount")
     @ResponseBody
@@ -105,17 +70,6 @@ public class IndexController  extends BaseController {
         );
         return ApiResponse.success(totalOpenCount != null ? totalOpenCount : 0);
     }
-
-    /**
-     * 跳转到关于作者页面
-     */
-    @GetMapping("/about/author")
-    public String aboutAuthor(Model model) {
-        model.addAttribute("activePage", "about-author");
-        return "common/version_info";
-    }
-
-
 
     @GetMapping("/api/dashboard/stats")
     @ResponseBody

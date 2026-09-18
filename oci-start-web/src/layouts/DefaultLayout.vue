@@ -9,6 +9,13 @@ import { useUserStore } from '@/stores/user'
 import { theme, themeMode, setTheme } from '@/composables/useTheme'
 import { chrome, setSidebarColor, setPageColor, resetChrome, SIDEBAR_SWATCHES, PAGE_SWATCHES } from '@/composables/useChrome'
 import { useLocale } from '@/composables/useLocale'
+import { useRoutePreload } from '@/composables/useRoutePreload'
+import { refreshHeaderVersionOnEntry, headerVersionSnapshot } from '@/api/headerVersion'
+import { navigateWithFeedback, navigationErrorDetail, navigationLoading, navigationLoadingVisible, navigationPending, navigationProblem, navigationTargetPath, dismissNavigationProblem } from '@/utils/navigation'
+import PageLoading from '@/components/PageLoading.vue'
+import PageErrorNotice from '@/components/PageErrorNotice.vue'
+import UserAvatar from '@/components/UserAvatar.vue'
+import { loadSiteBrand, siteLogoName } from '@/composables/useSiteBrand'
 import HeaderSearch from '@/components/header/HeaderSearch.vue'
 import HeaderMessages from '@/components/header/HeaderMessages.vue'
 import HeaderAssets from '@/components/header/HeaderAssets.vue'
@@ -20,51 +27,146 @@ const router = useRouter()
 const shell = useShellStore()
 const user = useUserStore()
 const { locale, setLocale, syncing: localeSyncing } = useLocale()
+const { prepare: preparePage, cancelIntent: cancelPagePreparation } = useRoutePreload(['/tenants/list', '/oci/list', '/vps/instances/list'])
 const assets = ref<InstanceType<typeof HeaderAssets>>()
 const version = ref<InstanceType<typeof HeaderVersion>>()
+const messages = ref<InstanceType<typeof HeaderMessages>>()
 const userRequest = new AbortController()
+const siteBrandRequest = new AbortController()
 let disposed = false
 // Reset any hidden provider retained by an already mounted development session.
 if (shell.cloudType !== 1) shell.setCloud(1)
 const userLabel = computed(() => user.username || t(user.loading ? 'header.loading' : 'header.user'))
 const languageLabel = computed(() => `${t('header.language')} · ${locale.value === 'zh' ? '简体中文' : 'English'}`)
 const themeIcon = computed(() => themeMode.value === 'system' ? 'i-mdi-monitor' : theme.value === 'dark' ? 'i-mdi-weather-night' : 'i-mdi-white-balance-sunny')
-const avatarUrl = '/images/default-avatar.png'
 const compactMedia = window.matchMedia('(max-width: 760px)')
 const compactViewport = ref(compactMedia.matches)
 const mobileNavOpen = ref(false)
 const sidebarToggle = ref<HTMLButtonElement | null>(null)
+const mobileSidebarToggle = ref<HTMLButtonElement | null>(null)
+const sidebar = ref<HTMLElement | null>(null)
+const mobilePreferencesOpen = ref(false)
 const content = ref<HTMLElement | null>(null)
-const sidebarCollapsed = computed(() => compactViewport.value ? !mobileNavOpen.value : shell.collapsed)
+const sidebarCollapsed = computed(() => !compactViewport.value && shell.collapsed)
+const mobileLinks: Record<string, string> = {
+  '/tenants/list': '/m/tenants', '/boot/fullBootList': '/m/boot', '/vps/instances/list': '/m/instances',
+  '/oci/list': '/m/oci-instances', '/delayTest': '/m/speedtest', '/boot/dashboard': '/m/monitor',
+  '/resource/list': '/m/arm-regions', '/system/settings': '/m/settings', '/dns/cloudflare': '/m/cloudflare',
+  '/system/notifySettings': '/m/notify-settings', '/system/memPage': '/m/memo', '/mfa/page': '/m/mfa',
+}
+const mobileTabs: NavItem[] = [
+  { id: 'tenants', href: '/m/tenants', labelKey: 'mobileShell.tabs.tenants', icon: 'i-mdi-account-group-outline' },
+  { id: 'boot', href: '/m/boot', labelKey: 'mobileShell.tabs.boot', icon: 'i-mdi-play-circle-outline' },
+  { id: 'instances', href: '/m/instances', labelKey: 'mobileShell.tabs.instances', icon: 'i-mdi-server-outline' },
+  { id: 'speed', href: '/m/speedtest', labelKey: 'mobileShell.tabs.speed', icon: 'i-mdi-speedometer' },
+  { id: 'monitor', href: '/m/monitor', labelKey: 'mobileShell.tabs.monitor', icon: 'i-mdi-chart-line' },
+]
+const pageTitleKeys: Record<string, string> = {
+  '/tenants/list': 'tenants', '/boot/fullBootList': 'boot', '/vps/instances/list': 'instances',
+  '/oci/list': 'ociInstances', '/delayTest': 'speed', '/boot/dashboard': 'monitor',
+  '/tenants/regionList': 'regions', '/tenants/auditPage': 'audit', '/tenants/regionSubList': 'subscriptions',
+  '/tenants/addSpeed': 'import', '/tenants/bootPage': 'launch', '/tenants/gcpBootPage': 'gcpLaunch',
+  '/instanceDetail/bootList': 'tenantInstances', '/monitor/homePage': 'traffic', '/cost/costPage': 'cost',
+  '/oci/vnic/manage': 'network', '/oci/metricsPage': 'metrics', '/oci/terminal': 'terminal', '/ssh/terminal': 'terminal',
+  '/ai/chat': 'chat', '/m/ai': 'telegram', '/m/user-mgr': 'users', '/m/disk-info': 'volumes',
+  '/m/security-rules': 'security', '/m/storage-instances': 'mysql',
+}
+function canonicalPath(path: string) {
+  const resolved = router.resolve(path)
+  return typeof resolved.meta.canonicalPath === 'string' ? resolved.meta.canonicalPath : resolved.path
+}
+const currentPath = computed(() => canonicalPath(route.path))
+const mobilePageTitle = computed(() => {
+  const detail = pageTitleKeys[currentPath.value] || pageTitleKeys[route.path]
+  if (detail) return t(`mobileShell.titles.${detail}`)
+  if (currentPath.value.startsWith('/oci/console/terminal')) return t('mobileShell.titles.console')
+  const items = MENU.flatMap(group => group.children)
+  const item = items.find(item => item.href === currentPath.value) || items.find(item => item.id === route.meta.id)
+  return item ? t(item.labelKey) : t('mobileShell.console')
+})
+const activeMobileTab = computed(() => {
+  const path = canonicalPath(navigationTargetPath.value || route.path)
+  if (path === '/delayTest') return 'speed'
+  if (path === '/boot/dashboard' || path === '/oci/metricsPage') return 'monitor'
+  if (['/boot/fullBootList', '/tenants/bootList', '/tenants/bootPage', '/tenants/gcpBootPage'].includes(path)) return 'boot'
+  if (path.startsWith('/vps/') || path.startsWith('/oci/')) return 'instances'
+  if (path.startsWith('/tenants/') || path.startsWith('/instanceDetail/') || ['/cost/costPage', '/monitor/homePage', '/m/user-mgr', '/m/disk-info', '/m/security-rules', '/m/storage-instances'].includes(path)) return 'tenants'
+  return ''
+})
+
+function itemHref(item: NavItem) { return compactViewport.value ? mobileLinks[item.href] || item.href : item.href }
 
 function updateViewport(event: MediaQueryListEvent) {
+  const activeElement = document.activeElement
+  const focusInSidebar = sidebar.value?.contains(document.activeElement)
+  const focusInDesktopTools = activeElement instanceof HTMLElement && activeElement.closest('.desktop-search, .desktop-tools')
+  const focusInMobileTools = activeElement instanceof HTMLElement && activeElement.closest('.mobile-heading, .mobile-tabs')
   compactViewport.value = event.matches
   mobileNavOpen.value = false
+  if (event.matches && route.matched.some(record => record.path === '/oci/sysHelp')) void router.replace('/m/instances')
+  if (event.matches && (focusInSidebar || focusInDesktopTools)) void nextTick(() => mobileSidebarToggle.value?.focus())
+  else if (!event.matches && focusInMobileTools) void nextTick(() => sidebarToggle.value?.focus())
 }
 
 function toggleSidebar() {
-  if (compactViewport.value) mobileNavOpen.value = !mobileNavOpen.value
+  if (compactViewport.value) {
+    if (mobileNavOpen.value) closeMobileNav()
+    else mobileNavOpen.value = true
+  }
   else shell.toggleCollapsed()
 }
 
-function closeMobileNav() {
+function closeMobileNav(restoreFocus = true) {
   if (!mobileNavOpen.value) return
   mobileNavOpen.value = false
-  sidebarToggle.value?.focus()
+  if (restoreFocus) void nextTick(() => mobileSidebarToggle.value?.focus())
+}
+
+function trapMobileFocus(event: KeyboardEvent) {
+  if (!compactViewport.value || !mobileNavOpen.value || event.key !== 'Tab') return
+  const controls = Array.from(sidebar.value?.querySelectorAll<HTMLElement>('a[href], button:not(:disabled), input:not(:disabled), [tabindex="0"]') || [])
+    .filter(element => element.getClientRects().length > 0)
+  const first = controls[0]
+  const last = controls[controls.length - 1]
+  if (!first || !last) { event.preventDefault(); return }
+  if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
+  else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
+}
+
+function keepMobileFocus(event: FocusEvent) {
+  if (compactViewport.value && mobileNavOpen.value && !sidebar.value?.contains(event.target as Node)) sidebarToggle.value?.focus()
+}
+
+function closeMobileNavWithEscape(event: KeyboardEvent) {
+  if (event.key === 'Escape' && compactViewport.value && mobileNavOpen.value) closeMobileNav()
 }
 
 onMounted(() => {
+  void refreshHeaderVersionOnEntry()
   void user.load(userRequest.signal)
+  void loadSiteBrand(siteBrandRequest.signal)
   compactMedia.addEventListener('change', updateViewport)
+  document.addEventListener('focusin', keepMobileFocus)
+  document.addEventListener('keydown', closeMobileNavWithEscape)
 })
 onBeforeUnmount(() => {
   disposed = true
   userRequest.abort()
+  siteBrandRequest.abort()
   compactMedia.removeEventListener('change', updateViewport)
+  document.removeEventListener('focusin', keepMobileFocus)
+  document.removeEventListener('keydown', closeMobileNavWithEscape)
+})
+
+watch(mobileNavOpen, async open => {
+  if (!open) return
+  messages.value?.close()
+  await nextTick()
+  if (mobileNavOpen.value) sidebarToggle.value?.focus()
 })
 
 watch(() => route.path, async () => {
-  mobileNavOpen.value = false
+  closeMobileNav()
   await nextTick()
   content.value?.scrollTo({ top: 0, left: 0 })
 })
@@ -73,7 +175,8 @@ const visibleGroups = computed(() => {
   const q = shell.menuQuery.trim().toLowerCase()
   return MENU.map((g) => ({
     ...g,
-    children: g.children.filter((it) => {
+    children: [...g.children, ...(compactViewport.value && g.id === 'tools' ? [{ id: 'mobile-telegram', href: '/m/ai', labelKey: 'mobileShell.titles.telegram', icon: 'i-mdi-robot-outline' } as NavItem] : [])].filter((it) => {
+      if (compactViewport.value && /sysHelp|rescue/i.test(`${it.id} ${it.href}`)) return false
       if (it.cloudTypes && !it.cloudTypes.includes(shell.cloudType)) return false
       if (!q) return true
       return `${t(it.labelKey)} ${t(g.labelKey)} ${it.href}`.toLowerCase().includes(q)
@@ -84,10 +187,11 @@ const visibleGroups = computed(() => {
 function openItem(it: NavItem, event: MouseEvent) {
   if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return
   event.preventDefault()
-  mobileNavOpen.value = false
+  closeMobileNav()
   shell.menuQuery = ''
-  if (it.newTab) window.open(router.resolve(it.href).href, '_blank', 'noopener')
-  else void router.push(it.href)
+  const href = itemHref(it)
+  if (it.newTab) window.open(router.resolve(href).href, '_blank', 'noopener')
+  else void navigateWithFeedback(router, href)
 }
 
 function changeTheme(value: unknown) {
@@ -111,27 +215,35 @@ function userCommand(value: unknown) {
   else if (value === 'about') version.value?.open()
   else if (value === 'logout') void signOut()
   else if (value === 'retry') void user.load(userRequest.signal)
+  else if (value === 'preferences') mobilePreferencesOpen.value = true
 }
 
 function isActive(it: NavItem) {
-  return route.path === it.href
+  return canonicalPath(navigationTargetPath.value || route.path) === canonicalPath(it.href)
+}
+
+function retryNavigation() {
+  const href = navigationProblem.value?.href
+  if (href) void navigateWithFeedback(router, href)
 }
 
 </script>
 
 <template>
-  <div class="shell" :class="{ collapsed: sidebarCollapsed, 'mobile-nav-open': mobileNavOpen }" @keydown.esc="closeMobileNav">
-    <Transition name="navigation-shade"><button v-if="compactViewport && mobileNavOpen" class="mobile-nav-backdrop" type="button" tabindex="-1" :aria-label="t('header.collapseNav')" @click="closeMobileNav" /></Transition>
-    <aside class="side">
+  <div class="shell" :class="{ collapsed: sidebarCollapsed, 'mobile-nav-open': mobileNavOpen }" @keydown.esc="closeMobileNav()">
+    <Transition name="navigation-shade"><button v-if="compactViewport && mobileNavOpen" class="mobile-nav-backdrop" type="button" tabindex="-1" :aria-label="t('header.collapseNav')" @click="closeMobileNav()" /></Transition>
+    <aside ref="sidebar" class="side" :role="compactViewport ? 'dialog' : undefined" :aria-modal="compactViewport && mobileNavOpen || undefined" :aria-label="compactViewport ? t('header.navigation') : undefined" :aria-hidden="compactViewport && !mobileNavOpen || undefined" :inert="compactViewport && !mobileNavOpen || undefined" @keydown="trapMobileFocus">
       <div class="brand">
-        <button ref="sidebarToggle" class="leaf" type="button" :aria-label="t(sidebarCollapsed ? 'header.expandNav' : 'header.collapseNav')" :title="t(sidebarCollapsed ? 'header.expandNav' : 'header.collapseNav')" :aria-expanded="!sidebarCollapsed" aria-controls="primary-navigation" @click="toggleSidebar">
+        <button ref="sidebarToggle" class="leaf" type="button" :aria-label="t(sidebarCollapsed ? 'header.expandNav' : 'header.collapseNav')" :title="t(sidebarCollapsed ? 'header.expandNav' : 'header.collapseNav')" :aria-expanded="compactViewport ? mobileNavOpen : !sidebarCollapsed" aria-controls="primary-navigation" @click="toggleSidebar">
           <i :class="compactViewport ? (mobileNavOpen ? 'i-mdi-close' : 'i-mdi-menu') : 'i-mdi-leaf'" aria-hidden="true" />
         </button>
-        <RouterLink to="/index" class="brand-text" :title="t('header.home')" :aria-label="t('header.home')" :tabindex="sidebarCollapsed ? -1 : undefined">
-          <strong>{{ t('brand') }}</strong>
+        <RouterLink :to="compactViewport ? '/m/monitor' : '/boot/dashboard'" class="brand-text" :title="t('header.home')" :aria-label="t('header.home')" :tabindex="sidebarCollapsed ? -1 : undefined">
+          <strong>{{ siteLogoName || t('brand') }}</strong>
           <small>{{ t('brandSub') }}</small>
         </RouterLink>
       </div>
+
+      <label v-if="compactViewport" class="mobile-menu-search"><i class="i-mdi-magnify" aria-hidden="true" /><input v-model="shell.menuQuery" type="search" :placeholder="t('mobileShell.search')" :aria-label="t('mobileShell.search')" /></label>
 
       <nav id="primary-navigation" class="nav" :aria-label="t('header.navigation')">
         <template v-for="g in visibleGroups" :key="g.id">
@@ -139,14 +251,19 @@ function isActive(it: NavItem) {
           <a
             v-for="it in g.children"
             :key="it.id"
-            :href="router.resolve(it.href).href"
+            :href="router.resolve(itemHref(it)).href"
             :target="it.newTab ? '_blank' : undefined"
             :rel="it.newTab ? 'noopener' : undefined"
             class="nav-item"
             :class="{ active: isActive(it) }"
             :title="t(it.labelKey)"
             :aria-label="t(it.labelKey)"
-            :aria-current="isActive(it) ? 'page' : undefined"
+            :aria-current="currentPath === canonicalPath(it.href) ? 'page' : undefined"
+            :aria-busy="isActive(it) && navigationPending || undefined"
+            @pointerenter="preparePage(itemHref(it))"
+            @pointerleave="cancelPagePreparation"
+            @focus="preparePage(itemHref(it))"
+            @blur="cancelPagePreparation"
             @click="openItem(it, $event)"
           >
             <i :class="it.icon" />
@@ -161,7 +278,7 @@ function isActive(it: NavItem) {
       </div>
 
       <div class="side-user">
-        <img :src="avatarUrl" alt="" />
+        <UserAvatar :name="user.username" context="sidebar" />
         <div class="side-user-meta">
           <b>{{ userLabel }}</b>
           <small>{{ shell.cloudName }}</small>
@@ -171,8 +288,13 @@ function isActive(it: NavItem) {
 
     <div class="main" :inert="compactViewport && mobileNavOpen || undefined">
       <header class="top">
-        <HeaderSearch />
+        <div class="mobile-heading">
+          <button ref="mobileSidebarToggle" class="icon-btn mobile-menu-toggle" type="button" :aria-label="t('header.expandNav')" :aria-expanded="mobileNavOpen" aria-controls="primary-navigation" @click="toggleSidebar"><i class="i-mdi-menu" aria-hidden="true" /></button>
+          <span class="mobile-page-title" :title="mobilePageTitle">{{ mobilePageTitle }}</span>
+        </div>
+        <div class="desktop-search"><HeaderSearch /></div>
         <div class="top-right">
+          <div class="desktop-tools">
           <HeaderVersion ref="version" />
           <el-dropdown trigger="click" @command="changeTheme">
             <button class="icon-btn" type="button" :title="`${t('header.appearance')} · ${t(`header.${themeMode}`)}`" :aria-label="`${t('header.appearance')} · ${t(`header.${themeMode}`)}`">
@@ -243,10 +365,11 @@ function isActive(it: NavItem) {
               </el-dropdown-menu>
             </template>
           </el-dropdown>
-          <HeaderMessages />
-          <el-dropdown trigger="click" @command="userCommand">
+          </div>
+          <HeaderMessages ref="messages" />
+          <el-dropdown trigger="click" placement="bottom-end" :popper-class="compactViewport ? 'mobile-account-menu' : undefined" @command="userCommand">
             <button class="user-chip" type="button" :title="t(user.loadFailed ? 'header.userFailed' : 'header.userMenu')" :aria-label="`${userLabel} · ${t('header.userMenu')}`">
-              <img :src="avatarUrl" alt="" />
+              <UserAvatar :name="user.username" />
               <span>
                 <b>{{ userLabel }}</b>
                 <small>{{ shell.cloudName }}</small>
@@ -257,24 +380,40 @@ function isActive(it: NavItem) {
               <el-dropdown-menu>
                 <el-dropdown-item disabled><span class="header-account-summary">{{ userLabel }}<small>{{ shell.cloudName }}</small></span></el-dropdown-item>
                 <el-dropdown-item v-if="user.loadFailed" command="retry" :disabled="user.loading"><i class="i-mdi-refresh" aria-hidden="true" />{{ t('header.retryUser') }}</el-dropdown-item>
+                <el-dropdown-item v-if="compactViewport" divided command="preferences"><i :class="themeIcon" aria-hidden="true" />{{ t('mobileShell.preferences') }}</el-dropdown-item>
                 <el-dropdown-item divided command="assets"><i class="i-mdi-chart-box-outline" aria-hidden="true" />{{ t('header.assets') }}</el-dropdown-item>
                 <el-dropdown-item command="about"><i class="i-mdi-information-outline" aria-hidden="true" />
-                  {{ t('about') }}
+                  {{ t(compactViewport && headerVersionSnapshot?.needUpdate ? 'headerVersion.updateAvailable' : 'about') }}
                 </el-dropdown-item>
-                <el-dropdown-item divided command="logout" :disabled="user.signingOut"><i class="i-mdi-logout" aria-hidden="true" />{{ t(user.signingOut ? 'header.signOutBusy' : 'logout') }}</el-dropdown-item>
+                <el-dropdown-item divided command="logout" class="account-logout" :disabled="user.signingOut"><i class="i-mdi-logout" aria-hidden="true" />{{ t(user.signingOut ? 'header.signOutBusy' : 'logout') }}</el-dropdown-item>
               </el-dropdown-menu>
             </template>
           </el-dropdown>
         </div>
       </header>
 
-      <section ref="content" class="content">
-        <RouterView v-slot="{ Component, route: currentRoute }">
-          <Transition name="page-view" mode="out-in"><component :is="Component" :key="currentRoute.path" /></Transition>
-        </RouterView>
-      </section>
+      <div class="content-stage" :aria-busy="navigationPending || undefined">
+        <section ref="content" class="content" :inert="navigationLoading && route.path !== navigationTargetPath || undefined">
+          <RouterView v-slot="{ Component, route: currentRoute }">
+            <component :is="Component" :key="currentRoute.path" />
+          </RouterView>
+        </section>
+        <PageLoading :visible="navigationLoadingVisible" />
+        <PageErrorNotice v-if="navigationProblem" :title="t('pageLoading.failed')"><p>{{ navigationErrorDetail || t('pageLoading.failed') }}</p><button type="button" @click="retryNavigation">{{ t('pageLoading.retry') }}</button><button type="button" @click="dismissNavigationProblem">{{ t('pageError.close') }}</button></PageErrorNotice>
+      </div>
+      <nav class="mobile-tabs" :aria-label="t('mobileShell.navigation')">
+        <a v-for="tab in mobileTabs" :key="tab.id" :href="router.resolve(tab.href).href" :class="{ active: activeMobileTab === tab.id }" :aria-current="activeMobileTab === tab.id ? 'page' : undefined" :aria-label="t(tab.labelKey)" @pointerenter="preparePage(tab.href)" @pointerleave="cancelPagePreparation" @focus="preparePage(tab.href)" @blur="cancelPagePreparation" @click="openItem(tab, $event)"><i :class="tab.icon" aria-hidden="true" /><span>{{ t(tab.labelKey) }}</span></a>
+      </nav>
     </div>
     <HeaderAssets ref="assets" />
+    <el-dialog v-model="mobilePreferencesOpen" class="mobile-preferences-dialog" :title="t('mobileShell.preferences')" width="min(460px, calc(100vw - 24px))" align-center append-to-body>
+      <div class="mobile-preferences">
+        <fieldset><legend>{{ t('header.appearance') }}</legend><div class="mobile-preference-options"><button v-for="mode in ['light', 'dark', 'system']" :key="mode" type="button" :aria-pressed="themeMode === mode" @click="changeTheme(mode)">{{ t(`header.${mode}`) }}<i v-if="themeMode === mode" class="i-mdi-check" aria-hidden="true" /></button></div></fieldset>
+        <fieldset><legend>{{ t('header.language') }}</legend><div class="mobile-preference-options"><button type="button" lang="zh-CN" :aria-pressed="locale === 'zh'" :disabled="localeSyncing" @click="changeLocale('zh')">简体中文<i v-if="locale === 'zh'" class="i-mdi-check" aria-hidden="true" /></button><button type="button" lang="en" :aria-pressed="locale === 'en'" :disabled="localeSyncing" @click="changeLocale('en')">English<i v-if="locale === 'en'" class="i-mdi-check" aria-hidden="true" /></button></div></fieldset>
+        <fieldset v-if="!compactViewport" class="chrome-pop"><legend>{{ t('chrome.sidebar') }}</legend><div class="swatches"><button v-for="c in SIDEBAR_SWATCHES" :key="c" type="button" class="swatch" :class="{ on: chrome.sidebar.toLowerCase() === c }" :style="{ background: c }" :aria-label="t('header.sidebarColor', { color: c })" :aria-pressed="chrome.sidebar.toLowerCase() === c" @click="setSidebarColor(c)" /><label class="swatch picker"><input type="color" :aria-label="t('header.customSidebar')" :value="chrome.sidebar || (theme === 'dark' ? '#000000' : '#1d1d1f')" @input="setSidebarColor(($event.target as HTMLInputElement).value)"></label></div></fieldset>
+        <fieldset class="chrome-pop"><legend>{{ t('chrome.page') }}</legend><div class="swatches"><button v-for="c in PAGE_SWATCHES" :key="c" type="button" class="swatch" :class="{ on: chrome.page.toLowerCase() === c }" :style="{ background: c }" :aria-label="t('header.pageColor', { color: c })" :aria-pressed="chrome.page.toLowerCase() === c" @click="setPageColor(c)" /><label class="swatch picker"><input type="color" :aria-label="t('header.customPage')" :value="chrome.page || (theme === 'dark' ? '#000000' : '#f5f5f7')" @input="setPageColor(($event.target as HTMLInputElement).value)"></label></div><button class="reset" type="button" @click="resetChrome">{{ t('chrome.reset') }}</button></fieldset>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -466,10 +605,6 @@ function isActive(it: NavItem) {
   gap: 0;
   padding-inline: 0;
 }
-.side-user img, .user-chip img {
-  width: 34px; height: 34px; border-radius: 50%; object-fit: cover; background: #234;
-  flex-shrink: 0;
-}
 .side-user-meta {
   min-width: 0;
   max-width: 160px;
@@ -519,6 +654,9 @@ function isActive(it: NavItem) {
   flex-shrink: 0;
 }
 .top-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.desktop-search { display: contents; }
+.desktop-tools { display: flex; align-items: center; gap: 8px; }
+.mobile-heading, .mobile-tabs { display: none; }
 .icon-btn {
   width: 38px; height: 38px; border: 0; border-radius: 50%;
   background: var(--bg-card); color: var(--text-secondary);
@@ -541,8 +679,10 @@ function isActive(it: NavItem) {
 .user-chip span { text-align: left; line-height: 1.15; max-width: 160px; overflow: hidden; }
 .user-chip b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .user-chip small { color: var(--text-secondary); }
+.content-stage { position: relative; display: flex; flex: 1; min-width: 0; min-height: 0; }
 .content {
   flex: 1;
+  min-width: 0;
   min-height: 0;
   padding: 8px 24px 24px;
   overflow: auto;
@@ -567,18 +707,39 @@ function isActive(it: NavItem) {
 .navigation-shade-enter-active, .navigation-shade-leave-active { transition: opacity 180ms ease; }
 .navigation-shade-enter-from, .navigation-shade-leave-to { opacity: 0; }
 @media (max-width: 760px) {
-  .side { position: absolute; inset: 0 auto 0 0; z-index: 20; width: min(260px, calc(100vw - 48px)); }
-  .collapsed .side { width: 64px; padding-inline: 8px; }
-  .main { margin-left: 64px; }
-  .top { padding-inline: 14px; gap: 8px; }
-  .content { padding: 12px 14px 20px; }
-  .user-chip { padding-right: 4px; }
+  .shell { width: 100%; height: 100dvh; max-height: 100dvh; overflow: hidden; }
+  .side { position: fixed; inset: 0 auto 0 0; z-index: 20; width: min(360px, calc(100vw - 28px)); max-width: 100%; height: 100dvh; padding: calc(14px + env(safe-area-inset-top)) 14px calc(14px + env(safe-area-inset-bottom)); transform: translateX(-100%); visibility: hidden; transition: transform 220ms ease, visibility 220ms; }
+  .mobile-nav-open .side { transform: translateX(0); visibility: visible; }
+  .brand { flex: none; padding: 0 0 14px; }
+  .brand-text { max-width: none; }
+  .leaf { width: 44px; height: 44px; }
+  .nav { min-height: 0; overscroll-behavior: contain; }
+  .nav-item { min-height: 44px; white-space: normal; }
+  .nav-item span { max-width: none; }
+  .mobile-menu-search { display: flex; flex: none; align-items: center; gap: 8px; min-height: 44px; margin-bottom: 8px; padding: 8px 12px; border: 1px solid color-mix(in srgb, var(--text-on-dark) 25%, transparent); border-radius: var(--r-pill); }
+  .mobile-menu-search > i { flex: none; width: 18px; height: 18px; }
+  .mobile-menu-search input { min-width: 0; width: 100%; border: 0; outline: 0; background: transparent; color: var(--text-on-dark); font: var(--font-size-body)/1.5 var(--sans); }
+  .mobile-menu-search input::placeholder { color: var(--text-on-dark-muted); opacity: 1; }
+  .mobile-menu-search:focus-within { outline: 2px solid var(--brand); outline-offset: 2px; }
+  .main { margin-left: 0; width: 100%; min-height: 0; }
+  .top { height: calc(60px + env(safe-area-inset-top)); padding: env(safe-area-inset-top) max(12px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left)); gap: 8px; box-sizing: border-box; flex-wrap: nowrap; }
+  .mobile-heading { display: flex; flex: 1; align-items: center; gap: 10px; min-width: 0; }
+  .mobile-page-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-primary); font-size: var(--font-size-body); font-weight: 600; }
+  .desktop-search, .desktop-tools { display: none; }
+  .top-right { gap: 8px; flex-wrap: nowrap; }
+  .top .icon-btn, .top :deep(.message-trigger) { width: 44px; height: 44px; }
+  .content { padding: 4px max(12px, env(safe-area-inset-right)) 12px max(12px, env(safe-area-inset-left)); }
+  .user-chip { justify-content: center; width: 44px; height: 44px; padding: 4px; }
   .user-chip > span, .user-chip > i { display: none; }
+  .side-user { flex: none; }
   .quote { display: none; }
-}
-@media (max-width: 560px) {
-  .top { height: auto; padding-block: 10px; flex-wrap: wrap; gap: 10px; }
-  .top-right { margin-left: auto; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+  .mobile-tabs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); flex: none; width: 100%; min-height: 60px; padding: 4px env(safe-area-inset-right) calc(4px + env(safe-area-inset-bottom)) env(safe-area-inset-left); border-top: 1px solid var(--border); background: var(--bg-card); }
+  .mobile-tabs a { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-width: 0; min-height: 52px; margin-inline: 2px; padding: 4px 0; border-radius: 12px; color: var(--text-primary); text-decoration: none; font: var(--font-size-body)/1.35 var(--sans); }
+  .mobile-tabs a > i { flex: none; width: 22px; height: 22px; font-size: 22px; }
+  .mobile-tabs a > span { max-width: 100%; white-space: nowrap; text-align: center; }
+  .mobile-tabs a.active { color: var(--brand); background: var(--status-ok-bg); font-weight: 600; }
+  .mobile-tabs a:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+  .mobile-nav-backdrop { position: fixed; }
 }
 @media (prefers-reduced-motion: reduce) {
   .icon-btn, .leaf, .navigation-shade-enter-active, .navigation-shade-leave-active { transition: none; }
@@ -619,4 +780,19 @@ function isActive(it: NavItem) {
   font: inherit; font-size: var(--font-size-body); font-weight: 600; cursor: pointer;
 }
 .chrome-pop .reset:hover { background: var(--bg-hover); }
+.mobile-account-menu { max-width: calc(100vw - 24px); }
+.mobile-account-menu .el-dropdown-menu__item { min-height: 44px; white-space: normal; font-size: var(--font-size-body); }
+.mobile-preferences-dialog { max-width: calc(100vw - 24px); }
+.mobile-preferences-dialog .el-dialog__body { max-height: calc(100dvh - 160px); overflow-y: auto; overscroll-behavior: contain; }
+.mobile-preferences { display: flex; flex-direction: column; gap: 20px; color: var(--text-primary); font: var(--font-size-body)/1.5 var(--sans); }
+.mobile-preferences fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
+.mobile-preferences legend { padding: 0; margin-bottom: 10px; color: var(--text-primary); font-weight: 600; }
+.mobile-preference-options { display: flex; flex-wrap: wrap; gap: 8px; }
+.mobile-preference-options button { display: flex; flex: 1; align-items: center; justify-content: center; gap: 5px; min-height: 44px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-card); color: var(--text-primary); font: var(--font-size-body)/1.4 var(--sans); cursor: pointer; }
+.mobile-preference-options button[aria-pressed='true'] { border-color: var(--brand); background: var(--status-ok-bg); }
+.mobile-preference-options button:disabled { opacity: .6; cursor: wait; }
+.mobile-preference-options button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.mobile-preference-options button i { flex: none; width: 16px; height: 16px; }
+.mobile-preferences .swatch, .mobile-preferences .swatch.picker input { width: 44px; height: 44px; }
+.mobile-preferences .chrome-pop .reset { height: 44px; }
 </style>

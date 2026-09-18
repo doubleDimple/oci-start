@@ -18,6 +18,7 @@ import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 
 import java.io.ByteArrayOutputStream;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -150,7 +151,13 @@ public class JschUtils {
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
     public static ScriptResult executeScriptJsch(String host, String username, String password,int port, String scriptContent) {
-        log.debug("开始执行远程连接,host:{},username:{},password:{}", host, username,password);
+        return executeScriptJsch(host, username, password, port, scriptContent, false);
+    }
+
+    /** Confidential installers use SSH stdin so credentials do not enter process arguments. */
+    public static ScriptResult executeScriptJsch(String host, String username, String password, int port,
+                                                String scriptContent, boolean confidential) {
+        log.debug("开始执行远程连接,host:{},username:{}", host, username);
 
         JSch jsch = new JSch();
         Session session = null;
@@ -175,7 +182,12 @@ public class JschUtils {
 
             // 创建执行通道
             Channel channel = session.openChannel("exec");
-            ((ChannelExec) channel).setCommand(scriptContent);
+            if (confidential) {
+                ((ChannelExec) channel).setCommand("bash -s");
+                channel.setInputStream(new ByteArrayInputStream(scriptContent.getBytes(StandardCharsets.UTF_8)));
+            } else {
+                ((ChannelExec) channel).setCommand(scriptContent);
+            }
 
             // 获取输入输出流
             InputStream stdout = channel.getInputStream();
@@ -206,7 +218,7 @@ public class JschUtils {
                     int exitStatus = channel.getExitStatus();
 
                     log.debug("脚本执行完成，退出状态: {}", exitStatus);
-                    if (!error.isEmpty()) {
+                    if (!confidential && !error.isEmpty()) {
                         log.debug("错误输出: {}", error);
                     }
 

@@ -15,6 +15,7 @@ struct SystemLogsView: View {
             title: "系统日志",
             subtitle: "应用运行日志 · 历史 + SSE 实时流",
             systemImage: "doc.plaintext",
+            layout: .workspace,
             toolbar: { toolbar },
             content: {
                 VStack(spacing: 0) {
@@ -24,7 +25,7 @@ struct SystemLogsView: View {
                     terminalCard
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding(12)
+                .padding(AppTheme.pagePadding)
             }
         )
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
@@ -64,13 +65,13 @@ struct SystemLogsView: View {
                 .frame(width: 8, height: 8)
             Text(model.connection.label)
                 .font(.system(size: 11, weight: .medium))
-                .foregroundColor(dark ? Color.white.opacity(0.75) : Color(hex: "374a61"))
+                .foregroundColor(AppTheme.textPrimary(dark))
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(dark ? Color(hex: "2c3136") : Color(hex: "eef2f6"))
+                .fill(AppTheme.inputBg(dark))
         )
     }
 
@@ -219,7 +220,7 @@ struct SystemLogsView: View {
                 .foregroundColor(Color(hex: "f39c12"))
             Text(text)
                 .font(.system(size: 12))
-                .foregroundColor(dark ? Color.white.opacity(0.85) : Color(hex: "1e2f42"))
+                .foregroundColor(AppTheme.textPrimary(dark))
                 .lineLimit(2)
             Spacer()
             Button("重试") { model.reconnectNow() }

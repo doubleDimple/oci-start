@@ -1,7 +1,7 @@
 import SwiftUI
 import AppKit
 
-/// Full Web-parity login page (`login_user.ftl` auth-shell + aurora).
+/// Native presentation of the Vue login layout; authentication stays in AppSession.
 struct LoginView: View {
     @EnvironmentObject private var session: AppSession
     @EnvironmentObject private var backend: BackendController
@@ -15,23 +15,15 @@ struct LoginView: View {
 
     var body: some View {
         ZStack {
-            auroraBackground
-
             GeometryReader { geo in
-                let w = min(1240, max(920, geo.size.width - 48))
-                let h = min(760, max(640, geo.size.height - 48))
-
                 HStack(spacing: 0) {
-                    LoginHeroView(
-                        dark: dark,
-                        crying: model.cryHero,
-                        shyMode: model.passwordFocused
-                    )
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-                    Rectangle()
-                        .fill(LoginPalette.divider(dark))
-                        .frame(width: 1)
+                    if geo.size.width >= 820 {
+                        LoginHeroView(dark: dark, locale: model.locale)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        Rectangle()
+                            .fill(LoginPalette.divider(dark))
+                            .frame(width: 1)
+                    }
 
                     LoginRightPanel(
                         model: model,
@@ -48,17 +40,13 @@ struct LoginView: View {
                             UserDefaults.standard.set(loc.rawValue, forKey: "appLocale")
                         }
                     )
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .frame(width: geo.size.width >= 820 ? max(420, geo.size.width * 0.38) : geo.size.width)
+                    .frame(maxHeight: .infinity)
                 }
-                .frame(width: w, height: h)
-                .background(LoginPalette.shellFill(dark))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 26)
-                        .stroke(LoginPalette.shellBorder(dark), lineWidth: 1)
-                )
-                .cornerRadius(26)
-                .shadow(color: Color.black.opacity(dark ? 0.55 : 0.14), radius: 30, y: 16)
                 .frame(width: geo.size.width, height: geo.size.height)
+                .background(LoginPalette.bg(dark))
+                .disabled(model.showForgotPassword)
+                .accessibilityHidden(model.showForgotPassword)
             }
 
             if model.showForgotPassword {
@@ -107,50 +95,6 @@ struct LoginView: View {
             countdownTask?.cancel()
             resetCountdownTask?.cancel()
         }
-    }
-
-    // MARK: - Aurora
-
-    private var auroraBackground: some View {
-        ZStack {
-            LinearGradient(
-                gradient: Gradient(colors: dark
-                    ? [Color(hex: "12151a"), Color(hex: "1a1d21"), Color(hex: "151820")]
-                    : [Color(hex: "eef1f6"), Color(hex: "e8ecf3"), Color(hex: "eef2f8")]),
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            Circle()
-                .fill(Color(hex: dark ? "4d9eff" : "6366f1").opacity(dark ? 0.35 : 0.40))
-                .frame(width: 560, height: 560)
-                .blur(radius: 64)
-                .offset(x: -280, y: -220)
-            Circle()
-                .fill(Color(hex: dark ? "8b5cf6" : "0ea5e9").opacity(dark ? 0.32 : 0.36))
-                .frame(width: 480, height: 480)
-                .blur(radius: 64)
-                .offset(x: 320, y: -40)
-            Circle()
-                .fill(Color(hex: dark ? "38bdf8" : "a78bfa").opacity(dark ? 0.22 : 0.28))
-                .frame(width: 620, height: 620)
-                .blur(radius: 70)
-                .offset(x: -40, y: 320)
-            Circle()
-                .fill(Color(hex: dark ? "22d3ee" : "3b82f6").opacity(dark ? 0.16 : 0.18))
-                .frame(width: 360, height: 360)
-                .blur(radius: 50)
-                .offset(x: 80, y: 40)
-            RadialGradient(
-                gradient: Gradient(colors: [
-                    Color.clear,
-                    Color.black.opacity(dark ? 0.45 : 0.08)
-                ]),
-                center: .center,
-                startRadius: 80,
-                endRadius: 700
-            )
-        }
-        .ignoresSafeArea()
     }
 
     // MARK: - Meta

@@ -1,4 +1,9 @@
 <script setup lang="ts">
+import PageErrorNotice from '@/components/PageErrorNotice.vue'
+import PageBackButton from '@/components/PageBackButton.vue'
+import MobileRecordList from '@/components/MobileRecordList.vue'
+import MobileRecordCard from '@/components/MobileRecordCard.vue'
+import { useCompactViewport } from '@/composables/useCompactViewport'
 import {
   computed,
   defineAsyncComponent,
@@ -14,6 +19,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { isCancel } from 'axios'
 import PrimaryBtn from '@/components/PrimaryBtn.vue'
 import GhostBtn from '@/components/GhostBtn.vue'
+import PagePagination from '@/components/PagePagination.vue'
 import { useShellStore } from '@/stores/shell'
 import { usePageMotion } from '@/composables/usePageMotion'
 import {
@@ -37,6 +43,7 @@ const TenantUpdateDialog = defineAsyncComponent(
   () => import('./components/TenantUpdateDialog.vue'),
 )
 const { t, locale } = useI18n()
+const compact = useCompactViewport()
 const numberFormat = computed(() => new Intl.NumberFormat(locale.value === 'en' ? 'en-US' : 'zh-CN'))
 const shell = useShellStore()
 const route = useRoute()
@@ -56,6 +63,37 @@ const submittedKeyword = ref(keyword.value.trim())
 const page = ref(readPage(route.query.page))
 const size = ref(readSize(route.query.size))
 const rows = ref<TenantRow[]>([])
+const mobileDetailId = computed(() => typeof route.query.detail === 'string' ? route.query.detail : '')
+const mobileDetailOpen = computed(() => compact.value && route.query.detail != null)
+const mobileDetailRows = computed(() => rows.value.filter(row => row.id === mobileDetailId.value))
+const mobileDetailHeading = ref<HTMLElement | null>(null)
+let mobileListScroll = 0
+function mobileTenantName(row: TenantRow) {
+  return row.defName || (nameVisible(row) ? row.tenancyName || t('tenant.common.unnamed') : maskName(row.tenancyName))
+}
+function mobileDetailLocation(row: TenantRow) {
+  return { path: route.path, query: { ...route.query, detail: row.id } }
+}
+function closeMobileDetail() {
+  const location = { path: route.path, query: { ...route.query, detail: undefined } }
+  if (window.history.state?.back === router.resolve(location).fullPath) router.back()
+  else void router.replace(location)
+}
+watch(mobileDetailOpen, async (open, wasOpen) => {
+  if (open) mobileListScroll = tableScroll.value?.scrollTop || 0
+  const previousId = mobileDetailId.value
+  await nextTick()
+  if (disposed) return
+  if (open) mobileDetailHeading.value?.focus({ preventScroll: true })
+  else if (wasOpen && tableScroll.value) {
+    tableScroll.value.scrollTop = mobileListScroll
+    // Returning to the list keeps both the scroll position and keyboard context.
+    const links = tableScroll.value.querySelectorAll<HTMLElement>('.tenant-summary-link')
+    Array.from(links).find(link => link.dataset.tenantId === lastMobileDetailId)?.focus({ preventScroll: true })
+  }
+  if (open) lastMobileDetailId = previousId
+})
+let lastMobileDetailId = ''
 const total = ref(0)
 const loading = ref(false)
 const loaded = ref(false)
@@ -92,7 +130,7 @@ const identityAction = computed(() =>
   ['users', 'email', 'social'].includes(action.value),
 )
 const resourceAction = computed(() =>
-  ['detail', 'quota', 'audit'].includes(action.value),
+  ['detail', 'quota'].includes(action.value),
 )
 const operationAction = computed(() =>
   ['proxy', 'traffic', 'import', 'export', 'batchCheck'].includes(action.value),
@@ -181,15 +219,16 @@ function proxyLabel(row: TenantRow) {
       ? t('tenant.proxy.bound')
       : t('tenant.proxy.configure')
 }
-async function syncUrl() {
+async function syncUrl(clearDetail = false) {
   await router.replace({
-    path: '/tenants/list',
+    path: route.path,
     query: {
       ...route.query,
       cloudType: String(shell.cloudType),
       page: String(page.value),
       size: String(size.value),
       keyword: submittedKeyword.value || undefined,
+      ...(clearDetail ? { detail: undefined } : {}),
     },
   })
 }
@@ -370,7 +409,7 @@ function rowActions(row: TenantRow): RowAction[] {
       { id: 'update', label: t('tenant.actions.update'), icon: 'i-mdi-refresh' },
       {
         id: 'regions',
-        label: t('tenant.actions.regions'),
+        label: t(compact.value ? 'tenant.mobile.regions' : 'tenant.actions.regions'),
         icon: 'i-mdi-information-outline',
         path: '/tenants/regionList',
       },
@@ -388,7 +427,7 @@ function rowActions(row: TenantRow): RowAction[] {
         icon: 'i-mdi-chart-line',
         path: '/monitor/homePage',
       },
-      { id: 'audit', label: t('tenant.actions.audit'), icon: 'i-mdi-text-box-search-outline' },
+      { id: 'audit', label: t('tenant.actions.audit'), icon: 'i-mdi-text-box-search-outline', path: '/tenants/auditPage' },
       {
         id: 'costs',
         label: t('tenant.actions.costs'),
@@ -403,7 +442,7 @@ function rowActions(row: TenantRow): RowAction[] {
   } else if (Number(row.cloudType ?? shell.cloudType) === 2) {
     items.push({
       id: 'regions',
-      label: t('tenant.actions.accountDetails'),
+      label: t(compact.value ? 'tenant.mobile.regions' : 'tenant.actions.accountDetails'),
       icon: 'i-mdi-information-outline',
       path: '/tenants/regionList',
     })
@@ -438,6 +477,7 @@ async function removeRow(row: TenantRow) {
     if (disposed) return
     await tenantGet('/tenants/deleteApi', { tenantId: row.id })
     ElMessage.success(t('tenant.delete.success'))
+    if (mobileDetailId.value === row.id) await router.replace({ path: route.path, query: { ...route.query, detail: undefined } })
     await load()
   } catch (cause) {
     if (cause !== 'cancel' && cause !== 'close')
@@ -462,16 +502,26 @@ function handleShortcut(event: KeyboardEvent) {
   event.preventDefault()
   searchInput.value?.focus()
 }
+// Read a bookmarked provider before installing change watchers so its list
+// position and open mobile detail survive the initial load.
+const initialCloud = Number(route.query.cloudType)
+if ([1, 2, 3, 4].includes(initialCloud) && initialCloud !== shell.cloudType) shell.setCloud(initialCloud)
 watch(
   () => shell.cloudType,
   async () => {
     closeAction()
     clearTimeout(searchTimer)
-    page.value = 0
+    const fromRoute = Number(route.query.cloudType) === shell.cloudType
+    page.value = fromRoute ? readPage(route.query.page) : 0
+    if (fromRoute) {
+      size.value = readSize(route.query.size)
+      keyword.value = String(route.query.keyword || '')
+      submittedKeyword.value = keyword.value.trim()
+    }
     rows.value = []
     total.value = 0
     loaded.value = false
-    await syncUrl()
+    if (!fromRoute) await syncUrl(true)
     void load(true)
   },
 )
@@ -483,11 +533,12 @@ watch(
     route.query.cloudType,
   ],
   () => {
-    if (route.path !== '/tenants/list') return
+    if (route.meta.canonicalPath !== '/tenants/list') return
     const cloud = Number(route.query.cloudType)
     if ([1, 2, 3, 4].includes(cloud) && cloud !== shell.cloudType) {
+      const previousCloud = shell.cloudType
       shell.setCloud(cloud)
-      return
+      if (previousCloud !== shell.cloudType) return
     }
     const nextPage = readPage(route.query.page),
       nextSize = readSize(route.query.size),
@@ -506,10 +557,7 @@ watch(
   },
 )
 onMounted(() => {
-  const cloud = Number(route.query.cloudType)
-  if ([1, 2, 3, 4].includes(cloud) && cloud !== shell.cloudType)
-    shell.setCloud(cloud)
-  else void load()
+  void load()
   document.addEventListener('keydown', handleShortcut)
 })
 onBeforeUnmount(() => {
@@ -525,6 +573,7 @@ onBeforeUnmount(() => {
 <template>
   <div ref="root" class="tenants-page">
     <section
+      v-show="!mobileDetailOpen"
       class="tenant-card"
       data-motion-enter
       :aria-label="t('tenant.list.label')"
@@ -550,7 +599,7 @@ onBeforeUnmount(() => {
             <i class="i-mdi-close-circle" /></button
           ><kbd v-else aria-hidden="true">/</kbd>
         </form>
-        <div class="toolbar-actions">
+        <div class="toolbar-actions" data-page-error-anchor>
           <button
             class="toolbar-button privacy-toggle"
             :aria-pressed="showAllNames"
@@ -604,14 +653,13 @@ onBeforeUnmount(() => {
         {{ t('tenant.list.searchResults', { keyword: submittedKeyword }) }}
         <button @click="clearSearch">{{ t('tenant.list.clearFilter') }}<i class="i-mdi-close" /></button>
       </div>
-      <div v-if="errorMessage" class="list-error" role="alert">
-        <i class="i-mdi-alert-circle-outline" />
+      <PageErrorNotice v-if="errorMessage">
         <div>
           <strong>{{ t('tenant.list.refreshFailed') }}</strong>
           <p>{{ errorMessage }}</p>
         </div>
         <GhostBtn @click="load()">{{ t('tenant.common.retry') }}</GhostBtn>
-      </div>
+      </PageErrorNotice>
       <div class="table-stage" :class="{ 'is-refreshing': loading && loaded }">
         <div v-if="loading && loaded" class="refresh-track" aria-hidden="true">
           <span />
@@ -620,9 +668,24 @@ onBeforeUnmount(() => {
           ref="tableScroll"
           class="table-scroll"
           tabindex="0"
-          :aria-label="t('tenant.list.tableLabel')"
+          :aria-label="t(compact ? 'tenant.list.label' : 'tenant.list.tableLabel')"
         >
-          <table class="tenant-table">
+          <div v-if="compact" class="tenant-summary-list">
+            <ul v-if="rows.length">
+              <li v-for="row in rows" :key="row.id" :class="{ 'row-saved': highlightedRow === row.id }">
+                <RouterLink class="tenant-summary-link" :data-tenant-id="row.id" :to="mobileDetailLocation(row)" :aria-label="t('tenant.mobile.openDetails', { name: mobileTenantName(row) })">
+                  <span class="tenant-summary-text">
+                    <span class="tenant-summary-name">{{ mobileTenantName(row) }}</span>
+                    <span class="tenant-summary-meta"><span v-if="row.defName">{{ nameVisible(row) ? row.tenancyName || t('tenant.common.unnamed') : maskName(row.tenancyName) }}</span><span>{{ row.region || t('tenant.common.unrecorded') }}</span></span>
+                  </span>
+                  <span class="tenant-status" :class="isActive(row) ? 'status-active' : 'status-inactive'"><span />{{ t(isActive(row) ? 'tenant.list.active' : 'tenant.list.inactive') }}</span>
+                  <i class="i-mdi-chevron-right tenant-summary-arrow" aria-hidden="true" />
+                </RouterLink>
+              </li>
+            </ul>
+            <p v-if="loading && !loaded" class="mobile-record-loading" role="status">{{ t('tenant.list.loading') }}</p>
+          </div>
+          <table v-else class="tenant-table">
             <thead>
               <tr>
                 <th scope="col" class="identity-column">{{ t('tenant.list.columns.tenant') }}</th>
@@ -837,7 +900,7 @@ onBeforeUnmount(() => {
           </div>
         </div>
       </div>
-      <footer class="list-footer">
+      <PagePagination :current-page="page + 1" :page-size="size" :total="total" :page-sizes="[10, 20, 50, 100]" @current-change="changePage" @size-change="changeSize">
         <p aria-live="polite">
           {{
             loading && !loaded
@@ -845,18 +908,47 @@ onBeforeUnmount(() => {
               : t('tenant.list.range', { start: numberFormat.format(rangeStart), end: numberFormat.format(rangeEnd), total: numberFormat.format(total) })
           }}
         </p>
-        <el-pagination
-          background
-          :current-page="page + 1"
-          :page-size="size"
-          :total="total"
-          :page-sizes="[10, 20, 50, 100]"
-          :pager-count="5"
-          layout="sizes, prev, pager, next"
-          @current-change="changePage"
-          @size-change="changeSize"
-        />
-      </footer>
+      </PagePagination>
+    </section>
+    <section v-if="mobileDetailOpen" class="tenant-card tenant-mobile-detail" :aria-label="t('tenant.mobile.details')" :aria-busy="loading">
+      <div class="tenant-detail-toolbar" data-page-error-anchor>
+        <PageBackButton @click="closeMobileDetail" />
+        <h2 ref="mobileDetailHeading" tabindex="-1">{{ t('tenant.mobile.details') }}</h2>
+        <button class="toolbar-button" :disabled="loading" :aria-label="t('tenant.common.refresh')" @click="load()"><i class="i-mdi-refresh" :class="{ 'is-spinning': loading }" aria-hidden="true" /></button>
+      </div>
+      <PageErrorNotice v-if="errorMessage"><p>{{ errorMessage }}</p><GhostBtn @click="load()">{{ t('tenant.common.retry') }}</GhostBtn></PageErrorNotice>
+      <MobileRecordList class="tenant-detail-records">
+            <MobileRecordCard v-for="row in mobileDetailRows" :key="row.id" :data-tenant-id="row.id" :class="{ 'row-saved': highlightedRow === row.id }">
+              <template #identity>
+                <button class="edit-name mobile-record-title" :title="row.defName || t('tenant.list.editName')" :aria-label="t('tenant.list.editName')" @click="openAction('name', row)">{{ row.defName || t('tenant.list.addName') }}<i class="i-mdi-pencil-outline" aria-hidden="true" /></button>
+                <button class="private-name" :aria-label="t(nameVisible(row) ? 'tenant.list.hideName' : 'tenant.list.showName')" :aria-pressed="nameVisible(row)" @click="toggleName(row)"><span>{{ nameVisible(row) ? row.tenancyName || t('tenant.common.unnamed') : maskName(row.tenancyName) }}</span><i :class="nameVisible(row) ? 'i-mdi-eye-outline' : 'i-mdi-eye-off-outline'" aria-hidden="true" /></button>
+              </template>
+              <template #actions>
+                <el-dropdown trigger="click" placement="bottom-end" popper-class="tenant-action-menu" @command="(item: RowAction) => runAction(item, row)">
+                  <button class="more-button" :disabled="busyRow === row.id" :aria-label="t('tenant.list.actions')"><i :class="busyRow === row.id ? 'i-mdi-loading is-spinning' : 'i-mdi-dots-horizontal'" aria-hidden="true" /></button>
+                  <template #dropdown><el-dropdown-menu><el-dropdown-item v-for="item in rowActions(row)" :key="item.id" :command="item" :class="{ 'danger-action': item.danger }"><i :class="item.icon" aria-hidden="true" /><span>{{ item.label }}</span></el-dropdown-item></el-dropdown-menu></template>
+                </el-dropdown>
+              </template>
+              <dl class="mobile-record-fields">
+                <div><dt>{{ t('tenant.list.columns.region') }}</dt><dd>{{ row.region || t('tenant.common.unrecorded') }}<span class="mobile-record-subtitle">{{ t(isMultiRegion(row) ? 'tenant.list.multiRegion' : 'tenant.list.singleRegion') }}</span></dd></div>
+                <div><dt>{{ t('tenant.list.columns.status') }}</dt><dd><span class="tenant-status" :class="isActive(row) ? 'status-active' : 'status-inactive'"><span />{{ t(isActive(row) ? 'tenant.list.active' : 'tenant.list.inactive') }}</span></dd></div>
+                <div><dt>{{ t('tenant.list.columns.cost') }}</dt><dd><button class="cell-link cost-link" :aria-label="t('tenant.list.editCost')" @click="openAction('cost', row)">{{ row.accountCost || t('tenant.common.unset') }}<i class="i-mdi-pencil-outline" aria-hidden="true" /></button><span class="mobile-record-subtitle">{{ t('tenant.list.activeDays', { days: numberFormat.format(Number(row.activeDays) || 0) }, Number(row.activeDays) || 0) }}</span></dd></div>
+                <div><dt>{{ t('tenant.list.columns.type') }}</dt><dd><button class="cell-link account-type" @click="openAction('detail', row)">{{ accountType(row) }}<i class="i-mdi-chevron-right" aria-hidden="true" /></button></dd></div>
+                <div><dt>{{ t('tenant.list.columns.boot') }}</dt><dd><span class="task-state" :class="{ 'task-running': row.openBootFlag }"><span v-if="row.openBootFlag" class="live-dot" />{{ t(row.openBootFlag ? 'tenant.list.bootRunning' : 'tenant.list.noTask') }}</span></dd></div>
+                <div><dt>{{ t('tenant.list.columns.created') }}</dt><dd>{{ createdAt(row) }}</dd></div>
+              </dl>
+              <template #footer>
+                <button v-if="Number(row.cloudType ?? shell.cloudType) === 1" class="mobile-record-button" @click="navigate('/tenants/bootPage', row)"><i class="i-mdi-play-outline" aria-hidden="true" />{{ t('tenant.actions.boot') }}</button>
+                <button v-for="item in rowActions(row).filter(item => item.id === 'regions')" :key="item.id" class="mobile-record-button" @click="runAction(item, row)"><i class="i-mdi-earth" aria-hidden="true" />{{ item.label }}</button>
+                <button class="proxy-button" :class="{ 'proxy-bound': row.proxyBound, 'proxy-force': row.proxyForce }" :aria-label="proxyLabel(row)" :title="proxyLabel(row)" @click="openAction('proxy', row)"><i :class="row.proxyBound || row.proxyForce ? 'i-mdi-shield-check-outline' : 'i-mdi-shield-outline'" aria-hidden="true" /></button>
+              </template>
+            </MobileRecordCard>
+        <p v-if="loading && !loaded" class="mobile-record-loading" role="status">{{ t('tenant.list.loading') }}</p>
+        <div v-else-if="!mobileDetailRows.length && !errorMessage" class="tenant-empty" role="status">
+          <h3>{{ t('tenant.mobile.unavailable') }}</h3>
+          <p>{{ t('tenant.mobile.unavailableHint') }}</p>
+        </div>
+      </MobileRecordList>
     </section>
     <TenantIdentityDialogs
       v-if="identityAction"
@@ -916,7 +1008,7 @@ onBeforeUnmount(() => {
           :show-word-limit="action === 'name'"
           :disabled="saving"
         />
-        <p v-if="editError" class="field-error" role="alert">{{ editError }}</p>
+        <PageErrorNotice v-if="editError">{{ editError }}</PageErrorNotice>
       </form>
       <template #footer
         ><GhostBtn :disabled="saving" @click="closeAction">{{ t('tenant.common.cancel') }}</GhostBtn

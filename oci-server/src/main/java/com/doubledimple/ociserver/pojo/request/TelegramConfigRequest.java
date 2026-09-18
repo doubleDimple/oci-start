@@ -12,6 +12,7 @@ import lombok.Data;
 @Data
 public class TelegramConfigRequest {
     private String botToken;
+    private Boolean keepBotToken;
     private String chatId;
     private String chatName;
     private boolean enabled;

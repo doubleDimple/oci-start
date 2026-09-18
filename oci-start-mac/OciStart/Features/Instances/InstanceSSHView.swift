@@ -652,14 +652,14 @@ struct InstanceSSHView: View {
                      ? "\(model.username)@\(model.host)"
                      : "SSH — \(item.displayName.isEmpty ? "实例" : item.displayName)")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
+                    .foregroundColor(AppTheme.textPrimary(dark))
                 HStack(spacing: 6) {
                     Circle()
                         .fill(model.isConnected ? Color(hex: "3fb950") : Color(hex: "8b949e"))
                         .frame(width: 7, height: 7)
                     Text(model.statusText)
                         .font(.system(size: 11))
-                        .foregroundColor(model.isConnected ? Color(hex: "3fb950") : AppTheme.sidebarText(dark))
+                        .foregroundColor(model.isConnected ? Color(hex: "3fb950") : AppTheme.textSecondary(dark))
                 }
             }
             Spacer()
@@ -674,7 +674,7 @@ struct InstanceSSHView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(AppTheme.sidebarBg(dark))
+        .background(AppTheme.cardBg(dark))
         .overlay(
             Rectangle().frame(height: 1).foregroundColor(AppTheme.border(dark).opacity(0.55)),
             alignment: .bottom
@@ -691,7 +691,7 @@ struct InstanceSSHView: View {
             HStack(spacing: 4) {
                 Text("密码")
                     .font(.system(size: 11))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .foregroundColor(AppTheme.textSecondary(dark))
                 if model.showPassword {
                     field(text: $model.password, width: 130, placeholder: "密码")
                 } else {
@@ -725,7 +725,7 @@ struct InstanceSSHView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
-        .background(AppTheme.sidebarBg(dark).opacity(0.65))
+        .background(AppTheme.cardBg(dark).opacity(0.65))
     }
 
     // MARK: Terminal toolbar
@@ -752,7 +752,7 @@ struct InstanceSSHView: View {
                 toolBtn("", "minus", tip: "减小字号") { model.changeFont(-1) }
                 Text("\(Int(model.fontSize))px")
                     .font(.system(size: 11, design: .monospaced))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .foregroundColor(AppTheme.textSecondary(dark))
                     .frame(width: 36)
                 toolBtn("", "plus", tip: "增大字号") { model.changeFont(1) }
             }
@@ -775,7 +775,7 @@ struct InstanceSSHView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(AppTheme.sidebarBg(dark).opacity(0.4))
+        .background(AppTheme.cardBg(dark).opacity(0.4))
         .overlay(
             Rectangle().frame(height: 1).foregroundColor(AppTheme.border(dark).opacity(0.4)),
             alignment: .bottom
@@ -785,7 +785,7 @@ struct InstanceSSHView: View {
     private var searchBar: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
-                .foregroundColor(AppTheme.sidebarText(dark))
+                .foregroundColor(AppTheme.textSecondary(dark))
             TextField("搜索终端内容…", text: $model.searchQuery, onCommit: {
                 model.updateSearch()
             })
@@ -795,7 +795,7 @@ struct InstanceSSHView: View {
             if !model.searchHitText.isEmpty {
                 Text(model.searchHitText)
                     .font(.system(size: 11))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .foregroundColor(AppTheme.textSecondary(dark))
             }
             Button(action: { model.showSearch = false; model.searchQuery = ""; model.searchHitText = "" }) {
                 Image(systemName: "xmark")
@@ -805,7 +805,7 @@ struct InstanceSSHView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
-        .background(AppTheme.sidebarHover(dark).opacity(0.5))
+        .background(AppTheme.hover(dark).opacity(0.5))
     }
 
     private var footer: some View {
@@ -814,20 +814,20 @@ struct InstanceSSHView: View {
                  ? "\(model.username)@\(model.host):\(model.port)"
                  : "等待连接")
                 .font(.system(size: 11, design: .monospaced))
-                .foregroundColor(AppTheme.sidebarText(dark))
+                .foregroundColor(AppTheme.textSecondary(dark))
             Spacer()
             Text("\(model.termCols) × \(model.termRows)")
                 .font(.system(size: 11, design: .monospaced))
-                .foregroundColor(AppTheme.sidebarText(dark))
+                .foregroundColor(AppTheme.textSecondary(dark))
             Text("·")
-                .foregroundColor(AppTheme.sidebarText(dark).opacity(0.5))
+                .foregroundColor(AppTheme.textSecondary(dark))
             Text("粘贴 ⌘V · 复制 ⌘C · 清屏后可下载日志")
                 .font(.system(size: 10))
-                .foregroundColor(AppTheme.sidebarText(dark))
+                .foregroundColor(AppTheme.textSecondary(dark))
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
-        .background(AppTheme.sidebarBg(dark))
+        .background(AppTheme.cardBg(dark))
         .overlay(
             Rectangle().frame(height: 1).foregroundColor(AppTheme.border(dark).opacity(0.55)),
             alignment: .top
@@ -847,7 +847,7 @@ struct InstanceSSHView: View {
         HStack(spacing: 6) {
             Text(label)
                 .font(.system(size: 11))
-                .foregroundColor(AppTheme.sidebarText(dark))
+                .foregroundColor(AppTheme.textSecondary(dark))
             field(text: text, width: width, placeholder: label)
         }
     }
@@ -889,7 +889,7 @@ struct InstanceSSHView: View {
                         .font(.system(size: 11, weight: .medium))
                 }
             }
-            .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
+            .foregroundColor(AppTheme.textPrimary(dark))
             .padding(.horizontal, title.isEmpty ? 8 : 10)
             .padding(.vertical, 6)
             .background(

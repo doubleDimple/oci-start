@@ -444,10 +444,10 @@ struct InstanceVnicView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("网络管理 — \(item.displayName.isEmpty ? "实例" : item.displayName)")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
+                    .foregroundColor(AppTheme.textPrimary(dark))
                 Text(item.instanceId.isEmpty ? "缺少 OCID" : item.instanceId)
                     .font(.system(size: 10, design: .monospaced))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .foregroundColor(AppTheme.textSecondary(dark))
                     .lineLimit(1)
             }
             Spacer()
@@ -460,7 +460,7 @@ struct InstanceVnicView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(AppTheme.sidebarBg(dark))
+        .background(AppTheme.cardBg(dark))
         .overlay(
             Rectangle().frame(height: 1).foregroundColor(AppTheme.border(dark).opacity(0.55)),
             alignment: .bottom
@@ -482,7 +482,7 @@ struct InstanceVnicView: View {
     private func chip(_ title: String, _ value: String, _ accent: Color) -> some View {
         HStack(spacing: 8) {
             Text(title)
-                .font(.system(size: 10, weight: .medium))
+                .font(.system(size: 14, weight: .medium))
                 .foregroundColor(AppSheetSurface.mutedText(dark))
             Text(value)
                 .font(.system(size: 14, weight: .semibold))
@@ -512,7 +512,7 @@ struct InstanceVnicView: View {
             VStack {
                 Spacer()
                 ProgressView()
-                Text("加载网络…").font(.system(size: 12)).foregroundColor(AppSheetSurface.mutedText(dark))
+                Text("加载网络…").font(.system(size: 14)).foregroundColor(AppSheetSurface.mutedText(dark))
                 Spacer()
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -541,12 +541,12 @@ struct InstanceVnicView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text(v.vnicDisplayName.isEmpty ? v.vnicId : v.vnicDisplayName)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(AppSheetSurface.primaryText(dark))
                     .lineLimit(1)
                 if v.isPrimary {
                     Text("主")
-                        .font(.system(size: 10, weight: .bold))
+                        .font(.system(size: 14, weight: .bold))
                         .foregroundColor(.white)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
@@ -554,7 +554,7 @@ struct InstanceVnicView: View {
                 }
                 Spacer()
                 Text(v.lifecycleState.isEmpty ? "—" : v.lifecycleState)
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.system(size: 14, weight: .medium))
                     .foregroundColor(v.lifecycleState.uppercased() == "ATTACHED" ? Color(hex: "3fb950") : AppSheetSurface.mutedText(dark))
             }
             infoRow("公网", v.publicIp.isEmpty ? "—" : v.publicIp) { model.copy(v.publicIp, label: "公网 IP") }
@@ -563,7 +563,7 @@ struct InstanceVnicView: View {
             if !v.ipv6Addresses.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("IPv6")
-                        .font(.system(size: 11, weight: .medium))
+                        .font(.system(size: 14, weight: .medium))
                         .foregroundColor(AppSheetSurface.mutedText(dark))
                     ForEach(v.ipv6Addresses, id: \.self) { ip in
                         HStack {
@@ -599,7 +599,7 @@ struct InstanceVnicView: View {
     private func infoRow(_ label: String, _ value: String, copy: @escaping () -> Void) -> some View {
         HStack(alignment: .top, spacing: 8) {
             Text(label)
-                .font(.system(size: 11, weight: .medium))
+                .font(.system(size: 14, weight: .medium))
                 .foregroundColor(AppSheetSurface.mutedText(dark))
                 .frame(width: 36, alignment: .leading)
             Text(value)
@@ -621,7 +621,7 @@ struct InstanceVnicView: View {
     private func errorBanner(_ text: String) -> some View {
         HStack {
             Image(systemName: "exclamationmark.triangle.fill")
-            Text(text).font(.system(size: 12))
+            Text(text).font(.system(size: 14))
             Spacer()
             Button("重试") { Task { await model.reload() } }
                 .buttonStyle(PlainButtonStyle())
@@ -659,7 +659,7 @@ struct InstanceVnicView: View {
                         AppTextField(text: $model.formIpv6Count, placeholder: "0")
                     }
                     if let e = model.formError, !e.isEmpty {
-                        Text(e).font(.system(size: 12)).foregroundColor(Color(hex: "f85149"))
+                        Text(e).font(.system(size: 14)).foregroundColor(Color(hex: "f85149"))
                     }
                 }
             }
@@ -684,13 +684,13 @@ struct InstanceVnicView: View {
             content: {
                 VStack(alignment: .leading, spacing: 12) {
                     Text(model.ipv6Target?.vnicDisplayName ?? model.ipv6Target?.vnicId ?? "")
-                        .font(.system(size: 12))
+                        .font(.system(size: 14))
                         .foregroundColor(AppSheetSurface.mutedText(dark))
                     FormFieldRow(label: "数量", required: true) {
                         AppTextField(text: $model.formIpv6AddCount, placeholder: "1")
                     }
                     if let e = model.formError, !e.isEmpty {
-                        Text(e).font(.system(size: 12)).foregroundColor(Color(hex: "f85149"))
+                        Text(e).font(.system(size: 14)).foregroundColor(Color(hex: "f85149"))
                     }
                 }
             }

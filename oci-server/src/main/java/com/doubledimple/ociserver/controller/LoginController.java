@@ -2,7 +2,7 @@ package com.doubledimple.ociserver.controller;
 
 import cn.dev33.satoken.stp.StpUtil;
 import com.doubledimple.ocicommon.utils.RsaUtils;
-import com.doubledimple.ociserver.controller.BaseController.MessageResolver;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.doubledimple.ociserver.pojo.request.MfaConfig;
 import com.doubledimple.ociserver.pojo.request.TurnstileConfig;
 import com.doubledimple.ociserver.service.VerifyService;
@@ -10,19 +10,19 @@ import com.doubledimple.ociserver.service.impl.system.SystemConfigService;
 import com.doubledimple.ociserver.service.login.LoginUserService;
 import com.doubledimple.ociserver.service.mfa.OTPService;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.MessageSource;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.context.i18n.LocaleContextHolder;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.http.CacheControl;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.util.WebUtils;
 
-import java.util.Locale;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
@@ -49,54 +49,50 @@ public class LoginController {
     private SystemConfigService systemConfigService;
 
     @Resource
-    private PasswordEncoder passwordEncoder;
-
-    @Resource
     private VerifyService verifyService;
 
     @Resource
     private OTPService otpService;
 
     @Resource
-    private MessageSource messageSource;
+    private ObjectMapper objectMapper;
 
-    @RequestMapping(value = "/login", method = RequestMethod.GET)
-    public String login(Model model, HttpServletRequest request) {
-        Locale locale = LocaleContextHolder.getLocale();
-        model.addAttribute("msg", new MessageResolver(messageSource, locale));
-        model.addAttribute("currentLocale", locale.toString());
-        model.addAttribute("siteLogoName", systemConfigService.getSiteLogoName());
-        HttpSession session = request.getSession();
-        String publicKey = null;
+    /** Public configuration for the Vue login page. Private credentials stay in the session. */
+    @RequestMapping(value = "/api/auth/bootstrap", method = RequestMethod.GET)
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> bootstrap(HttpServletRequest request) {
         try {
-            String existingPrivateKey = (String) session.getAttribute(RSA_PRIVATE_KEY);
-            if (existingPrivateKey == null) {
-                KeyPair keyPair = RsaUtils.generateKeyPair();
-                publicKey = RsaUtils.getPublicKeyString(keyPair);
-                String privateKey = RsaUtils.getPrivateKeyString(keyPair);
-                session.setAttribute(RSA_PRIVATE_KEY, privateKey);
-                session.setAttribute(RSA_PUBLIC_KEY, publicKey);
-            } else {
+            HttpSession session = request.getSession();
+            String publicKey;
+            // Reloads and concurrent tabs must keep the key used by in-flight login requests.
+            synchronized (WebUtils.getSessionMutex(session)) {
                 publicKey = (String) session.getAttribute(RSA_PUBLIC_KEY);
+                if (!StringUtils.hasText(publicKey) || session.getAttribute(RSA_PRIVATE_KEY) == null) {
+                    KeyPair keyPair = RsaUtils.generateKeyPair();
+                    publicKey = RsaUtils.getPublicKeyString(keyPair);
+                    session.setAttribute(RSA_PRIVATE_KEY, RsaUtils.getPrivateKeyString(keyPair));
+                    session.setAttribute(RSA_PUBLIC_KEY, publicKey);
+                }
             }
-            model.addAttribute("publicKey", publicKey);
-        } catch (IllegalStateException e) {
-            log.debug("login session 已失效，RSA 写入跳过: {}", e.getMessage());
+            TurnstileConfig turnstile = systemConfigService.getTurnstileConfig();
+            MfaConfig mfa = systemConfigService.getMfaConfig();
+            Map<String, Object> config = new LinkedHashMap<>();
+            config.put("siteLogoName", systemConfigService.getSiteLogoName());
+            config.put("publicKey", publicKey);
+            config.put("allowRegister", !loginUserService.existsAnyUser());
+            config.put("githubEnabled", systemConfigService.getGithubConfig().isEnabled());
+            config.put("googleEnabled", systemConfigService.getGoogleConfig().isEnabled());
+            config.put("turnstileEnabled", turnstile.isEnabled());
+            config.put("turnstileSiteKey", turnstile.isEnabled() ? turnstile.getSiteKey() : "");
+            config.put("messageEnabled", verifyService.isMessageEnabled());
+            config.put("mfaEnabled", mfa != null && mfa.isEnabled());
+            config.put("locale", LocaleContextHolder.getLocale().toLanguageTag());
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(config);
         } catch (Exception e) {
-            log.error("生成RSA密钥对失败", e);
+            log.error("登录页面初始化失败", e);
+            return ResponseEntity.status(503).cacheControl(CacheControl.noStore())
+                    .body(java.util.Collections.singletonMap("message", "登录初始化失败，请重试"));
         }
-        model.addAttribute("allowRegister", !loginUserService.existsAnyUser());
-        model.addAttribute("githubEnabled", systemConfigService.getGithubConfig().isEnabled());
-        model.addAttribute("googleEnabled", systemConfigService.getGoogleConfig().isEnabled());
-
-        TurnstileConfig turnstileConfig = systemConfigService.getTurnstileConfig();
-        model.addAttribute("turnstileEnabled", turnstileConfig.isEnabled());
-        model.addAttribute("turnstileSiteKey", turnstileConfig.getSiteKey());
-
-        if (isMobileRequest(request)) {
-            return "mobile/login";
-        }
-        return "login_user";
     }
 
     @RequestMapping(value = "/perform_login", method = RequestMethod.POST)
@@ -152,7 +148,7 @@ public class LoginController {
     }
 
     private String validateAdditionalFactors(HttpServletRequest request, String username) {
-        boolean messageEnabled = isMessageEnabled();
+        boolean messageEnabled = verifyService.isMessageEnabled();
         MfaConfig mfaConfig = systemConfigService.getMfaConfig();
         boolean mfaEnabled = mfaConfig != null && mfaConfig.isEnabled();
 
@@ -194,16 +190,6 @@ public class LoginController {
         }
     }
 
-    private boolean isMessageEnabled() {
-        try {
-            return systemConfigService.getTelegramConfig().isEnabled()
-                    || systemConfigService.getDingTalkConfig().isEnabled()
-                    || systemConfigService.getBarkConfig().isEnabled();
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
     @RequestMapping(value = "/perform_logout", method = {RequestMethod.POST, RequestMethod.GET})
     @ResponseBody
     public void performLogout(HttpServletRequest request, HttpServletResponse response) throws IOException {
@@ -225,8 +211,10 @@ public class LoginController {
         if (isAjax) {
             response.setContentType("application/json;charset=utf-8");
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            String escaped = message == null ? "" : message.replace("\"", "\\\"");
-            response.getWriter().write("{\"success\":false,\"message\":\"" + escaped + "\"}");
+            Map<String, Object> error = new LinkedHashMap<>();
+            error.put("success", false);
+            error.put("message", message == null ? "登录失败" : message);
+            objectMapper.writeValue(response.getWriter(), error);
         } else {
             String loginUrl = mobile ? "/m/login" : "/login";
             String encoded = URLEncoder.encode(message == null ? "" : message, StandardCharsets.UTF_8.name());

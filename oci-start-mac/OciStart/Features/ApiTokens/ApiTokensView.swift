@@ -15,6 +15,7 @@ struct ApiTokensView: View {
             title: "Token 配置",
             subtitle: "Open API 访问令牌 · 生成 / 撤销 / 使用说明",
             systemImage: "key.fill",
+            layout: .workspace,
             toolbar: { toolbar },
             content: {
                 ScrollView {
@@ -35,7 +36,7 @@ struct ApiTokensView: View {
                             }
                         }
                     }
-                    .padding(16)
+                    .padding(AppTheme.pagePadding)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -143,8 +144,8 @@ struct ApiTokensView: View {
                 )
             }
             Text("生成新 Token 会使旧 Token 立即失效。")
-                .font(.system(size: 11))
-                .foregroundColor(AppTheme.sidebarText(dark))
+                .font(.system(size: 13))
+                .foregroundColor(AppTheme.textSecondary(dark))
         } footer: {
             HStack(spacing: 8) {
                 AppButton(
@@ -179,8 +180,8 @@ struct ApiTokensView: View {
             minHeight: cardMinHeight
         ) {
             Text("使用 Bearer Token 调用 Open API。可在浏览器打开 Swagger 或下载 OpenAPI JSON。")
-                .font(.system(size: 12))
-                .foregroundColor(AppTheme.sidebarText(dark))
+                .font(.system(size: 13))
+                .foregroundColor(AppTheme.textSecondary(dark))
                 .fixedSize(horizontal: false, vertical: true)
 
             VStack(alignment: .leading, spacing: 10) {
@@ -207,17 +208,17 @@ struct ApiTokensView: View {
             minHeight: cardMinHeight
         ) {
             Text("在 HTTP 请求头中加入：")
-                .font(.system(size: 12))
-                .foregroundColor(AppTheme.sidebarText(dark))
+                .font(.system(size: 13))
+                .foregroundColor(AppTheme.textSecondary(dark))
 
             Text(authHeaderSample)
                 .font(.system(size: 12, design: .monospaced))
-                .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
+                .foregroundColor(AppTheme.textPrimary(dark))
                 .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(
                     RoundedRectangle(cornerRadius: 8)
-                        .fill(dark ? Color.black.opacity(0.25) : Color(hex: "f1f5f9"))
+                        .fill(AppTheme.inputBg(dark))
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
@@ -225,8 +226,8 @@ struct ApiTokensView: View {
                 )
 
             Text("示例路径：/open-api/v1/system/info")
-                .font(.system(size: 11))
-                .foregroundColor(AppTheme.sidebarText(dark))
+                .font(.system(size: 13))
+                .foregroundColor(AppTheme.textSecondary(dark))
         } footer: {
             AppButton(title: "复制请求头", systemImage: "doc.on.doc", kind: .secondary) {
                 model.copyAuthHeader()
@@ -246,20 +247,20 @@ struct ApiTokensView: View {
                     .foregroundColor(Color(hex: "9b59b6"))
                     .frame(width: 18)
                 Text(title)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(AppTheme.textPrimary(dark))
                 Spacer()
                 Text(path)
                     .font(.system(size: 11, design: .monospaced))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .foregroundColor(AppTheme.textSecondary(dark))
                 Image(systemName: "arrow.up.right")
                     .font(.system(size: 10))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .foregroundColor(AppTheme.textSecondary(dark))
             }
             .padding(10)
             .background(
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(AppTheme.sidebarBg(dark).opacity(0.6))
+                    .fill(AppTheme.cardBg(dark).opacity(0.6))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
@@ -272,15 +273,15 @@ struct ApiTokensView: View {
     private func infoRow(_ label: String, _ value: String, warn: Bool = false) -> some View {
         HStack(alignment: .top, spacing: 10) {
             Text(label)
-                .font(.system(size: 12))
-                .foregroundColor(AppTheme.sidebarText(dark))
+                .font(.system(size: 13))
+                .foregroundColor(AppTheme.textSecondary(dark))
                 .frame(width: 72, alignment: .leading)
             Text(value)
-                .font(.system(size: 12, weight: warn ? .semibold : .regular))
+                .font(.system(size: 14, weight: warn ? .semibold : .regular))
                 .foregroundColor(
                     warn
                         ? Color(hex: "f0881a")
-                        : (dark ? Color.white.opacity(0.9) : Color.primary)
+                        : (AppTheme.textPrimary(dark))
                 )
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -290,7 +291,7 @@ struct ApiTokensView: View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundColor(Color(hex: "f85149"))
-            Text(text).font(.system(size: 12))
+            Text(text).font(.system(size: 14))
             Spacer()
             Button("重试") { Task { await model.reload() } }
                 .buttonStyle(PlainButtonStyle())

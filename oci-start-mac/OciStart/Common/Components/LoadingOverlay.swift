@@ -94,7 +94,7 @@ struct PageLoadingView: View {
             if !message.isEmpty {
                 Text(message)
                     .font(.system(size: 12))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .foregroundColor(AppTheme.textSecondary(dark))
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

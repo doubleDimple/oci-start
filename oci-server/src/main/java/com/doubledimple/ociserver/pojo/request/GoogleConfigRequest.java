@@ -15,5 +15,6 @@ public class GoogleConfigRequest {
     private String email;
     private String clientId;
     private String clientSecret;
+    private Boolean keepSecret;
     private String redirectUri;
 }

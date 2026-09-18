@@ -19,6 +19,7 @@ struct NotifyView: View {
             title: "通知管理",
             subtitle: "定时任务 · Telegram · Bark · 钉钉 · 飞书",
             systemImage: "bell",
+            layout: .workspace,
             toolbar: { toolbar },
             content: {
                 ScrollView {
@@ -48,7 +49,7 @@ struct NotifyView: View {
                             Color.clear
                         }
                     }
-                    .padding(16)
+                    .padding(AppTheme.pagePadding)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -99,8 +100,8 @@ struct NotifyView: View {
                         searchable: false
                     )
                     Text("系统时区下每天 \(String(format: "%02d:00", model.task.executeHour)) 触发")
-                        .font(.system(size: 11))
-                        .foregroundColor(AppTheme.sidebarText(dark))
+                        .font(.system(size: 13))
+                        .foregroundColor(AppTheme.textSecondary(dark))
                         .lineLimit(1)
                 }
             }
@@ -169,12 +170,12 @@ struct NotifyView: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(AppTheme.textPrimary(dark))
                     .lineLimit(1)
                 Text(subtitle)
-                    .font(.system(size: 11))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .font(.system(size: 13))
+                    .foregroundColor(AppTheme.textSecondary(dark))
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -334,8 +335,8 @@ struct NotifyView: View {
                 AppTextField(text: $model.bark.deviceKey, placeholder: "设备密钥", leadingSystemImage: "key")
             }
             Text("用于 iOS Bark App 接收推送；服务 URL 可自建。")
-                .font(.system(size: 11))
-                .foregroundColor(AppTheme.sidebarText(dark))
+                .font(.system(size: 13))
+                .foregroundColor(AppTheme.textSecondary(dark))
                 .fixedSize(horizontal: false, vertical: true)
         } footer: {
             HStack(spacing: 8) {
@@ -375,8 +376,8 @@ struct NotifyView: View {
                 AppTextField(text: $model.dingTalk.secret, placeholder: "可选 Secret", secure: true)
             }
             Text("在钉钉群「智能群助手」中添加自定义机器人获取 Webhook。")
-                .font(.system(size: 11))
-                .foregroundColor(AppTheme.sidebarText(dark))
+                .font(.system(size: 13))
+                .foregroundColor(AppTheme.textSecondary(dark))
                 .fixedSize(horizontal: false, vertical: true)
         } footer: {
             HStack(spacing: 8) {
@@ -417,8 +418,8 @@ struct NotifyView: View {
                 AppTextField(text: $model.feishu.secret, placeholder: "可选 Secret", secure: true)
             }
             Text("在飞书群「设置 → 群机器人」中添加自定义机器人。")
-                .font(.system(size: 11))
-                .foregroundColor(AppTheme.sidebarText(dark))
+                .font(.system(size: 13))
+                .foregroundColor(AppTheme.textSecondary(dark))
                 .fixedSize(horizontal: false, vertical: true)
         } footer: {
             HStack(spacing: 8) {
@@ -446,7 +447,7 @@ struct NotifyView: View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundColor(Color(hex: "f85149"))
-            Text(text).font(.system(size: 12))
+            Text(text).font(.system(size: 14))
             Spacer()
             Button("重试") { Task { await model.reload() } }
                 .buttonStyle(PlainButtonStyle())

@@ -23,18 +23,20 @@ struct AppButton: View {
                     ProgressView().scaleEffect(0.6).frame(width: 12, height: 12)
                 } else if let systemImage = systemImage {
                     Image(systemName: systemImage)
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: AppTheme.bodySize, weight: .semibold))
                 }
                 Text(title)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: AppTheme.bodySize, weight: .semibold))
+                    .lineLimit(1)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
+            .fixedSize(horizontal: true, vertical: false)
+            .padding(.horizontal, 16)
+            .frame(minHeight: 36)
             .background(background)
             .foregroundColor(foreground)
-            .cornerRadius(8)
+            .cornerRadius(AppTheme.controlRadius)
             .overlay(
-                RoundedRectangle(cornerRadius: 8)
+                RoundedRectangle(cornerRadius: AppTheme.controlRadius)
                     .stroke(borderColor, lineWidth: kind == .secondary ? 1 : 0)
             )
             .opacity(enabled && !isLoading ? 1 : 0.5)
@@ -46,8 +48,8 @@ struct AppButton: View {
     private var background: Color {
         switch kind {
         case .primary: return AppTheme.sidebarActive
-        case .danger: return Color(hex: "f85149")
-        case .secondary: return dark ? Color(hex: "2c3136") : Color(hex: "eef2f6")
+        case .danger: return AppTheme.danger
+        case .secondary: return AppTheme.cardBg(dark)
         case .plain: return Color.clear
         }
     }
@@ -55,7 +57,7 @@ struct AppButton: View {
     private var foreground: Color {
         switch kind {
         case .primary, .danger: return .white
-        case .secondary: return dark ? Color.white.opacity(0.92) : Color(hex: "1e2f42")
+        case .secondary: return AppTheme.textPrimary(dark)
         case .plain: return AppTheme.sidebarActive
         }
     }

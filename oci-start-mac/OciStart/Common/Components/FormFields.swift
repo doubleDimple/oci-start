@@ -5,46 +5,41 @@ import SwiftUI
 /// Global input tokens — match login filled box (soft fill, radius 12, focus glow).
 /// Toolbar/filter height is slightly denser than login form (40 vs 48).
 enum AppInputStyle {
-    static let height: CGFloat = 40
-    static let radius: CGFloat = 12
-    static let fontSize: CGFloat = 13
-    static let iconSize: CGFloat = 12
+    static let height: CGFloat = 36
+    static let radius: CGFloat = AppTheme.controlRadius
+    static let fontSize: CGFloat = AppTheme.bodySize
+    static let iconSize: CGFloat = 14
     static let hPad: CGFloat = 12
 
     static func fill(_ dark: Bool, focused: Bool = false) -> Color {
-        if focused {
-            return dark ? Color(hex: "1a1d21") : Color.white
-        }
-        return dark ? Color(hex: "292d32") : Color(hex: "f8f9fa")
+        focused ? AppTheme.cardBg(dark) : AppTheme.inputBg(dark)
     }
 
     static func border(_ dark: Bool, focused: Bool = false, hovering: Bool = false) -> Color {
         if focused {
-            return dark ? Color(hex: "4d9eff") : Color(hex: "42b983")
+            return AppTheme.sidebarActive
         }
         if hovering {
-            return dark ? Color(hex: "4d9eff").opacity(0.45) : Color(hex: "42b983").opacity(0.45)
+            return AppTheme.sidebarActive.opacity(0.65)
         }
-        return dark ? Color(hex: "31363d") : Color(hex: "e4e7ed")
+        return AppTheme.border(dark)
     }
 
     static func glow(_ dark: Bool, focused: Bool) -> Color {
         guard focused else { return .clear }
-        return dark
-            ? Color(hex: "4d9eff").opacity(0.18)
-            : Color(hex: "42b983").opacity(0.14)
+        return AppTheme.sidebarActive.opacity(0.14)
     }
 
     static func text(_ dark: Bool) -> Color {
-        dark ? Color(hex: "cdd9e5") : Color(hex: "2c3e50")
+        AppTheme.textPrimary(dark)
     }
 
     static func placeholder(_ dark: Bool) -> Color {
-        dark ? Color(hex: "768390") : Color(hex: "999999")
+        AppTheme.textMuted(dark)
     }
 
     static func icon(_ dark: Bool) -> Color {
-        dark ? Color(hex: "768390") : Color(hex: "6b7280")
+        AppTheme.textSecondary(dark)
     }
 }
 
@@ -108,11 +103,11 @@ struct FormFieldRow<Content: View>: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 2) {
                 Text(label)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .font(.system(size: AppTheme.bodySize, weight: .semibold))
+                    .foregroundColor(AppTheme.textSecondary(dark))
                 if required {
                     Text("*")
-                        .font(.system(size: 12, weight: .bold))
+                        .font(.system(size: AppTheme.bodySize, weight: .bold))
                         .foregroundColor(Color(hex: "f85149"))
                 }
             }
@@ -197,7 +192,7 @@ struct AppCompactField: View {
                 secure: false,
                 dark: dark,
                 enabled: true,
-                fontSize: 12,
+                fontSize: AppTheme.bodySize,
                 isFocused: $focused,
                 onCommit: onCommit
             )
@@ -219,12 +214,12 @@ struct KeyValueRow: View {
     var body: some View {
         HStack(alignment: .top) {
             Text(key)
-                .font(.system(size: 12))
-                .foregroundColor(AppTheme.sidebarText(dark))
+                .font(.system(size: AppTheme.bodySize))
+                .foregroundColor(AppTheme.textSecondary(dark))
                 .frame(width: 120, alignment: .leading)
             Text(value)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
+                .font(.system(size: AppTheme.bodySize, weight: .medium))
+                .foregroundColor(AppTheme.textPrimary(dark))
             Spacer()
         }
         .padding(.vertical, 4)

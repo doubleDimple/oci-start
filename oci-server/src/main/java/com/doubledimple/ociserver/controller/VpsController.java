@@ -1,14 +1,13 @@
 package com.doubledimple.ociserver.controller;
 
-import cn.hutool.json.JSONUtil;
 import com.doubledimple.ociserver.pojo.response.InstanceDetailsRes;
 import com.doubledimple.ocicommon.param.ApiResponse;
 import com.doubledimple.ociserver.service.oracle.OracleInstanceService;
 import com.doubledimple.ociserver.utils.PingUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -16,9 +15,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import javax.annotation.Resource;
-import javax.servlet.http.HttpServletRequest;
-
-import static com.doubledimple.ociserver.utils.DesktopUtils.isMobileRequest;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * @version 1.0.0
@@ -32,35 +32,72 @@ import static com.doubledimple.ociserver.utils.DesktopUtils.isMobileRequest;
 @Slf4j
 public class VpsController extends BaseController{
 
-
     @Resource
     OracleInstanceService oracleInstanceService;
 
-    @GetMapping("/list")
-    public String listUsers(@RequestParam(defaultValue = "1000") int size,
-                            @RequestParam(defaultValue = "0") int page,
-                            @RequestParam(required = false) String tenantId,
-                            HttpServletRequest request,
-                            Model model) {
-        Page<InstanceDetailsRes> userPage;
-        int adjustedPage = page;
-        userPage = oracleInstanceService.getAllInstances(page, size,tenantId);
-
-
-        log.debug("oci 获取到的数据是:{}", JSONUtil.parse(userPage.getContent()));
-        model.addAttribute("instanceDetailsRes", userPage.getContent());
-        model.addAttribute("currentPage", adjustedPage); // 当前页码
-        model.addAttribute("totalPages", userPage.getTotalPages()); // 总页数
-        model.addAttribute("totalElements", userPage.getTotalElements()); // 总记录数
-        model.addAttribute("size", size); // 每页大小
-        model.addAttribute("activePage", "vps-instances");
-
-        // 将instanceId添加到模型中，以便在前端页面使用
-        if (tenantId != null) {
-            model.addAttribute("selectedInstanceId", tenantId);
+    /** VPS uses all providers; the OCI-specific JSON endpoint intentionally does not. */
+    @GetMapping("/list/json")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> listJson(
+            @RequestParam(defaultValue = "200") int size,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(required = false) String tenantId) {
+        if (page < 0 || size < 1 || size > 1000) {
+            return ResponseEntity.badRequest().body(listError("分页参数无效"));
         }
+        if (tenantId != null) {
+            try {
+                if (!tenantId.matches("[1-9][0-9]*") || Long.parseLong(tenantId) <= 0) {
+                    return ResponseEntity.badRequest().body(listError("租户标识无效"));
+                }
+            } catch (NumberFormatException e) {
+                return ResponseEntity.badRequest().body(listError("租户标识无效"));
+            }
+        }
+        try {
+            Page<InstanceDetailsRes> records = oracleInstanceService.getAllInstances(page, size, tenantId);
+            List<Map<String, Object>> content = new ArrayList<>();
+            for (InstanceDetailsRes record : records.getContent()) content.add(vpsListRow(record));
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("content", content);
+            result.put("currentPage", records.getNumber());
+            result.put("totalPages", records.getTotalPages());
+            result.put("totalElements", records.getTotalElements());
+            result.put("size", records.getSize());
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            log.error("读取VPS资源列表失败", e);
+            return ResponseEntity.status(500).body(listError("读取VPS资源列表失败"));
+        }
+    }
 
-        return "vps_list";
+    private Map<String, Object> vpsListRow(InstanceDetailsRes record) {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("id", record.getId());
+        row.put("instanceId", record.getInstanceId());
+        row.put("tenantId", String.valueOf(record.getTenantId()));
+        row.put("displayName", record.getDisplayName());
+        row.put("publicIps", record.getPublicIps());
+        row.put("tenancyName", record.getTenancyName());
+        row.put("regionName", record.getRegionName());
+        row.put("regionCode", record.getRegionCode());
+        row.put("architecture", record.getArchitecture());
+        row.put("cloudType", record.getCloudType());
+        row.put("ocpus", record.getOcpus());
+        row.put("memoryInGBs", record.getMemoryInGBs());
+        row.put("bootVolumeSizeInGBs", record.getBootVolumeSizeInGBs());
+        row.put("onLineEnable", record.getOnLineEnable());
+        row.put("enablePing", record.getEnablePing());
+        row.put("monitorInstalled", record.getMonitorInstalled());
+        row.put("lastHeartbeat", record.getLastHeartbeat() == null ? null : record.getLastHeartbeat().getTime());
+        return row;
+    }
+
+    private Map<String, Object> listError(String message) {
+        Map<String, Object> error = new LinkedHashMap<>();
+        error.put("success", false);
+        error.put("message", message);
+        return error;
     }
 
     /**

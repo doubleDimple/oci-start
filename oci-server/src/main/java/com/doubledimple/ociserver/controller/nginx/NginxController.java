@@ -3,7 +3,6 @@ package com.doubledimple.ociserver.controller.nginx;
 import com.doubledimple.dao.entity.NginxConfig;
 import com.doubledimple.dao.entity.ProxyConfig;
 import com.doubledimple.dao.entity.SslCertificate;
-import com.doubledimple.dao.entity.Tenant;
 import com.doubledimple.ociserver.controller.BaseController;
 import com.doubledimple.ociserver.pojo.request.nginx.CertificateDTO;
 import com.doubledimple.ociserver.pojo.request.nginx.ProxyConfigCreateDto;
@@ -24,7 +23,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -37,12 +35,9 @@ import org.springframework.web.bind.annotation.ResponseBody;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import static com.doubledimple.ociserver.utils.DesktopUtils.isMobileRequest;
 
 /**
  * @version 1.0.0
@@ -60,17 +55,6 @@ public class NginxController extends BaseController {
     private final ProxyConfigService proxyConfigService;
     private final SslCertificateService sslCertificateService;
     private final NginxConfigService nginxConfigService;
-
-    /**
-     * SSL管理页面
-     */
-    @GetMapping("/nginx/management")
-    public String managementPage(@RequestParam(required = false) Integer cloudType,
-                                 HttpServletRequest request,
-                                 Model model) {
-        model.addAttribute("activePage", "nginx-management");
-        return "nginx_config";
-    }
 
     // =================== 反向代理配置API ===================
 
@@ -570,6 +554,5 @@ public class NginxController extends BaseController {
             return ApiResponse.error("获取证书列表失败: " + e.getMessage());
         }
     }
-
 
 }

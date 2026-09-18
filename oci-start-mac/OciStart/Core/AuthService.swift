@@ -15,13 +15,20 @@ final class AuthService {
         mfaCode: String? = nil,
         rememberMe: Bool = true
     ) async throws {
-        let html = try await client.fetchLoginPage(baseURL: baseURL)
+        let config = try await client.fetchLoginPageMeta(baseURL: baseURL)
+        if config.turnstileEnabled {
+            throw APIError.serverMessage("服务器已启用人机验证，请在浏览器中登录。")
+        }
         let encrypted: String
-        if let publicKey = Self.extractPublicKey(from: html),
-           let cipher = RSAHelper.encrypt(plainText: password, publicKeyBase64: publicKey) {
+        if let publicKey = config.publicKey {
+            guard let cipher = RSAHelper.encrypt(plainText: password, publicKeyBase64: publicKey) else {
+                throw APIError.serverMessage("登录公钥无效，请重试。")
+            }
             encrypted = cipher
-        } else {
+        } else if config.usesLegacyHTML {
             encrypted = password
+        } else {
+            throw APIError.invalidResponse
         }
 
         let result = try await client.performLogin(

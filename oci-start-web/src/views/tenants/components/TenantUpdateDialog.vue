@@ -1,10 +1,12 @@
 <script setup lang="ts">
+import PageErrorNotice from '@/components/PageErrorNotice.vue'
 import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import PrimaryBtn from '@/components/PrimaryBtn.vue'
 import GhostBtn from '@/components/GhostBtn.vue'
 import { tenantCsrfToken, type TenantRow } from '@/api/tenant'
+import { checkSession } from '@/utils/session'
 
 const props = defineProps<{ tenant: TenantRow }>()
 const emit = defineEmits<{ close: []; changed: [] }>()
@@ -70,6 +72,7 @@ function start() {
     source = new EventSource(`/tenants/updateTenant?${params}`, {
       withCredentials: true,
     })
+    const activeSource = source
     source.addEventListener('progress', (event) =>
       append((event as MessageEvent).data),
     )
@@ -79,12 +82,14 @@ function start() {
       state.value = 'success'
       emit('changed')
     })
-    source.addEventListener('error', (event) =>
+    source.addEventListener('error', (event) => {
+      if (disposed || source !== activeSource || state.value !== 'running') return
+      void checkSession()
       fail(
         'interrupted',
         (event as MessageEvent).data || '',
-      ),
-    )
+      )
+    })
     timeout = setTimeout(
       () => fail('timeout'),
       180000,
@@ -126,7 +131,7 @@ onBeforeUnmount(() => {
       <span class="update-icon"><i class="i-mdi-sync" /></span>
       <div>
         <strong>{{ tenant.defName || t('tenant.update.currentTenant') }}</strong>
-        <p>{{ message }}</p>
+        <p v-if="state !== 'error'">{{ message }}</p>
       </div>
       <i
         v-if="state === 'success'"
@@ -140,12 +145,12 @@ onBeforeUnmount(() => {
       tabindex="0"
       :aria-label="t('tenant.update.logs')"
     >
-      <p v-if="!logs.length">{{ t('tenant.update.connecting') }}</p>
+      <p v-if="!logs.length" class="update-waiting">{{ t('tenant.update.connecting') }}</p>
       <p v-for="(line, index) in logs" :key="index">{{ line }}</p>
     </div>
-    <p v-if="state === 'error'" class="update-error" role="alert">
+    <PageErrorNotice v-if="state === 'error'">
       {{ message }}
-    </p>
+    </PageErrorNotice>
     <p v-if="state === 'running'" class="update-note">
       {{ t('tenant.update.closeHint') }}
     </p>
@@ -164,11 +169,13 @@ onBeforeUnmount(() => {
 
 <style>
 .tenant-update-dialog {
+  font-family: var(--sans);
   font-size: var(--font-size-body);
+  color: var(--text-primary);
   max-width: calc(100vw - 32px);
   padding: 26px;
 }
-.tenant-update-dialog .el-dialog__title { font-size: var(--font-size-dialog-title); }
+.tenant-update-dialog .el-dialog__title { font-family: var(--sans); font-size: var(--font-size-dialog-title); font-weight: 600; color: var(--text-primary); }
 .tenant-update-dialog .el-button { font-size: var(--font-size-body); }
 .tenant-update-dialog .el-alert__title { font-size: var(--font-size-body); }
 .tenant-update-dialog .el-alert__description { font-size: var(--font-size-secondary); }
@@ -190,6 +197,7 @@ onBeforeUnmount(() => {
   font-size: 23px;
 }
 .tenant-update-dialog strong {
+  font-size: var(--font-size-body);
   font-weight: 600;
   color: var(--text-primary);
 }
@@ -210,13 +218,18 @@ onBeforeUnmount(() => {
   padding: 16px;
   background: var(--bg-search);
   border-radius: 12px;
-  font: var(--font-size-secondary)/1.7 var(--mono);
+  font: var(--font-size-body)/1.7 var(--mono);
   color: var(--text-primary);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 .tenant-update-dialog .update-log p {
   margin: 0 0 5px;
+}
+.tenant-update-dialog .update-log .update-waiting {
+  color: var(--text-secondary);
+  font-family: var(--sans);
+  font-size: var(--font-size-secondary);
 }
 .tenant-update-dialog .update-error {
   color: var(--status-danger);

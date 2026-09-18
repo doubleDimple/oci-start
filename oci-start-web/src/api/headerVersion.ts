@@ -25,6 +25,7 @@ export const headerVersionUpdateState = readonly(updateState)
 export const headerVersionUpdateProblem = readonly(updateProblem)
 let snapshotRevision = 0
 let latestCacheRequest = 0
+let entryRefresh: Promise<void> | undefined
 
 class HeaderVersionResponseError extends Error {
   constructor() {
@@ -55,7 +56,7 @@ function parseVersion(body: unknown): HeaderVersionInfo {
   }
 }
 
-/** The home page forwards its existing remote response; this never sends a request. */
+/** Accept a remote check result; this function never sends a request. */
 export function acceptRemoteVersionSnapshot(body: unknown): boolean {
   try {
     const result = parseVersion(body)
@@ -67,7 +68,23 @@ export function acceptRemoteVersionSnapshot(body: unknown): boolean {
   }
 }
 
-/** Header and About only read the stored result. Remote refresh belongs to the home page. */
+/** Check once on console entry, without delaying navigation or retrying failures. */
+export function refreshHeaderVersionOnEntry(): Promise<void> {
+  if (!entryRefresh) {
+    // Retain the settled promise too: remounting the layout in this document
+    // must not repeat the remote check, even after an unsuccessful response.
+    entryRefresh = request.get<unknown, unknown>('/api/version/check', {
+      params: { refresh: true }, silent: true,
+    }).then(body => {
+      // Cache reads may finish while this request is pending. The remote result
+      // still takes precedence and invalidates any older in-flight cache read.
+      acceptRemoteVersionSnapshot(body)
+    }).catch(() => undefined)
+  }
+  return entryRefresh
+}
+
+/** Header and About only read the stored result; console entry refreshes it remotely. */
 export async function fetchHeaderVersion(signal?: AbortSignal): Promise<HeaderVersionInfo> {
   const revision = snapshotRevision
   const cacheRequest = ++latestCacheRequest
@@ -77,7 +94,7 @@ export async function fetchHeaderVersion(signal?: AbortSignal): Promise<HeaderVe
     ++snapshotRevision
     versionSnapshot.value = result
   }
-  // An older cache response cannot overwrite a completed home-page remote check.
+  // An older cache response cannot overwrite a completed remote check.
   return versionSnapshot.value ?? result
 }
 

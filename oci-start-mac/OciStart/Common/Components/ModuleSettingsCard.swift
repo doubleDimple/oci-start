@@ -19,7 +19,7 @@ struct EqualHeightCardRow<A: View, B: View>: View {
     }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 14) {
+        HStack(alignment: .top, spacing: 18) {
             first
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             second
@@ -79,11 +79,11 @@ struct ModuleSettingsCard<BodyContent: View, Footer: View>: View {
         }
         .frame(maxWidth: .infinity, minHeight: minHeight, maxHeight: .infinity, alignment: .top)
         .background(
-            RoundedRectangle(cornerRadius: 14)
-                .fill(AppTheme.sidebarBg(dark))
+            RoundedRectangle(cornerRadius: AppTheme.cardRadius)
+                .fill(AppTheme.cardBg(dark))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 14)
+            RoundedRectangle(cornerRadius: AppTheme.cardRadius)
                 .stroke(
                     isOn
                         ? accent.opacity(dark ? 0.45 : 0.35)
@@ -91,7 +91,7 @@ struct ModuleSettingsCard<BodyContent: View, Footer: View>: View {
                     lineWidth: 1
                 )
         )
-        .shadow(color: Color.black.opacity(dark ? 0.22 : 0.06), radius: 10, y: 3)
+        .shadow(color: Color.black.opacity(dark ? 0 : 0.04), radius: 10, y: 3)
         .animation(.easeInOut(duration: 0.18), value: isOn)
     }
 
@@ -100,18 +100,18 @@ struct ModuleSettingsCard<BodyContent: View, Footer: View>: View {
             ZStack {
                 RoundedRectangle(cornerRadius: 10)
                     .fill(accent.opacity(0.15))
-                    .frame(width: 36, height: 36)
+                    .frame(width: 40, height: 40)
                 Image(systemName: systemImage)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(accent)
             }
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
+                    .font(.system(size: AppTheme.sectionSize, weight: .semibold))
+                    .foregroundColor(AppTheme.textPrimary(dark))
                 Text(subtitle)
-                    .font(.system(size: 11))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .font(.system(size: AppTheme.secondarySize))
+                    .foregroundColor(AppTheme.textSecondary(dark))
                     .lineLimit(1)
             }
             Spacer(minLength: 8)

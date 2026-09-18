@@ -1,0 +1,36 @@
+export const mobileTenantToolsMessages = {
+  zh: {
+    tools: { users: '用户管理', volumes: '磁盘信息', security: '安全规则', mysql: '存储实例' },
+    loading: '正在读取租户信息…',
+    open: '打开{tool}',
+    retry: '重试',
+    selectTenant: '选择租户',
+    currentTenant: '当前租户',
+    tenantId: '租户 ID',
+    errors: {
+      invalidTenant: '缺少有效的租户 ID，请从租户列表重新进入。',
+      invalidResponse: '租户信息格式不正确，请重试。',
+      notFound: '无法找到此租户，请重试或重新选择租户。',
+      unsupportedCloud: '此功能仅适用于 OCI 租户，请重新选择租户。',
+      invalidTool: '无法找到此租户功能，请从租户列表重新进入。',
+      requestFailed: '租户信息读取失败，请重试。',
+    },
+  },
+  en: {
+    tools: { users: 'User management', volumes: 'Boot volumes', security: 'Security rules', mysql: 'Database instances' },
+    loading: 'Loading account details…',
+    open: 'Open {tool}',
+    retry: 'Retry',
+    selectTenant: 'Select an account',
+    currentTenant: 'Current account',
+    tenantId: 'Account ID',
+    errors: {
+      invalidTenant: 'A valid account ID is required. Open this tool from the account list.',
+      invalidResponse: 'The account details could not be read. Please retry.',
+      notFound: 'This account could not be found. Retry or select another account.',
+      unsupportedCloud: 'This tool is available for OCI accounts. Please select an OCI account.',
+      invalidTool: 'This account tool could not be found. Open it from the account list.',
+      requestFailed: 'Account details could not be loaded. Please retry.',
+    },
+  },
+}

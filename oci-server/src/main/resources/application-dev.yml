@@ -29,21 +29,6 @@ spring:
       write-dates-as-timestamps: false
   application:
     name: oci-server-pro
-  freemarker:
-    template-loader-path: classpath:/templates/
-    content-type: text/html
-    cache: true
-    charset: UTF-8
-    check-template-location: true
-    expose-request-attributes: false
-    expose-session-attributes: false
-    request-context-attribute: req
-    suffix: .ftl
-    settings:
-      api_builtin_enabled: true
-      date_format: yyyy-MM-dd
-      time_format: HH:mm:ss
-      datetime_format: yyyy-MM-dd HH:mm:ss
   datasource:
     driverClassName: org.h2.Driver
     ##数据库的用户名和密码,目前只支持h2

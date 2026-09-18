@@ -106,6 +106,11 @@ public class TelegramUserService {
         telegramBotConfig.stopBot();
     }
 
+    @Transactional
+    public void clearUsersForExplicitRestart() {
+        telegramUserRepository.deleteAll();
+    }
+
 
     public DefaultBotSession getSession(){
         DefaultBotSession botSession = telegramBotConfig.getBotSession();

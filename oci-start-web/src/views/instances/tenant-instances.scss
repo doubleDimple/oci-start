@@ -1,0 +1,61 @@
+.tenant-instances-page {
+  display: flex; flex-direction: column; width: 100%; height: 100%; min-height: 0; min-width: 0; overflow: hidden;
+  border: 1px solid var(--border); border-radius: var(--r-card); background: var(--bg-card); box-shadow: var(--shadow-card);
+  color: var(--text-primary); font: var(--font-size-body)/1.5 var(--sans);
+  .tenant-instances-toolbar { display: flex; align-items: center; flex: none; flex-wrap: wrap; gap: 10px; padding: 12px 18px; border-bottom: 1px solid var(--border); }
+  .tenant-instances-tabs { display: inline-flex; align-items: center; gap: 3px; padding: 3px; border: 1px solid var(--border); border-radius: var(--r-pill); background: var(--bg-search); }
+  .tenant-instances-tabs button { min-height: 28px; padding: 3px 12px; border: 1px solid transparent; border-radius: var(--r-pill); background: transparent; color: var(--text-primary); font: 500 var(--font-size-body)/20px var(--sans); white-space: nowrap; cursor: pointer; }
+  .tenant-instances-tabs button[aria-pressed="true"] { background: var(--bg-card); border-color: var(--border); }
+  .tenant-instances-tabs button:not(:disabled):hover { background: var(--bg-hover); }
+  .tenant-instances-refresh { margin-left: auto; min-height: 36px; padding: 7px 12px; }
+  .tenant-instances-notice { flex: none; display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 9px 18px; border-bottom: 1px solid var(--border); background: var(--bg-search); color: var(--text-secondary); font-size: var(--font-size-secondary); overflow-wrap: anywhere; }
+  .tenant-instances-notice.error { background: var(--status-danger-bg); }
+  .tenant-instances-table { flex: 1; min-height: 0; min-width: 0; }
+  .el-table { color: var(--text-primary); font: var(--font-size-body)/1.5 var(--sans); --el-table-header-bg-color: var(--bg-search); }
+  .el-table th.el-table__cell { height: 40px; color: var(--text-primary); font-weight: 500; }
+  .el-table td.el-table__cell { height: 56px; padding: 8px 0; }
+  .el-table .cell { padding-inline: 14px; line-height: 1.5; }
+  .el-table th .cell { white-space: nowrap; }
+  .el-table__empty-text { max-width: 100%; padding: 18px; color: var(--text-primary); line-height: 1.5; }
+  .tenant-instance-state { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .tenant-instance-state i { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--text-muted); }
+  .tenant-instance-state .running { background: var(--status-ok); }
+  .tenant-instance-state .pending { background: var(--status-warn); }
+  .tenant-instance-state .terminated { background: var(--status-danger); }
+  .tenant-instance-quantity, .tenant-instance-date { white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .tenant-instance-address { display: flex; align-items: baseline; gap: 10px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .tenant-instance-address > span:first-child { flex: none; min-width: 45px; color: var(--text-secondary); }
+  .tenant-instance-address > span:last-child { overflow: hidden; text-overflow: ellipsis; }
+  .tenant-instance-menu { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--bg-card); color: var(--text-primary); cursor: pointer; }
+  .tenant-instance-menu > i { font-size: 18px; }
+  .tenant-instance-menu:not(:disabled):hover, .tenant-volume-actions button:not(:disabled):hover { background: var(--bg-hover); }
+  .tenant-volume-actions { display: flex; justify-content: flex-end; align-items: center; gap: 6px; }
+  .tenant-volume-actions button { padding: 5px 9px; border: 1px solid var(--border); border-radius: var(--r-pill); background: var(--bg-card); color: var(--text-primary); font: var(--font-size-body)/20px var(--sans); white-space: nowrap; cursor: pointer; }
+  .tenant-instances-context { display: flex; flex-direction: column; min-width: 0; gap: 3px; color: var(--text-secondary); font-size: var(--font-size-secondary); font-variant-numeric: tabular-nums; }
+  .tenant-instances-context > span { max-width: 340px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  button:disabled { opacity: .6; cursor: default; }
+  button:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+}
+.tenant-instance-details { max-width: calc(100vw - 24px); color: var(--text-primary); font: var(--font-size-body)/1.5 var(--sans); }
+.tenant-instance-details .el-dialog__title { color: var(--text-primary); font-size: var(--font-size-dialog-title); font-weight: 600; }
+.tenant-instance-details .el-dialog__body { max-height: 65vh; overflow-y: auto; }
+.tenant-instance-details-note { margin: 0 0 14px; color: var(--text-secondary); font-size: var(--font-size-secondary); }
+.tenant-instance-fields { margin: 0; }
+.tenant-instance-fields > div { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--border); }
+.tenant-instance-fields > div:last-child { border-bottom: 0; }
+.tenant-instance-fields dt { color: var(--text-secondary); }
+.tenant-instance-fields dd { min-width: 0; margin: 0; color: var(--text-primary); white-space: pre-wrap; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+@media (max-width: 760px) {
+  .tenant-instances-page {
+    .tenant-instances-toolbar, .tenant-instances-notice { padding-inline: 12px; }
+    .tenant-instances-tabs { order: 3; max-width: 100%; overflow-x: auto; }
+    .tenant-instances-context > span { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+    .tenant-instances-table { overflow-y: auto; overscroll-behavior: contain; }
+    .tenant-instances-tabs { width: 100%; }
+    .tenant-instances-tabs button { flex: 1; min-height: 36px; padding-inline: 8px; white-space: normal; }
+    .tenant-instance-menu { width: 40px; height: 40px; }
+    .mobile-record-card .tenant-instance-state { display: inline-flex; }
+    .tenant-instances-mobile-empty { margin: 0; padding: 28px 12px; text-align: center; color: var(--text-secondary); }
+  }
+  .tenant-instance-fields > div { grid-template-columns: 1fr; gap: 4px; }
+}

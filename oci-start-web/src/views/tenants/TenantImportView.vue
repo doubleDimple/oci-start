@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import PageErrorNotice from '@/components/PageErrorNotice.vue'
+import PageBackButton from '@/components/PageBackButton.vue'
 import { computed, nextTick, onBeforeUnmount, reactive, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -39,7 +41,7 @@ const fieldDefinitions = computed<FieldDefinition[]>(() => [
   { id: 'tenancy', label: provider.value === 2 ? 'projectId' : 'tenancy', placeholder: provider.value === 2 ? 'projectIdPlaceholder' : 'tenancyPlaceholder' },
 ])
 const regions = computed(() => Object.keys(REGION_COORDINATES).map(value => ({ value, label: `${regionCityName(value, locale.value)} · ${value}` })))
-const unknownRegion = computed(() => Boolean(form.region) && !Object.hasOwn(REGION_COORDINATES, form.region))
+const unknownRegion = computed(() => Boolean(form.region) && !Object.prototype.hasOwnProperty.call(REGION_COORDINATES, form.region))
 const configText = ref('')
 const parsedText = ref('')
 const profiles = shallowRef<OciProfile[]>([])
@@ -343,13 +345,13 @@ onBeforeUnmount(() => {
   <div ref="root" class="tenant-import-page">
     <form class="import-card" novalidate data-motion-enter @submit.prevent="submit">
       <div class="import-toolbar">
-        <button type="button" class="icon-button" :disabled="saving" :title="t('tenantImport.back')" :aria-label="t('tenantImport.back')" @click="goBack"><i class="i-mdi-arrow-left" aria-hidden="true" /></button>
+        <PageBackButton :disabled="saving" :title="t('tenantImport.back')" @click="goBack" />
         <div class="provider-switch" role="group" :aria-label="t('tenantImport.providerLabel')">
           <button v-for="cloud in providerOptions" :key="cloud" type="button" :aria-pressed="provider === cloud" :disabled="saving" @click="changeProvider(cloud)">
             <img :src="cloud === 1 ? '/images/oracle.png' : '/images/google.png'" alt="" />{{ t(`tenantImport.${cloud === 1 ? 'ociProvider' : 'gcpProvider'}`) }}
           </button>
         </div>
-        <div class="import-toolbar-actions">
+        <div class="import-toolbar-actions" data-page-error-anchor>
           <GhostBtn :disabled="saving || !provider" @click="clearForm">{{ t('tenantImport.clear') }}</GhostBtn>
           <PrimaryBtn type="submit" :loading="saving" :disabled="!provider || reading || saved"><i v-if="!saving" class="i-mdi-check" aria-hidden="true" />{{ t(`tenantImport.${saving ? 'saving' : 'save'}`) }}</PrimaryBtn>
         </div>
@@ -358,7 +360,8 @@ onBeforeUnmount(() => {
       <div v-if="!provider" class="unsupported-provider" role="status"><i class="i-mdi-cloud-outline" aria-hidden="true" /><p>{{ t('tenantImport.unsupportedProvider') }}</p></div>
       <template v-else>
         <div v-if="saving" class="save-notice" role="status"><i class="i-mdi-loading import-spin" aria-hidden="true" /><span>{{ t('tenantImport.savePending') }}</span></div>
-        <div v-if="saveError" class="save-notice is-error" role="alert"><i class="i-mdi-alert-circle-outline" aria-hidden="true" /><div><strong>{{ t('tenantImport.saveFailed') }}</strong><p>{{ tenantImportError(saveError) }}</p><p>{{ t('tenantImport.saveUnknown') }}</p></div><button type="button" @click="goBack">{{ t('tenantImport.checkList') }}</button></div>
+        <PageErrorNotice v-if="saveError"><strong>{{ t('tenantImport.saveFailed') }}</strong><p>{{ tenantImportError(saveError) }}</p></PageErrorNotice>
+        <div v-if="saveError" class="save-notice is-warning" role="alert"><span>{{ t('tenantImport.saveUnknown') }}</span><button type="button" @click="goBack">{{ t('tenantImport.checkList') }}</button></div>
         <div v-if="saved" class="save-notice" role="status"><i class="i-mdi-check-circle-outline" aria-hidden="true" /><span>{{ t('tenantImport.saveSuccess') }}</span><button type="button" @click="goBack">{{ t('tenantImport.checkList') }}</button></div>
 
         <div class="import-scroll">

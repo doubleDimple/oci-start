@@ -116,6 +116,50 @@ public sealed class ApiClient
         return Encoding.UTF8.GetString(data);
     }
 
+    public sealed record LoginBootstrap(string? PublicKey, bool AllowRegister, bool GithubEnabled,
+        bool GoogleEnabled, bool UsesLegacyHtml = false, bool TurnstileEnabled = false);
+
+    public async Task<LoginBootstrap> GetLoginBootstrapAsync(CancellationToken ct = default)
+    {
+        using var req = new HttpRequestMessage(HttpMethod.Get, MakeUrl("/api/auth/bootstrap"));
+        req.Headers.TryAddWithoutValidation("Accept", "application/json");
+        req.Headers.TryAddWithoutValidation("X-Requested-With", "XMLHttpRequest");
+        req.Headers.TryAddWithoutValidation("Cache-Control", "no-store");
+        AttachCookie(req);
+        // The shared handler retains the RSA session cookie for the subsequent login POST.
+        using var resp = await _http.SendAsync(req, ct).ConfigureAwait(false);
+        var data = await resp.Content.ReadAsByteArrayAsync(ct).ConfigureAwait(false);
+        if (resp.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Unauthorized)
+        {
+            var html = await GetHtmlAsync("/login", ct).ConfigureAwait(false);
+            var legacyPublicKey = RsaHelper.ExtractPublicKeyFromLoginHtml(html);
+            // Old authentication filters may reject unknown routes with 401. Only a real
+            // RSA login page qualifies; a Vue shell must never enable plaintext fallback.
+            if (resp.StatusCode == HttpStatusCode.Unauthorized && string.IsNullOrWhiteSpace(legacyPublicKey))
+                throw ApiError.Unauthorized();
+            return new LoginBootstrap(legacyPublicKey,
+                html.Contains("id=\"registerForm\"", StringComparison.Ordinal)
+                    || html.Contains("switchTab('register')", StringComparison.Ordinal),
+                html.Contains("id=\"githubLoginBtn\"", StringComparison.Ordinal),
+                html.Contains("id=\"googleLoginBtn\"", StringComparison.Ordinal), UsesLegacyHtml: true);
+        }
+
+        EnsureSuccess(resp, data);
+        var body = JsonUtil.Obj(data);
+        if (body == null || !body.TryGetValue("publicKey", out var publicKey)
+            || publicKey.ValueKind != System.Text.Json.JsonValueKind.String
+            || string.IsNullOrWhiteSpace(publicKey.GetString())) throw ApiError.InvalidResponse();
+        foreach (var flag in new[] { "allowRegister", "githubEnabled", "googleEnabled", "turnstileEnabled" })
+        {
+            if (!body.TryGetValue(flag, out var value)
+                || value.ValueKind is not (System.Text.Json.JsonValueKind.True or System.Text.Json.JsonValueKind.False))
+                throw ApiError.InvalidResponse();
+        }
+        return new LoginBootstrap(publicKey.GetString(), JsonUtil.Bool(body, "allowRegister"),
+            JsonUtil.Bool(body, "githubEnabled"), JsonUtil.Bool(body, "googleEnabled"),
+            TurnstileEnabled: JsonUtil.Bool(body, "turnstileEnabled"));
+    }
+
     public async Task<byte[]> PostJsonAsync(
         string path,
         object? body = null,

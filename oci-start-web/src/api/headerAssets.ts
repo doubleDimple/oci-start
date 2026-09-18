@@ -1,6 +1,7 @@
 import { isAxiosError } from 'axios'
 import { i18n } from '@/i18n'
 import { tenantCsrfToken, tenantGet } from './tenant'
+import { checkSession, handleSessionResponse } from '@/utils/session'
 
 export interface HeaderAssetSummary {
   totalCount: number
@@ -67,14 +68,21 @@ export async function streamHeaderAssetAnalysis(
     const response = await fetch('/tenants/analyze', {
       method: 'GET', credentials: 'include', cache: 'no-store', headers, signal: controller.signal,
     })
+    handleSessionResponse({ status: response.status, url: response.url })
+    if (response.type === 'opaqueredirect') void checkSession()
     if (response.status === 401) throw new HeaderAssetError('unauthorized')
     if (!response.ok) {
       const body: unknown = await response.json().catch(() => null)
+      handleSessionResponse({ body })
       const message = backendMessage(body)
       if (message) throw new Error(message)
       throw new HeaderAssetError('requestFailed')
     }
     if (!response.body || !response.headers.get('content-type')?.toLowerCase().includes('text/event-stream')) {
+      if (response.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase() === 'application/json') {
+        const body: unknown = await response.json().catch(() => null)
+        handleSessionResponse({ body })
+      }
       throw new HeaderAssetError('invalidResponse')
     }
     reader = response.body.getReader()

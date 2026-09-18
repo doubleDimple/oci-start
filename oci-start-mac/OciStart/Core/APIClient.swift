@@ -325,16 +325,62 @@ final class APIClient {
         }
     }
 
-    /// Parse flags from `/login` HTML (same source as Web page).
+    /// Older servers may reject an unknown bootstrap route before returning 404.
     struct LoginPageMeta {
         var allowRegister: Bool
         var githubEnabled: Bool
         var googleEnabled: Bool
         var publicKey: String?
+        var usesLegacyHTML = false
+        var turnstileEnabled = false
+    }
+
+    private struct LoginBootstrap: Decodable {
+        let allowRegister: Bool
+        let githubEnabled: Bool
+        let googleEnabled: Bool
+        let publicKey: String
+        let turnstileEnabled: Bool
     }
 
     func fetchLoginPageMeta(baseURL: String) async throws -> LoginPageMeta {
+        let url = try makeURL(baseURL, path: "/api/auth/bootstrap")
+        var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("XMLHttpRequest", forHTTPHeaderField: "X-Requested-With")
+        // Use the same session as performLogin so its RSA private key remains available.
+        let data: Data
+        let response: HTTPURLResponse
+        do {
+            (data, response) = try await self.data(for: request)
+        } catch APIError.unauthorized {
+            // A protected legacy route may return 401. Require its real RSA login marker;
+            // a Vue shell or arbitrary HTML must never enable plaintext fallback.
+            return try await fetchLegacyLoginPageMeta(baseURL: baseURL, requiresPublicKey: true)
+        }
+        if response.statusCode != 404 {
+            guard (200..<300).contains(response.statusCode) else {
+                throw APIError.serverMessage(Self.friendlyServerMessage(data: data, status: response.statusCode))
+            }
+            guard let config = try? JSONDecoder().decode(LoginBootstrap.self, from: data),
+                  !config.publicKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                throw APIError.invalidResponse
+            }
+            return LoginPageMeta(allowRegister: config.allowRegister, githubEnabled: config.githubEnabled,
+                                 googleEnabled: config.googleEnabled, publicKey: config.publicKey,
+                                 turnstileEnabled: config.turnstileEnabled)
+        }
+
+        return try await fetchLegacyLoginPageMeta(baseURL: baseURL, requiresPublicKey: false)
+    }
+
+    private func fetchLegacyLoginPageMeta(baseURL: String, requiresPublicKey: Bool) async throws -> LoginPageMeta {
         let html = try await fetchLoginPage(baseURL: baseURL)
+        let publicKey = AuthService.extractPublicKeyPublic(from: html)
+        if requiresPublicKey && (publicKey?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true) {
+            throw APIError.unauthorized
+        }
         let allow = html.contains("id=\"registerForm\"") || html.contains("switchTab('register')")
         let githubOn = html.contains("id=\"githubLoginBtn\"")
         let googleOn = html.contains("id=\"googleLoginBtn\"")
@@ -342,7 +388,8 @@ final class APIClient {
             allowRegister: allow,
             githubEnabled: githubOn,
             googleEnabled: googleOn,
-            publicKey: nil
+            publicKey: publicKey,
+            usesLegacyHTML: true
         )
     }
 

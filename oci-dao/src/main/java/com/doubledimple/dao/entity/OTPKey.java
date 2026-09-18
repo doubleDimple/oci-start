@@ -25,7 +25,7 @@ public class OTPKey {
     private String keyName;
     private String secretKey;
 
-    @Column(name = "qrCode", length = 1024, nullable = true)
+    @Column(name = "qrCode", columnDefinition = "TEXT", nullable = true)
     private String qrCode;
 
     private String issuer;
@@ -113,4 +113,3 @@ public class OTPKey {
     }
 
 }
-

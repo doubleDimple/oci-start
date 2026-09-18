@@ -5,7 +5,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -26,31 +25,6 @@ public class LogController  extends BaseController{
 
     @Autowired
     private LogService logService;
-
-    @GetMapping("/logs")
-    public String showLogs(@RequestParam(value = "isBootLog", required = false, defaultValue = "false") boolean isBootLog,
-                           Model model) {
-        try {
-            List<String> logLines = logService.getLatestLogLines(300, isBootLog);
-            model.addAttribute("logLines", logLines);
-        } catch (Exception e) {
-            model.addAttribute("error", "无法读取日志文件");
-        }
-        model.addAttribute("activePage", "api-logs");
-        return "sys_log";
-    }
-
-    @GetMapping("/openLogs")
-    public String openLogs(Model model) {
-        try {
-            List<String> logLines = logService.getLatestLogLines(300, true);
-            model.addAttribute("logLines", logLines);
-        } catch (Exception e) {
-            model.addAttribute("error", "无法读取日志文件");
-        }
-        model.addAttribute("activePage", "api-openLog");
-        return "open_boot_log";
-    }
 
     /**
      * 开机日志历史行 JSON（Mac 客户端 / AJAX，对齐 /boot/fullBootList/json 形态）

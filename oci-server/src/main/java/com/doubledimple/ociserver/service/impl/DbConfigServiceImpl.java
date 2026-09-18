@@ -285,6 +285,8 @@ public class DbConfigServiceImpl implements DbConfigService {
                     boolean b = terminateMysqlDbSystem(tenantOptional.get(), dbId);
                     if (b){
                         dbConfigRepository.delete(dbConfig);
+                    } else {
+                        return ApiResponse.error("未能确认 MySQL 删除请求成功，本地记录已保留，请核对云端状态后再操作");
                     }
                     break;
                 default:

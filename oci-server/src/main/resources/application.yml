@@ -9,7 +9,7 @@ spring:
         strategy:
           content:
             enabled: true
-            paths: /js/**, /css/**
+            paths: /js/**
   cache:
     type: caffeine
     caffeine:
@@ -36,21 +36,6 @@ spring:
       write-dates-as-timestamps: false
   application:
     name: oci-start
-  freemarker:
-    template-loader-path: classpath:/templates/
-    content-type: text/html
-    cache: true
-    charset: UTF-8
-    check-template-location: true
-    expose-request-attributes: false
-    expose-session-attributes: false
-    request-context-attribute: req
-    suffix: .ftl
-    settings:
-      api_builtin_enabled: true
-      date_format: yyyy-MM-dd
-      time_format: HH:mm:ss
-      datetime_format: yyyy-MM-dd HH:mm:ss
   messages:
     basename: i18n/messages
     encoding: UTF-8

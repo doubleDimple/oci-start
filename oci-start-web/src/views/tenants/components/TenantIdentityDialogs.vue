@@ -1,14 +1,22 @@
 <script setup lang="ts">
+import PageErrorNotice from '@/components/PageErrorNotice.vue'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { tenantGet, tenantPost } from '@/api/tenant'
+import PagePagination from '@/components/PagePagination.vue'
+import MobileRecordCard from '@/components/MobileRecordCard.vue'
+import MobileRecordList from '@/components/MobileRecordList.vue'
+import { useCompactViewport } from '@/composables/useCompactViewport'
 
 type Row = Record<string, any>
 type LoadKey = 'users' | 'groups' | 'notifications' | 'mfa' | 'policy' | 'email' | 'social'
 const props = defineProps<{ tenant: Row | null; action: string }>()
 const emit = defineEmits<{ close: []; changed: [] }>()
 const { t, locale } = useI18n()
+const compact = useCompactViewport()
+const route = useRoute()
 const tenantId = computed(() => String(props.tenant?.id ?? ''))
 const tenantName = computed(() => props.tenant?.defName || props.tenant?.tenancyName || t('tenantIdentity.currentTenant'))
 const visible = computed(() => !!props.tenant && ['users', 'email', 'social'].includes(props.action))
@@ -22,6 +30,9 @@ const users = ref<Row[]>([])
 const page = ref(1)
 const pageSize = 5
 const pageUsers = computed(() => users.value.slice((page.value - 1) * pageSize, page.value * pageSize))
+const usersListId = computed(() => `identity-users-${tenantId.value}`)
+const recipientsListId = computed(() => `identity-recipients-${tenantId.value}`)
+const mobileUsers = computed(() => typeof route.query.mobileRecord === 'string' && route.query.mobileRecord.startsWith(`${usersListId.value}:`) ? users.value : pageUsers.value)
 const groups = ref<Row[]>([])
 const groupsReady = ref(false)
 const userForm = reactive({ username: '', email: '', groupId: '', useEmail: false })
@@ -72,7 +83,7 @@ async function confirm(message: string, heading: string) {
   if (confirming || busy.value) return false
   confirming = true
   try {
-    await ElMessageBox.confirm(message, heading, { confirmButtonText: t('tenantIdentity.actions.confirm'), cancelButtonText: t('tenantIdentity.actions.cancel'), type: 'warning', closeOnClickModal: false })
+    await ElMessageBox.confirm(message, heading, { customClass: 'tenant-identity-confirm', confirmButtonText: t('tenantIdentity.actions.confirm'), cancelButtonText: t('tenantIdentity.actions.cancel'), type: 'warning', closeOnClickModal: false })
     return true
   } catch { return false }
   finally { confirming = false }
@@ -369,6 +380,13 @@ watch(tab, value => {
   if (value === 'notifications') void loadRecipients()
   if (value === 'mfa') void loadMfa()
 })
+watch(() => [route.query.mobileRecord, tenantId.value, props.action], () => {
+  if (!compact.value || !visible.value || props.action !== 'users' || busy.value) return
+  const selected = route.query.mobileRecord
+  if (typeof selected !== 'string') return
+  if (selected.startsWith(`${recipientsListId.value}:`)) tab.value = 'notifications'
+  else if (selected.startsWith(`${usersListId.value}:`)) tab.value = 'users'
+}, { immediate: true })
 
 onBeforeUnmount(() => { generation += 1; readController.abort() })
 </script>
@@ -388,8 +406,22 @@ onBeforeUnmount(() => { generation += 1; readController.abort() })
           <section v-if="tab === 'users'" :key="'users-' + editor" class="identity-panel">
             <template v-if="!editor">
               <div class="toolbar"><p class="secondary">{{ t('tenantIdentity.descriptions.users') }}</p><div class="actions"><el-button :disabled="busy || loading.users" @click="loadUsers">{{ t('tenantIdentity.actions.refresh') }}</el-button><el-button :disabled="busy" @click="openPolicy">{{ t('tenantIdentity.actions.passwordPolicy') }}</el-button><el-button type="primary" :disabled="busy" @click="addUser">{{ t('tenantIdentity.actions.addUser') }}</el-button></div></div>
-              <el-alert v-if="errors.users" :title="errorMessage(errors.users)" type="error" :closable="false" show-icon />
-              <el-table v-loading="loading.users" :data="pageUsers" row-key="id" class="identity-table" max-height="440" :empty-text="t('tenantIdentity.empty.users')">
+              <PageErrorNotice v-if="errors.users">{{ errorMessage(errors.users) }}</PageErrorNotice>
+              <MobileRecordList v-if="compact" drilldown :list-id="usersListId" :record-keys="users.map(row => String(row.id))" :loading="loading.users" class="identity-mobile-list">
+                <MobileRecordCard v-for="row in mobileUsers" :key="row.id" :record-key="String(row.id)" :summary-title="displayUsername(row.username)" :summary-meta="row.email || row.domain || '—'" :summary-status="userStatus(row.lifecycleState)" :summary-tone="row.lifecycleState === 'Active' ? 'success' : 'neutral'">
+                  <template #identity><h3 class="mobile-record-title">{{ displayUsername(row.username) }}</h3></template>
+                  <dl class="mobile-record-fields">
+                    <div class="mobile-record-wide"><dt>{{ t('tenantIdentity.labels.domain') }}</dt><dd>{{ row.domain || '—' }}</dd></div>
+                    <div class="mobile-record-wide"><dt>{{ t('tenantIdentity.labels.email') }}</dt><dd>{{ row.email || '—' }}</dd></div>
+                    <div><dt>{{ t('tenantIdentity.labels.status') }}</dt><dd><span class="status-pill" :class="row.lifecycleState === 'Active' ? 'is-active' : 'is-inactive'">{{ userStatus(row.lifecycleState) }}</span></dd></div>
+                    <div class="mobile-record-wide"><dt>{{ t('tenantIdentity.labels.createdAt') }}</dt><dd>{{ row.timeCreated || '—' }}</dd></div>
+                    <div class="mobile-record-wide"><dt>{{ t('tenantIdentity.labels.lastLogin') }}</dt><dd>{{ row.lastSuccessfulLoginTime || '—' }}</dd></div>
+                  </dl>
+                  <template #footer><el-button :disabled="busy || loading.users" @click="resetPassword(row)">{{ t('tenantIdentity.actions.resetPassword') }}</el-button><el-button type="danger" plain :disabled="busy || loading.users" @click="deleteUser(row)">{{ t('tenantIdentity.actions.delete') }}</el-button></template>
+                </MobileRecordCard>
+                <p v-if="loading.users || !users.length" class="identity-mobile-empty" role="status">{{ t(loading.users ? 'pageLoading.loading' : 'tenantIdentity.empty.users') }}</p>
+              </MobileRecordList>
+              <el-table v-else v-loading="loading.users" :data="pageUsers" row-key="id" class="identity-table" max-height="440" :empty-text="t('tenantIdentity.empty.users')">
                 <el-table-column prop="domain" :label="t('tenantIdentity.labels.domain')" min-width="105" show-overflow-tooltip />
                 <el-table-column :label="t('tenantIdentity.labels.username')" min-width="135" show-overflow-tooltip><template #default="{ row }"><span class="user-name">{{ displayUsername(row.username) }}</span></template></el-table-column>
                 <el-table-column prop="email" :label="t('tenantIdentity.labels.email')" min-width="185" show-overflow-tooltip />
@@ -398,21 +430,21 @@ onBeforeUnmount(() => { generation += 1; readController.abort() })
                 <el-table-column :label="t('tenantIdentity.labels.lastLogin')" min-width="165" show-overflow-tooltip><template #default="{ row }">{{ row.lastSuccessfulLoginTime || '—' }}</template></el-table-column>
                 <el-table-column :label="t('tenantIdentity.labels.actions')" :width="locale.startsWith('en') ? 188 : 146" fixed="right"><template #default="{ row }"><el-button link :disabled="busy" @click="resetPassword(row)">{{ t('tenantIdentity.actions.resetPassword') }}</el-button><el-button link type="danger" :disabled="busy" @click="deleteUser(row)">{{ t('tenantIdentity.actions.delete') }}</el-button></template></el-table-column>
               </el-table>
-              <div class="table-footer"><span class="secondary">{{ t('tenantIdentity.counts.users', { count: users.length }) }}</span><el-pagination v-model:current-page="page" :page-size="pageSize" :total="users.length" :disabled="busy" layout="prev, pager, next" /></div>
+              <PagePagination embedded class="identity-pagination" v-model:current-page="page" :page-size="pageSize" :total="users.length" :disabled="busy"><span class="secondary">{{ t('tenantIdentity.counts.users', { count: users.length }) }}</span></PagePagination>
             </template>
             <div v-else-if="editor === 'user'" class="form-panel" v-loading="loading.groups">
               <div class="section-title"><el-button text :disabled="busy" @click="closeEditor">← {{ t('tenantIdentity.actions.backToUsers') }}</el-button><h3>{{ t('tenantIdentity.actions.addUser') }}</h3><p class="secondary">{{ t('tenantIdentity.descriptions.newUser') }}</p></div>
-              <el-alert v-if="errors.groups" :title="errorMessage(errors.groups)" type="error" :closable="false" show-icon><el-button text @click="loadGroups">{{ t('tenantIdentity.actions.reloadGroups') }}</el-button></el-alert>
+              <PageErrorNotice v-if="errors.groups"><p>{{ errorMessage(errors.groups) }}</p><el-button text @click="loadGroups">{{ t('tenantIdentity.actions.reloadGroups') }}</el-button></PageErrorNotice>
               <el-form label-position="top" :disabled="busy" @submit.prevent="createUser">
                 <div class="form-grid"><el-form-item :label="t('tenantIdentity.labels.username')" required><el-input :model-value="userForm.useEmail ? userForm.email : userForm.username" @update:model-value="userForm.username = $event" :disabled="userForm.useEmail" :placeholder="t('tenantIdentity.placeholders.username')" autocomplete="off" /></el-form-item><el-form-item :label="t('tenantIdentity.labels.email')" required><el-input v-model="userForm.email" type="email" :placeholder="t('tenantIdentity.placeholders.email')" /></el-form-item></div>
                 <el-checkbox v-model="userForm.useEmail">{{ t('tenantIdentity.labels.useEmail') }}</el-checkbox>
-                <el-form-item :label="t('tenantIdentity.labels.userGroup')" required><el-select v-model="userForm.groupId" :placeholder="t('tenantIdentity.placeholders.group')" :disabled="!groupsReady"><el-option v-for="group in groups" :key="group.groupId" :label="group.groupName" :value="group.groupId" /></el-select></el-form-item>
+                <el-form-item :label="t('tenantIdentity.labels.userGroup')" required><el-select v-model="userForm.groupId" popper-class="tenant-identity-select" :placeholder="t('tenantIdentity.placeholders.group')" :disabled="!groupsReady"><el-option v-for="group in groups" :key="group.groupId" :label="group.groupName" :value="group.groupId" /></el-select></el-form-item>
                 <div class="form-actions"><el-button :disabled="busy" @click="closeEditor">{{ t('tenantIdentity.actions.cancel') }}</el-button><el-button type="primary" native-type="submit" :loading="busy" :disabled="!groupsReady || !groups.length">{{ t('tenantIdentity.actions.createUser') }}</el-button></div>
               </el-form>
             </div>
             <div v-else-if="editor === 'policy'" class="form-panel" v-loading="loading.policy">
               <div class="section-title"><el-button text :disabled="busy" @click="closeEditor">← {{ t('tenantIdentity.actions.backToUsers') }}</el-button><h3>{{ t('tenantIdentity.actions.passwordPolicy') }}</h3><p class="secondary">{{ t('tenantIdentity.descriptions.policy') }}</p></div>
-              <el-alert v-if="errors.policy" :title="errorMessage(errors.policy)" type="error" :closable="false" show-icon><el-button text @click="loadPolicy">{{ t('tenantIdentity.actions.reload') }}</el-button></el-alert>
+              <PageErrorNotice v-if="errors.policy"><p>{{ errorMessage(errors.policy) }}</p><el-button text @click="loadPolicy">{{ t('tenantIdentity.actions.reload') }}</el-button></PageErrorNotice>
               <div v-if="policies.length" class="policy-list"><div v-for="(policy, index) in policies" :key="index" class="policy-row"><span>{{ policy.name || t('tenantIdentity.labels.policy', { index: index + 1 }) }}</span><span class="secondary">{{ policy.enablePasswordExpiry ? t('tenantIdentity.status.expiresIn', { days: policy.expiryDays ?? 0 }) : t('tenantIdentity.status.neverExpires') }}</span></div></div>
               <el-form label-position="top" :disabled="busy || !policyReady" @submit.prevent="savePolicy"><div class="setting-row"><div><strong>{{ t('tenantIdentity.labels.enablePasswordExpiry') }}</strong><p class="secondary">{{ t('tenantIdentity.descriptions.passwordExpiry') }}</p></div><el-switch v-model="policyForm.enablePasswordExpiry" :aria-label="t('tenantIdentity.labels.enablePasswordExpiry')" /></div><el-form-item v-if="policyForm.enablePasswordExpiry" :label="t('tenantIdentity.labels.expiryDays')"><el-input-number v-model="policyForm.expiryDays" :min="0" :max="365" :precision="0" /></el-form-item><div class="form-actions"><el-button :disabled="busy" @click="closeEditor">{{ t('tenantIdentity.actions.cancel') }}</el-button><el-button type="primary" native-type="submit" :loading="busy" :disabled="!policyReady">{{ t('tenantIdentity.actions.savePolicy') }}</el-button></div></el-form>
             </div>
@@ -420,15 +452,23 @@ onBeforeUnmount(() => { generation += 1; readController.abort() })
 
           <section v-else-if="tab === 'notifications'" key="notifications" class="identity-panel">
             <div class="toolbar"><p class="secondary">{{ t('tenantIdentity.descriptions.notifications') }}</p><div class="actions"><el-button :disabled="busy || loading.notifications" @click="loadRecipients">{{ t('tenantIdentity.actions.refresh') }}</el-button><el-button v-if="editor !== 'notification'" type="primary" :disabled="busy" @click="editor = 'notification'">{{ t('tenantIdentity.actions.addRecipient') }}</el-button></div></div>
-            <el-alert v-if="errors.notifications" :title="errorMessage(errors.notifications)" type="error" :closable="false" show-icon />
+            <PageErrorNotice v-if="errors.notifications">{{ errorMessage(errors.notifications) }}</PageErrorNotice>
             <el-form v-if="editor === 'notification'" class="notification-form" label-position="top" @submit.prevent="updateRecipient()"><el-form-item :label="t('tenantIdentity.labels.notificationEmail')" required><el-input v-model="notificationEmail" type="email" :placeholder="t('tenantIdentity.placeholders.email')" :disabled="busy" /></el-form-item><div class="actions"><el-button :disabled="busy" @click="closeEditor">{{ t('tenantIdentity.actions.cancel') }}</el-button><el-button type="primary" native-type="submit" :loading="busy">{{ t('tenantIdentity.actions.add') }}</el-button></div></el-form>
-            <el-table v-loading="loading.notifications" :data="recipients.map(email => ({ email }))" row-key="email" class="identity-table" :empty-text="t('tenantIdentity.empty.recipients')"><el-table-column type="index" :label="t('tenantIdentity.labels.index')" width="70" /><el-table-column prop="email" :label="t('tenantIdentity.labels.notificationEmail')" min-width="210" show-overflow-tooltip /><el-table-column :label="t('tenantIdentity.labels.status')" width="90"><template #default><span class="status-pill is-active">{{ t('tenantIdentity.status.normal') }}</span></template></el-table-column><el-table-column :label="t('tenantIdentity.labels.actions')" width="90"><template #default="{ row }"><el-button link type="danger" :disabled="busy" @click="updateRecipient(row.email)">{{ t('tenantIdentity.actions.remove') }}</el-button></template></el-table-column></el-table>
+            <MobileRecordList v-if="compact" drilldown :list-id="recipientsListId" :record-keys="recipients" :loading="loading.notifications" class="identity-mobile-list">
+              <MobileRecordCard v-for="(email, index) in recipients" :key="email" :record-key="email" :summary-title="email" :summary-status="t('tenantIdentity.status.normal')" summary-tone="success">
+                <template #identity><h3 class="mobile-record-title">{{ email }}</h3></template>
+                <dl class="mobile-record-fields"><div><dt>{{ t('tenantIdentity.labels.index') }}</dt><dd>{{ index + 1 }}</dd></div><div><dt>{{ t('tenantIdentity.labels.status') }}</dt><dd><span class="status-pill is-active">{{ t('tenantIdentity.status.normal') }}</span></dd></div><div class="mobile-record-wide"><dt>{{ t('tenantIdentity.labels.notificationEmail') }}</dt><dd>{{ email }}</dd></div></dl>
+                <template #footer><el-button type="danger" plain :disabled="busy || loading.notifications" @click="updateRecipient(email)">{{ t('tenantIdentity.actions.remove') }}</el-button></template>
+              </MobileRecordCard>
+              <p v-if="loading.notifications || !recipients.length" class="identity-mobile-empty" role="status">{{ t(loading.notifications ? 'pageLoading.loading' : 'tenantIdentity.empty.recipients') }}</p>
+            </MobileRecordList>
+            <el-table v-else v-loading="loading.notifications" :data="recipients.map(email => ({ email }))" row-key="email" class="identity-table" :empty-text="t('tenantIdentity.empty.recipients')"><el-table-column type="index" :label="t('tenantIdentity.labels.index')" width="70" /><el-table-column prop="email" :label="t('tenantIdentity.labels.notificationEmail')" min-width="210" show-overflow-tooltip /><el-table-column :label="t('tenantIdentity.labels.status')" width="90"><template #default><span class="status-pill is-active">{{ t('tenantIdentity.status.normal') }}</span></template></el-table-column><el-table-column :label="t('tenantIdentity.labels.actions')" width="90"><template #default="{ row }"><el-button link type="danger" :disabled="busy" @click="updateRecipient(row.email)">{{ t('tenantIdentity.actions.remove') }}</el-button></template></el-table-column></el-table>
             <div class="table-footer secondary">{{ t('tenantIdentity.counts.recipients', { count: recipients.length }) }}</div>
           </section>
 
           <section v-else key="mfa" class="identity-panel" v-loading="loading.mfa">
             <div class="toolbar"><p class="secondary">{{ t('tenantIdentity.descriptions.mfa') }}</p><el-button :disabled="busy || loading.mfa" @click="loadMfa">{{ t('tenantIdentity.actions.refreshStatus') }}</el-button></div>
-            <el-alert v-if="errors.mfa" :title="errorMessage(errors.mfa)" type="error" :closable="false" show-icon />
+            <PageErrorNotice v-if="errors.mfa">{{ errorMessage(errors.mfa) }}</PageErrorNotice>
             <div class="factor-list"><div v-for="factor in mfaFactors" :key="factor.key" class="factor-row"><div class="factor-icon" :class="factor.icon" /><div class="factor-label"><strong>{{ factor.name }}</strong><p class="secondary">{{ factor.description }}</p></div><span class="status-pill" :class="mfa?.[factor.key] ? 'is-active' : 'is-inactive'">{{ t(mfa ? (mfa[factor.key] ? 'tenantIdentity.status.enabled' : 'tenantIdentity.status.notEnabled') : 'tenantIdentity.status.pending') }}</span></div></div>
             <div class="form-actions spread"><el-button :disabled="busy" @click="resetMfa">{{ t('tenantIdentity.actions.resetMfa') }}</el-button><div class="actions"><el-button :disabled="busy || !mfa" @click="updateEmailMfa(false)">{{ t('tenantIdentity.actions.disableEmailMfa') }}</el-button><el-button type="primary" :disabled="busy || !mfa" :loading="busy" @click="updateEmailMfa(true)">{{ t('tenantIdentity.actions.enableEmailMfa') }}</el-button></div></div>
           </section>
@@ -437,35 +477,46 @@ onBeforeUnmount(() => { generation += 1; readController.abort() })
 
       <section v-else-if="action === 'email'" class="identity-panel email-panel" v-loading="loading.email">
         <div class="service-icon i-mdi-email-fast-outline" /><h3>{{ t('tenantIdentity.descriptions.emailTitle') }}</h3><p class="secondary">{{ t('tenantIdentity.descriptions.email') }}</p>
-        <el-alert v-if="errors.email" :title="errorMessage(errors.email)" type="error" :closable="false" show-icon><el-button text @click="loadEmail">{{ t('tenantIdentity.actions.reload') }}</el-button></el-alert>
+        <PageErrorNotice v-if="errors.email"><p>{{ errorMessage(errors.email) }}</p><el-button text @click="loadEmail">{{ t('tenantIdentity.actions.reload') }}</el-button></PageErrorNotice>
         <el-form label-position="top" @submit.prevent="saveEmail"><el-form-item :label="t('tenantIdentity.labels.emailDomain')" required><el-input v-model="emailDomain" :placeholder="t('tenantIdentity.placeholders.domain')" :maxlength="100" :disabled="emailReadOnly || busy" /></el-form-item><p class="field-hint">{{ t('tenantIdentity.descriptions.emailDomain') }}</p><div class="form-actions"><el-button :disabled="busy" @click="close">{{ t('tenantIdentity.actions.close') }}</el-button><el-button v-if="emailReadOnly" :disabled="loading.email || !!errors.email" @click="emailReadOnly = false">{{ t('tenantIdentity.actions.reconfigure') }}</el-button><el-button v-else type="primary" native-type="submit" :loading="busy">{{ t('tenantIdentity.actions.configureEmail') }}</el-button></div></el-form>
       </section>
 
       <section v-else-if="action === 'social'" class="identity-panel">
         <template v-if="editor !== 'social'">
           <div class="toolbar"><p class="secondary">{{ t('tenantIdentity.descriptions.social') }}</p><div class="actions"><el-button :disabled="busy || loading.social" @click="loadSocial">{{ t('tenantIdentity.actions.refresh') }}</el-button><el-button type="primary" :disabled="busy || !socialTypes.length" @click="editSocial()">{{ t('tenantIdentity.actions.addSocial') }}</el-button></div></div>
-          <el-alert v-if="errors.social" :title="errorMessage(errors.social)" type="error" :closable="false" show-icon />
-          <el-table v-loading="loading.social" :data="socialRows" row-key="id" class="identity-table" :empty-text="t('tenantIdentity.empty.social')"><el-table-column :label="t('tenantIdentity.labels.loginService')" min-width="130"><template #default="{ row }"><span class="user-name">{{ row.socialTypeStr || row.serviceProviderName || t('tenantIdentity.status.unknown') }}</span></template></el-table-column><el-table-column prop="clientId" :label="t('tenantIdentity.labels.clientId')" min-width="170" show-overflow-tooltip /><el-table-column prop="redirectUrl" :label="t('tenantIdentity.labels.redirectUrl')" min-width="230" show-overflow-tooltip /><el-table-column :label="t('tenantIdentity.labels.status')" width="100"><template #default="{ row }"><span class="status-pill" :class="!row.socialStatus || row.socialStatus === 'null' || row.socialStatus === 'active' ? 'is-active' : 'is-inactive'">{{ socialStatus(row.socialStatus) }}</span></template></el-table-column><el-table-column :label="t('tenantIdentity.labels.actions')" :width="locale.startsWith('en') ? 154 : 126" fixed="right"><template #default="{ row }"><el-button link :disabled="busy" @click="editSocial(row)">{{ t('tenantIdentity.actions.edit') }}</el-button><el-button link :disabled="busy" :type="row.socialStatus === 'disabled' ? 'primary' : 'danger'" @click="toggleSocial(row)">{{ t(row.socialStatus === 'disabled' ? 'tenantIdentity.actions.enable' : 'tenantIdentity.actions.disable') }}</el-button></template></el-table-column></el-table>
+          <PageErrorNotice v-if="errors.social">{{ errorMessage(errors.social) }}</PageErrorNotice>
+          <MobileRecordList v-if="compact" drilldown :list-id="`identity-social-${tenantId}`" :record-keys="socialRows.map(row => String(row.id))" :loading="loading.social" class="identity-mobile-list">
+            <MobileRecordCard v-for="row in socialRows" :key="row.id" :record-key="String(row.id)" :summary-title="row.socialTypeStr || row.serviceProviderName || t('tenantIdentity.status.unknown')" :summary-meta="row.clientId || '—'" :summary-status="socialStatus(row.socialStatus)" :summary-tone="!row.socialStatus || row.socialStatus === 'null' || row.socialStatus === 'active' ? 'success' : 'neutral'">
+              <template #identity><h3 class="mobile-record-title">{{ row.socialTypeStr || row.serviceProviderName || t('tenantIdentity.status.unknown') }}</h3></template>
+              <dl class="mobile-record-fields"><div class="mobile-record-wide"><dt>{{ t('tenantIdentity.labels.clientId') }}</dt><dd>{{ row.clientId || '—' }}</dd></div><div class="mobile-record-wide"><dt>{{ t('tenantIdentity.labels.redirectUrl') }}</dt><dd>{{ row.redirectUrl || '—' }}</dd></div><div class="mobile-record-wide"><dt>{{ t('tenantIdentity.labels.status') }}</dt><dd><span class="status-pill" :class="!row.socialStatus || row.socialStatus === 'null' || row.socialStatus === 'active' ? 'is-active' : 'is-inactive'">{{ socialStatus(row.socialStatus) }}</span></dd></div></dl>
+              <template #footer><el-button :disabled="busy || loading.social" @click="editSocial(row)">{{ t('tenantIdentity.actions.edit') }}</el-button><el-button plain :disabled="busy || loading.social" :type="row.socialStatus === 'disabled' ? 'primary' : 'danger'" @click="toggleSocial(row)">{{ t(row.socialStatus === 'disabled' ? 'tenantIdentity.actions.enable' : 'tenantIdentity.actions.disable') }}</el-button></template>
+            </MobileRecordCard>
+            <p v-if="loading.social || !socialRows.length" class="identity-mobile-empty" role="status">{{ t(loading.social ? 'pageLoading.loading' : 'tenantIdentity.empty.social') }}</p>
+          </MobileRecordList>
+          <el-table v-else v-loading="loading.social" :data="socialRows" row-key="id" class="identity-table" :empty-text="t('tenantIdentity.empty.social')"><el-table-column :label="t('tenantIdentity.labels.loginService')" min-width="130"><template #default="{ row }"><span class="user-name">{{ row.socialTypeStr || row.serviceProviderName || t('tenantIdentity.status.unknown') }}</span></template></el-table-column><el-table-column prop="clientId" :label="t('tenantIdentity.labels.clientId')" min-width="170" show-overflow-tooltip /><el-table-column prop="redirectUrl" :label="t('tenantIdentity.labels.redirectUrl')" min-width="230" show-overflow-tooltip /><el-table-column :label="t('tenantIdentity.labels.status')" width="100"><template #default="{ row }"><span class="status-pill" :class="!row.socialStatus || row.socialStatus === 'null' || row.socialStatus === 'active' ? 'is-active' : 'is-inactive'">{{ socialStatus(row.socialStatus) }}</span></template></el-table-column><el-table-column :label="t('tenantIdentity.labels.actions')" :width="locale.startsWith('en') ? 154 : 126" fixed="right"><template #default="{ row }"><el-button link :disabled="busy" @click="editSocial(row)">{{ t('tenantIdentity.actions.edit') }}</el-button><el-button link :disabled="busy" :type="row.socialStatus === 'disabled' ? 'primary' : 'danger'" @click="toggleSocial(row)">{{ t(row.socialStatus === 'disabled' ? 'tenantIdentity.actions.enable' : 'tenantIdentity.actions.disable') }}</el-button></template></el-table-column></el-table>
         </template>
-        <div v-else class="form-panel"><div class="section-title"><el-button text :disabled="busy" @click="closeEditor">← {{ t('tenantIdentity.actions.backToSocial') }}</el-button><h3>{{ t(socialForm.id ? 'tenantIdentity.actions.editSocial' : 'tenantIdentity.actions.addSocial') }}</h3></div><el-form label-position="top" :disabled="busy" @submit.prevent="saveSocial"><el-form-item :label="t('tenantIdentity.labels.loginService')" required><el-input v-if="socialForm.id" :model-value="socialForm.socialTypeStr" readonly /><el-select v-else v-model="socialForm.socialTypeStr" :placeholder="t('tenantIdentity.placeholders.loginService')"><el-option v-for="provider in socialTypes" :key="provider" :label="provider" :value="provider" /></el-select></el-form-item><el-form-item :label="t('tenantIdentity.labels.clientIdField')" required><el-input v-model="socialForm.clientId" autocomplete="off" /></el-form-item><el-form-item :label="t('tenantIdentity.labels.clientSecret')" required><el-input v-model="socialForm.clientSecret" type="password" show-password autocomplete="new-password" /></el-form-item><el-form-item v-if="socialForm.redirectUrl" :label="t('tenantIdentity.labels.redirectUrl')"><div class="copy-field"><el-input :model-value="socialForm.redirectUrl" readonly /><el-button @click="copy(socialForm.redirectUrl)">{{ t('tenantIdentity.actions.copy') }}</el-button></div><p class="field-hint">{{ t('tenantIdentity.descriptions.redirectUrl') }}</p></el-form-item><div class="form-actions"><el-button :disabled="busy" @click="closeEditor">{{ t('tenantIdentity.actions.cancel') }}</el-button><el-button type="primary" native-type="submit" :loading="busy">{{ t('tenantIdentity.actions.saveConfig') }}</el-button></div></el-form></div>
+        <div v-else class="form-panel"><div class="section-title"><el-button text :disabled="busy" @click="closeEditor">← {{ t('tenantIdentity.actions.backToSocial') }}</el-button><h3>{{ t(socialForm.id ? 'tenantIdentity.actions.editSocial' : 'tenantIdentity.actions.addSocial') }}</h3></div><el-form label-position="top" :disabled="busy" @submit.prevent="saveSocial"><el-form-item :label="t('tenantIdentity.labels.loginService')" required><el-input v-if="socialForm.id" :model-value="socialForm.socialTypeStr" readonly /><el-select v-else v-model="socialForm.socialTypeStr" popper-class="tenant-identity-select" :placeholder="t('tenantIdentity.placeholders.loginService')"><el-option v-for="provider in socialTypes" :key="provider" :label="provider" :value="provider" /></el-select></el-form-item><el-form-item :label="t('tenantIdentity.labels.clientIdField')" required><el-input v-model="socialForm.clientId" autocomplete="off" /></el-form-item><el-form-item :label="t('tenantIdentity.labels.clientSecret')" required><el-input v-model="socialForm.clientSecret" type="password" show-password autocomplete="new-password" /></el-form-item><el-form-item v-if="socialForm.redirectUrl" :label="t('tenantIdentity.labels.redirectUrl')"><div class="copy-field"><el-input :model-value="socialForm.redirectUrl" readonly /><el-button @click="copy(socialForm.redirectUrl)">{{ t('tenantIdentity.actions.copy') }}</el-button></div><p class="field-hint">{{ t('tenantIdentity.descriptions.redirectUrl') }}</p></el-form-item><div class="form-actions"><el-button :disabled="busy" @click="closeEditor">{{ t('tenantIdentity.actions.cancel') }}</el-button><el-button type="primary" native-type="submit" :loading="busy">{{ t('tenantIdentity.actions.saveConfig') }}</el-button></div></el-form></div>
       </section>
     </div>
   </el-dialog>
 
-  <el-dialog :model-value="!!credentials && visible" :title="t('tenantIdentity.actions.saveCredentials')" width="min(520px, calc(100vw - 32px))" align-center append-to-body :close-on-click-modal="false" @close="credentials = null">
+  <el-dialog :model-value="!!credentials && visible" :title="t('tenantIdentity.actions.saveCredentials')" width="min(520px, calc(100vw - 32px))" class="tenant-identity-credentials" align-center append-to-body :close-on-click-modal="false" @close="credentials = null">
     <div v-if="credentials" class="identity-content credential-panel"><el-alert :title="t('tenantIdentity.descriptions.credentials')" type="warning" :closable="false" show-icon /><el-form label-position="top"><el-form-item :label="t('tenantIdentity.labels.username')"><div class="copy-field"><el-input :model-value="credentials.username" readonly /><el-button @click="copy(credentials.username)">{{ t('tenantIdentity.actions.copy') }}</el-button></div></el-form-item><el-form-item v-if="credentials.email" :label="t('tenantIdentity.labels.email')"><el-input :model-value="credentials.email" readonly /></el-form-item><el-form-item v-if="credentials.group" :label="t('tenantIdentity.labels.userGroup')"><el-input :model-value="credentials.group" readonly /></el-form-item><el-form-item :label="t('tenantIdentity.labels.temporaryPassword')"><div class="copy-field"><el-input :model-value="credentials.password" readonly /><el-button @click="copy(credentials.password)">{{ t('tenantIdentity.actions.copy') }}</el-button></div></el-form-item><p v-if="credentials.resetTime" class="secondary">{{ t('tenantIdentity.labels.resetTime', { time: credentials.resetTime }) }}</p></el-form><div class="form-actions"><el-button @click="credentials = null">{{ t('tenantIdentity.actions.savedClose') }}</el-button><el-button type="primary" @click="copyCredentials">{{ t('tenantIdentity.actions.copyAllCredentials') }}</el-button></div></div>
   </el-dialog>
 </template>
 
 <style scoped>
 .identity-content { color: var(--text-primary); font-family: var(--sans); font-size: var(--font-size-body); }
-:global(.tenant-identity-dialog .el-dialog__title) { font-size: var(--font-size-dialog-title); }
+:global(.tenant-identity-dialog), :global(.tenant-identity-credentials) { font-family: var(--sans); font-size: var(--font-size-body); color: var(--text-primary); }
+:global(.tenant-identity-dialog .el-dialog__title), :global(.tenant-identity-credentials .el-dialog__title) { font-size: var(--font-size-dialog-title); font-weight: 600; color: var(--text-primary); }
+:global(.tenant-identity-confirm) { font-family: var(--sans); --el-messagebox-title-color: var(--text-primary); --el-messagebox-content-color: var(--text-primary); --el-messagebox-font-size: var(--font-size-dialog-title); --el-messagebox-content-font-size: var(--font-size-body); }
+:global(.tenant-identity-confirm .el-message-box__title) { font-weight: 600; }
+:global(.tenant-identity-select.el-popper) { font-family: var(--sans); font-size: var(--font-size-body); }
 .identity-content :deep(.el-button), .identity-content :deep(.el-input__inner), .identity-content :deep(.el-select__wrapper), .identity-content :deep(.el-form-item__label), .identity-content :deep(.el-checkbox__label), .identity-content :deep(.el-radio__label), .identity-content :deep(.el-table) { font-size: var(--font-size-body); }
 .identity-content :deep(.el-alert__title) { font-size: var(--font-size-body); }
 .identity-content :deep(.el-alert__description), .identity-content :deep(.el-form-item__error), .identity-content :deep(.el-empty__description p) { font-size: var(--font-size-secondary); }
 .identity-content :deep(.el-tag) { font-size: var(--font-size-caption); }
-.identity-content :deep(.el-pagination) { --el-pagination-font-size: var(--font-size-body); --el-pagination-font-size-small: var(--font-size-body); }
-.identity-content :deep(.el-pagination .el-pager li) { font-size: var(--font-size-body); }
+.identity-pagination { margin-top: 16px; }
 .tenant-context { display: flex; align-items: center; gap: 8px; margin: 0 0 20px; color: var(--text-secondary); font-size: var(--font-size-secondary); }
 .context-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--brand); }
 .identity-tabs { margin-bottom: 10px; }
@@ -488,7 +539,7 @@ onBeforeUnmount(() => { generation += 1; readController.abort() })
 .identity-content :deep(.el-checkbox) { margin-bottom: 16px; }
 .identity-content :deep(.el-form-item__label) { color: var(--text-primary); }
 .identity-table { border: 1px solid var(--border); border-radius: var(--r-sm); }
-.identity-table :deep(th.el-table__cell) { font-size: var(--font-size-body); font-weight: 500; color: var(--text-secondary); background: var(--bg-hover); }
+.identity-table :deep(th.el-table__cell) { font-size: var(--font-size-body); font-weight: 600; color: var(--text-secondary); background: var(--bg-hover); }
 .identity-table :deep(td.el-table__cell) { padding-block: 13px; }
 .user-name { font-weight: 500; }
 .status-pill { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; border-radius: var(--r-pill); padding: 3px 9px; font-size: var(--font-size-caption); overflow-wrap: anywhere; }
@@ -521,7 +572,7 @@ onBeforeUnmount(() => { generation += 1; readController.abort() })
 .field-hint { font-size: var(--font-size-secondary); margin-top: 8px; }
 .copy-field { display: flex; gap: 8px; width: 100%; }
 .copy-field .el-input { min-width: 0; }
-.credential-panel :deep(.el-input__inner) { font-family: var(--mono); }
+.credential-panel :deep(.el-input__inner) { font-family: var(--sans); color: var(--text-primary); }
 .identity-panel-enter-active { transition: opacity 200ms ease, transform 260ms cubic-bezier(.2,.8,.2,1); }
 .identity-panel-leave-active { transition: opacity 110ms ease, transform 110ms ease; }
 .identity-panel-enter-from { opacity: 0; transform: translateY(7px); }
@@ -534,6 +585,14 @@ onBeforeUnmount(() => { generation += 1; readController.abort() })
   .factor-label p { font-size: var(--font-size-secondary); }
   .form-actions.spread { flex-wrap: wrap; }
   .identity-tabs :deep(.el-tabs__item) { padding-inline: 16px; }
+}
+@media (max-width: 760px) {
+  :global(.tenant-identity-dialog) { max-height: calc(100dvh - 32px); overflow-y: auto; }
+  .identity-panel { min-height: 0; }
+  .identity-mobile-list { padding: 0; max-height: 56dvh; overflow-y: auto; overscroll-behavior: contain; }
+  .identity-mobile-empty { display: grid; place-items: center; min-height: 88px; margin: 0; color: var(--text-secondary); font-size: var(--font-size-body); }
+  .identity-mobile-list :deep(.el-button) { min-height: 44px; margin-left: 0; }
+  .notification-form .el-form-item { min-width: 0; flex-basis: 100%; }
 }
 @media (prefers-reduced-motion: reduce) {
   .identity-panel-enter-active, .identity-panel-leave-active, .identity-content :deep(.el-button) { transition: none; }

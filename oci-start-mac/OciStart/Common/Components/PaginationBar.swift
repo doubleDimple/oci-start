@@ -21,12 +21,15 @@ struct PaginationBar: View {
     var onChange: () -> Void = {}
 
     @State private var jumpText: String = ""
+    @State private var compactLayout = false
 
     @EnvironmentObject private var appearance: AppearanceController
     @Environment(\.colorScheme) private var colorScheme
     private var dark: Bool { appearance.isDarkEffective || colorScheme == .dark }
 
     private let controlHeight: CGFloat = 32
+    private let compactWidth: CGFloat = 800
+    private var rowHeight: CGFloat { max(controlHeight, AppInputStyle.height) }
 
     private var sizeOptions: [SelectOption] {
         PageState.sizeOptions.map { SelectOption(id: "\($0)", title: "\($0)") }
@@ -45,18 +48,39 @@ struct PaginationBar: View {
     }
 
     var body: some View {
-        HStack(alignment: .center, spacing: 12) {
-            if showsSizeSelector {
-                sizeSelector
-                Spacer(minLength: 8)
+        GeometryReader { proxy in
+            VStack(spacing: 4) {
+                if proxy.size.width < compactWidth {
+                    scrollingRow(width: proxy.size.width) {
+                        if showsSizeSelector {
+                            sizeSelector.fixedSize(horizontal: true, vertical: false)
+                            Spacer(minLength: 12)
+                        }
+                        infoAndJump.fixedSize(horizontal: true, vertical: false)
+                    }
+                    scrollingRow(width: proxy.size.width) {
+                        Spacer(minLength: 0)
+                        navControls.fixedSize(horizontal: true, vertical: false)
+                    }
+                } else {
+                    scrollingRow(width: proxy.size.width) {
+                        if showsSizeSelector {
+                            sizeSelector.fixedSize(horizontal: true, vertical: false)
+                            Spacer(minLength: 8)
+                        }
+                        navControls.fixedSize(horizontal: true, vertical: false)
+                        Spacer(minLength: 8)
+                        infoAndJump.fixedSize(horizontal: true, vertical: false)
+                    }
+                }
             }
-            navControls
-            Spacer(minLength: 8)
-            infoAndJump
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .onAppear { updateLayout(width: proxy.size.width) }
+            .onChange(of: proxy.size.width) { updateLayout(width: $0) }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(AppTheme.sidebarBg(dark).opacity(0.55))
+        .frame(height: compactLayout ? rowHeight * 2 + 24 : rowHeight + 20)
+        .background(AppTheme.cardBg(dark))
         .overlay(
             Rectangle()
                 .frame(height: 1)
@@ -65,13 +89,27 @@ struct PaginationBar: View {
         )
     }
 
+    /// Preserve all controls even for long ranges or unusually small embedded panels.
+    private func scrollingRow<Content: View>(width: CGFloat, @ViewBuilder content: () -> Content) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(alignment: .center, spacing: 12, content: content)
+                .frame(minWidth: max(0, width - 24), minHeight: rowHeight, alignment: .leading)
+        }
+        .frame(height: rowHeight)
+    }
+
+    private func updateLayout(width: CGFloat) {
+        let compact = width < compactWidth
+        if compactLayout != compact { compactLayout = compact }
+    }
+
     // MARK: - Size
 
     private var sizeSelector: some View {
         HStack(spacing: 8) {
             Text("每页")
-                .font(.system(size: 12))
-                .foregroundColor(AppTheme.sidebarText(dark))
+                .font(.system(size: AppTheme.bodySize))
+                .foregroundColor(AppTheme.textSecondary(dark))
             SelectMenu(
                 options: sizeOptions,
                 selection: sizeSelection,
@@ -81,8 +119,8 @@ struct PaginationBar: View {
                 searchable: false
             )
             Text("条")
-                .font(.system(size: 12))
-                .foregroundColor(AppTheme.sidebarText(dark))
+                .font(.system(size: AppTheme.bodySize))
+                .foregroundColor(AppTheme.textSecondary(dark))
         }
     }
 
@@ -97,8 +135,8 @@ struct PaginationBar: View {
             ForEach(visiblePages, id: \.self) { p in
                 if p < 0 {
                     Text("…")
-                        .font(.system(size: 11))
-                        .foregroundColor(AppTheme.sidebarText(dark))
+                        .font(.system(size: AppTheme.bodySize))
+                        .foregroundColor(AppTheme.textSecondary(dark))
                         .frame(width: 22, height: controlHeight)
                 } else {
                     Button(action: {
@@ -106,7 +144,7 @@ struct PaginationBar: View {
                         onChange()
                     }) {
                         Text("\(p + 1)")
-                            .font(.system(size: 12, weight: p == state.page ? .bold : .regular))
+                            .font(.system(size: AppTheme.bodySize, weight: p == state.page ? .bold : .regular))
                             .frame(minWidth: controlHeight, minHeight: controlHeight)
                             .background(
                                 RoundedRectangle(cornerRadius: 8)
@@ -136,14 +174,14 @@ struct PaginationBar: View {
     private var infoAndJump: some View {
         HStack(spacing: 8) {
             Text(rangeTextOverride ?? state.rangeText)
-                .font(.system(size: 12))
-                .foregroundColor(AppTheme.sidebarText(dark))
+                .font(.system(size: AppTheme.bodySize))
+                .foregroundColor(AppTheme.textSecondary(dark))
                 .lineLimit(1)
 
             if showsJump {
                 Text("跳至")
-                    .font(.system(size: 12))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .font(.system(size: AppTheme.bodySize))
+                    .foregroundColor(AppTheme.textSecondary(dark))
 
                 AppCompactField(
                     text: $jumpText,
@@ -155,11 +193,11 @@ struct PaginationBar: View {
 
                 Button(action: jump) {
                     Text("Go")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(.white)
+                        .font(.system(size: AppTheme.bodySize, weight: .semibold))
+                        .foregroundColor(AppTheme.textPrimary(dark))
                         .padding(.horizontal, 12)
                         .frame(height: controlHeight)
-                        .background(AppTheme.sidebarActive)
+                        .background(AppTheme.inputBg(dark))
                         .cornerRadius(8)
                 }
                 .buttonStyle(PlainButtonStyle())
@@ -170,7 +208,7 @@ struct PaginationBar: View {
     private func pageButton(systemName: String, disabled: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
-                .font(.system(size: 11, weight: .semibold))
+                .font(.system(size: AppTheme.bodySize, weight: .semibold))
                 .frame(width: controlHeight, height: controlHeight)
                 .background(
                     RoundedRectangle(cornerRadius: 8)

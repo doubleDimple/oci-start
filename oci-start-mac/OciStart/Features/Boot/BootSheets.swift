@@ -77,7 +77,7 @@ struct BootSheetHost: View {
                 }
                 if let err = model.formError, !err.isEmpty {
                     Text(err)
-                        .font(.system(size: 12))
+                        .font(.system(size: 14))
                         .foregroundColor(AppSheetSurface.accentRed(dark))
                 }
             }
@@ -112,11 +112,11 @@ struct BootSheetHost: View {
                     Image(systemName: "person.2")
                         .foregroundColor(AppTheme.sidebarActive)
                     Text(item.displayTenant)
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(primaryText)
                     if !item.regionName.isEmpty {
                         Text("· \(item.regionName)")
-                            .font(.system(size: 12))
+                            .font(.system(size: 13))
                             .foregroundColor(mutedText)
                     }
                     Spacer()
@@ -129,7 +129,7 @@ struct BootSheetHost: View {
                         ForEach(["ARM", "AMD", "X86"], id: \.self) { arch in
                             Button(action: { model.onCreateArchitectureChanged(arch) }) {
                                 Text(arch)
-                                    .font(.system(size: 12, weight: .semibold))
+                                    .font(.system(size: 14, weight: .semibold))
                                     .foregroundColor(model.createArchitecture == arch ? .white : primaryText)
                                     .padding(.horizontal, 12)
                                     .padding(.vertical, 6)
@@ -214,7 +214,7 @@ struct BootSheetHost: View {
 
                 if let err = model.formError, !err.isEmpty {
                     Text(err)
-                        .font(.system(size: 12))
+                        .font(.system(size: 14))
                         .foregroundColor(AppSheetSurface.accentRed(dark))
                 }
             }

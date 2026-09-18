@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { isAxiosError } from 'axios'
 import GhostBtn from '@/components/GhostBtn.vue'
 import PrimaryBtn from '@/components/PrimaryBtn.vue'
+import PageBackButton from '@/components/PageBackButton.vue'
+import PageErrorNotice from '@/components/PageErrorNotice.vue'
 import { usePageMotion } from '@/composables/usePageMotion'
 import { useShellStore } from '@/stores/shell'
 import { REGION_COORDINATES, regionCityName } from '@/views/regions/regionCoords'
@@ -63,6 +65,7 @@ const parentId = computed(() => {
   const value = route.query.tenantId
   return isBootTenantId(value) ? value : ''
 })
+const preferredRegionId = computed(() => isBootTenantId(route.query.regionId) ? route.query.regionId : '')
 const regions = shallowRef<BootRegion[]>([])
 const regionId = ref('')
 const regionsLoading = ref(false)
@@ -198,7 +201,8 @@ async function loadRegions() {
     const result = await getBootRegions(requestedParent, controller.signal)
     if (disposed || version !== regionVersion || controller.signal.aborted) return
     regions.value = result
-    regionId.value = result.find(region => region.id === previousId)?.id
+    regionId.value = result.find(region => region.id === preferredRegionId.value)?.id
+      || result.find(region => region.id === previousId)?.id
       || result.find(region => region.isHomeRegion)?.id || result[0]?.id || ''
     regionsReady.value = true
   } catch (error) {
@@ -241,7 +245,7 @@ watch(selectedOs, os => {
     selectedImageId.value = images.value.find(image => image.operatingSystem === os)?.imageId || ''
   }
 })
-watch(() => route.query.tenantId, () => {
+watch([() => route.query.tenantId, () => route.query.regionId], () => {
   pageVersion += 1
   regionVersion += 1
   regionController?.abort()
@@ -346,9 +350,13 @@ async function viewTasks() {
   catch { /* Keep the success notice and its navigation action available. */ }
 }
 function goBack() {
-  if (creating.value) return
-  void router.push({ path: '/tenants/list', query: { cloudType: '1' } })
+  if (creating.value || confirmOpen.value) return
+  const previous = window.history.state?.back
+  if (typeof previous === 'string' && previous.startsWith('/') && !previous.startsWith('//')) router.back()
+  else void router.push({ path: '/tenants/list', query: { cloudType: '1' } })
 }
+onBeforeRouteLeave(() => !creating.value)
+onBeforeRouteUpdate(() => !creating.value)
 onBeforeUnmount(() => {
   disposed = true
   pageVersion += 1
@@ -363,7 +371,7 @@ onBeforeUnmount(() => {
   <div ref="root" class="oci-boot-page">
     <form class="boot-card" data-motion-enter novalidate :aria-busy="creating || undefined" @submit.prevent="prepareSubmission">
       <div class="boot-toolbar">
-        <GhostBtn :disabled="creating || confirmOpen" @click="goBack"><i class="i-mdi-arrow-left" aria-hidden="true" />{{ t('ociBoot.back') }}</GhostBtn>
+        <PageBackButton :disabled="creating || confirmOpen" @click="goBack" />
         <div class="boot-region-picker">
           <label class="sr-only" for="boot-region">{{ t('ociBoot.region') }}</label>
           <el-select id="boot-region" v-model="regionId" filterable :disabled="locked || regionsLoading || !regions.length" :loading="regionsLoading" :placeholder="t('ociBoot.selectRegion')" :aria-label="t('ociBoot.region')">
@@ -374,7 +382,7 @@ onBeforeUnmount(() => {
           <button type="button" :aria-pressed="mode === 'quick'" :disabled="locked" @click="setMode('quick')">{{ t('ociBoot.quick') }}</button>
           <button type="button" :aria-pressed="mode === 'custom'" :disabled="locked" @click="setMode('custom')">{{ t('ociBoot.custom') }}</button>
         </div>
-        <div class="boot-toolbar-actions">
+        <div class="boot-toolbar-actions" data-page-error-anchor>
           <button type="button" class="text-button" :disabled="locked" @click="resetConfiguration">{{ t('ociBoot.reset') }}</button>
           <PrimaryBtn type="submit" :loading="creating" :disabled="createDisabled"><i v-if="!creating" class="i-mdi-play-outline" aria-hidden="true" />{{ t(`ociBoot.${creating ? 'creating' : 'create'}`) }}</PrimaryBtn>
         </div>
@@ -382,16 +390,20 @@ onBeforeUnmount(() => {
 
       <div v-if="creating" class="boot-notice is-pending" role="status"><i class="i-mdi-loading boot-spin" aria-hidden="true" /><div>{{ t('ociBoot.savePending') }}</div></div>
       <div v-else-if="saved" class="boot-notice is-success" role="status"><i class="i-mdi-check-circle-outline" aria-hidden="true" /><div>{{ t('ociBoot.saveSuccess') }}</div><button type="button" class="text-button" @click="viewTasks">{{ t('ociBoot.viewTasks') }}</button></div>
-      <div v-else-if="saveFailure" class="boot-notice is-error" role="alert">
+      <div v-else-if="saveFailure && saveUncertain" class="boot-notice is-error" role="alert">
         <i class="i-mdi-alert-circle-outline" aria-hidden="true" />
         <div><strong>{{ t(saveUncertain ? 'ociBoot.saveUnconfirmed' : 'ociBoot.saveFailed') }}</strong><p>{{ saveFailure.key ? t(`ociBoot.${saveFailure.key}`) : saveFailure.message }}</p><p v-if="requestMayHaveRun">{{ t('ociBoot.saveUnknown') }}</p></div>
         <button v-if="submittedRegionId && requestMayHaveRun" type="button" class="text-button" @click="viewTasks">{{ t('ociBoot.viewTasks') }}</button>
       </div>
+      <template v-else-if="saveFailure">
+        <PageErrorNotice class="boot-error-notice" :title="t('ociBoot.saveFailed')">{{ saveFailure.key ? t(`ociBoot.${saveFailure.key}`) : saveFailure.message }}</PageErrorNotice>
+        <div v-if="requestMayHaveRun" class="boot-notice is-error" role="alert"><div>{{ t('ociBoot.saveUnknown') }}</div><button v-if="submittedRegionId" type="button" class="text-button" @click="viewTasks">{{ t('ociBoot.viewTasks') }}</button></div>
+      </template>
 
       <div class="boot-scroll">
         <div v-if="!parentId" class="boot-empty" role="status"><i class="i-mdi-account-alert-outline" aria-hidden="true" /><strong>{{ t('ociBoot.invalidTenant') }}</strong><p>{{ t('ociBoot.invalidTenantHint') }}</p></div>
         <div v-else-if="regionsLoading" class="boot-empty" role="status"><i class="i-mdi-loading boot-spin" aria-hidden="true" /><p>{{ t('ociBoot.regionsLoading') }}</p></div>
-        <div v-else-if="regionsError" class="boot-empty" role="alert"><i class="i-mdi-cloud-alert-outline" aria-hidden="true" /><strong>{{ t('ociBoot.regionsFailed') }}</strong><p>{{ bootError(regionsError) }}</p><GhostBtn @click="loadRegions">{{ t('ociBoot.retry') }}</GhostBtn></div>
+        <PageErrorNotice v-else-if="regionsError" class="boot-load-notice" :title="t('ociBoot.regionsFailed')"><span>{{ bootError(regionsError) }}</span><GhostBtn @click="loadRegions">{{ t('ociBoot.retry') }}</GhostBtn></PageErrorNotice>
         <div v-else-if="!regions.length" class="boot-empty" role="status"><i class="i-mdi-map-marker-outline" aria-hidden="true" /><strong>{{ t('ociBoot.noRegions') }}</strong><p>{{ t('ociBoot.noRegionsHint') }}</p><GhostBtn @click="loadRegions">{{ t('ociBoot.retry') }}</GhostBtn></div>
         <template v-else>
           <div class="boot-risk-strip"><i class="i-mdi-information-outline" aria-hidden="true" /><div><strong>{{ t('ociBoot.riskTitle') }}</strong><p>{{ t('ociBoot.riskBanner') }}</p></div></div>
@@ -428,8 +440,9 @@ onBeforeUnmount(() => {
                   <p class="field-hint">{{ t(useDefaultImage ? 'ociBoot.defaultImageHint' : 'ociBoot.imageHint') }}</p>
                   <div v-if="useDefaultImage" class="inline-state"><i class="i-mdi-layers-outline" aria-hidden="true" /><div>{{ t('ociBoot.defaultImage') }}</div></div>
                   <div v-else-if="imagesLoading" class="inline-state" role="status"><i class="i-mdi-loading boot-spin" aria-hidden="true" /><div>{{ t('ociBoot.imagesLoading') }}</div></div>
-                  <div v-else-if="imagesError || !images.length" class="inline-state" :class="{ 'is-error': imagesError }" role="status">
-                    <i class="i-mdi-image-outline" aria-hidden="true" /><div><p>{{ imagesError ? t('ociBoot.imagesFailed') : t('ociBoot.noImages') }}</p><p v-if="imagesError">{{ bootError(imagesError) }}</p><p>{{ t('ociBoot.noImagesHint') }}</p><button type="button" class="text-button" :disabled="locked" @click="loadImages">{{ t('ociBoot.retry') }}</button></div>
+                  <PageErrorNotice v-else-if="imagesError" class="boot-image-error" :title="t('ociBoot.imagesFailed')"><div><p>{{ bootError(imagesError) }}</p><p>{{ t('ociBoot.noImagesHint') }}</p></div><button type="button" class="text-button" :disabled="locked" @click="loadImages">{{ t('ociBoot.retry') }}</button></PageErrorNotice>
+                  <div v-else-if="!images.length" class="inline-state" role="status">
+                    <i class="i-mdi-image-outline" aria-hidden="true" /><div><p>{{ t('ociBoot.noImages') }}</p><p>{{ t('ociBoot.noImagesHint') }}</p><button type="button" class="text-button" :disabled="locked" @click="loadImages">{{ t('ociBoot.retry') }}</button></div>
                   </div>
                   <div v-else class="image-fields">
                     <div class="form-field"><label for="boot-os">{{ t('ociBoot.operatingSystem') }}</label><el-select id="boot-os" v-model="selectedOs" :disabled="locked" :placeholder="t('ociBoot.selectOs')" :aria-label="t('ociBoot.operatingSystem')" :aria-invalid="attempted && !imageValid || undefined"><el-option v-for="os in operatingSystems" :key="os" :value="os" :label="os" /></el-select></div>

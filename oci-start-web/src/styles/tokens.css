@@ -1,6 +1,7 @@
-/* 布局真源：design/img.png。字色/字体：Apple Store（SF / 苹方，近黑墨色）。主色仍是森林绿。 */
+/* 布局真源：design/img.png。字体：系统 SF / 苹方；浅色普通字按用户要求使用纯黑。主色仍是森林绿。 */
 
-:root {
+html:root,
+html:root[data-content-theme] {
   color-scheme: light;
   --bg-app: #f5f5f7;
   --bg-page: #f5f5f7;
@@ -8,9 +9,12 @@
   --bg-card: #ffffff;
   --bg-search: #f5f5f7;
   --bg-hover: #f5f5f7;
-  --text-primary: #1d1d1f;
-  --text-secondary: #6e6e73;
-  --text-muted: #86868b;
+  --bg-tooltip: #1d1d1f;
+  --text-tooltip: #f5f5f7;
+  /* User preference: all ordinary light-theme text is pure black; size/weight carry hierarchy. */
+  --text-primary: #000000;
+  --text-secondary: #000000;
+  --text-muted: #000000;
   --text-on-dark: #f5f5f7;
   --text-on-dark-muted: #a1a1a6;
   --brand: #1b8a6a;
@@ -69,44 +73,98 @@
   --font-size-dialog-title: 18px;
 
   --el-color-primary: var(--brand);
-  --el-color-primary-light-3: color-mix(in srgb, var(--brand) 70%, #fff);
-  --el-color-primary-light-5: color-mix(in srgb, var(--brand) 50%, #fff);
-  --el-color-primary-light-7: color-mix(in srgb, var(--brand) 30%, #fff);
-  --el-color-primary-light-8: color-mix(in srgb, var(--brand) 20%, #fff);
-  --el-color-primary-light-9: color-mix(in srgb, var(--brand) 12%, #fff);
+  --el-color-primary-light-3: color-mix(in srgb, var(--brand) 70%, var(--bg-card));
+  --el-color-primary-light-5: color-mix(in srgb, var(--brand) 50%, var(--bg-card));
+  --el-color-primary-light-7: color-mix(in srgb, var(--brand) 30%, var(--bg-card));
+  --el-color-primary-light-8: color-mix(in srgb, var(--brand) 20%, var(--bg-card));
+  --el-color-primary-light-9: color-mix(in srgb, var(--brand) 12%, var(--bg-card));
   --el-color-primary-dark-2: var(--brand-hover);
   --el-color-success: var(--status-ok);
   --el-color-warning: var(--status-warn);
   --el-color-danger: var(--status-danger);
+  --el-color-error: var(--status-danger);
   --el-color-info: var(--status-info);
+  --el-color-success-light-3: color-mix(in srgb, var(--status-ok) 70%, var(--bg-card));
+  --el-color-success-light-5: color-mix(in srgb, var(--status-ok) 50%, var(--bg-card));
+  --el-color-success-light-7: color-mix(in srgb, var(--status-ok) 30%, var(--bg-card));
+  --el-color-success-light-8: color-mix(in srgb, var(--status-ok) 20%, var(--bg-card));
+  --el-color-success-dark-2: color-mix(in srgb, var(--status-ok) 80%, #000);
+  --el-color-warning-light-3: color-mix(in srgb, var(--status-warn) 70%, var(--bg-card));
+  --el-color-warning-light-5: color-mix(in srgb, var(--status-warn) 50%, var(--bg-card));
+  --el-color-warning-light-7: color-mix(in srgb, var(--status-warn) 30%, var(--bg-card));
+  --el-color-warning-light-8: color-mix(in srgb, var(--status-warn) 20%, var(--bg-card));
+  --el-color-warning-dark-2: color-mix(in srgb, var(--status-warn) 80%, #000);
+  --el-color-danger-light-3: color-mix(in srgb, var(--status-danger) 70%, var(--bg-card));
+  --el-color-danger-light-5: color-mix(in srgb, var(--status-danger) 50%, var(--bg-card));
+  --el-color-danger-light-7: color-mix(in srgb, var(--status-danger) 30%, var(--bg-card));
+  --el-color-danger-light-8: color-mix(in srgb, var(--status-danger) 20%, var(--bg-card));
+  --el-color-danger-dark-2: color-mix(in srgb, var(--status-danger) 80%, #000);
+  --el-color-error-light-3: var(--el-color-danger-light-3);
+  --el-color-error-light-5: var(--el-color-danger-light-5);
+  --el-color-error-light-7: var(--el-color-danger-light-7);
+  --el-color-error-light-8: var(--el-color-danger-light-8);
+  --el-color-error-dark-2: var(--el-color-danger-dark-2);
+  --el-color-info-light-3: color-mix(in srgb, var(--status-info) 70%, var(--bg-card));
+  --el-color-info-light-5: color-mix(in srgb, var(--status-info) 50%, var(--bg-card));
+  --el-color-info-light-7: color-mix(in srgb, var(--status-info) 30%, var(--bg-card));
+  --el-color-info-light-8: color-mix(in srgb, var(--status-info) 20%, var(--bg-card));
+  --el-color-info-dark-2: color-mix(in srgb, var(--status-info) 80%, #000);
+  --el-color-success-light-9: var(--status-ok-bg);
+  --el-color-warning-light-9: var(--status-warn-bg);
+  --el-color-danger-light-9: var(--status-danger-bg);
+  --el-color-error-light-9: var(--status-danger-bg);
+  --el-color-info-light-9: var(--status-info-bg);
   --el-bg-color: var(--bg-card);
   --el-bg-color-page: var(--bg-page);
+  --el-bg-color-overlay: var(--bg-card);
   --el-text-color-primary: var(--text-primary);
   --el-text-color-regular: var(--text-primary);
   --el-text-color-secondary: var(--text-secondary);
   --el-text-color-placeholder: var(--text-muted);
+  --el-text-color-disabled: var(--text-muted);
   --el-border-color: var(--border);
   --el-border-color-light: var(--border);
   --el-border-color-lighter: var(--border);
+  --el-border-color-extra-light: color-mix(in srgb, var(--border) 55%, var(--bg-card));
+  --el-border-color-dark: var(--border-strong);
+  --el-border-color-darker: color-mix(in srgb, var(--border-strong) 85%, var(--text-primary));
+  --el-border-color-hover: var(--border-strong);
   --el-fill-color: var(--bg-search);
   --el-fill-color-light: var(--bg-hover);
   --el-fill-color-blank: var(--bg-card);
   --el-fill-color-lighter: var(--bg-page);
+  --el-fill-color-extra-light: color-mix(in srgb, var(--bg-hover) 45%, var(--bg-card));
+  --el-fill-color-dark: color-mix(in srgb, var(--bg-search) 85%, var(--border));
+  --el-fill-color-darker: color-mix(in srgb, var(--bg-search) 70%, var(--border));
+  --el-disabled-bg-color: var(--bg-hover);
+  --el-disabled-border-color: var(--border);
   --el-disabled-text-color: var(--text-muted);
+  --el-box-shadow: var(--shadow-card);
+  --el-box-shadow-light: var(--shadow-card);
+  --el-box-shadow-lighter: var(--shadow-card);
+  --el-box-shadow-dark: var(--shadow-card);
   --el-mask-color: rgba(0, 0, 0, 0.4);
+  --el-mask-color-extra-light: color-mix(in srgb, var(--bg-card) 30%, transparent);
 }
 
-[data-theme="dark"] {
+/* Sidebar appearance remains attached to the chosen shell mode. */
+html:root[data-theme="dark"] {
+  --bg-sidebar: #000000;
+}
+
+/* A custom content color may have a different brightness from the shell mode. */
+html:root[data-content-theme="dark"],
+html:root[data-theme="dark"]:not([data-content-theme]) {
   color-scheme: dark;
   --bg-app: #000000;
   --bg-page: #000000;
-  --bg-sidebar: #000000;
   --bg-card: #1d1d1f;
   --bg-search: #2c2c2e;
   --bg-hover: #2c2c2e;
+  --bg-tooltip: #2c2c2e;
   --text-primary: #f5f5f7;
-  --text-secondary: #a1a1a6;
-  --text-muted: #6e6e73;
+  --text-secondary: #d2d2d7;
+  --text-muted: #b5b5bd;
   --text-on-dark: #f5f5f7;
   --text-on-dark-muted: #a1a1a6;
   --border: #424245;
@@ -116,6 +174,7 @@
   --status-info-bg: #13263a;
   --status-warn-bg: #3a2c12;
   --status-danger-bg: #3a1616;
+  --el-color-primary-light-9: var(--status-ok-bg);
   --icon-mint: #16352c;
   --icon-lavender: #2a2640;
   --icon-blue: #13263a;
@@ -139,8 +198,40 @@
   --el-mask-color: rgba(0, 0, 0, 0.65);
 }
 
+/* Keep the user's chosen page hue across the content surfaces and states.
+   The page value itself is supplied by useChrome; palette values live here. */
+html:root[data-content-custom="true"] {
+  --bg-app: var(--bg-page);
+  --bg-card: color-mix(in srgb, var(--bg-page) 14%, #ffffff);
+  --bg-search: color-mix(in srgb, var(--bg-page) 65%, #e8e8ed);
+  --bg-hover: color-mix(in srgb, var(--bg-page) 48%, #e8e8ed);
+  --bg-tooltip: color-mix(in srgb, var(--bg-page) 8%, #1d1d1f);
+  --border: color-mix(in srgb, var(--bg-page) 30%, #c4c4ca);
+  --border-strong: color-mix(in srgb, var(--bg-page) 20%, #a1a1a6);
+  --status-ok-bg: color-mix(in srgb, var(--status-ok) 10%, var(--bg-card));
+  --status-info-bg: color-mix(in srgb, var(--status-info) 10%, var(--bg-card));
+  --status-warn-bg: color-mix(in srgb, var(--status-warn) 10%, var(--bg-card));
+  --status-danger-bg: color-mix(in srgb, var(--status-danger) 10%, var(--bg-card));
+  --icon-mint: var(--status-ok-bg);
+  --icon-blue: var(--status-info-bg);
+  --icon-lavender: color-mix(in srgb, #eee9fe 70%, var(--bg-card));
+  --icon-peach: color-mix(in srgb, #fff1e4 70%, var(--bg-card));
+}
+
+html:root[data-content-custom="true"][data-content-theme="dark"] {
+  --bg-card: color-mix(in srgb, var(--bg-page) 18%, #1d1d1f);
+  --bg-search: color-mix(in srgb, var(--bg-page) 16%, #2c2c2e);
+  --bg-hover: color-mix(in srgb, var(--bg-page) 16%, #363638);
+  --bg-tooltip: color-mix(in srgb, var(--bg-page) 16%, #363638);
+  --border: color-mix(in srgb, var(--bg-page) 15%, #424245);
+  --border-strong: color-mix(in srgb, var(--bg-page) 12%, #565658);
+  --icon-lavender: color-mix(in srgb, #2a2640 70%, var(--bg-card));
+  --icon-peach: color-mix(in srgb, #3a2a16 70%, var(--bg-card));
+}
+
 /* Component CSS is lazy loaded; keep its type scale tied to the shared tokens. */
 html:root {
+  --el-font-family: var(--sans);
   --el-font-size-base: var(--font-size-body);
   --el-font-size-small: var(--font-size-secondary);
   --el-font-size-extra-small: var(--font-size-caption);
@@ -148,7 +239,7 @@ html:root {
   --el-font-size-large: var(--font-size-dialog-title);
 }
 
-html, body, #app {
+html:root, html:root body, #app {
   height: 100%;
   margin: 0;
   background: var(--bg-page);

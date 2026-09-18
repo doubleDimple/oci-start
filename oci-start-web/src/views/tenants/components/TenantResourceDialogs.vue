@@ -1,18 +1,23 @@
 <script setup lang="ts">
+import PageErrorNotice from '@/components/PageErrorNotice.vue'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { tenantGet, tenantPost, tenantPut } from '@/api/tenant'
+import { tenantGet, tenantPut } from '@/api/tenant'
+import PagePagination from '@/components/PagePagination.vue'
+import MobileRecordCard from '@/components/MobileRecordCard.vue'
+import MobileRecordList from '@/components/MobileRecordList.vue'
+import { useCompactViewport } from '@/composables/useCompactViewport'
 
 type Row = Record<string, any>
-type AuditPage = { rows: Row[]; nextToken: string | null }
 type UiMessage = string | { key: string; params?: Record<string, string | number> }
 
 const { t } = useI18n()
+const compact = useCompactViewport()
 const props = defineProps<{ tenant: Row | null; action: string }>()
 const emit = defineEmits<{ close: []; changed: [] }>()
 const titles = computed<Record<string, string>>(() => ({
-  detail: t('tenantResources.titles.detail'), volumes: t('tenantResources.titles.volumes'), quota: t('tenantResources.titles.quota'), audit: t('tenantResources.titles.audit'), transferDetail: t('tenantResources.titles.transferDetail'),
+  detail: t('tenantResources.titles.detail'), volumes: t('tenantResources.titles.volumes'), quota: t('tenantResources.titles.quota'), transferDetail: t('tenantResources.titles.transferDetail'),
 }))
 const visible = computed(() => Boolean(props.tenant && titles.value[props.action]))
 const tenantName = computed(() => props.tenant?.defName || props.tenant?.tenancyName || props.tenant?.userName || t('tenantResources.currentTenant'))
@@ -108,6 +113,7 @@ async function saveVolume() {
   try {
     try {
       await ElMessageBox.confirm(t('tenantResources.volume.confirmMessage', { previous: row.displayName || t('tenantResources.volume.fallbackName'), name, vpus: proposedVpus }), t('tenantResources.volume.confirmTitle'), {
+        customClass: 'tenant-resource-confirm',
         confirmButtonText: t('tenantResources.volume.confirmAction'), cancelButtonText: t('tenantResources.cancel'), type: 'warning',
       })
     } catch { return }
@@ -199,6 +205,17 @@ async function queryQuota(page = 0) {
   }
 }
 
+function changeQuotaPage(value: number) {
+  const knownPages = quotaPage.value + 1 + (quota.value?.hasNextPage ? 1 : 0)
+  if (!Number.isInteger(value) || value < 1 || value > knownPages || value === quotaPage.value + 1) return
+  void queryQuota(value - 1)
+}
+function changeQuotaSize(value: number) {
+  if (loading.value || ![10, 20, 50].includes(value) || value === quotaPageSize.value) return
+  quotaPageSize.value = value
+  void queryQuota(0)
+}
+
 function instanceType(value: unknown) {
   const name = String(value || '').toLowerCase()
   const bareMetal = name.startsWith('bm-') || name.includes('-bm-')
@@ -224,81 +241,6 @@ function usageClass(row: Row) {
   return percent >= 90 ? 'danger' : percent >= 60 ? 'warning' : 'healthy'
 }
 
-const auditStart = ref('')
-const auditEnd = ref('')
-const auditDates = ref({ startDate: '', endDate: '' })
-const auditPage = ref(1)
-const auditCache = ref<Record<number, AuditPage>>({})
-const auditTokens = ref<Record<number, string | null>>({ 1: null })
-const auditRows = computed(() => auditCache.value[auditPage.value]?.rows || [])
-const auditHasNext = computed(() => Boolean(auditCache.value[auditPage.value]?.nextToken))
-const auditKnownPages = computed(() => Math.max(1, ...Object.keys(auditTokens.value).map(Number)))
-const auditCount = computed(() => Object.values(auditCache.value).reduce((total, page) => total + page.rows.length, 0))
-const auditOffset = computed(() => Object.entries(auditCache.value).reduce((count, [page, data]) => Number(page) < auditPage.value ? count + data.rows.length : count, 0))
-
-function auditRowClass({ row }: { row: Row }) {
-  return row.responseStatus && String(row.responseStatus) !== '200' ? 'audit-error-row' : ''
-}
-
-function auditCell(row: Row, column: { property: string }) {
-  return row[column.property] || '—'
-}
-
-async function loadAudit(page = 1) {
-  if (loading.value || (page > 1 && !(page in auditTokens.value))) return
-  error.value = ''
-  if (auditCache.value[page]) {
-    auditPage.value = page
-    return
-  }
-  const current = session
-  loading.value = true
-  try {
-    const result = await tenantPost<Row>('/tenants/audit/log', {
-      tenantId: String(props.tenant!.id), ...auditDates.value, pageToken: auditTokens.value[page] || null,
-    }, config())
-    if (current !== session) return
-    const data = result.data
-    if (!data || !Array.isArray(data.data)) throw localMessage('errors.auditFormat')
-    const nextToken = data.nextPageToken || null
-    auditCache.value[page] = { rows: data.data, nextToken }
-    if (nextToken) auditTokens.value[page + 1] = nextToken
-    auditPage.value = page
-  } catch (cause) {
-    if (current === session) error.value = message(cause)
-  } finally {
-    if (current === session) loading.value = false
-  }
-}
-
-function queryAudit() {
-  const startDate = auditStart.value
-  const endDate = auditEnd.value || startDate
-  if (!startDate) {
-    error.value = localMessage('errors.startDate')
-    return
-  }
-  if (startDate > endDate) {
-    error.value = localMessage('errors.dateOrder')
-    return
-  }
-  const earliest = new Date()
-  earliest.setUTCDate(earliest.getUTCDate() - 90)
-  if (startDate < earliest.toISOString().slice(0, 10)) {
-    error.value = localMessage('errors.startDateRange')
-    return
-  }
-  if ((Date.parse(endDate) - Date.parse(startDate)) / 86400000 > 90) {
-    error.value = localMessage('errors.dateRange')
-    return
-  }
-  auditDates.value = { startDate, endDate }
-  auditPage.value = 1
-  auditCache.value = {}
-  auditTokens.value = { 1: null }
-  void loadAudit(1)
-}
-
 watch(() => [props.action, props.tenant?.id], () => {
   session += 1
   controller.abort()
@@ -313,19 +255,9 @@ watch(() => [props.action, props.tenant?.id], () => {
   quotaTenantId.value = ''
   quotaService.value = 'compute'
   regionsError.value = ''
-  auditCache.value = {}
-  auditTokens.value = { 1: null }
-  auditPage.value = 1
   if (!props.tenant) return
   if (props.action === 'volumes') void loadVolumes()
   if (props.action === 'quota') void loadQuotaRegions()
-  if (props.action === 'audit') {
-    const today = new Date().toISOString().slice(0, 10)
-    auditStart.value = today
-    auditEnd.value = today
-    auditDates.value = { startDate: today, endDate: today }
-    void loadAudit(1)
-  }
 }, { immediate: true })
 
 onBeforeUnmount(() => {
@@ -356,7 +288,7 @@ onBeforeUnmount(() => {
         <dl v-if="detail" class="account-details">
           <div class="detail-feature"><dt>{{ t('tenantResources.account.typeAndPlan') }}</dt><dd>{{ accountPlan }}</dd></div>
           <div><dt>{{ t('tenantResources.account.registeredAt') }}</dt><dd>{{ detail.registerTime || '—' }}</dd></div>
-          <div><dt>{{ t('tenantResources.account.subscriptionNumber') }}</dt><dd class="mono">{{ detail.subscriptionPlanNumber || '—' }}</dd></div>
+          <div><dt>{{ t('tenantResources.account.subscriptionNumber') }}</dt><dd>{{ detail.subscriptionPlanNumber || '—' }}</dd></div>
           <div><dt>{{ t('tenantResources.account.email') }}</dt><dd>{{ detail.emailAddress || '—' }}</dd></div>
           <div><dt>{{ t('tenantResources.account.address') }}</dt><dd>{{ accountAddress }}</dd></div>
         </dl>
@@ -369,8 +301,16 @@ onBeforeUnmount(() => {
 
       <template v-else-if="action === 'volumes'">
         <div class="resource-toolbar"><span>{{ t('tenantResources.volume.description') }}</span><el-button :loading="loading" :disabled="saving" @click="loadVolumes">{{ t('tenantResources.refresh') }}</el-button></div>
-        <el-alert v-if="error" :title="displayMessage(error)" type="error" :closable="false" show-icon />
-        <el-table :data="volumes" v-loading="loading" max-height="380" row-key="id" class="resource-table" :empty-text="t('tenantResources.volume.empty')">
+        <PageErrorNotice v-if="error">{{ displayMessage(error) }}</PageErrorNotice>
+        <MobileRecordList v-if="compact" drilldown :list-id="`tenant-resource-volumes-${tenant?.id}`" :record-keys="volumes.map(row => String(row.id))" :loading="loading" class="resource-mobile-list">
+          <MobileRecordCard v-for="row in volumes" :key="row.id" :record-key="String(row.id)" :summary-title="row.displayName || '—'" :summary-meta="row.instanceName || '—'" :summary-status="row.sizeInGBs == null ? undefined : `${row.sizeInGBs} GB`">
+            <template #identity><h3 class="mobile-record-title">{{ row.displayName || '—' }}</h3></template>
+            <dl class="mobile-record-fields"><div class="mobile-record-wide"><dt>{{ t('tenantResources.volume.instance') }}</dt><dd>{{ row.instanceName || '—' }}</dd></div><div><dt>{{ t('tenantResources.volume.size') }}</dt><dd>{{ row.sizeInGBs ?? '—' }}</dd></div><div><dt>{{ t('tenantResources.volume.vpus') }}</dt><dd>{{ row.vpusPerGB ?? '—' }}</dd></div></dl>
+            <template #footer><el-button :disabled="saving || loading" @click="editVolume(row)">{{ t('tenantResources.edit') }}</el-button></template>
+          </MobileRecordCard>
+          <p v-if="loading || !volumes.length" class="resource-mobile-empty" role="status">{{ t(loading ? 'pageLoading.loading' : 'tenantResources.volume.empty') }}</p>
+        </MobileRecordList>
+        <el-table v-else :data="volumes" v-loading="loading" max-height="380" row-key="id" class="resource-table" :empty-text="t('tenantResources.volume.empty')">
           <el-table-column prop="instanceName" :label="t('tenantResources.volume.instance')" min-width="160"><template #default="{ row }">{{ row.instanceName || '—' }}</template></el-table-column>
           <el-table-column prop="displayName" :label="t('tenantResources.volume.name')" min-width="210" show-overflow-tooltip />
           <el-table-column prop="sizeInGBs" :label="t('tenantResources.volume.size')" width="120" />
@@ -383,7 +323,7 @@ onBeforeUnmount(() => {
             <el-form label-position="top" :disabled="saving" @submit.prevent="saveVolume">
               <el-form-item :label="t('tenantResources.volume.name')"><el-input v-model="volumeName" :placeholder="t('tenantResources.volume.namePlaceholder')" /></el-form-item>
               <el-form-item :label="t('tenantResources.volume.performance')"><el-slider v-model="volumeVpus" :min="Math.min(10, Number(editingVolume.vpusPerGB ?? 10))" :max="120" :step="10" show-input :aria-label="t('tenantResources.volume.performanceAria')" /></el-form-item>
-              <el-alert v-if="volumeError" :title="displayMessage(volumeError)" type="error" :closable="false" show-icon />
+              <PageErrorNotice v-if="volumeError">{{ displayMessage(volumeError) }}</PageErrorNotice>
               <div class="editor-actions"><el-button :disabled="saving" @click="editingVolume = null">{{ t('tenantResources.cancel') }}</el-button><el-button type="primary" :loading="saving" native-type="submit">{{ t('tenantResources.saveChanges') }}</el-button></div>
             </el-form>
           </section>
@@ -393,23 +333,35 @@ onBeforeUnmount(() => {
       <template v-else-if="action === 'quota'">
         <el-form class="query-filters" label-position="top" :disabled="loading" @submit.prevent="queryQuota(0)">
           <el-form-item :label="t('tenantResources.quota.tenantRegion')" class="filter-grow">
-            <el-select v-model="quotaTenantId" filterable :loading="regionsLoading" :disabled="regionsLoading" :placeholder="t('tenantResources.quota.regionPlaceholder')" @change="resetQuota">
+            <el-select v-model="quotaTenantId" popper-class="tenant-resource-select" filterable :loading="regionsLoading" :disabled="regionsLoading" :placeholder="t('tenantResources.quota.regionPlaceholder')" @change="resetQuota">
               <el-option v-for="(region, index) in quotaRegions" :key="`${region.id}-${index}`" :value="String(region.id)" :label="`${region.tenancyName || region.userName || t('tenantResources.currentTenant')}${region.region ? ` · ${region.region}` : ''}`" />
             </el-select>
           </el-form-item>
           <el-form-item :label="t('tenantResources.quota.serviceType')" class="filter-grow">
-            <el-select v-model="quotaService" @change="resetQuota">
+            <el-select v-model="quotaService" popper-class="tenant-resource-select" @change="resetQuota">
               <el-option-group v-for="group in services" :key="group.group" :label="group.group"><el-option v-for="option in group.options" :key="option.value" v-bind="option" /></el-option-group>
             </el-select>
           </el-form-item>
           <el-form-item><el-button native-type="submit" type="primary" :loading="loading" :disabled="!quotaTenantId || regionsLoading">{{ t('tenantResources.quota.query') }}</el-button></el-form-item>
         </el-form>
-        <el-alert v-if="regionsError" :title="t('tenantResources.errors.regionsFallback', { message: displayMessage(regionsError) })" type="warning" :closable="false" show-icon />
-        <el-alert v-if="error" :title="displayMessage(error)" type="error" :closable="false" show-icon />
+        <PageErrorNotice v-if="regionsError">{{ t('tenantResources.errors.regionsFallback', { message: displayMessage(regionsError) }) }}</PageErrorNotice>
+        <PageErrorNotice v-if="error">{{ displayMessage(error) }}</PageErrorNotice>
         <div v-loading="loading" class="resource-results" :aria-busy="loading">
           <template v-if="quota">
             <p class="result-caption" aria-live="polite">{{ t('tenantResources.quota.caption', { region: quota.region || '', service: queriedService, count: quotaRows.length }) }}</p>
-            <el-table :data="quotaRows" max-height="390" class="resource-table" :empty-text="t('tenantResources.quota.empty')">
+            <MobileRecordList v-if="compact" drilldown :list-id="`tenant-quota-${tenant?.id}-${quotaTenantId}-${quota.service}-${quotaPage}`" :record-keys="quotaRows.map(row => String(row.name))" :loading="loading" class="resource-mobile-list">
+              <MobileRecordCard v-for="row in quotaRows" :key="row.name" :record-key="String(row.name)" :summary-title="row.name || '—'" :summary-meta="instanceType(row.name) || queriedService" :summary-status="`${t('tenantResources.quota.available')}: ${row.available ?? 0}`" :summary-tone="Number(row.available || 0) <= 0 ? 'danger' : 'success'">
+                <template #identity><h3 class="mobile-record-title">{{ row.name || '—' }}</h3></template>
+                <dl class="mobile-record-fields">
+                  <div v-if="hasInstanceTypes" class="mobile-record-wide"><dt>{{ t('tenantResources.quota.instanceType') }}</dt><dd>{{ instanceType(row.name) || '—' }}</dd></div>
+                  <div><dt>{{ t('tenantResources.quota.total') }}</dt><dd>{{ row.total ?? 0 }}</dd></div><div><dt>{{ t('tenantResources.quota.used') }}</dt><dd>{{ row.used ?? 0 }}</dd></div>
+                  <div><dt>{{ t('tenantResources.quota.available') }}</dt><dd :class="Number(row.available || 0) <= 0 ? 'danger' : 'healthy'">{{ row.available ?? 0 }}</dd></div>
+                  <div class="mobile-record-wide"><dt>{{ t('tenantResources.quota.usage') }}</dt><dd><div class="usage" :class="usageClass(row)"><span class="usage-track" role="progressbar" :aria-valuenow="usage(row)" :aria-valuemin="0" :aria-valuemax="100" :aria-label="t('tenantResources.quota.usageAria', { name: row.name })"><span :style="{ transform: `scaleX(${usage(row) / 100})` }" /></span><span>{{ usage(row) }}%</span></div></dd></div>
+                </dl>
+              </MobileRecordCard>
+              <p v-if="!quotaRows.length" class="resource-mobile-empty" role="status">{{ t('tenantResources.quota.empty') }}</p>
+            </MobileRecordList>
+            <el-table v-else :data="quotaRows" max-height="390" class="resource-table" :empty-text="t('tenantResources.quota.empty')">
               <el-table-column prop="name" :label="t('tenantResources.quota.limitName')" min-width="245" show-overflow-tooltip />
               <el-table-column v-if="hasInstanceTypes" :label="t('tenantResources.quota.instanceType')" min-width="140"><template #default="{ row }"><span class="instance-type">{{ instanceType(row.name) || '—' }}</span></template></el-table-column>
               <el-table-column :label="t('tenantResources.quota.total')" width="80" align="right"><template #default="{ row }">{{ row.total ?? 0 }}</template></el-table-column>
@@ -417,38 +369,12 @@ onBeforeUnmount(() => {
               <el-table-column :label="t('tenantResources.quota.available')" width="95" align="right"><template #default="{ row }"><span :class="Number(row.available || 0) <= 0 ? 'danger' : 'healthy'">{{ row.available ?? 0 }}</span></template></el-table-column>
               <el-table-column :label="t('tenantResources.quota.usage')" min-width="155"><template #default="{ row }"><div class="usage" :class="usageClass(row)"><span class="usage-track" role="progressbar" :aria-valuenow="usage(row)" :aria-valuemin="0" :aria-valuemax="100" :aria-label="t('tenantResources.quota.usageAria', { name: row.name })"><span :style="{ transform: `scaleX(${usage(row) / 100})` }" /></span><span>{{ usage(row) }}%</span></div></template></el-table-column>
             </el-table>
-            <div class="resource-pagination">
-              <label class="page-size">{{ t('tenantResources.quota.pageSize') }}<el-select v-model="quotaPageSize" :disabled="loading" :aria-label="t('tenantResources.quota.pageSizeAria')" @change="queryQuota(0)"><el-option v-for="size in [10, 20, 50]" :key="size" :value="size" :label="String(size)" /></el-select></label>
-              <div class="page-controls"><el-button :disabled="loading || quotaPage === 0" @click="queryQuota(quotaPage - 1)">{{ t('tenantResources.previousPage') }}</el-button><span aria-live="polite">{{ t('tenantResources.pageNumber', { page: quotaPage + 1 }) }}</span><el-button :disabled="loading || !quota.hasNextPage" @click="queryQuota(quotaPage + 1)">{{ t('tenantResources.nextPage') }}</el-button></div>
-            </div>
+            <PagePagination embedded cursor class="resource-pagination" :current-page="quotaPage + 1" :page-size="quotaPageSize" :has-next="!!quota.hasNextPage" :has-previous="quotaPage > 0" :page-sizes="[10, 20, 50]" :disabled="loading" @current-change="changeQuotaPage" @size-change="changeQuotaSize"><span aria-live="polite">{{ t('tenantResources.pageNumber', { page: quotaPage + 1 }) }}</span></PagePagination>
           </template>
           <el-empty v-else :description="loading ? t('tenantResources.quota.loading') : t('tenantResources.quota.selectPrompt')" :image-size="88" />
         </div>
       </template>
 
-      <template v-else-if="action === 'audit'">
-        <el-form class="query-filters" label-position="top" :disabled="loading" @submit.prevent="queryAudit">
-          <el-form-item :label="t('tenantResources.audit.startDate')" class="filter-date"><el-date-picker v-model="auditStart" type="date" value-format="YYYY-MM-DD" format="YYYY-MM-DD" :placeholder="t('tenantResources.audit.startPlaceholder')" /></el-form-item>
-          <el-form-item :label="t('tenantResources.audit.endDate')" class="filter-date"><el-date-picker v-model="auditEnd" type="date" value-format="YYYY-MM-DD" format="YYYY-MM-DD" :placeholder="t('tenantResources.audit.endPlaceholder')" /></el-form-item>
-          <el-form-item><el-button native-type="submit" type="primary" :loading="loading">{{ t('tenantResources.audit.query') }}</el-button></el-form-item>
-        </el-form>
-        <el-alert v-if="error" :title="displayMessage(error)" type="error" :closable="false" show-icon />
-        <p class="result-caption">{{ t('tenantResources.audit.dateRange', { start: auditDates.startDate, end: auditDates.endDate }) }}</p>
-        <el-table :data="auditRows" v-loading="loading" max-height="420" class="resource-table" :empty-text="t('tenantResources.audit.empty')" :row-class-name="auditRowClass">
-          <el-table-column :label="t('tenantResources.audit.index')" width="68"><template #default="{ $index }">{{ auditOffset + $index + 1 }}</template></el-table-column>
-          <el-table-column prop="userName" :label="t('tenantResources.audit.username')" min-width="150" show-overflow-tooltip :formatter="auditCell" />
-          <el-table-column prop="ipAddress" :label="t('tenantResources.audit.sourceIp')" min-width="180" show-overflow-tooltip :formatter="auditCell" />
-          <el-table-column prop="eventType" :label="t('tenantResources.audit.eventType')" min-width="180" show-overflow-tooltip :formatter="auditCell" />
-          <el-table-column prop="clientEnv" :label="t('tenantResources.audit.client')" min-width="150" show-overflow-tooltip :formatter="auditCell" />
-          <el-table-column prop="eventTime" :label="t('tenantResources.audit.eventTime')" min-width="170" :formatter="auditCell" />
-          <el-table-column :label="t('tenantResources.audit.response')" width="100"><template #default="{ row }"><span :class="row.responseStatus && String(row.responseStatus) !== '200' ? 'danger' : ''">{{ row.responseStatus || '—' }}</span></template></el-table-column>
-        </el-table>
-        <div class="resource-pagination">
-          <span class="result-caption" aria-live="polite">{{ t(auditHasNext ? 'tenantResources.audit.loadedWithMore' : 'tenantResources.audit.loaded', { count: auditCount }) }}</span>
-          <el-pagination :current-page="auditPage" :page-count="auditKnownPages" :pager-count="5" layout="prev, pager, next" :disabled="loading" @current-change="loadAudit" />
-        </div>
-        <p class="audit-note">{{ t('tenantResources.audit.note') }}</p>
-      </template>
     </div>
     <template v-if="action === 'detail' || action === 'transferDetail'" #footer><el-button @click="close">{{ t('tenantResources.close') }}</el-button></template>
   </el-dialog>
@@ -456,12 +382,16 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .resource-body { color: var(--text-primary); font-family: var(--sans); font-size: var(--font-size-body); }
-:global(.tenant-resource-dialog .el-dialog__title) { font-size: var(--font-size-dialog-title); }
+:global(.tenant-resource-dialog) { font-family: var(--sans); font-size: var(--font-size-body); color: var(--text-primary); }
+:global(.tenant-resource-dialog .el-dialog__title) { font-size: var(--font-size-dialog-title); font-weight: 600; color: var(--text-primary); }
+:global(.tenant-resource-confirm) { font-family: var(--sans); --el-messagebox-title-color: var(--text-primary); --el-messagebox-content-color: var(--text-primary); --el-messagebox-font-size: var(--font-size-dialog-title); --el-messagebox-content-font-size: var(--font-size-body); }
+:global(.tenant-resource-confirm .el-message-box__title) { font-weight: 600; }
+:global(.tenant-resource-select.el-popper) { font-family: var(--sans); font-size: var(--font-size-body); }
+:global(.tenant-resource-select .el-select-group__title) { color: var(--text-secondary); font-size: var(--font-size-secondary); }
 :global(.tenant-resource-dialog .el-button), :global(.tenant-resource-dialog .el-input__inner), :global(.tenant-resource-dialog .el-select__wrapper), :global(.tenant-resource-dialog .el-form-item__label), :global(.tenant-resource-dialog .el-checkbox__label), :global(.tenant-resource-dialog .el-radio__label), :global(.tenant-resource-dialog .el-table) { font-size: var(--font-size-body); }
 :global(.tenant-resource-dialog .el-tag) { font-size: var(--font-size-caption); }
 :global(.tenant-resource-dialog .el-alert__title) { font-size: var(--font-size-body); }
 :global(.tenant-resource-dialog .el-alert__description), :global(.tenant-resource-dialog .el-form-item__error), :global(.tenant-resource-dialog .el-empty__description p) { font-size: var(--font-size-secondary); }
-.resource-body :deep(.el-date-editor .el-range-input), .resource-body :deep(.el-date-editor .el-range-separator) { font-size: var(--font-size-body); }
 .resource-context { margin: -4px 0 24px; color: var(--text-secondary); font-size: var(--font-size-secondary); overflow-wrap: anywhere; }
 .account-details { margin: 0; }
 .account-details > div { display: grid; grid-template-columns: 128px minmax(0, 1fr); gap: 20px; padding: 18px 0; border-bottom: 1px solid var(--border); }
@@ -470,28 +400,22 @@ onBeforeUnmount(() => {
 .account-details dd { margin: 0; overflow-wrap: anywhere; }
 .account-details .detail-feature { display: block; padding: 24px; margin-bottom: 6px; background: var(--bg-search); border: 0; border-radius: var(--r-card); }
 .detail-feature dd { margin-top: 8px; font-size: var(--font-size-section); font-weight: 600; letter-spacing: -.022em; }
-.mono { font-family: var(--mono); }
 .transfer-summary { display: grid; gap: 12px; padding: 30px 0 38px; text-align: center; color: var(--text-secondary); }
 .transfer-summary strong { font-size: 44px; font-weight: 600; color: var(--brand); font-variant-numeric: tabular-nums; }
-.resource-toolbar, .query-filters, .resource-pagination, .page-controls, .page-size { display: flex; align-items: center; gap: 12px; }
+.resource-toolbar, .query-filters { display: flex; align-items: center; gap: 12px; }
 .resource-toolbar { justify-content: space-between; flex-wrap: wrap; margin-bottom: 18px; color: var(--text-secondary); }
+.resource-toolbar > span { font-size: var(--font-size-secondary); }
 .query-filters { align-items: flex-end; flex-wrap: wrap; gap: 12px; }
 .query-filters :deep(.el-form-item) { margin-bottom: 18px; }
-.query-filters :deep(.el-form-item__label) { color: var(--text-secondary); }
+.resource-body :deep(.el-form-item__label) { font-family: var(--sans); color: var(--text-primary); }
 .filter-grow { flex: 1 1 220px; }
-.filter-date { flex: 1 1 210px; }
-.filter-date :deep(.el-date-editor) { width: 100%; }
 .resource-results { min-height: 230px; }
 .resource-table { margin-top: 14px; border-radius: var(--r-sm); font-variant-numeric: tabular-nums; }
 .resource-table :deep(.el-table__cell) { padding: 13px 0; }
-.resource-table :deep(.audit-error-row) { --el-table-tr-bg-color: var(--status-danger-bg); }
-.resource-pagination { flex-wrap: wrap; justify-content: space-between; margin-top: 18px; }
-.page-size { color: var(--text-secondary); font-size: var(--font-size-secondary); }
-.page-size :deep(.el-select) { width: 75px; }
-.page-controls { flex-wrap: wrap; }
-.page-controls > span { color: var(--text-secondary); font-size: var(--font-size-secondary); white-space: nowrap; }
+.resource-table :deep(th.el-table__cell) { font-size: var(--font-size-body); font-weight: 600; color: var(--text-secondary); }
+.resource-pagination { margin-top: 18px; }
 .result-caption { margin: 0; color: var(--text-secondary); font-size: var(--font-size-secondary); }
-.instance-type { font-size: var(--font-size-body); color: var(--text-secondary); }
+.instance-type { font-size: var(--font-size-body); color: var(--text-primary); }
 .usage { display: flex; align-items: center; gap: 10px; font-size: var(--font-size-body); font-variant-numeric: tabular-nums; }
 .usage > span:last-child { width: 35px; text-align: right; }
 .usage-track { flex: 1; height: 6px; overflow: hidden; border-radius: var(--r-pill); background: var(--bg-search); }
@@ -504,16 +428,23 @@ onBeforeUnmount(() => {
 .volume-editor :deep(.el-slider) { margin-inline: 7px; }
 .editor-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 22px; }
 .editor-actions :deep(.el-button + .el-button) { margin-left: 0; }
-.audit-note { margin: 14px 0 0; font-size: var(--font-size-secondary); color: var(--text-muted); }
 .resource-reveal-enter-active, .resource-reveal-leave-active { transition: transform 320ms cubic-bezier(.22, 1, .36, 1), opacity 220ms ease; }
 .resource-reveal-enter-from, .resource-reveal-leave-to { opacity: 0; transform: translateY(8px); }
 @media (max-width: 600px) {
   .account-details > div { grid-template-columns: 1fr; gap: 7px; }
   .detail-feature dd { font-size: var(--font-size-section); }
-  .resource-pagination { gap: 16px; }
   .volume-editor { padding: 18px; }
   .volume-editor :deep(.el-slider__input) { width: 100px; }
-  .page-controls { gap: 8px; }
+}
+@media (max-width: 760px) {
+  :global(.tenant-resource-dialog) { max-height: calc(100dvh - 32px); overflow-y: auto; }
+  .resource-body, .query-filters, .filter-grow { min-width: 0; }
+  .resource-results { min-height: 100px; }
+  .resource-mobile-list { padding: 0; max-height: 52dvh; overflow-y: auto; overscroll-behavior: contain; }
+  .resource-mobile-empty { display: grid; place-items: center; min-height: 88px; margin: 0; color: var(--text-secondary); font-size: var(--font-size-body); }
+  .resource-mobile-list :deep(.el-button) { min-height: 44px; height: auto; max-width: 100%; white-space: normal; }
+  .result-caption { margin-bottom: 12px; overflow-wrap: anywhere; }
+  .editor-actions { flex-wrap: wrap; }
 }
 @media (prefers-reduced-motion: reduce) {
   .resource-reveal-enter-active, .resource-reveal-leave-active, .usage-track > span { transition: none; }

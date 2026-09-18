@@ -1,0 +1,77 @@
+.memos-page {
+  display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; height: 100%; overflow: hidden;
+  border: 1px solid var(--border); border-radius: var(--r-card); background: var(--bg-card); color: var(--text-primary);
+  font: 400 var(--font-size-body)/1.5 var(--sans);
+  .btn { min-height: 36px; padding: 7px 13px; }
+  i { display: inline-block; flex: none; width: 18px; height: 18px; }
+}
+.memos-toolbar { display: flex; align-items: center; flex: none; gap: 16px; min-height: 64px; padding: 13px 20px; border-bottom: 1px solid var(--border); }
+.memos-context { flex: 1; min-width: 0; font-weight: 500; }
+.memos-toolbar-actions, .memos-inline-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 9px; }
+.memos-toolbar-actions { margin-left: auto; }
+.memos-search {
+  display: flex; align-items: center; flex: 1; gap: 8px; min-width: 130px; max-width: 450px; padding: 0 12px;
+  border: 1px solid var(--border); border-radius: var(--r-pill); background: var(--bg-search);
+  input { width: 100%; min-width: 0; height: 36px; padding: 0; border: 0; background: transparent; color: var(--text-primary); font: inherit; outline: none; }
+  input::placeholder { color: var(--text-muted); }
+  &:focus-within { outline: 2px solid var(--brand); outline-offset: 2px; }
+}
+.memos-table-scroll { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+.memos-table {
+  width: 100%; min-width: 890px; table-layout: fixed; border-collapse: separate; border-spacing: 0;
+  th, td { padding: 12px 18px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: middle; font-size: var(--font-size-body); }
+  th { position: sticky; top: 0; z-index: 2; height: 44px; padding-block: 10px; background: var(--bg-search); color: var(--text-primary); font-weight: 500; white-space: nowrap; }
+  td { height: 64px; background: var(--bg-card); }
+  tbody tr:hover td { background: var(--bg-hover); }
+  time { display: block; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .memos-sticky-actions { position: sticky; right: 0; z-index: 1; border-left: 1px solid var(--border); }
+  th.memos-sticky-actions { z-index: 3; }
+}
+.memos-date-col { width: 190px; }
+.memos-actions-col { width: 225px; }
+.memos-note-link {
+  display: grid; gap: 5px; width: 100%; min-width: 0; padding: 2px 0; border: 0; background: transparent; color: var(--text-primary); font: inherit; text-align: left; cursor: pointer;
+  strong, span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  strong { font-size: var(--font-size-body); font-weight: 500; }
+  span { color: var(--text-secondary); font-size: var(--font-size-secondary); }
+  &:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; border-radius: 4px; }
+  &:disabled { cursor: default; opacity: .6; }
+}
+.memos-row-actions {
+  display: flex; align-items: center; gap: 3px;
+  button { display: inline-flex; align-items: center; justify-content: center; flex: none; gap: 5px; min-width: 32px; height: 32px; padding: 5px 7px; border: 0; border-radius: 6px; background: transparent; color: var(--text-primary); font: inherit; cursor: pointer; white-space: nowrap; }
+  button:hover:not(:disabled) { background: var(--bg-search); }
+  button:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
+  button:disabled { cursor: default; opacity: .5; }
+  button.is-danger { color: var(--status-danger); }
+}
+.memos-empty { height: 240px !important; text-align: center !important; color: var(--text-secondary); > i { display: block; width: 26px; height: 26px; margin: 0 auto 12px; } }
+.memos-footer { display: flex; align-items: center; justify-content: space-between; flex: none; gap: 16px; min-height: 64px; padding: 12px 20px; border-top: 1px solid var(--border); background: var(--bg-card); }
+.memos-footer > span { min-width: 0; color: var(--text-secondary); font-size: var(--font-size-secondary); }
+.memos-notice { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; flex: none; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--border); background: var(--bg-search); font-size: var(--font-size-secondary); p { flex: 1 1 290px; margin: 0; } &.is-warning { border-bottom-color: var(--status-warn); } }
+.memos-error { flex: none; margin: 0; padding: 10px 20px; border-bottom: 1px solid var(--border); color: var(--status-danger); font-size: var(--font-size-secondary); overflow-wrap: anywhere; }
+.memos-body { flex: 1; min-height: 0; padding: 26px 32px; overflow: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.memos-body-status { margin: 0 0 20px; color: var(--text-secondary); font-size: var(--font-size-secondary); }
+.memos-body-error { margin: 12px 0; color: var(--status-danger); font-size: var(--font-size-secondary); overflow-wrap: anywhere; }
+.memo-reading { max-width: 1100px; h2 { margin: 0 0 16px; color: var(--text-primary); font-size: var(--font-size-section); font-weight: 600; overflow-wrap: anywhere; } h2:focus { outline: none; } }
+.memo-metadata { display: flex; flex-wrap: wrap; gap: 10px 26px; margin: 0 0 20px; padding: 0 0 20px; border-bottom: 1px solid var(--border); color: var(--text-secondary); font-size: var(--font-size-secondary); div { display: flex; flex-wrap: wrap; gap: 8px; } dt, dd { margin: 0; } }
+.memo-summary { padding: 0 0 22px; margin: 0 0 22px; border-bottom: 1px solid var(--border); color: var(--text-primary); white-space: pre-wrap; overflow-wrap: anywhere; }
+.memo-form { max-width: 1100px; fieldset { display: grid; gap: 22px; min-width: 0; margin: 0; padding: 0; border: 0; } }
+.memo-field {
+  display: grid; gap: 8px; min-width: 0;
+  label { color: var(--text-primary); font-weight: 500; }
+  > input, > textarea { width: 100%; min-width: 0; box-sizing: border-box; padding: 9px 12px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--bg-card); color: var(--text-primary); font: inherit; }
+  > input { min-height: 38px; }
+  > textarea { min-height: 68px; resize: vertical; }
+  > input::placeholder, > textarea::placeholder { color: var(--text-muted); }
+  > input:focus-visible, > textarea:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+  small { color: var(--text-secondary); font-size: var(--font-size-secondary); text-align: right; }
+}
+.memo-compare { display: grid; gap: 14px; padding-top: 24px; margin-top: 26px; border-top: 1px solid var(--border); h3 { margin: 0; font-size: var(--font-size-section); font-weight: 600; } p { margin: 0; overflow-wrap: anywhere; } > .btn { justify-self: start; } }
+.memo-compare-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.memo-review-search { min-width: 0; width: 100%; box-sizing: border-box; height: 38px; padding: 8px 12px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--bg-card); color: var(--text-primary); font: inherit; &:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; } }
+.memo-review-item { padding: 12px 0; border-bottom: 1px solid var(--border); summary { padding: 4px 0; cursor: pointer; overflow-wrap: anywhere; } summary:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; } > p { margin: 12px 0; white-space: pre-wrap; } }
+.memos-sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.memo-confirm-dialog { max-width: calc(100vw - 28px); background: var(--bg-card); color: var(--text-primary); border-radius: var(--r-card); font-family: var(--sans); .el-dialog__title { color: var(--text-primary); font: 600 var(--font-size-dialog-title)/1.5 var(--sans); } .el-dialog__body { color: var(--text-primary); font: 400 var(--font-size-body)/1.7 var(--sans); } .el-dialog__body > p { margin: 0 0 12px; overflow-wrap: anywhere; } .el-dialog__footer { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; } .el-dialog__headerbtn .el-dialog__close { color: var(--text-primary); } }
+@media (max-width: 900px) { .memos-toolbar { flex-wrap: wrap; gap: 10px; padding: 12px; } .memos-search { max-width: none; } .memos-footer { flex-wrap: wrap; padding: 12px; } .memos-body { padding: 22px; } }
+@media (max-width: 680px) { .memos-toolbar-actions { justify-content: flex-end; } .memos-table { min-width: 780px; } .memos-table th, .memos-table td { padding-inline: 12px; } .memos-actions-col { width: 126px; } .memos-row-actions button > span { display: none; } .memos-body { padding: 20px 16px; } .memos-footer > span { font-size: var(--font-size-secondary); } }

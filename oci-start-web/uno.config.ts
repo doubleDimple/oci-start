@@ -30,7 +30,7 @@ export default defineConfig({
     'i-mdi-swap-horizontal',
     'i-mdi-bell-outline',
     'i-mdi-notebook-outline',
-    'i-mdi-migrate',
+    'i-mdi-database-sync-outline',
     'i-mdi-cellphone-key',
     'i-mdi-code-tags',
     'i-mdi-folder-outline',

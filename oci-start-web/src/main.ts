@@ -12,6 +12,7 @@ import { applyStoredTheme } from './composables/useTheme'
 import './styles/tokens.css'
 import './styles/index.scss'
 import './styles/motion.scss'
+import './styles/mobile-ios.scss'
 
 applyStoredTheme()
 

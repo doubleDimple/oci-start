@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import PageErrorNotice from '@/components/PageErrorNotice.vue'
 import GhostBtn from '@/components/GhostBtn.vue'
 import PrimaryBtn from '@/components/PrimaryBtn.vue'
 import {
@@ -157,7 +158,8 @@ onBeforeUnmount(() => {
     <div class="version-content">
       <div class="version-byline">{{ t('headerVersion.author') }}</div>
 
-      <div v-if="updateState !== 'idle'" class="version-notice" :class="`is-${updateState}`" role="status" aria-live="polite">
+      <PageErrorNotice v-if="updateState === 'failed'" :title="stateTitle">{{ stateHint }}</PageErrorNotice>
+      <div v-else-if="updateState !== 'idle'" class="version-notice" :class="`is-${updateState}`" role="status" aria-live="polite">
         <i :class="starting ? 'i-mdi-loading version-spin' : submitted ? 'i-mdi-information-outline' : 'i-mdi-alert-circle-outline'" aria-hidden="true" />
         <div>
           <strong>{{ stateTitle }}</strong>
@@ -166,14 +168,12 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <div v-if="loadProblem" class="version-notice is-failed" role="alert">
-        <i class="i-mdi-alert-circle-outline" aria-hidden="true" />
+      <PageErrorNotice v-if="loadProblem" :title="t('headerVersion.loadFailed')">
         <div>
-          <strong>{{ t('headerVersion.loadFailed') }}</strong>
           <p>{{ problemText(loadProblem) }}</p>
           <p v-if="info">{{ t('headerVersion.retainedInfo') }}</p>
         </div>
-      </div>
+      </PageErrorNotice>
       <p v-if="loading && !info" class="version-loading" role="status">{{ t('headerVersion.loading') }}</p>
       <dl class="version-facts" :aria-busy="loading">
         <div><dt>{{ t('headerVersion.currentVersion') }}</dt><dd>{{ info?.currentVersion || t('headerVersion.unavailable') }}</dd></div>
@@ -200,7 +200,7 @@ onBeforeUnmount(() => {
           <div class="support-methods">
             <div v-for="method in supportMethods" :key="method.name" class="support-method">
               <el-image class="support-qr" :src="method.src" :alt="t(`headerVersion.${method.alt}`)" :preview-src-list="[method.src]" preview-teleported fit="contain" role="button" tabindex="0" :aria-label="t(`headerVersion.${method.alt}`)" @keydown="onQrKeydown">
-                <template #error><span class="qr-error">{{ t('headerVersion.imageUnavailable') }}</span></template>
+                <template #error><PageErrorNotice :title="t(`headerVersion.${method.alt}`)">{{ t('headerVersion.imageUnavailable') }}</PageErrorNotice></template>
               </el-image>
               <strong>{{ t(`headerVersion.${method.name}`) }}</strong>
             </div>
@@ -212,7 +212,7 @@ onBeforeUnmount(() => {
               <i class="i-mdi-content-copy" aria-hidden="true" />
               {{ copyState === 'copied' ? t('headerVersion.copied') : t('headerVersion.copyAddress') }}
             </button>
-            <p v-if="copyState === 'failed'" class="copy-error" role="alert">{{ t('headerVersion.copyFailed') }}</p>
+            <PageErrorNotice v-if="copyState === 'failed'">{{ t('headerVersion.copyFailed') }}</PageErrorNotice>
             <span v-else-if="copyState === 'copied'" class="version-sr-only" role="status">{{ t('headerVersion.copied') }}</span>
           </div>
         </div>
@@ -280,7 +280,6 @@ onBeforeUnmount(() => {
   > i { margin-top: 3px; color: var(--status-info); }
   strong { font-weight: 600; }
   p { margin: 4px 0 0; font-size: var(--font-size-secondary); overflow-wrap: anywhere; }
-  &.is-failed { background: var(--status-danger-bg); > i { color: var(--status-danger); } }
   &.is-unknown { background: var(--status-warn-bg); > i { color: var(--status-warn); } }
   &.is-started { background: var(--status-ok-bg); > i { color: var(--status-ok); } }
 }
@@ -314,7 +313,6 @@ onBeforeUnmount(() => {
 .support-methods { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .support-method { min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; strong { font-weight: 600; } }
 .support-qr { width: min(144px, 100%); height: 144px; border: 1px solid var(--border); border-radius: var(--r-sm); }
-.qr-error { display: grid; width: 100%; height: 100%; place-content: center; padding: 10px; color: var(--text-secondary); background: var(--bg-search); font-size: var(--font-size-secondary); text-align: center; }
 .support-address {
   display: grid;
   gap: 7px;
@@ -324,7 +322,6 @@ onBeforeUnmount(() => {
   .version-text-button { justify-self: start; }
 }
 .version-text-button { display: inline-flex; align-items: center; gap: 6px; border: 0; padding: 5px 0; background: transparent; color: var(--brand); font: inherit; cursor: pointer; &:disabled { cursor: default; opacity: .6; } }
-.copy-error { margin: 0; color: var(--status-danger); font-size: var(--font-size-secondary); }
 .version-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
 .version-actions-end { display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: 8px; margin-inline-start: auto; }
 .version-login-link { display: inline-flex; align-items: center; justify-content: center; min-height: 40px; box-sizing: border-box; padding: 9px 16px; border-radius: var(--r-pill); background: var(--brand); color: var(--nav-active-fg); text-decoration: none; font-weight: 600; &:hover { background: var(--brand-hover); } }

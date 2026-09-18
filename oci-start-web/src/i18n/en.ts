@@ -1,5 +1,45 @@
 import regionGlobe from './regions/globe'
+import emailManagement from './email/management'
+import emailCompose from './email/compose'
+import storageManagement from './storage/management'
+import storageUpload from './storage/upload'
+import storagePreview from './storage/preview'
+import tenantSecurity from './tenants/security'
+import tenantRegions from './tenants/regions'
+import tenantAudit from './tenants/audit'
+import ociCost from './cost/oci'
+import tenantTraffic from './monitor/traffic'
+import metrics from './monitor/metrics'
+import domainProviders from './settings/domainProviders'
+import cloudflareDns from './dns/cloudflare'
+import edgeoneDns from './dns/edgeone'
+import vps from './vps/list'
+import vpsDetails from './vps/resourceDetails'
+import networkQuality from './settings/networkQuality'
+import systemLogs from './settings/systemLogs'
+import securitySettings from './settings/securitySettings'
+import vpnProxy from './settings/vpnProxy'
+import notificationSettings from './settings/notificationSettings'
+import memos from './settings/memos'
+import migration from './settings/migration'
+import mfaBackup from './settings/mfaBackup'
+import apiTokens from './settings/apiTokens'
+import aiChat from './ai/chat'
+import aiModels from './ai/models'
+import delayTest from './tools/delayTest'
+import openLogs from './boot/logs'
+import instances from './instances/list'
+import tenantInstances from './instances/tenantInstances'
+import sshTerminal from './terminal/ssh'
+import sftp from './terminal/sftp'
+import vnc from './terminal/vnc'
+import vnic from './network/vnic'
+import vnicActions from './network/vnicActions'
+import instanceOperations from './instances/operations'
+import instanceNetwork from './instances/network'
+import gcpInstances from './instances/gcp'
 import ociBoot from './boot/oci'
+import bootTasks from './boot/tasks'
 import regionPage from './regions/page'
 import tenant from './tenants/list'
 import tenantIdentity from './tenants/identity'
@@ -11,13 +51,63 @@ import { headerEn } from './header'
 import { headerMessagesEn } from './headerMessages'
 import { headerAssetsEn } from './headerAssets'
 import { headerVersionEn } from './headerVersion'
+import { mobileTenantToolsMessages } from './mobileTenantTools'
+import { mobileShellMessages } from './mobileShell'
+import { mobileRecordsMessages } from './mobileRecords'
 
 export default {
+  mobileRecords: mobileRecordsMessages.en,
+  mobileTenantTools: mobileTenantToolsMessages.en,
+  mobileShell: mobileShellMessages.en,
+  pageLoading: { loading: 'Loading…', failed: 'Unable to load page', retry: 'Reload' },
+  pageError: { title: 'Error details', open: 'An error occurred. Open details', close: 'Close error details' },
+  pagePagination: { label: 'Pagination', previous: 'Previous page', next: 'Next page', pageSize: 'Items per page', perPage: '{count}/page' },
+  emailManagement: emailManagement.en,
+  emailCompose: emailCompose.en,
+  storageManagement: storageManagement.en,
+  storageUpload: storageUpload.en,
+  storagePreview: storagePreview.en,
+  pageBack: 'Back',
+  tenantSecurity: tenantSecurity.en,
+  tenantRegions: tenantRegions.en,
+  tenantAudit: tenantAudit.en,
+  ociCost: ociCost.en,
+  tenantTraffic: tenantTraffic.en,
+  metrics: metrics.en,
+  domainProviders: domainProviders.en,
+  cloudflareDns: cloudflareDns.en,
+  edgeoneDns: edgeoneDns.en,
+  vps: vps.en,
+  vpsDetails: vpsDetails.en,
+  networkQuality: networkQuality.en,
+  systemLogs: systemLogs.en,
+  securitySettings: securitySettings.en,
+  vpnProxy: vpnProxy.en,
+  notificationSettings: notificationSettings.en,
+  memo: memos.en,
+  migration: migration.en,
+  mfaBackup: mfaBackup.en,
+  apiTokens: apiTokens.en,
+  aiChat: aiChat.en,
+  aiModels: aiModels.en,
+  delayTest: delayTest.en,
+  openLogs: openLogs.en,
+  instances: instances.en,
+  tenantInstances: tenantInstances.en,
+  sshTerminal: sshTerminal.en,
+  sftp: sftp.en,
+  vnc: vnc.en,
+  vnic: vnic.en,
+  vnicActions: vnicActions.en,
+  instanceOperations: instanceOperations.en,
+  instanceNetwork: instanceNetwork.en,
+  gcpInstances: gcpInstances.en,
   header: headerEn,
   headerMessages: headerMessagesEn,
   headerAssets: headerAssetsEn,
   headerVersion: headerVersionEn,
   ociBoot: ociBoot.en,
+  bootTasks: bootTasks.en,
   regionGlobe: regionGlobe.en,
   regionPage: regionPage.en,
   tenant: tenant.en,
@@ -48,13 +138,14 @@ export default {
   chrome: {
     title: 'Appearance',
     sidebar: 'Sidebar',
-    page: 'Content area',
+    page: 'Content palette',
     reset: 'Reset',
   },
   cloudSwitch: 'Cloud provider',
   noMenu: 'No matching menu',
   comingSoon: 'Coming soon',
   dashboard: {
+    yearUnit: 'y', dayUnit: 'd', hourUnit: 'h', minuteUnit: 'm',
     pageTitle: 'System monitor',
     loading: 'Loading...',
     apiTotal: 'API calls',
@@ -141,7 +232,7 @@ export default {
     storage: 'OCI Object Storage',
     boot: 'OCI Boot',
     ai: 'OCI AI',
-    speed: 'Speed test',
+    speed: 'OCI Latency Test',
     openLog: 'OCI boot logs',
     gcpAccounts: 'GCP Accounts',
     gcpInstances: 'GCP Instances',

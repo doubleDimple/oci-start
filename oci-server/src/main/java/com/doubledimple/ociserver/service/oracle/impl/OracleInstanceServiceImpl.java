@@ -9,6 +9,7 @@ import com.doubledimple.dao.repository.CloudTenancyRepository;
 import com.doubledimple.dao.repository.CloudSshConnRepository;
 import com.doubledimple.dao.repository.OracleInstanceDetailRepository;
 import com.doubledimple.dao.repository.TenantRepository;
+import com.doubledimple.ocicommon.enums.CloudTypeEnum;
 import com.doubledimple.ocicommon.enums.RegionEnum;
 import com.doubledimple.ocicommon.param.ScriptResult;
 import com.doubledimple.ocicommon.template.MessageTemplate;
@@ -324,11 +325,26 @@ public class OracleInstanceServiceImpl implements OracleInstanceService {
 
     @Override
     public Page<InstanceDetailsRes> getAllInstances(int page, int size, String tenantId) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("tenantId").ascending());
+        return getInstanceRecords(page, size, tenantId, null);
+    }
+
+    @Override
+    public Page<InstanceDetailsRes> getOciInstances(int page, int size, String tenantId) {
+        return getInstanceRecords(page, size, tenantId, CloudTypeEnum.ORACLE_CLOUD.getType());
+    }
+
+    private Page<InstanceDetailsRes> getInstanceRecords(int page, int size, String tenantId, Integer cloudType) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("tenantId").ascending().and(Sort.by("id").ascending()));
 
         // 创建 Specification 用于动态查询
         Specification<InstanceDetails> specification = (root, query, criteriaBuilder) -> {
             List<Predicate> predicates = new ArrayList<>();
+
+            // Apply before pagination so OCI pages and totals share the same provider scope.
+            // The existing all-provider callers pass null and retain their original scope.
+            if (cloudType != null) {
+                predicates.add(criteriaBuilder.equal(root.get("cloudType"), cloudType));
+            }
 
             // 当 instanceId 不为空时添加查询条件
             if (StringUtils.hasText(tenantId)) {
@@ -985,7 +1001,7 @@ public class OracleInstanceServiceImpl implements OracleInstanceService {
 
     @Override
     public void updateInstance(InstanceDetails instance) {
-        log.info("保存SSH配置,请求参数是:{}", JSONUtil.toJsonStr(instance));
+        log.info("保存SSH配置,本地实例ID:{}", instance.getId());
         ociSshConnService.saveOrUpdate(instance);
 
     }
@@ -1036,7 +1052,6 @@ public class OracleInstanceServiceImpl implements OracleInstanceService {
         List<String> cidrList = request.getCidrRanges();
         InstanceDetails instanceDetails = oracleInstanceDetailRepository.findByInstanceId(request.getInstanceId());
         String instanceId = instanceDetails.getInstanceId();
-        String publicIpsDb = instanceDetails.getPublicIps();
         Tenant tenant = tenantRepository.findById(instanceDetails.getTenantId()).get();
 
         //如果cidr不为空,检测cidr是不是输入正确
@@ -1060,22 +1075,27 @@ public class OracleInstanceServiceImpl implements OracleInstanceService {
 
             String newPublicIp = "";
             Vnic vnic = getVnicById(request.getVnicId(),computeClient,provider,vnClient);
+            String oldPublicIp = vnic.getPublicIp();
+            boolean primaryVnic = Boolean.TRUE.equals(vnic.getIsPrimary());
             if (CollectionUtils.isEmpty(cidrs)){
                 newPublicIp = reassignEphemeralPublicIp(vnic,vnClient,provider.getTenantId());
                 // 9. 构建成功响应
                 Map<String, String> details = new HashMap<>();
-                details.put("oldIp", publicIpsDb);
+                details.put("oldIp", oldPublicIp);
                 details.put("newIp", newPublicIp);
 
                 result.put("status", "success");
                 result.put("message", "IP切换成功");
                 result.put("details", details);
-                instanceDetails.setPublicIps(newPublicIp);
-                oracleInstanceDetailRepository.saveAndFlush(instanceDetails);
+                // SSH 等实例入口使用主网卡地址，辅助网卡换 IP 不应覆盖该记录。
+                if (primaryVnic) {
+                    instanceDetails.setPublicIps(newPublicIp);
+                    oracleInstanceDetailRepository.saveAndFlush(instanceDetails);
+                }
                 ipSwitchTasks.remove(instanceId);
 
                 //发消息
-                messageFactory.getType(MessageEnum.TELEGRAM).sendMessageTemplate(String.format(MessageTemplate.MESSAGE_CONFIG_IP_SWITCH_TEMPLATE,tenant.getUserName(),instanceId,publicIpsDb,newPublicIp));
+                messageFactory.getType(MessageEnum.TELEGRAM).sendMessageTemplate(String.format(MessageTemplate.MESSAGE_CONFIG_IP_SWITCH_TEMPLATE,tenant.getUserName(),instanceId,oldPublicIp,newPublicIp));
                 return ResponseEntity.ok(result);
             }
 
@@ -1094,12 +1114,14 @@ public class OracleInstanceServiceImpl implements OracleInstanceService {
                     } else {
                         ipSwitchTasks.remove(instanceId);
 
-                        instanceDetails.setPublicIps(newPublicIp);
-                        oracleInstanceDetailRepository.saveAndFlush(instanceDetails);
+                        if (primaryVnic) {
+                            instanceDetails.setPublicIps(newPublicIp);
+                            oracleInstanceDetailRepository.saveAndFlush(instanceDetails);
+                        }
 
                         // 构建成功响应
                         Map<String, String> details = new HashMap<>();
-                        details.put("oldIp", publicIpsDb);
+                        details.put("oldIp", oldPublicIp);
                         details.put("newIp", newPublicIp);
 
                         result.put("status", "success");

@@ -1,13 +1,19 @@
-import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
-import { finishProgress, startProgress } from '@/utils/progress'
+import { createRouter, createWebHistory, type RouteLocationNormalized, type RouteRecordRaw } from 'vue-router'
+import { watch } from 'vue'
+import { doneProgress, startProgress } from '@/utils/progress'
+import { createRoutePreloader } from './preload'
+import { mobileAliases } from './mobile'
+import { beginRouteNavigation, endRouteNavigation, isSameNavigation, navigationPending } from '@/utils/navigation'
 
 const layout = () => import('@/layouts/DefaultLayout.vue')
 
 const children: RouteRecordRaw[] = [
+  { path: 'about/author', meta: { title: '关于 Oci-Start', titleKey: 'headerVersion.about' }, component: () => import('@/views/common/AboutView.vue') },
   { path: 'boot/dashboard', meta: { title: '系统资源监控', id: 'api-dashboard' }, component: () => import('@/views/dashboard/DashboardView.vue') },
   { path: 'resource/list', meta: { title: 'OCI 区域管理', id: 'api-records' }, component: () => import('@/views/regions/ArmRegionsView.vue') },
   { path: 'tenants/list', meta: { title: 'OCI 租户管理', id: 'api-management' }, component: () => import('@/views/tenants/TenantsView.vue') },
   { path: 'tenants/regionList', meta: { title: '区域列表', id: 'api-management' }, component: () => import('@/views/tenants/TenantRegionsView.vue') },
+  { path: 'tenants/auditPage', meta: { title: '审计日志', id: 'api-management' }, component: () => import('@/views/tenants/TenantAuditView.vue') },
   { path: 'tenants/regionSubList', meta: { title: '区域订阅', id: 'api-management' }, component: () => import('@/views/tenants/RegionSubView.vue') },
   { path: 'tenants/addSpeed', meta: { title: 'API 导入', id: 'api-management' }, component: () => import('@/views/tenants/TenantImportView.vue') },
   { path: 'tenants/bootPage', meta: { title: '添加开机', id: 'api-fullBootList' }, component: () => import('@/views/boot/AddBootView.vue') },
@@ -18,7 +24,7 @@ const children: RouteRecordRaw[] = [
   { path: 'oci/storage/page', meta: { title: '对象存储', id: 'oci-object-storage' }, component: () => import('@/views/storage/StorageView.vue') },
   { path: 'boot/fullBootList', meta: { title: 'OCI 开机管理', id: 'api-fullBootList' }, component: () => import('@/views/boot/BootListView.vue') },
   { path: 'system/ai/models', meta: { title: 'OCI AI 管理', id: 'ai-models' }, component: () => import('@/views/ai/AiModelsView.vue') },
-  { path: 'delayTest', meta: { title: '延迟测试', id: 'api-delayTest' }, component: () => import('@/views/tools/SpeedTestView.vue') },
+  { path: 'delayTest', meta: { title: 'OCI延迟测试', id: 'api-delayTest' }, component: () => import('@/views/tools/SpeedTestView.vue') },
   { path: 'system/openLogs', meta: { title: '开机日志', id: 'api-openLog' }, component: () => import('@/views/logs/OpenLogsView.vue') },
   { path: 'other/instances/list', meta: { title: 'GCP 实例', id: 'api-ociBootList' }, component: () => import('@/views/gcp/GcpInstancesView.vue') },
   { path: 'azure/vms', meta: { title: 'Azure 虚拟机' }, component: () => import('@/views/common/ComingSoonView.vue') },
@@ -47,18 +53,36 @@ const children: RouteRecordRaw[] = [
   { path: 'ssh/terminal', meta: { title: 'SSH 终端' }, component: () => import('@/views/terminal/SshTerminalView.vue') },
   { path: 'oci/sysHelp', meta: { title: '系统救援' }, component: () => import('@/views/terminal/RescueView.vue') },
   { path: 'oci/metricsPage', meta: { title: '监控' }, component: () => import('@/views/monitor/MetricsView.vue') },
-  { path: 'instanceDetail/bootList', meta: { title: '租户实例' }, component: () => import('@/views/instances/InstancesView.vue') },
+  { path: 'instanceDetail/bootList', meta: { title: '租户实例', id: 'api-management' }, component: () => import('@/views/instances/TenantInstancesView.vue') },
   { path: 'cost/costPage', meta: { title: '费用' }, component: () => import('@/views/cost/CostView.vue') },
   { path: 'monitor/homePage', meta: { title: '流量监控' }, component: () => import('@/views/monitor/TrafficView.vue') },
   { path: 'oci/vnic/manage', meta: { title: '网络管理' }, component: () => import('@/views/network/VnicView.vue') },
   { path: 'oci/console/terminal/:instanceId?', meta: { title: '控制台' }, component: () => import('@/views/terminal/ConsoleView.vue') },
   { path: 'ai/chat', meta: { title: 'AI 对话' }, component: () => import('@/views/ai/ChatView.vue') },
+  { path: 'm/ai', meta: { title: 'Telegram AI', titleKey: 'notificationSettings.ai.title', canonicalPath: '/system/notifySettings' }, component: () => import('@/views/settings/MobileTelegramAiView.vue') },
+  ...([
+    ['user-mgr', 'users'], ['disk-info', 'volumes'], ['security-rules', 'security'], ['storage-instances', 'mysql'],
+  ] as const).map(([path, tool]): RouteRecordRaw => ({
+    path: `m/${path}`,
+    meta: { titleKey: `mobileTenantTools.tools.${tool}`, canonicalPath: '/tenants/list', mobileTenantTool: tool },
+    props: { tool },
+    component: () => import('@/views/tenants/MobileTenantToolsView.vue'),
+  })),
 ]
+
+for (const child of children) {
+  child.meta = { canonicalPath: `/${child.path}`, ...child.meta }
+  if (mobileAliases[child.path]) child.alias = mobileAliases[child.path]
+}
 
 const router = createRouter({
   history: createWebHistory('/'),
   routes: [
-    { path: '/index', component: () => import('@/views/welcome/WelcomeView.vue') },
+    { path: '/login', alias: '/m/login', meta: { public: true }, component: () => import('@/views/auth/LoginView.vue') },
+    { path: '/forbidden', meta: { public: true }, component: () => import('@/views/auth/ForbiddenView.vue') },
+    { path: '/m', redirect: to => ({ path: '/m/tenants', query: to.query }) },
+    { path: '/m/sysHelp', redirect: '/m/instances' },
+    { path: '/index', redirect: '/boot/dashboard' },
     {
       path: '/',
       component: layout,
@@ -70,11 +94,33 @@ const router = createRouter({
   ],
 })
 
-router.beforeEach(() => {
+export const routePreloader = createRoutePreloader(router)
+watch(navigationPending, value => routePreloader.navigationPending(value), { immediate: true, flush: 'sync' })
+let progressOwner: RouteLocationNormalized | null = null
+
+router.beforeEach(to => {
+  if (to.matched.some(record => record.path === '/oci/sysHelp') && window.matchMedia('(max-width: 760px)').matches) {
+    return { path: '/m/instances', replace: true }
+  }
+  beginRouteNavigation(to)
+  // Guard redirects need not settle the previous target through afterEach.
+  if (progressOwner) doneProgress()
+  progressOwner = to
   startProgress()
   return true
 })
-router.afterEach(() => finishProgress())
-router.onError(() => finishProgress())
+function finishRouteProgress(to: RouteLocationNormalized) {
+  if (!progressOwner || !isSameNavigation(progressOwner, to)) return
+  progressOwner = null
+  doneProgress()
+}
+router.afterEach((to, _from, failure) => {
+  finishRouteProgress(to)
+  void endRouteNavigation(to, !!failure)
+})
+router.onError((error, to) => {
+  finishRouteProgress(to)
+  void endRouteNavigation(to, true, error)
+})
 
 export default router

@@ -2,7 +2,6 @@ package com.doubledimple.ociserver.service.login;
 
 import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.util.ObjectUtil;
-import cn.hutool.json.JSONUtil;
 import com.doubledimple.dao.entity.LoginUser;
 import com.doubledimple.dao.repository.LoginUserRepository;
 import com.doubledimple.ocicommon.enums.LoginTypeEnum;
@@ -125,9 +124,7 @@ public class LoginUserService {
         return loginUserRepository.count() > 0;
     }
 
-    public void updatePassword(PasswordUpdateRequest request, HttpServletRequest httpServletRequest) {
-        log.info("修改用户信息请求参数：{}", JSONUtil.toJsonStr(request));
-
+    public boolean updatePassword(PasswordUpdateRequest request, HttpServletRequest httpServletRequest) {
         String currentUsername = StpUtil.getLoginIdAsString();
         LoginUser user = loginUserRepository.findByUsername(currentUsername)
                 .orElseThrow(() -> {
@@ -139,24 +136,44 @@ public class LoginUserService {
                     return new RuntimeException("用户名或密码错误");
                 });
 
-        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
-            throw new RuntimeException("当前密码不正确");
+        if (request.getCurrentPassword() == null
+                || !passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+            throw new AccountValidationException("currentPasswordIncorrect", "当前密码不正确");
         }
 
+        boolean changed = false;
         if (StringUtils.hasText(request.getNewUsername())
                 && !request.getNewUsername().equals(user.getUsername())) {
             if (loginUserRepository.existsByUsername(request.getNewUsername())) {
-                throw new RuntimeException("新用户名已存在");
+                throw new AccountValidationException("usernameExists", "新用户名已存在");
             }
             user.setUsername(request.getNewUsername());
+            changed = true;
         }
 
-        log.info("修改后的用户信息：{}", JSONUtil.toJsonStr(user));
         if (StringUtils.hasText(request.getNewPassword())) {
             if (!ObjectUtil.equals(request.getNewPassword(), request.getCurrentPassword())) {
                 user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+                changed = true;
             }
         }
-        loginUserRepository.save(user);
+        if (changed) {
+            loginUserRepository.save(user);
+        }
+        return changed;
+    }
+
+    /** Only these explicit checks run before any account entity mutation. */
+    public static final class AccountValidationException extends RuntimeException {
+        private final String errorKey;
+
+        private AccountValidationException(String errorKey, String message) {
+            super(message);
+            this.errorKey = errorKey;
+        }
+
+        public String getErrorKey() {
+            return errorKey;
+        }
     }
 }

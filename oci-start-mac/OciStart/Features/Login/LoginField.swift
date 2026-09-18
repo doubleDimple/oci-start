@@ -3,12 +3,12 @@ import AppKit
 
 // MARK: - Filled rounded field (web `.form-control` style, no underline)
 
-/// Smooth box input aligned with web `login_user.css` `.form-control`:
-/// height 48, radius 12, soft fill, focus border + glow — no bottom underline.
+/// Input dimensions and colors match Vue `views/auth/login.scss`.
 struct LoginField: View {
+    @Environment(\.isEnabled) private var environmentEnabled
     /// Shared with trailing action buttons so rows stay equal height.
-    static let boxHeight: CGFloat = 48
-    static let boxRadius: CGFloat = AppInputStyle.radius
+    static let boxHeight: CGFloat = 42
+    static let boxRadius: CGFloat = 8
 
     let title: String
     let placeholder: String
@@ -28,26 +28,28 @@ struct LoginField: View {
     @State private var lastShake = 0
     @State private var hovering = false
 
+    private var isInteractive: Bool { enabled && environmentEnabled }
+
     private var fillColor: Color {
-        AppInputStyle.fill(dark, focused: focused)
+        LoginPalette.input(dark)
     }
 
     private var borderColor: Color {
         if shakeX != 0 {
             return Color(hex: dark ? "f87171" : "ef4444")
         }
-        return AppInputStyle.border(dark, focused: focused, hovering: hovering && enabled)
+        return focused && isInteractive ? LoginPalette.primary(dark) : (hovering && isInteractive ? LoginPalette.muted(dark).opacity(0.3) : LoginPalette.line(dark))
     }
 
     private var glowColor: Color {
-        AppInputStyle.glow(dark, focused: focused)
+        focused && isInteractive ? LoginPalette.primary(dark).opacity(0.13) : Color.clear
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             if !title.isEmpty {
                 Text(title)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 13, weight: .regular))
                     .foregroundColor(LoginPalette.text(dark))
             }
 
@@ -57,14 +59,14 @@ struct LoginField: View {
                     placeholder: placeholder,
                     secure: secure && !revealPassword,
                     dark: dark,
-                    enabled: enabled,
+                    enabled: isInteractive,
                     isFocused: $focused,
                     onCommit: onCommit
                 )
                 .frame(maxWidth: .infinity)
                 .frame(height: 22)
 
-                if secure && enabled {
+                if secure && isInteractive {
                     Button(action: { revealPassword.toggle() }) {
                         Image(systemName: revealPassword ? "eye.slash" : "eye")
                             .font(.system(size: 13, weight: .medium))
@@ -76,7 +78,7 @@ struct LoginField: View {
                     .help(revealPassword ? "隐藏密码" : "显示密码")
                 }
 
-                if enabled && !text.isEmpty && (focused || hovering) {
+                if isInteractive && !text.isEmpty && (focused || hovering) {
                     Button(action: { text = "" }) {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 13))
@@ -100,11 +102,11 @@ struct LoginField: View {
             .shadow(color: glowColor, radius: focused ? 6 : 0, y: 0)
             .animation(.easeOut(duration: 0.18), value: focused)
             .animation(.easeOut(duration: 0.15), value: hovering)
-            .onHover { hovering = $0 && enabled }
+            .onHover { hovering = $0 && isInteractive }
         }
         // Empty-title fields sit inline with action buttons — no extra bottom pad.
-        .padding(.bottom, title.isEmpty ? 0 : 6)
-        .opacity(enabled ? 1 : 0.5)
+        .padding(.bottom, 0)
+        .opacity(isInteractive ? 1 : 0.5)
         .offset(x: shakeX)
         .onChange(of: shakeToken) { token in
             guard token != lastShake, token > 0 else { return }
@@ -136,7 +138,7 @@ struct LoginFieldActionButton: View {
     var loading: Bool = false
     var enabled: Bool = true
     var dark: Bool = true
-    var minWidth: CGFloat = 108
+    var minWidth: CGFloat = 100
     let action: () -> Void
 
     @State private var hovering = false
@@ -154,7 +156,7 @@ struct LoginFieldActionButton: View {
                     .lineLimit(1)
             }
             .foregroundColor(LoginPalette.text(dark))
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 12)
             .frame(minWidth: minWidth)
             .frame(height: LoginField.boxHeight)
             .background(
@@ -178,6 +180,7 @@ struct LoginFieldActionButton: View {
 // MARK: - AppKit field (no system focus ring)
 
 private struct LoginNSTextField: NSViewRepresentable {
+    @Environment(\.isEnabled) private var environmentEnabled
     @Binding var text: String
     var placeholder: String
     var secure: Bool
@@ -185,6 +188,8 @@ private struct LoginNSTextField: NSViewRepresentable {
     var enabled: Bool
     @Binding var isFocused: Bool
     var onCommit: (() -> Void)?
+
+    private var isInteractive: Bool { enabled && environmentEnabled }
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -230,8 +235,6 @@ private struct LoginNSTextField: NSViewRepresentable {
 
         guard let field = coord.field else { return }
         applyStyle(field)
-        field.isEditable = enabled
-        field.isSelectable = enabled
         if field.stringValue != text, field.currentEditor() == nil {
             field.stringValue = text
         }
@@ -250,7 +253,7 @@ private struct LoginNSTextField: NSViewRepresentable {
         field.drawsBackground = false
         field.focusRingType = .none
         field.backgroundColor = .clear
-        field.font = NSFont.systemFont(ofSize: 16, weight: .regular)
+        field.font = NSFont.systemFont(ofSize: 14, weight: .regular)
         field.lineBreakMode = .byTruncatingTail
         field.maximumNumberOfLines = 1
         if let cell = field.cell as? NSTextFieldCell {
@@ -263,7 +266,14 @@ private struct LoginNSTextField: NSViewRepresentable {
     }
 
     private func applyStyle(_ field: NSTextField) {
-        field.textColor = nsHex(dark ? "cdd9e5" : "2c3e50")
+        if !isInteractive, field.currentEditor() != nil {
+            field.window?.endEditing(for: field)
+        }
+        field.isEnabled = isInteractive
+        field.isEditable = isInteractive
+        field.isSelectable = isInteractive
+        field.setAccessibilityLabel(placeholder)
+        field.textColor = nsHex(dark ? "e8eef4" : "000000")
         field.placeholderAttributedString = placeholderAttr()
         field.focusRingType = .none
         field.drawsBackground = false
@@ -277,8 +287,8 @@ private struct LoginNSTextField: NSViewRepresentable {
         NSAttributedString(
             string: placeholder,
             attributes: [
-                .foregroundColor: nsHex(dark ? "768390" : "999999"),
-                .font: NSFont.systemFont(ofSize: 16, weight: .regular)
+                .foregroundColor: nsHex(dark ? "7d8f9d" : "000000"),
+                .font: NSFont.systemFont(ofSize: 14, weight: .regular)
             ]
         )
     }
@@ -319,7 +329,7 @@ private struct LoginNSTextField: NSViewRepresentable {
 
         func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
             if commandSelector == #selector(NSResponder.insertNewline(_:)) {
-                parent.onCommit?()
+                if parent.isInteractive { parent.onCommit?() }
                 return true
             }
             return false
@@ -348,19 +358,19 @@ struct LoginPillButton: View {
                         .frame(width: 14, height: 14)
                 }
                 Text(title)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .lineLimit(1)
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 52)
+            .frame(height: 44)
             .foregroundColor(secondary ? LoginPalette.text(dark) : Color.white)
             .background(
                 (secondary ? LoginPalette.oauthBg(dark) : LoginPalette.primary(dark))
                     .opacity(hovering ? 0.92 : 1)
             )
-            .cornerRadius(14)
+            .cornerRadius(8)
             .overlay(
-                RoundedRectangle(cornerRadius: 14)
+                RoundedRectangle(cornerRadius: 8)
                     .stroke(secondary ? LoginPalette.oauthBorder(dark) : Color.clear, lineWidth: 1)
             )
         }

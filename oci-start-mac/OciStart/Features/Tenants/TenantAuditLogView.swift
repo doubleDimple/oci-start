@@ -61,6 +61,13 @@ struct TenantAuditLogView: View {
 
     private var toolbar: some View {
         HStack(spacing: 8) {
+            if let selectedTenant = tenant {
+                Text("审计日志 · \(selectedTenant.displayName) · \(selectedTenant.region.isEmpty ? "—" : selectedTenant.region)")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(AppTheme.textSecondary(dark))
+                    .lineLimit(1)
+                    .frame(maxWidth: 220, alignment: .leading)
+            }
             AppButton(title: "返回列表", systemImage: "chevron.left", kind: .secondary) {
                 model.closeAudit()
             }
@@ -80,18 +87,18 @@ struct TenantAuditLogView: View {
             leading: {
                 HStack(spacing: 8) {
                     Text("开始")
-                        .font(.system(size: 12))
-                        .foregroundColor(AppTheme.sidebarText(dark))
+                        .font(.system(size: 13))
+                        .foregroundColor(AppTheme.textSecondary(dark))
                     AppTextField(text: $model.auditStart, placeholder: "yyyy-MM-dd")
                         .frame(width: 140)
                     Text("结束")
-                        .font(.system(size: 12))
-                        .foregroundColor(AppTheme.sidebarText(dark))
+                        .font(.system(size: 13))
+                        .foregroundColor(AppTheme.textSecondary(dark))
                     AppTextField(text: $model.auditEnd, placeholder: "yyyy-MM-dd")
                         .frame(width: 140)
                     Text("最多查询近 90 天")
-                        .font(.system(size: 11))
-                        .foregroundColor(AppTheme.sidebarText(dark).opacity(0.85))
+                        .font(.system(size: 13))
+                        .foregroundColor(AppTheme.textSecondary(dark))
                 }
             },
             trailing: {
@@ -106,7 +113,7 @@ struct TenantAuditLogView: View {
     private func errorBanner(_ text: String) -> some View {
         HStack {
             Image(systemName: "exclamationmark.triangle.fill")
-            Text(text).font(.system(size: 12))
+            Text(text).font(.system(size: 14))
             Spacer()
             Button("重试") {
                 model.reloadAudit()
@@ -127,8 +134,8 @@ struct TenantAuditLogView: View {
                 Spacer()
                 ProgressView()
                 Text("加载审计日志…")
-                    .font(.system(size: 12))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .font(.system(size: 13))
+                    .foregroundColor(AppTheme.textSecondary(dark))
                     .padding(.top, 8)
                 Spacer()
             }
@@ -186,7 +193,7 @@ struct TenantAuditLogView: View {
         .padding(.horizontal, hPad)
         .padding(.vertical, 9)
         .frame(width: width, alignment: .leading)
-        .background(AppTheme.sidebarHover(dark).opacity(0.65))
+        .background(AppTheme.hover(dark).opacity(0.65))
         .overlay(
             Rectangle().frame(height: 1).foregroundColor(AppTheme.border(dark).opacity(0.5)),
             alignment: .bottom
@@ -202,7 +209,7 @@ struct TenantAuditLogView: View {
         width: CGFloat
     ) -> some View {
         let errorTint = Color(hex: "f85149").opacity(dark ? 0.12 : 0.08)
-        let stripe = index % 2 == 1 ? AppTheme.sidebarHover(dark).opacity(0.18) : Color.clear
+        let stripe = index % 2 == 1 ? AppTheme.hover(dark).opacity(0.18) : Color.clear
         return HStack(spacing: 0) {
             cell("\(displayIndex)", wIndex, muted: true)
             cell(display(log.userName), wUser)
@@ -235,18 +242,18 @@ struct TenantAuditLogView: View {
 
     private func colHeader(_ title: String, _ w: CGFloat, align: Alignment = .leading) -> some View {
         Text(title)
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundColor(AppTheme.sidebarText(dark))
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundColor(AppTheme.textSecondary(dark))
             .frame(width: w, alignment: align)
     }
 
     private func cell(_ text: String, _ w: CGFloat, muted: Bool = false, bold: Bool = false) -> some View {
         Text(text)
-            .font(.system(size: 12, weight: bold ? .semibold : .regular))
+            .font(.system(size: 14, weight: bold ? .semibold : .regular))
             .foregroundColor(
                 muted
-                    ? AppTheme.sidebarText(dark)
-                    : (dark ? Color.white.opacity(0.9) : Color.primary)
+                    ? AppTheme.textSecondary(dark)
+                    : (AppTheme.textPrimary(dark))
             )
             .lineLimit(1)
             .help(text)

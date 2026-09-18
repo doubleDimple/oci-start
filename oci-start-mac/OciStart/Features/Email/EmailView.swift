@@ -102,11 +102,11 @@ struct EmailView: View {
                 Image(systemName: section.systemImage)
                     .font(.system(size: 12, weight: .semibold))
                 Text(section.title)
-                    .font(.system(size: 13, weight: active ? .semibold : .medium))
+                    .font(.system(size: 14, weight: active ? .semibold : .medium))
                 if let count = count {
                     Text("\(count)")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(active ? .white : AppTheme.sidebarText(dark))
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(active ? .white : AppTheme.textSecondary(dark))
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(
@@ -115,12 +115,12 @@ struct EmailView: View {
                         )
                 }
             }
-            .foregroundColor(active ? AppTheme.sidebarActive : AppTheme.sidebarText(dark))
+            .foregroundColor(active ? AppTheme.sidebarActive : AppTheme.textSecondary(dark))
             .frame(maxWidth: .infinity)
             .padding(.vertical, 10)
             .background(
                 RoundedRectangle(cornerRadius: 10)
-                    .fill(active ? AppTheme.sidebarActive.opacity(0.12) : AppTheme.sidebarBg(dark))
+                    .fill(active ? AppTheme.sidebarActive.opacity(0.12) : AppTheme.cardBg(dark))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 10)
@@ -167,12 +167,12 @@ struct EmailView: View {
                         }
                     case .contacts:
                         Text("管理常用收件人，发送邮件时可多选")
-                            .font(.system(size: 12))
-                            .foregroundColor(AppTheme.sidebarText(dark))
+                            .font(.system(size: 13))
+                            .foregroundColor(AppTheme.textSecondary(dark))
                     case .records:
                         Text("查看历史发送结果与收件明细")
-                            .font(.system(size: 12))
-                            .foregroundColor(AppTheme.sidebarText(dark))
+                            .font(.system(size: 13))
+                            .foregroundColor(AppTheme.textSecondary(dark))
                     }
                 }
             },
@@ -230,17 +230,17 @@ struct EmailView: View {
                 Button(action: { model.switchTenantTab(tab) }) {
                     HStack(spacing: 5) {
                         Text(tab.title)
-                            .font(.system(size: 12, weight: active ? .semibold : .regular))
+                            .font(.system(size: 14, weight: active ? .semibold : .regular))
                         Text("\(count)")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(active ? .white : AppTheme.sidebarText(dark).opacity(0.85))
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(active ? .white : AppTheme.textSecondary(dark))
                             .padding(.horizontal, 5)
                             .padding(.vertical, 1)
                             .background(
                                 Capsule().fill(active ? AppTheme.sidebarActive : AppTheme.border(dark).opacity(0.5))
                             )
                     }
-                    .foregroundColor(active ? AppTheme.sidebarActive : AppTheme.sidebarText(dark))
+                    .foregroundColor(active ? AppTheme.sidebarActive : AppTheme.textSecondary(dark))
                     .padding(.horizontal, 12)
                     .padding(.vertical, 7)
                     .background(
@@ -332,14 +332,14 @@ struct EmailView: View {
                 HStack(spacing: 8) {
                     Text(item.displaySender)
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
+                        .foregroundColor(AppTheme.textPrimary(dark))
                         .lineLimit(1)
                     StatusBadge(text: "运行中", tone: .success)
                 }
                 if !item.tenantName.isEmpty {
                     Text(item.tenantName)
-                        .font(.system(size: 12))
-                        .foregroundColor(AppTheme.sidebarText(dark))
+                        .font(.system(size: 13))
+                        .foregroundColor(AppTheme.textSecondary(dark))
                         .lineLimit(1)
                 }
                 usageBar(item)
@@ -361,8 +361,8 @@ struct EmailView: View {
     private func usageBar(_ item: TenantEmailConfigItem) -> some View {
         HStack(spacing: 10) {
             Text("今日 \(item.todaySentCount)/\(item.dailyEmailLimit)")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundColor(AppTheme.sidebarText(dark))
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(AppTheme.textSecondary(dark))
                 .frame(width: 96, alignment: .leading)
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
@@ -396,11 +396,11 @@ struct EmailView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.name)
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
+                    .foregroundColor(AppTheme.textPrimary(dark))
                     .lineLimit(1)
                 Text(item.region.isEmpty ? "未开启邮件服务" : item.region)
-                    .font(.system(size: 12))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .font(.system(size: 13))
+                    .foregroundColor(AppTheme.textSecondary(dark))
                     .lineLimit(1)
             }
 
@@ -459,11 +459,11 @@ struct EmailView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(c.name.isEmpty ? "—" : c.name)
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
+                    .foregroundColor(AppTheme.textPrimary(dark))
                     .lineLimit(1)
                 Text(c.email)
-                    .font(.system(size: 12))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .font(.system(size: 13))
+                    .foregroundColor(AppTheme.textSecondary(dark))
                     .lineLimit(1)
             }
 
@@ -471,8 +471,8 @@ struct EmailView: View {
 
             if !c.createTime.isEmpty {
                 Text(c.createTime)
-                    .font(.system(size: 11))
-                    .foregroundColor(AppTheme.sidebarText(dark).opacity(0.85))
+                    .font(.system(size: 13))
+                    .foregroundColor(AppTheme.textSecondary(dark))
             }
 
             AppButton(title: "删除", systemImage: "trash", kind: .danger) {
@@ -530,27 +530,27 @@ struct EmailView: View {
         HStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 3) {
                 Text(r.subjectText)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(AppTheme.textPrimary(dark))
                     .lineLimit(1)
                 if !r.senderEmail.isEmpty {
                     Text(r.senderEmail)
-                        .font(.system(size: 11))
-                        .foregroundColor(AppTheme.sidebarText(dark))
+                        .font(.system(size: 13))
+                        .foregroundColor(AppTheme.textSecondary(dark))
                         .lineLimit(1)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
             Text(r.createTime.isEmpty ? "—" : r.createTime)
-                .font(.system(size: 12))
-                .foregroundColor(AppTheme.sidebarText(dark))
+                .font(.system(size: 13))
+                .foregroundColor(AppTheme.textSecondary(dark))
                 .frame(width: 150, alignment: .leading)
                 .lineLimit(1)
 
             Text(r.tenantText)
-                .font(.system(size: 12))
-                .foregroundColor(AppTheme.sidebarText(dark))
+                .font(.system(size: 13))
+                .foregroundColor(AppTheme.textSecondary(dark))
                 .frame(width: 120, alignment: .leading)
                 .lineLimit(1)
 
@@ -568,7 +568,7 @@ struct EmailView: View {
                 .foregroundColor(
                     r.receiveFailTotal > 0
                         ? StatusTone.danger.color(dark: dark)
-                        : AppTheme.sidebarText(dark)
+                        : AppTheme.textSecondary(dark)
                 )
                 .frame(width: 56, alignment: .leading)
 
@@ -614,7 +614,7 @@ struct EmailView: View {
 
     private var cardBackground: some View {
         RoundedRectangle(cornerRadius: 14)
-            .fill(AppTheme.sidebarBg(dark))
+            .fill(AppTheme.cardBg(dark))
     }
 
     private func cardStroke(accent: Color, active: Bool) -> some View {
@@ -632,8 +632,8 @@ struct EmailView: View {
             Spacer()
             ProgressView().scaleEffect(0.85)
             Text("加载中…")
-                .font(.system(size: 12))
-                .foregroundColor(AppTheme.sidebarText(dark))
+                .font(.system(size: 13))
+                .foregroundColor(AppTheme.textSecondary(dark))
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -643,7 +643,7 @@ struct EmailView: View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundColor(Color(hex: "f85149"))
-            Text(text).font(.system(size: 12))
+            Text(text).font(.system(size: 14))
             Spacer()
             Button("重试") { Task { await model.reloadAll() } }
                 .buttonStyle(PlainButtonStyle())

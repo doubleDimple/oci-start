@@ -31,6 +31,7 @@ import org.springframework.web.client.RestTemplate;
 
 import javax.annotation.Resource;
 import java.io.UnsupportedEncodingException;
+import java.net.URI;
 import java.net.URLEncoder;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -221,6 +222,283 @@ public class CloudflareService {
         }
     }
 
+    /** JSON clients only receive a complete account-wide zone snapshot. */
+    public List<Map<String, Object>> listAllZonesStrict() {
+        List<Map<String, Object>> zones = new ArrayList<>();
+        Set<String> ids = new HashSet<>();
+        int expectedPages = -1;
+        int expectedTotal = -1;
+        int perPage = 50;
+        for (int page = 1; ; page++) {
+            JsonNode body = readCloudflareJson(CLOUDFLARE_API_BASE + "/zones?page=" + page + "&per_page=" + perPage);
+            JsonNode result = body.get("result");
+            JsonNode info = body.get("result_info");
+            if (result == null || !result.isArray() || info == null || !info.isObject()) {
+                throw new IllegalStateException("Cloudflare区域分页响应不完整");
+            }
+            int totalPages = requiredNonnegativeInt(info, "total_pages");
+            int total = requiredNonnegativeInt(info, "total_count");
+            long calculatedPages = (total + (long) perPage - 1) / perPage;
+            int expectedCount = (int) Math.max(0L, Math.min((long) perPage, total - (page - 1L) * perPage));
+            if (requiredNonnegativeInt(info, "page") != page
+                    || (total > 0 && totalPages != calculatedPages) || (total == 0 && totalPages > 1)
+                    || (info.has("per_page") && requiredNonnegativeInt(info, "per_page") != perPage)
+                    || (info.has("count") && requiredNonnegativeInt(info, "count") != result.size())
+                    || result.size() != expectedCount) {
+                throw new IllegalStateException("Cloudflare区域分页信息不一致，请重新读取");
+            }
+            if (expectedPages < 0) {
+                expectedPages = totalPages;
+                expectedTotal = total;
+            } else if (expectedPages != totalPages || expectedTotal != total) {
+                throw new IllegalStateException("读取期间Cloudflare区域总量发生变化，请重新读取");
+            }
+            for (JsonNode zone : result) {
+                String id = requireCloudflareId(requiredText(zone, "id"));
+                if (!ids.add(id)) throw new IllegalStateException("Cloudflare区域分页包含重复标识，请重新读取");
+                Map<String, Object> item = new HashMap<>();
+                item.put("id", id);
+                item.put("name", requiredText(zone, "name"));
+                item.put("status", requiredText(zone, "status"));
+                zones.add(item);
+            }
+            if (page >= expectedPages) break;
+        }
+        if (zones.size() != expectedTotal) throw new IllegalStateException("Cloudflare完整区域数量不一致，请重新读取");
+        return zones;
+    }
+
+    /** JSON clients must distinguish a failed cloud read from an empty zone. */
+    public Map<String, Object> listDnsRecordsPageStrict(String zoneId, int page, int pageSize,
+                                                        String searchName, String searchContent) {
+        requireCloudflareId(zoneId);
+        if (page < 1 || pageSize < 1 || pageSize > 1000) {
+            throw new IllegalArgumentException("DNS分页参数无效");
+        }
+        StringBuilder url = new StringBuilder(CLOUDFLARE_API_BASE).append("/zones/")
+                .append(zoneId).append("/dns_records?page=").append(page)
+                .append("&per_page=").append(pageSize);
+        try {
+            if (StringUtils.isNotBlank(searchName)) {
+                url.append("&name=").append(URLEncoder.encode(searchName.trim(), "UTF-8"));
+            }
+            if (StringUtils.isNotBlank(searchContent)) {
+                url.append("&content=").append(URLEncoder.encode(searchContent.trim(), "UTF-8"));
+            }
+        } catch (UnsupportedEncodingException e) {
+            throw new IllegalStateException("无法编码DNS查询参数", e);
+        }
+        JsonNode body = readCloudflareJson(url.toString());
+        JsonNode result = body.get("result");
+        JsonNode info = body.get("result_info");
+        if (result == null || !result.isArray() || info == null || !info.isObject()) {
+            throw new IllegalStateException("Cloudflare DNS分页响应不完整");
+        }
+        int actualPage = requiredNonnegativeInt(info, "page");
+        int totalPages = requiredNonnegativeInt(info, "total_pages");
+        int totalElements = requiredNonnegativeInt(info, "total_count");
+        long expectedPages = (totalElements + (long) pageSize - 1) / pageSize;
+        if (actualPage != page || (totalElements > 0 && totalPages != expectedPages)
+                || (totalElements == 0 && totalPages > 1)
+                || (info.has("per_page") && requiredNonnegativeInt(info, "per_page") != pageSize)
+                || (info.has("count") && requiredNonnegativeInt(info, "count") != result.size())) {
+            throw new IllegalStateException("Cloudflare DNS分页信息发生变化或不完整，请重新读取");
+        }
+        long offset = (page - 1L) * pageSize;
+        int expectedCount = (int) Math.max(0L, Math.min((long) pageSize, totalElements - offset));
+        if (result.size() != expectedCount) {
+            throw new IllegalStateException("Cloudflare DNS分页记录数量不一致，请重新读取");
+        }
+        List<Map<String, Object>> records = new ArrayList<>();
+        Set<String> ids = new HashSet<>();
+        for (JsonNode record : result) {
+            Map<String, Object> item = cloudflareRecordInfo(record);
+            if (!ids.add((String) item.get("id"))) {
+                throw new IllegalStateException("Cloudflare DNS分页包含重复记录，请重新读取");
+            }
+            records.add(item);
+        }
+        Map<String, Object> pageResult = new HashMap<>();
+        pageResult.put("content", records);
+        pageResult.put("totalPages", totalPages);
+        pageResult.put("totalElements", totalElements);
+        pageResult.put("number", page - 1);
+        pageResult.put("size", pageSize);
+        pageResult.put("first", page == 1);
+        pageResult.put("last", totalPages == 0 || page >= totalPages);
+        return pageResult;
+    }
+
+    private JsonNode readCloudflareJson(String url) {
+        CloudflareConfig config = systemConfigService.getCloudflareConfig();
+        if (!config.isEnabled() || StringUtils.isBlank(config.getApiToken()) || StringUtils.isBlank(config.getEmail())) {
+            throw new IllegalStateException("Cloudflare未配置或未启用");
+        }
+        try {
+            HttpEntity<Void> request = new HttpEntity<>(null, createHeaders(config.getApiToken()));
+            // URI avoids RestTemplate encoding an already encoded search a second time.
+            ResponseEntity<String> response = new RestTemplate().exchange(URI.create(url), HttpMethod.GET, request, String.class);
+            JsonNode body = new ObjectMapper().readTree(response.getBody());
+            requireCloudflareSuccess(body);
+            return body;
+        } catch (Exception e) {
+            throw new IllegalStateException("读取Cloudflare数据失败: " + e.getMessage(), e);
+        }
+    }
+
+    private void requireCloudflareSuccess(JsonNode body) {
+        if (body == null || !body.isObject() || !body.path("success").isBoolean()
+                || !body.path("success").booleanValue()) {
+            if (body != null && body.isObject()) handleCloudflareErrors(body);
+            throw new IllegalStateException("Cloudflare未返回成功响应");
+        }
+    }
+
+    private String requireCloudflareId(String id) {
+        if (id == null || !id.matches("[A-Za-z0-9_-]+")) {
+            throw new IllegalArgumentException("Cloudflare区域或记录标识无效");
+        }
+        return id;
+    }
+
+    private String requiredText(JsonNode node, String field) {
+        JsonNode value = node == null ? null : node.get(field);
+        if (value == null || !value.isTextual() || value.textValue().trim().isEmpty()) {
+            throw new IllegalStateException("Cloudflare记录字段不完整: " + field);
+        }
+        return value.textValue();
+    }
+
+    private int requiredNonnegativeInt(JsonNode node, String field) {
+        JsonNode value = node == null ? null : node.get(field);
+        if (value == null || !value.isIntegralNumber() || !value.canConvertToInt() || value.intValue() < 0) {
+            throw new IllegalStateException("Cloudflare数值字段无效: " + field);
+        }
+        return value.intValue();
+    }
+
+    private Map<String, Object> cloudflareRecordInfo(JsonNode record) {
+        Map<String, Object> item = new HashMap<>();
+        item.put("id", requireCloudflareId(requiredText(record, "id")));
+        item.put("type", requiredText(record, "type"));
+        item.put("name", requiredText(record, "name"));
+        JsonNode content = record.get("content");
+        if (content == null || !content.isTextual()) throw new IllegalStateException("Cloudflare记录值不完整");
+        item.put("content", content.textValue());
+        JsonNode data = record.get("data");
+        if (data != null && !data.isNull() && !data.isObject()) {
+            throw new IllegalStateException("Cloudflare结构化记录字段无效");
+        }
+        item.put("contentEditable", data == null || data.isNull() || data.size() == 0);
+        int ttl = requiredNonnegativeInt(record, "ttl");
+        if (ttl == 0) throw new IllegalStateException("Cloudflare TTL无效");
+        item.put("ttl", ttl);
+        JsonNode proxied = record.get("proxied");
+        if (proxied != null && !proxied.isNull() && !proxied.isBoolean()) {
+            throw new IllegalStateException("Cloudflare代理状态无效");
+        }
+        item.put("proxied", proxied != null && proxied.isBoolean() ? proxied.booleanValue() : false);
+        if (record.hasNonNull("priority")) {
+            int priority = requiredNonnegativeInt(record, "priority");
+            requirePriority(priority);
+            item.put("priority", priority);
+        }
+        if (record.hasNonNull("comment")) {
+            if (!record.get("comment").isTextual()) throw new IllegalStateException("Cloudflare备注字段无效");
+            item.put("comment", record.get("comment").textValue());
+        }
+        return item;
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> readCompleteDnsSnapshot(String zoneId) {
+        List<Map<String, Object>> records = new ArrayList<>();
+        Set<String> ids = new HashSet<>();
+        int expectedPages = -1;
+        int expectedTotal = -1;
+        for (int page = 1; ; page++) {
+            Map<String, Object> response = listDnsRecordsPageStrict(zoneId, page, 100, null, null);
+            int totalPages = (Integer) response.get("totalPages");
+            int total = (Integer) response.get("totalElements");
+            if (expectedPages < 0) {
+                expectedPages = totalPages;
+                expectedTotal = total;
+            } else if (expectedPages != totalPages || expectedTotal != total) {
+                throw new IllegalStateException("同步期间Cloudflare记录总量发生变化，请重试同步");
+            }
+            for (Map<String, Object> record : (List<Map<String, Object>>) response.get("content")) {
+                if (!ids.add((String) record.get("id"))) {
+                    throw new IllegalStateException("同步期间Cloudflare分页记录重复，请重试同步");
+                }
+                // All types must be representable before the first local mutation.
+                requireStoredRecordType((String) record.get("type"));
+                records.add(record);
+            }
+            if (page >= expectedPages) break;
+        }
+        if (records.size() != expectedTotal) {
+            throw new IllegalStateException("Cloudflare完整记录数量不一致，未修改本地记录");
+        }
+        return records;
+    }
+
+    private RecordType requireStoredRecordType(String type) {
+        RecordType recordType = RecordType.fromValue(type);
+        if (recordType == null) throw new IllegalArgumentException("本地DNS记录暂不支持此类型: " + type);
+        return recordType;
+    }
+
+    private void requirePriority(Integer priority) {
+        if (priority != null && (priority < 0 || priority > 65535)) {
+            throw new IllegalArgumentException("MX优先级必须为0到65535之间的整数");
+        }
+    }
+
+    private DnsRecord findCachedCloudflareRecord(String zoneId, String recordId) {
+        DnsRecord match = null;
+        for (DnsRecord record : dnsRecordRepository.findByZoneIdAndProviderType(zoneId, ProviderType.CLOUDFLARE)) {
+            if (!recordId.equals(record.getProviderRecordId())) continue;
+            if (match != null) throw new IllegalStateException("本地区域存在重复DNS缓存，请先核对记录");
+            match = record;
+        }
+        return match;
+    }
+
+    private String resolveCloudflareRecordZone(String recordId, String zoneId) {
+        requireCloudflareId(recordId);
+        // Explicit UI scope takes precedence; an old cache must never redirect it.
+        if (StringUtils.isNotBlank(zoneId)) return requireCloudflareId(zoneId);
+        // Keep the original one-argument email cleanup call compatible.
+        Optional<DnsRecord> cached = dnsRecordRepository.findByProviderRecordId(recordId);
+        if (!cached.isPresent() || cached.get().getProviderType() != ProviderType.CLOUDFLARE) {
+            throw new IllegalArgumentException("缺少Cloudflare区域信息，请刷新页面后重试");
+        }
+        return requireCloudflareId(cached.get().getZoneId());
+    }
+
+    private JsonNode readCloudflareRecord(String zoneId, String recordId) {
+        requireCloudflareId(zoneId);
+        requireCloudflareId(recordId);
+        JsonNode record = readCloudflareJson(CLOUDFLARE_API_BASE + "/zones/" + zoneId
+                + "/dns_records/" + recordId).get("result");
+        if (record == null || !record.isObject() || !recordId.equals(requiredText(record, "id"))) {
+            throw new IllegalStateException("Cloudflare返回的DNS记录标识不匹配");
+        }
+        if (record.hasNonNull("zone_id") && !zoneId.equals(requiredText(record, "zone_id"))) {
+            throw new IllegalStateException("Cloudflare记录不属于当前区域");
+        }
+        cloudflareRecordInfo(record);
+        return record;
+    }
+
+    private String readCloudflareZoneName(String zoneId) {
+        JsonNode zone = readCloudflareJson(CLOUDFLARE_API_BASE + "/zones/" + requireCloudflareId(zoneId)).get("result");
+        if (zone == null || !zone.isObject() || !zoneId.equals(requiredText(zone, "id"))) {
+            throw new IllegalStateException("Cloudflare返回的区域标识不匹配");
+        }
+        return requiredText(zone, "name");
+    }
+
     private Map<String, Object> createEmptyPageResult() {
         Map<String, Object> result = new HashMap<>();
         result.put("content", new ArrayList<>());
@@ -241,8 +519,13 @@ public class CloudflareService {
         log.info("开始同步Cloudflare DNS记录，zoneId: {}, domain: {}", zoneId, domainName);
 
         try {
+            String actualDomainName = readCloudflareZoneName(zoneId);
+            if (domainName == null || !actualDomainName.equalsIgnoreCase(domainName.trim())) {
+                throw new IllegalArgumentException("域名与当前Cloudflare区域不匹配，请刷新区域列表");
+            }
+            domainName = actualDomainName;
             // 获取Cloudflare的所有DNS记录
-            List<Map<String, Object>> cloudflareRecords = listDnsRecords(zoneId);
+            List<Map<String, Object>> cloudflareRecords = readCompleteDnsSnapshot(zoneId);
 
             // 获取数据库中已存在的记录
             List<DnsRecord> existingRecords = dnsRecordRepository.findByZoneIdAndProviderType(zoneId,
@@ -268,6 +551,7 @@ public class CloudflareService {
                     log.info("新增DNS记录: {} -> {}", dnsRecord.getRecordName(), dnsRecord.getRecordValue());
                 } else {
                     // 已存在，更新
+                    dnsRecord.setDomainName(domainName);
                     updateDnsRecordFromCloudflare(dnsRecord, cfRecord);
                     dnsRecordRepository.save(dnsRecord);
                     log.debug("更新DNS记录: {} -> {}", dnsRecord.getRecordName(), dnsRecord.getRecordValue());
@@ -311,13 +595,10 @@ public class CloudflareService {
         log.info("开始删除DNS记录，recordId: {}", recordId);
 
         try {
-            // 从数据库查找记录
-            Optional<DnsRecord> optionalRecord = dnsRecordRepository.findByProviderRecordId(recordId);
-            DnsRecord dnsRecord = optionalRecord.orElse(null);
-            String resolvedZoneId = dnsRecord != null ? dnsRecord.getZoneId() : zoneId;
-            if (StringUtils.isBlank(resolvedZoneId)) {
-                throw new IllegalArgumentException("缺少域名区域信息，请刷新页面后重试");
-            }
+            String resolvedZoneId = resolveCloudflareRecordZone(recordId, zoneId);
+            DnsRecord dnsRecord = findCachedCloudflareRecord(resolvedZoneId, recordId);
+            // Confirm the remote record in this exact zone before any deletion.
+            readCloudflareRecord(resolvedZoneId, recordId);
 
             CloudflareConfig config = systemConfigService.getCloudflareConfig();
 
@@ -337,6 +618,10 @@ public class CloudflareService {
             ObjectMapper mapper = new ObjectMapper();
             JsonNode jsonNode = mapper.readTree(response.getBody());
 
+            requireCloudflareSuccess(jsonNode);
+            if (!recordId.equals(requiredText(jsonNode.get("result"), "id"))) {
+                throw new IllegalStateException("Cloudflare删除回执标识不匹配，请核对当前记录");
+            }
             if (jsonNode.get("success").asBoolean()) {
                 // 删除成功，更新数据库记录状态
                 if (dnsRecord != null) {
@@ -754,6 +1039,7 @@ public class CloudflareService {
         dnsRecord.setRecordValue((String) cfRecord.get("content"));
         dnsRecord.setTtl((Integer) cfRecord.get("ttl"));
         dnsRecord.setProxied((Boolean) cfRecord.get("proxied"));
+        dnsRecord.setPriority((Integer) cfRecord.get("priority"));
         dnsRecord.setStatus(RecordStatus.ACTIVE);
         dnsRecord.setLastSyncTime(LocalDateTime.now());
 
@@ -764,9 +1050,12 @@ public class CloudflareService {
      * 从Cloudflare记录更新DnsRecord实体
      */
     private void updateDnsRecordFromCloudflare(DnsRecord dnsRecord, Map<String, Object> cfRecord) {
+        dnsRecord.setRecordName(extractRecordName((String) cfRecord.get("name"), dnsRecord.getDomainName()));
+        dnsRecord.setRecordType(requireStoredRecordType((String) cfRecord.get("type")));
         dnsRecord.setRecordValue((String) cfRecord.get("content"));
         dnsRecord.setTtl((Integer) cfRecord.get("ttl"));
         dnsRecord.setProxied((Boolean) cfRecord.get("proxied"));
+        dnsRecord.setPriority((Integer) cfRecord.get("priority"));
         dnsRecord.setStatus(RecordStatus.ACTIVE);
         dnsRecord.setLastSyncTime(LocalDateTime.now());
         dnsRecord.setUpdateTime(LocalDateTime.now());
@@ -819,7 +1108,20 @@ public class CloudflareService {
      */
     @Transactional
     public ApiResponse createDnsRecord(String zoneId, String type, String name, String content, Integer ttl, Boolean proxied) {
+        return createDnsRecord(zoneId, type, name, content, ttl, proxied, null);
+    }
+
+    @Transactional
+    public ApiResponse createDnsRecord(String zoneId, String type, String name, String content,
+                                       Integer ttl, Boolean proxied, Integer priority) {
         log.info("开始创建DNS记录，zoneId: {}, type: {}, name: {}, content: {}", zoneId, type, name, content);
+
+        requireCloudflareId(zoneId);
+        requireStoredRecordType(type);
+        requirePriority(priority);
+        if (StringUtils.isBlank(name) || StringUtils.isBlank(content) || (ttl != null && ttl < 1)) {
+            throw new IllegalArgumentException("DNS名称、记录值或TTL无效");
+        }
 
         CloudflareConfig config = systemConfigService.getCloudflareConfig();
 
@@ -828,6 +1130,7 @@ public class CloudflareService {
         }
         DnsRecordDetail dnsRecordDetail = new DnsRecordDetail();
         try {
+            String domainName = readCloudflareZoneName(zoneId);
             String url = CLOUDFLARE_API_BASE + "/zones/" + zoneId + "/dns_records";
 
             HttpHeaders headers = createHeaders(config.getApiToken());
@@ -839,10 +1142,10 @@ public class CloudflareService {
             requestData.put("content", content);
             requestData.put("ttl", ttl != null ? ttl : 1); // 默认自动TTL
 
-            // 只有A和AAAA记录支持代理
-            if (("A".equals(type) || "AAAA".equals(type)) && proxied != null) {
+            if (("A".equals(type) || "AAAA".equals(type) || "CNAME".equals(type)) && proxied != null) {
                 requestData.put("proxied", proxied);
             }
+            if ("MX".equals(type)) requestData.put("priority", priority == null ? 0 : priority);
 
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestData, headers);
 
@@ -851,23 +1154,17 @@ public class CloudflareService {
 
             ObjectMapper mapper = new ObjectMapper();
             JsonNode jsonNode = mapper.readTree(response.getBody());
-
-            if (jsonNode.get("success").asBoolean()) {
-                log.info("创建DNS记录成功: {} -> {}", name, content);
-
-                // 获取创建的记录信息并保存到数据库
-                JsonNode result = jsonNode.get("result");
-                if (result != null) {
-                    saveDnsRecordToDatabase(result, zoneId, extractDomainFromZone(zoneId));
-                }
-                dnsRecordDetail.setDnsId(result.get("id").asText());
-                dnsRecordDetail.setFlag(1);
-                return ApiResponse.success(dnsRecordDetail);
-            } else {
-                handleCloudflareErrors(jsonNode);
-                dnsRecordDetail.setFlag(0);
-                return ApiResponse.success(dnsRecordDetail);
+            requireCloudflareSuccess(jsonNode);
+            JsonNode result = jsonNode.get("result");
+            Map<String, Object> created = cloudflareRecordInfo(result);
+            if (!type.equals(created.get("type"))) {
+                throw new IllegalStateException("Cloudflare创建回执的记录类型不匹配，请核对云端记录");
             }
+            saveDnsRecordToDatabase(result, zoneId, domainName);
+            dnsRecordDetail.setDnsId((String) created.get("id"));
+            dnsRecordDetail.setFlag(1);
+            log.info("创建DNS记录成功，recordId: {}", dnsRecordDetail.getDnsId());
+            return ApiResponse.success(dnsRecordDetail);
 
         } catch (HttpClientErrorException e) {
             log.error("创建DNS记录失败: {}", e.getResponseBodyAsString());
@@ -883,81 +1180,83 @@ public class CloudflareService {
      */
     @Transactional
     public boolean updateDnsRecord(String recordId, String content, Integer ttl, Boolean proxied,String recordTypeStr,String recordName,String zoneId) {
-        log.info("开始更新DNS记录，recordId: {}, content: {}", recordId, content);
+        return updateDnsRecord(recordId, content, ttl, proxied, recordTypeStr, recordName, zoneId, null);
+    }
+
+    @Transactional
+    public boolean updateDnsRecord(String recordId, String content, Integer ttl, Boolean proxied,
+                                   String recordTypeStr, String recordName, String zoneId, Integer priority) {
+        log.info("开始更新DNS记录，recordId: {}", recordId);
 
         try {
-            // 从数据库查找记录信息
-            DnsRecord dnsRecord;
-            Optional<DnsRecord> optionalRecord = dnsRecordRepository.findByProviderRecordId(recordId);
-            if (!optionalRecord.isPresent()) {
-                log.warn("未找到DNS记录: {}", recordId);
-                dnsRecord = new DnsRecord();
-                dnsRecord.setTtl(ttl);
-                dnsRecord.setProviderRecordId(recordId);
-                dnsRecord.setRecordValue( content);
-                dnsRecord.setRecordType(RecordType.fromValue(recordTypeStr));
-                dnsRecord.setRecordName(recordName);
-                dnsRecord.setZoneId(zoneId);
-                dnsRecord.setDomainName(recordName);
-                dnsRecord.setProviderType(ProviderType.CLOUDFLARE);
-            }else {
-                dnsRecord = optionalRecord.get();
+            requirePriority(priority);
+            if (StringUtils.isBlank(content) || (ttl != null && ttl < 1)) {
+                throw new IllegalArgumentException("DNS记录值或TTL无效");
             }
-
+            String resolvedZoneId = resolveCloudflareRecordZone(recordId, zoneId);
+            DnsRecord dnsRecord = findCachedCloudflareRecord(resolvedZoneId, recordId);
+            JsonNode original = readCloudflareRecord(resolvedZoneId, recordId);
+            String actualType = requiredText(original, "type");
+            String actualName = requiredText(original, "name");
+            requireStoredRecordType(actualType);
+            if (!actualType.equals(recordTypeStr) || !actualName.equals(recordName)) {
+                throw new IllegalStateException("云端DNS记录名称或类型已变化，请刷新记录后重试");
+            }
+            JsonNode structuredData = original.get("data");
+            String updatedContent = content;
+            if (structuredData != null && structuredData.isObject() && structuredData.size() > 0) {
+                String originalContent = original.get("content").textValue();
+                if (!originalContent.equals(content) && !originalContent.trim().equals(content)) {
+                    throw new IllegalArgumentException("结构化记录值请到Cloudflare编辑；此处可修改TTL等其他属性");
+                }
+                // The legacy form trims its text; retain the cloud bytes for a read-only value.
+                updatedContent = originalContent;
+            }
+            String domainName = readCloudflareZoneName(resolvedZoneId);
             CloudflareConfig config = systemConfigService.getCloudflareConfig();
-
             if (!config.isEnabled() || StringUtils.isEmpty(config.getApiToken())) {
                 throw new IllegalStateException("Cloudflare未配置或未启用");
             }
 
-            // 准备更新数据
+            // PUT replaces the record. Preserve writable attributes from the fresh cloud detail,
+            // never cache identity or read-only response metadata. There is no atomic ETag contract.
             Map<String, Object> updateData = new HashMap<>();
-            updateData.put("content", content);
-            updateData.put("name", dnsRecord.getRecordName());
-            updateData.put("type", dnsRecord.getRecordType().name());
-            updateData.put("ttl", ttl != null ? ttl : (dnsRecord.getTtl() != null ? dnsRecord.getTtl() : 1));
-
-            // 只有A和AAAA记录支持代理
-            RecordType recordType = dnsRecord.getRecordType();
-            if ((recordType == RecordType.A || recordType == RecordType.AAAA) && proxied != null) {
-                updateData.put("proxied", proxied);
-            } else if (dnsRecord.getProxied() != null) {
-                updateData.put("proxied", dnsRecord.getProxied());
+            String[] writableFields = {"type", "name", "content", "ttl", "proxied", "priority",
+                    "data", "comment", "tags", "settings"};
+            for (String field : writableFields) {
+                if (original.has(field)) updateData.put(field, original.get(field));
             }
+            updateData.put("content", updatedContent);
+            if (ttl != null) updateData.put("ttl", ttl);
+            if (("A".equals(actualType) || "AAAA".equals(actualType) || "CNAME".equals(actualType))
+                    && proxied != null) {
+                updateData.put("proxied", proxied);
+            }
+            if ("MX".equals(actualType) && priority != null) updateData.put("priority", priority);
 
-            // 调用Cloudflare API更新记录
-            String url = CLOUDFLARE_API_BASE + "/zones/" + dnsRecord.getZoneId() + "/dns_records/" + recordId;
-
+            String url = CLOUDFLARE_API_BASE + "/zones/" + resolvedZoneId + "/dns_records/" + recordId;
             HttpHeaders headers = createHeaders(config.getApiToken());
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(updateData, headers);
-
             RestTemplate restTemplate = new RestTemplate();
             ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.PUT, entity, String.class);
-
             ObjectMapper mapper = new ObjectMapper();
             JsonNode jsonNode = mapper.readTree(response.getBody());
-
-            if (jsonNode.get("success").asBoolean()) {
-                // 更新成功，同步数据库记录
-                String oldValue = dnsRecord.getRecordValue();
-                dnsRecord.setRecordValue(content);
-                if (ttl != null) {
-                    dnsRecord.setTtl(ttl);
-                }
-                if (proxied != null && (recordType == RecordType.A || recordType == RecordType.AAAA)) {
-                    dnsRecord.setProxied(proxied);
-                }
-                dnsRecord.setUpdateTime(LocalDateTime.now());
-                dnsRecord.setLastSyncTime(LocalDateTime.now());
-                dnsRecord.setRemark("记录已更新: " + oldValue + " -> " + content);
-                dnsRecordRepository.save(dnsRecord);
-
-                log.info("更新DNS记录成功: {} {} -> {}", dnsRecord.getRecordName(), oldValue, content);
-                return true;
-            } else {
-                handleCloudflareErrors(jsonNode);
-                return false;
+            requireCloudflareSuccess(jsonNode);
+            Map<String, Object> updated = cloudflareRecordInfo(jsonNode.get("result"));
+            if (!recordId.equals(updated.get("id")) || !actualType.equals(updated.get("type"))
+                    || !actualName.equals(updated.get("name"))) {
+                throw new IllegalStateException("Cloudflare更新回执的记录标识不匹配，请核对云端记录");
             }
+            if (dnsRecord == null) {
+                dnsRecord = createDnsRecordFromCloudflare(updated, resolvedZoneId, domainName);
+            } else {
+                dnsRecord.setDomainName(domainName);
+                updateDnsRecordFromCloudflare(dnsRecord, updated);
+            }
+            dnsRecord.setRemark("通过API更新");
+            dnsRecordRepository.save(dnsRecord);
+            log.info("更新DNS记录成功: {}", recordId);
+            return true;
 
         } catch (HttpClientErrorException e) {
             log.error("更新DNS记录失败: {}", e.getResponseBodyAsString());
@@ -993,6 +1292,9 @@ public class CloudflareService {
 
             if (recordNode.has("proxied")) {
                 dnsRecord.setProxied(recordNode.get("proxied").asBoolean());
+            }
+            if (recordNode.hasNonNull("priority")) {
+                dnsRecord.setPriority(requiredNonnegativeInt(recordNode, "priority"));
             }
 
             dnsRecord.setStatus(RecordStatus.ACTIVE);

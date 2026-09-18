@@ -17,6 +17,7 @@ struct SecuritySettingsView: View {
             title: "安全管理",
             subtitle: "账号安全 · OAuth · MFA · Turnstile · 频道通知",
             systemImage: "slider.horizontal.3",
+            layout: .workspace,
             toolbar: { toolbar },
             content: {
                 ScrollView {
@@ -42,7 +43,7 @@ struct SecuritySettingsView: View {
                             }
                         }
                     }
-                    .padding(16)
+                    .padding(AppTheme.pagePadding)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -270,11 +271,11 @@ struct SecuritySettingsView: View {
                             )
                         VStack(alignment: .leading, spacing: 6) {
                             Text("扫码绑定")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(AppTheme.textPrimary(dark))
                             Text("使用 Google Authenticator 等应用扫码")
-                                .font(.system(size: 11))
-                                .foregroundColor(AppTheme.sidebarText(dark))
+                                .font(.system(size: 13))
+                                .foregroundColor(AppTheme.textSecondary(dark))
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                         Spacer(minLength: 0)
@@ -317,8 +318,8 @@ struct SecuritySettingsView: View {
                 }
             } else {
                 Text("保存启用后将生成二维码与密钥")
-                    .font(.system(size: 11))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .font(.system(size: 13))
+                    .foregroundColor(AppTheme.textSecondary(dark))
             }
         } footer: {
             HStack(spacing: 8) {
@@ -397,12 +398,12 @@ struct SecuritySettingsView: View {
             minHeight: cardMinHeight
         ) {
             Text("开启后，抢机成功会向公共频道上报实例类型与区域，不含账号与 IP 等隐私信息。")
-                .font(.system(size: 12))
-                .foregroundColor(AppTheme.sidebarText(dark))
+                .font(.system(size: 13))
+                .foregroundColor(AppTheme.textSecondary(dark))
                 .fixedSize(horizontal: false, vertical: true)
             Text("采集：机型、区域。不采集：租户、密钥、IP、用户名。")
-                .font(.system(size: 11))
-                .foregroundColor(AppTheme.sidebarText(dark).opacity(0.9))
+                .font(.system(size: 13))
+                .foregroundColor(AppTheme.textSecondary(dark))
                 .fixedSize(horizontal: false, vertical: true)
         } footer: {
             AppButton(
@@ -420,7 +421,7 @@ struct SecuritySettingsView: View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundColor(Color(hex: "f85149"))
-            Text(text).font(.system(size: 12))
+            Text(text).font(.system(size: 14))
             Spacer()
             Button("重试") { Task { await model.reload() } }
                 .buttonStyle(PlainButtonStyle())

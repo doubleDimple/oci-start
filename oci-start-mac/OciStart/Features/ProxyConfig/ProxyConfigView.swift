@@ -190,7 +190,7 @@ struct ProxyConfigView: View {
                                      ? Color(hex: dark ? "e67e22" : "d35400")
                                      : Color(hex: dark ? "1abc9c" : "16a085"))
                 Text(item.forceLabel)
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(item.isForce
                                      ? Color(hex: dark ? "e67e22" : "d35400")
                                      : Color(hex: dark ? "1abc9c" : "16a085"))
@@ -228,12 +228,12 @@ struct ProxyConfigView: View {
             }) {
                 HStack(spacing: 4) {
                     Text(revealed ? item.proxyPassword : "••••••••")
-                        .font(.system(size: 12, design: revealed ? .monospaced : .default))
-                        .foregroundColor(dark ? Color.white.opacity(0.88) : Color(hex: "1e2f42"))
+                        .font(.system(size: 14, design: revealed ? .monospaced : .default))
+                        .foregroundColor(AppTheme.textPrimary(dark))
                         .lineLimit(1)
                     Image(systemName: revealed ? "eye.slash" : "eye")
                         .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(AppTheme.sidebarText(dark))
+                        .foregroundColor(AppTheme.textSecondary(dark))
                 }
                 .frame(width: 80, alignment: .leading)
             }
@@ -244,8 +244,8 @@ struct ProxyConfigView: View {
 
     private func cell(_ text: String, width: CGFloat?, weight: Font.Weight = .regular) -> some View {
         Text(text)
-            .font(.system(size: 12, weight: weight))
-            .foregroundColor(dark ? Color.white.opacity(0.88) : Color(hex: "1e2f42"))
+            .font(.system(size: 14, weight: weight))
+            .foregroundColor(AppTheme.textPrimary(dark))
             .lineLimit(1)
             .frame(width: width, alignment: .leading)
             .frame(maxWidth: width == nil ? .infinity : nil, alignment: .leading)
@@ -255,7 +255,7 @@ struct ProxyConfigView: View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundColor(Color(hex: "f85149"))
-            Text(text).font(.system(size: 12))
+            Text(text).font(.system(size: 14))
             Spacer()
             Button("重试") { Task { await model.reload() } }
                 .buttonStyle(PlainButtonStyle())

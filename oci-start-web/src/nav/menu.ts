@@ -47,7 +47,6 @@ export const MENU: NavGroup[] = [
       { id: 'domain-settings', href: '/system/domainSettings', labelKey: 'nav.keyConfig', icon: 'i-mdi-key-outline' },
       { id: 'cloudflare-servers', href: '/dns/cloudflare', labelKey: 'nav.cf', icon: 'i-mdi-earth' },
       { id: 'edgeOne-servers', href: '/dns/edgeone', labelKey: 'nav.eo', icon: 'i-mdi-earth' },
-      { id: 'nginx-management', href: '/ssl/nginx/management', labelKey: 'nav.nginx', icon: 'i-mdi-server' },
     ],
   },
   {
@@ -73,7 +72,7 @@ export const MENU: NavGroup[] = [
     children: [
       { id: 'api-notifySettings', href: '/system/notifySettings', labelKey: 'nav.notify', icon: 'i-mdi-bell-outline' },
       { id: 'api-memPage', href: '/system/memPage', labelKey: 'nav.notes', icon: 'i-mdi-notebook-outline' },
-      { id: 'api-migPage', href: '/migration/migPage', labelKey: 'nav.migration', icon: 'i-mdi-migrate' },
+      { id: 'api-migPage', href: '/migration/migPage', labelKey: 'nav.migration', icon: 'i-mdi-database-sync-outline' },
       { id: 'api-mfa', href: '/mfa/page', labelKey: 'nav.mfa', icon: 'i-mdi-cellphone-key' },
     ],
   },
@@ -92,5 +91,3 @@ export const PROVIDERS = [
   { type: 3, name: 'Azure Cloud' },
   { type: 4, name: 'Amazon Cloud' },
 ] as const
-
-

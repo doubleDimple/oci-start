@@ -60,7 +60,7 @@ public class TelegramBotConfig {
     /**
      * 停止机器人
      */
-    public void stopBot() {
+    public synchronized void stopBot() {
         try {
             if (botSession != null && botSession.isRunning()){
                 botSession.stop();
@@ -90,10 +90,20 @@ public class TelegramBotConfig {
     @Bean
     @Primary
     public DefaultBotOptions botOptions() {
+        return createBotOptions(false);
+    }
+
+    // @Bean calls return a cached singleton; an explicit restart needs the newly saved proxy settings.
+    private DefaultBotOptions createBotOptions(boolean strict) {
         DefaultBotOptions options = new DefaultBotOptions();
 
         try {
             ProxyConfig proxyConfig = systemConfigService.getProxyConfig();
+            if (strict && proxyConfig.isEnabled() && (StringUtils.isBlank(proxyConfig.getHost())
+                    || proxyConfig.getPort() < 1 || proxyConfig.getPort() > 65535
+                    || (!"HTTP".equals(proxyConfig.getType()) && !"SOCKS5".equals(proxyConfig.getType())))) {
+                throw new IllegalStateException("Telegram 代理配置无效");
+            }
 
             options.setMaxThreads(3);
 
@@ -144,6 +154,7 @@ public class TelegramBotConfig {
             }
 
         } catch (Exception e) {
+            if (strict) throw new IllegalStateException("Telegram 代理配置读取失败");
             log.warn("获取代理配置失败，使用默认设置: {}", e.getMessage());
 
             // 默认配置
@@ -160,6 +171,67 @@ public class TelegramBotConfig {
         }
 
         return options;
+    }
+
+    public DefaultBotOptions prepareExplicitBotOptions() {
+        return createBotOptions(true);
+    }
+
+    public synchronized void stopBotStrict() {
+        try {
+            if (botSession != null && botSession.isRunning()) botSession.stop();
+            if (botSession != null && botSession.isRunning()) {
+                throw new IllegalStateException("Telegram 旧会话停止未确认");
+            }
+            // The old token may have been revoked. Stopping its long-poll session is sufficient;
+            // registerBot handles the new token's webhook and must not depend on old credentials.
+            botsApi = null;
+            currentBot = null;
+            botSession = null;
+            botRunning = false;
+        } catch (Exception e) {
+            throw new IllegalStateException("Telegram 旧会话停止未确认");
+        }
+    }
+
+    /** One explicit registration attempt, with ownership recorded for the next stop. No background retry. */
+    public synchronized void registerBotExplicit(TelegramConfig config, DefaultBotOptions options) {
+        DefaultBotSession candidateSession = null;
+        try {
+            TelegramBotCus candidate = new TelegramBotCus(options);
+            candidate.setApplicationContext(applicationContext);
+            candidate.setBotId(Long.valueOf(config.getBotToken().substring(0, config.getBotToken().indexOf(':'))));
+            candidate.setBotToken(config.getBotToken());
+            candidate.setBotUsername("OCI_START_Bot");
+            TelegramBotsApi candidateApi = new TelegramBotsApi(DefaultBotSession.class);
+            candidateSession = (DefaultBotSession) candidateApi.registerBot(candidate);
+            if (candidateSession == null || !candidateSession.isRunning()) {
+                throw new IllegalStateException("Telegram 会话注册未确认");
+            }
+            botsApi = candidateApi;
+            currentBot = candidate;
+            botSession = candidateSession;
+            botRunning = true;
+            // The registration receipt does not promise welcome-message delivery or a working command round trip.
+            CompletableFuture.runAsync(() -> {
+                try {
+                    Thread.sleep(2000);
+                    synchronized (TelegramBotConfig.this) {
+                        if (currentBot != candidate || botSession == null || !botSession.isRunning()) return;
+                    }
+                    candidate.sendWelcomeMessageAfterStartup();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                } catch (Exception e) {
+                    log.warn("Telegram 欢迎消息发送未确认");
+                }
+            });
+        } catch (Exception e) {
+            if (candidateSession != null) {
+                try { candidateSession.stop(); } catch (Exception ignored) { /* Keep a fixed public error. */ }
+            }
+            throw new IllegalStateException("Telegram 会话注册未确认，请核对机器人状态");
+        }
     }
 
     /**
@@ -208,7 +280,6 @@ public class TelegramBotConfig {
 
             log.debug("正在启动 Telegram 机器人...");
             log.debug("Bot Username: {}", bot.getBotUsername());
-            log.debug("Bot Token: {}...", bot.getBotToken().substring(0, Math.min(5, bot.getBotToken().length())));
 
             // 创建并注册机器人
             registerBotWithRetry(bot);
@@ -258,7 +329,6 @@ public class TelegramBotConfig {
 
                 log.debug("正在启动 Telegram 机器人...");
                 log.debug("Bot Username: {}", bot.getBotUsername());
-                log.debug("Bot Token: {}...", bot.getBotToken().substring(0, Math.min(5, bot.getBotToken().length())));
 
                 // 创建并注册机器人
                 registerBotWithRetry(bot);
@@ -269,7 +339,7 @@ public class TelegramBotConfig {
         };
     }
 
-    private void registerBotWithRetry(TelegramBotCus bot) {
+    private synchronized void registerBotWithRetry(TelegramBotCus bot) {
         final int maxRetries = 3;
         final long retryDelay = 10000;
 
@@ -278,6 +348,8 @@ public class TelegramBotConfig {
                 TelegramBotsApi botsApi = new TelegramBotsApi(DefaultBotSession.class);
                 botSession = (DefaultBotSession) botsApi.registerBot(bot);
                 setBotsApi(botsApi);
+                currentBot = bot;
+                botRunning = true;
 
                 log.info("Telegram 机器人启动成功!");
 

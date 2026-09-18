@@ -116,7 +116,6 @@ public class OTPService {
             if (StringUtils.isEmpty(mfaConfig.getSecretKey())) {
                 throw new RuntimeException("MFA未启用或配置不完整");
             }
-            log.debug("MFA验证开始，秘钥;：{}", mfaConfig.getSecretKey());
             return googleAuthenticatorDef.verify(mfaConfig.getSecretKey(), mfaCode);
         } catch (Exception e) {
             log.error("MFA验证失败", e);

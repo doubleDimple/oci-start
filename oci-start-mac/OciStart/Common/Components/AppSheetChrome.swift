@@ -1,19 +1,19 @@
 import SwiftUI
 
-// MARK: - Web modal tokens (`tenant-list.css` / `add_boot.css`)
+// MARK: - Shared modal tokens (Vue console)
 
 /// Color tokens aligned with Web tenant modals (`--surface`, `--text-primary`, …).
 enum AppSheetSurface {
     static func surface(_ dark: Bool) -> Color {
-        dark ? Color(hex: "22262b") : Color.white
+        AppTheme.cardBg(dark)
     }
 
     static func surface2(_ dark: Bool) -> Color {
-        dark ? Color(hex: "292d32") : Color(hex: "f8fafc")
+        AppTheme.inputBg(dark)
     }
 
     static func panelBg(_ dark: Bool) -> Color {
-        dark ? Color(hex: "2d3138") : Color(hex: "f1f5f9") // --hover-bg
+        AppTheme.hover(dark) // --hover-bg
     }
 
     static func rowHover(_ dark: Bool) -> Color {
@@ -21,33 +21,33 @@ enum AppSheetSurface {
     }
 
     static func primaryText(_ dark: Bool) -> Color {
-        dark ? Color(hex: "cdd9e5") : Color(hex: "1a202c")
+        AppTheme.textPrimary(dark)
     }
 
     static func mutedText(_ dark: Bool) -> Color {
-        dark ? Color(hex: "768390") : Color(hex: "64748b")
+        AppTheme.textSecondary(dark)
     }
 
     static func border(_ dark: Bool) -> Color {
-        dark ? Color(hex: "31363d") : Color(hex: "dde3ec")
+        AppTheme.border(dark)
     }
 
     static func cardBg(_ dark: Bool) -> Color { surface(dark) }
 
     static func accentBlue(_ dark: Bool) -> Color {
-        dark ? Color(hex: "4d9eff") : Color(hex: "2563eb")
+        AppTheme.info
     }
 
     static func accentGreen(_ dark: Bool) -> Color {
-        dark ? Color(hex: "3fb950") : Color(hex: "16a34a")
+        AppTheme.success
     }
 
     static func accentRed(_ dark: Bool) -> Color {
-        dark ? Color(hex: "ff6b6b") : Color(hex: "dc2626")
+        AppTheme.danger
     }
 
     static func accentOrange(_ dark: Bool) -> Color {
-        dark ? Color(hex: "f78166") : Color(hex: "ea580c")
+        AppTheme.warning(dark)
     }
 }
 
@@ -126,7 +126,7 @@ struct AppSheetChrome<Content: View, Footer: View>: View {
                     .foregroundColor(AppTheme.sidebarActive)
             }
             Text(title)
-                .font(.system(size: 16, weight: .semibold))
+                .font(.system(size: AppTheme.dialogTitleSize, weight: .semibold))
                 .foregroundColor(AppSheetSurface.primaryText(dark))
                 .lineLimit(2)
             Spacer(minLength: 8)
@@ -180,7 +180,7 @@ struct AppSheetChrome<Content: View, Footer: View>: View {
 
 // MARK: - Tabs (Web `.user-management-tabs` / `.user-tab`)
 
-/// Flat tabs: hover-bg track, active = surface + accent-blue (not filled green).
+/// Flat tabs: hover-bg track, active = surface + forest-green text.
 struct AppSheetTabBar: View {
     let titles: [String]
     let selectedIndex: Int
@@ -196,17 +196,17 @@ struct AppSheetTabBar: View {
                 let selected = selectedIndex == idx
                 Button(action: { onSelect(idx) }) {
                     Text(title)
-                        .font(.system(size: 13, weight: selected ? .medium : .regular))
+                        .font(.system(size: AppTheme.bodySize, weight: selected ? .medium : .regular))
                         .foregroundColor(
                             selected
-                                ? AppSheetSurface.accentBlue(dark)
+                                ? AppTheme.sidebarActive
                                 : AppSheetSurface.mutedText(dark)
                         )
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
                         .padding(.horizontal, 12)
                         .background(
-                            RoundedRectangle(cornerRadius: 2)
+                            RoundedRectangle(cornerRadius: AppTheme.controlRadius)
                                 .fill(selected ? AppSheetSurface.surface(dark) : Color.clear)
                         )
                 }
@@ -215,7 +215,7 @@ struct AppSheetTabBar: View {
         }
         .padding(4)
         .background(AppSheetSurface.panelBg(dark))
-        .cornerRadius(2)
+        .cornerRadius(AppTheme.controlRadius)
     }
 }
 
@@ -232,7 +232,7 @@ struct AppSheetTableHeader: View {
         HStack(spacing: 0) {
             ForEach(Array(columns.enumerated()), id: \.offset) { _, col in
                 Text(col.title.uppercased())
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: AppTheme.bodySize, weight: .semibold))
                     .foregroundColor(AppSheetSurface.mutedText(dark))
                     .lineLimit(1)
                     .frame(width: col.width, alignment: .leading)
@@ -308,11 +308,11 @@ struct AppDetailRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 15) {
             Text(label)
-                .font(.system(size: 13, weight: .medium))
+                .font(.system(size: AppTheme.bodySize, weight: .medium))
                 .foregroundColor(AppSheetSurface.mutedText(dark))
                 .frame(width: 88, alignment: .leading)
             Text(value.isEmpty ? "—" : value)
-                .font(.system(size: 13))
+                .font(.system(size: AppTheme.bodySize))
                 .foregroundColor(AppSheetSurface.primaryText(dark))
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -343,14 +343,14 @@ struct AppTextEditor: View {
 
     var body: some View {
         TextEditor(text: $text)
-            .font(.system(size: monospaced ? 12 : 13,
+            .font(.system(size: AppTheme.bodySize,
                           design: monospaced ? .monospaced : .default))
             .foregroundColor(AppSheetSurface.primaryText(dark))
             .padding(8)
             .frame(minHeight: minHeight)
             .background(
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(dark ? Color(hex: "161820") : Color.white)
+                    .fill(AppTheme.inputBg(dark))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
@@ -376,12 +376,12 @@ struct AppSheetInfoBox: View {
                 Image(systemName: "info.circle.fill")
                     .foregroundColor(AppSheetSurface.accentBlue(dark))
                 Text(text)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.system(size: AppTheme.bodySize, weight: .medium))
                     .foregroundColor(AppSheetSurface.accentBlue(dark))
             }
             ForEach(lines, id: \.self) { line in
                 Text("• \(line)")
-                    .font(.system(size: 12))
+                    .font(.system(size: AppTheme.bodySize))
                     .foregroundColor(AppSheetSurface.mutedText(dark))
             }
         }

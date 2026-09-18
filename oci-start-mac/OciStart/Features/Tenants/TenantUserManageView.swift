@@ -9,9 +9,9 @@ struct TenantUserManageView: View {
     private var dark: Bool { appearance.isDarkEffective }
     private var tenant: TenantItem? { model.userManageParent }
 
-    private var primaryText: Color { dark ? Color.white.opacity(0.9) : Color.primary }
-    private var mutedText: Color { AppTheme.sidebarText(dark) }
-    private var panelBg: Color { dark ? Color.white.opacity(0.04) : Color.black.opacity(0.03) }
+    private var primaryText: Color { AppTheme.textPrimary(dark) }
+    private var mutedText: Color { AppTheme.textSecondary(dark) }
+    private var panelBg: Color { AppTheme.inputBg(dark) }
     private var border: Color { AppTheme.border(dark) }
 
     var body: some View {
@@ -35,6 +35,13 @@ struct TenantUserManageView: View {
 
     private var toolbar: some View {
         HStack(spacing: 8) {
+            if let selectedTenant = tenant {
+                Text("用户管理 · \(selectedTenant.displayName) · \(selectedTenant.region.isEmpty ? "—" : selectedTenant.region)")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(AppTheme.textSecondary(dark))
+                    .lineLimit(1)
+                    .frame(maxWidth: 220, alignment: .leading)
+            }
             AppButton(title: "返回列表", systemImage: "chevron.left", kind: .secondary) {
                 model.closeUserManage()
             }
@@ -154,7 +161,7 @@ struct TenantUserManageView: View {
         }) {
             VStack(spacing: 0) {
                 Text(tab.title)
-                    .font(.system(size: 13, weight: active ? .semibold : .regular))
+                    .font(.system(size: 14, weight: active ? .semibold : .regular))
                     .foregroundColor(active ? AppTheme.sidebarActive : mutedText)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
@@ -245,7 +252,7 @@ struct TenantUserManageView: View {
                 .buttonStyle(PlainButtonStyle())
             }
             ForEach(model.policyInfoLines, id: \.self) { line in
-                Text(line).font(.system(size: 12)).foregroundColor(mutedText)
+                Text(line).font(.system(size: 14)).foregroundColor(mutedText)
             }
             HStack(alignment: .top, spacing: 24) {
                 VStack(alignment: .leading, spacing: 8) {
@@ -257,9 +264,9 @@ struct TenantUserManageView: View {
                 }
                 VStack(alignment: .leading, spacing: 4) {
                     Text("说明").font(.system(size: 11, weight: .semibold)).foregroundColor(mutedText)
-                    Text("· 策略作用于该租户下 OCI 用户").font(.system(size: 11)).foregroundColor(mutedText)
-                    Text("· 过期后用户需重置密码").font(.system(size: 11)).foregroundColor(mutedText)
-                    Text("· 天数为 0 表示永不过期").font(.system(size: 11)).foregroundColor(mutedText)
+                    Text("· 策略作用于该租户下 OCI 用户").font(.system(size: 14)).foregroundColor(mutedText)
+                    Text("· 过期后用户需重置密码").font(.system(size: 14)).foregroundColor(mutedText)
+                    Text("· 天数为 0 表示永不过期").font(.system(size: 14)).foregroundColor(mutedText)
                 }
             }
             HStack(spacing: 8) {
@@ -337,7 +344,7 @@ struct TenantUserManageView: View {
         }
         .padding(.horizontal, hPad).padding(.vertical, 9)
         .frame(width: width, alignment: .leading)
-        .background(AppTheme.sidebarHover(dark).opacity(0.65))
+        .background(AppTheme.hover(dark).opacity(0.65))
         .overlay(Rectangle().frame(height: 1).foregroundColor(border.opacity(0.5)), alignment: .bottom)
     }
 
@@ -367,7 +374,7 @@ struct TenantUserManageView: View {
         }
         .padding(.horizontal, hPad).padding(.vertical, 9)
         .frame(width: width, alignment: .leading)
-        .background(index % 2 == 1 ? AppTheme.sidebarHover(dark).opacity(0.18) : Color.clear)
+        .background(index % 2 == 1 ? AppTheme.hover(dark).opacity(0.18) : Color.clear)
         .overlay(Rectangle().frame(height: 1).foregroundColor(border.opacity(0.3)), alignment: .bottom)
     }
 
@@ -456,7 +463,7 @@ struct TenantUserManageView: View {
         }
         .padding(.horizontal, hPad).padding(.vertical, 9)
         .frame(width: width, alignment: .leading)
-        .background(AppTheme.sidebarHover(dark).opacity(0.65))
+        .background(AppTheme.hover(dark).opacity(0.65))
         .overlay(Rectangle().frame(height: 1).foregroundColor(border.opacity(0.5)), alignment: .bottom)
     }
 
@@ -474,7 +481,7 @@ struct TenantUserManageView: View {
         }
         .padding(.horizontal, hPad).padding(.vertical, 9)
         .frame(width: width, alignment: .leading)
-        .background(index % 2 == 1 ? AppTheme.sidebarHover(dark).opacity(0.18) : Color.clear)
+        .background(index % 2 == 1 ? AppTheme.hover(dark).opacity(0.18) : Color.clear)
         .overlay(Rectangle().frame(height: 1).foregroundColor(border.opacity(0.3)), alignment: .bottom)
     }
 
@@ -482,7 +489,7 @@ struct TenantUserManageView: View {
         HStack(spacing: 6) {
             Image(systemName: "info.circle").font(.system(size: 11)).foregroundColor(AppTheme.sidebarActive)
             Text("共 \(model.notifyEmails.count) ���收件人，系统通知将发送至全部邮箱")
-                .font(.system(size: 12)).foregroundColor(mutedText)
+                .font(.system(size: 14)).foregroundColor(mutedText)
             Spacer()
         }
         .padding(.horizontal, 16).padding(.vertical, 10)
@@ -519,7 +526,7 @@ struct TenantUserManageView: View {
             }
             HStack(spacing: 12) {
                 Text(model.mfaStatusText)
-                    .font(.system(size: 13))
+                    .font(.system(size: 14))
                     .foregroundColor(primaryText)
                 StatusBadge(
                     text: model.mfaEmailEnabled ? "邮箱 MFA 开" : "邮箱 MFA 关",
@@ -560,7 +567,7 @@ struct TenantUserManageView: View {
         VStack(spacing: 8) {
             Spacer()
             ProgressView()
-            Text(text).font(.system(size: 12)).foregroundColor(mutedText)
+            Text(text).font(.system(size: 14)).foregroundColor(mutedText)
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -568,14 +575,14 @@ struct TenantUserManageView: View {
 
     private func colHeader(_ title: String, _ w: CGFloat) -> some View {
         Text(title)
-            .font(.system(size: 11, weight: .semibold))
+            .font(.system(size: 13, weight: .semibold))
             .foregroundColor(mutedText)
             .frame(width: w, alignment: .leading)
     }
 
     private func cell(_ text: String, _ w: CGFloat, muted: Bool = false, bold: Bool = false) -> some View {
         Text(text)
-            .font(.system(size: 12, weight: bold ? .semibold : .regular))
+            .font(.system(size: 13, weight: bold ? .semibold : .regular))
             .foregroundColor(muted ? mutedText : primaryText)
             .lineLimit(1)
             .frame(width: w, alignment: .leading)

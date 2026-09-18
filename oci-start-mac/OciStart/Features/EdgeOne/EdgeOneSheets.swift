@@ -178,7 +178,7 @@ struct EdgeOneConfigSheet: View {
                     VStack(alignment: .leading, spacing: 14) {
                         HStack {
                             Text("启用 EdgeOne")
-                                .font(.system(size: 13, weight: .medium))
+                                .font(.system(size: 14, weight: .medium))
                             Spacer()
                             Toggle("", isOn: Binding(
                                 get: { model.configForm?.enabled ?? false },
@@ -208,8 +208,8 @@ struct EdgeOneConfigSheet: View {
                             )
                         }
                         Text("访问管理 → API 密钥管理")
-                            .font(.system(size: 11))
-                            .foregroundColor(AppTheme.sidebarText(dark))
+                            .font(.system(size: 13))
+                            .foregroundColor(AppTheme.textSecondary(dark))
 
                         FormFieldRow(label: "SecretKey", required: true) {
                             AppTextField(

@@ -505,7 +505,7 @@
     </dependencyManagement>
 
     <profiles>
-        <!-- 前端构建：mvn package -P web（先 generate-resources 再 pack，避免 reactor 顺序把空 static 打进 jar） -->
+        <!-- Full distribution: mvn -Pweb -pl oci-server -am clean package. -->
         <profile>
             <id>web</id>
             <modules>

@@ -315,7 +315,7 @@ public class OracleCloudService {
                  if (!hasComputeCapacity(computeClient, compartmentId, availabilityDomain,
                          launchInstanceDetails.getShape(), ocpus, memory)) {
                      skippedDueToNoCapacity = true;
-                     log.debug("[TaskId={}] 用户:[{}] AD:{} shape:{} 无容量，跳过创建",
+                     log.warn("[TaskId={}] 用户:[{}] AD:{} shape:{} 无容量，跳过创建",
                              user.getBootId(), user.getUserName(), availabilityDomain, launchInstanceDetails.getShape());
                      continue;
                  }

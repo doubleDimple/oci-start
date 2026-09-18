@@ -72,13 +72,6 @@ public class GoogleAuthenticatorDef {
         try {
             // 获取当前代码
             String currentCode = generateCode(secretKey);
-            // 调试信息
-            if (log.isDebugEnabled()){
-                log.debug("Input Code: " + code);
-                log.debug("Generated Code: " + currentCode);
-            }
-
-
             // 考虑前后 30 秒的容差
             return code.equals(currentCode) ||
                     code.equals(generateCodeForTime(secretKey, -30)) ||

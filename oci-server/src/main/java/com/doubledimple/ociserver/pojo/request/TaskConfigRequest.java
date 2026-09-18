@@ -17,6 +17,9 @@ public class TaskConfigRequest {
      * 通知秘钥
      */
     private String notificationSecret;
+    private Boolean keepNotificationSecret;
+    // Opt-in clear; legacy blank or missing notificationSecret continues to preserve it.
+    private Boolean clearNotificationSecret;
 
     private boolean enableAccountCheck;
     private boolean enableBootLog;

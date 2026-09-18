@@ -5,11 +5,11 @@ enum StatusTone {
 
     func color(dark: Bool) -> Color {
         switch self {
-        case .success: return Color(hex: "3fb950")
-        case .warning: return Color(hex: "d29922")
-        case .danger:  return Color(hex: "f85149")
-        case .info:    return Color(hex: "58a6ff")
-        case .neutral: return dark ? Color(hex: "8b949e") : Color(hex: "6B7280")
+        case .success: return AppTheme.success
+        case .warning: return AppTheme.warning(dark)
+        case .danger:  return AppTheme.danger
+        case .info:    return AppTheme.info
+        case .neutral: return AppTheme.textSecondary(dark)
         }
     }
 
@@ -35,7 +35,7 @@ struct StatusBadge: View {
     var body: some View {
         let c = tone.color(dark: dark)
         Text(text)
-            .font(.system(size: 11, weight: .semibold))
+            .font(.system(size: AppTheme.captionSize, weight: .semibold))
             .foregroundColor(c)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)

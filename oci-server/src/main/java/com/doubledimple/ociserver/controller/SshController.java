@@ -10,7 +10,6 @@ import com.doubledimple.ocicommon.param.ApiResponse;
 import com.doubledimple.ociserver.service.CloudSshFolderService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -22,8 +21,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import javax.annotation.Resource;
-import javax.servlet.http.HttpServletRequest;
-
 
 /**
  * @version 1.0.0
@@ -39,14 +36,6 @@ public class SshController extends BaseController{
 
     @Resource
     private CloudSshFolderService cloudSshFolderService;
-
-
-    @RequestMapping("/terminal")
-    public String terminal(HttpServletRequest request, Model model){
-        model.addAttribute("activePage", "ssh-terminal");
-        return "ssh_terminal";
-    }
-
 
     /** 文件夹树 */
     @GetMapping("/folders/tree")
@@ -176,6 +165,5 @@ public class SshController extends BaseController{
             return ApiResponse.error("更新失败");
         }
     }
-
 
 }

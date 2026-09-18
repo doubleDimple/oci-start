@@ -197,7 +197,7 @@ struct ProxyConfigSheet: View {
                         : "非强制：代理不通时可回退直连"
                 )
                 .font(.system(size: 11))
-                .foregroundColor(AppTheme.sidebarText(dark))
+                .foregroundColor(AppTheme.textSecondary(dark))
                 .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
@@ -228,11 +228,11 @@ struct ProxyConfigSheet: View {
                     .foregroundColor(AppTheme.sidebarActive)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("当前绑定")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(AppTheme.sidebarText(dark))
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(AppTheme.textSecondary(dark))
                     Text(model.selectedTenantLabel())
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(AppTheme.textPrimary(dark))
                         .lineLimit(2)
                 }
                 Spacer()
@@ -265,8 +265,8 @@ struct ProxyConfigSheet: View {
                     )
                     if model.pagedTenants.isEmpty {
                         Text("无匹配租户")
-                            .font(.system(size: 11))
-                            .foregroundColor(AppTheme.sidebarText(dark))
+                            .font(.system(size: 13))
+                            .foregroundColor(AppTheme.textSecondary(dark))
                             .padding(.vertical, 12)
                             .frame(maxWidth: .infinity)
                     } else {
@@ -292,8 +292,8 @@ struct ProxyConfigSheet: View {
                 .disabled(model.tenantPageIndex <= 0)
                 Spacer()
                 Text("\(model.tenantPageIndex + 1) / \(model.tenantTotalPages) · 共 \(model.filteredTenants.count) 个")
-                    .font(.system(size: 11))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .font(.system(size: 13))
+                    .foregroundColor(AppTheme.textSecondary(dark))
                 Spacer()
                 Button(action: { model.changeTenantPage(1) }) {
                     Image(systemName: "chevron.right")
@@ -302,7 +302,7 @@ struct ProxyConfigSheet: View {
                 .buttonStyle(PlainButtonStyle())
                 .disabled(model.tenantPageIndex >= model.tenantTotalPages - 1)
             }
-            .foregroundColor(dark ? Color.white.opacity(0.85) : Color.primary)
+            .foregroundColor(AppTheme.textPrimary(dark))
         }
         .padding(14)
         .background(
@@ -344,12 +344,12 @@ struct ProxyConfigSheet: View {
                 }
                 VStack(alignment: .leading, spacing: 1) {
                     Text(title)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(AppTheme.textPrimary(dark))
                         .lineLimit(1)
                     Text(meta)
-                        .font(.system(size: 10))
-                        .foregroundColor(AppTheme.sidebarText(dark))
+                        .font(.system(size: 13))
+                        .foregroundColor(AppTheme.textSecondary(dark))
                         .lineLimit(1)
                 }
                 Spacer()
@@ -371,11 +371,11 @@ struct ProxyConfigSheet: View {
                 .foregroundColor(AppTheme.sidebarActive)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(AppTheme.textPrimary(dark))
                 Text(desc)
-                    .font(.system(size: 11))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .font(.system(size: 13))
+                    .foregroundColor(AppTheme.textSecondary(dark))
             }
         }
     }

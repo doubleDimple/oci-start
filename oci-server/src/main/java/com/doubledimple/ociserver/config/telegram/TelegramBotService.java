@@ -39,9 +39,37 @@ public class TelegramBotService implements InitializingBean {
     private int maxRetryAttempts = 3;
     private int currentRetryCount = 0;
     private long retryIntervalMs = 30000;
+    // Guard queued legacy retries against a later explicit restart, without changing their normal policy.
+    private long retryGeneration = 0;
 
     public DefaultBotSession getBotSession() {
         return telegramBotConfig.getBotSession();
+    }
+
+    /** Manual settings action; the old startup/retry path is retained for its existing callers. */
+    public synchronized void restartBotExplicit() {
+        TelegramConfig config = systemConfigService.getTelegramConfig();
+        if (!config.isEnabled() || StringUtils.isBlank(config.getChatId())
+                || config.getBotToken() == null || !config.getBotToken().matches("[1-9][0-9]*:[A-Za-z0-9_-]+")) {
+            throw new IllegalArgumentException("请先保存并启用完整的 Telegram 配置");
+        }
+        // Validate the local bot-id range before stopping a working bot or deleting local associations.
+        try {
+            Long.parseLong(config.getBotToken().substring(0, config.getBotToken().indexOf(':')));
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Telegram 机器人配置无效");
+        }
+        synchronized (telegramBotConfig) {
+            DefaultBotOptions options = telegramBotConfig.prepareExplicitBotOptions();
+            retryGeneration++;
+            currentRetryCount = 0;
+            telegramBotConfig.stopBotStrict();
+            isBotRegistered = false;
+            telegramUserService.clearUsersForExplicitRestart();
+            telegramBotConfig.registerBotExplicit(config, options);
+            isBotRegistered = true;
+            currentRetryCount = 0;
+        }
     }
 
     /**
@@ -117,11 +145,15 @@ public class TelegramBotService implements InitializingBean {
      * 计划重试
      */
     private void scheduleRetry() {
+        final long scheduledGeneration = retryGeneration;
         new Thread(() -> {
             try {
                 Thread.sleep(retryIntervalMs);
-                log.info("开始第{}次重试注册Telegram机器人", currentRetryCount + 1);
-                startBot();
+                synchronized (TelegramBotService.this) {
+                    if (retryGeneration != scheduledGeneration) return;
+                    log.info("开始第{}次重试注册Telegram机器人", currentRetryCount + 1);
+                    startBot();
+                }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 log.warn("重试被中断");

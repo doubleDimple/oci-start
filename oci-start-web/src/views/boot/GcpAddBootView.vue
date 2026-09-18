@@ -1,21 +1,26 @@
 <script setup lang="ts">
 import { useRoute, useRouter } from 'vue-router'
-import PageHero from '@/components/PageHero.vue'
+import { useI18n } from 'vue-i18n'
 import ListCard from '@/components/ListCard.vue'
-import GhostBtn from '@/components/GhostBtn.vue'
-const route = useRoute()
+import PageBackButton from '@/components/PageBackButton.vue'
+const { t } = useI18n()
 const router = useRouter()
+const route = useRoute()
+function back() {
+  const previous = window.history.state?.back
+  if (typeof previous === 'string' && previous.startsWith('/') && !previous.startsWith('//')) router.back()
+  else void router.push({ path: '/tenants/list', query: typeof route.query.cloudType === 'string' ? { cloudType: route.query.cloudType } : {} })
+}
 </script>
 <template>
-  <div>
-    <PageHero title="添加开机任务" :desc="`tenantId=${route.query.tenantId || ''}，保存仍走 /tenants/boot/save`">
-      <GhostBtn @click="router.back()">返回</GhostBtn>
-    </PageHero>
-    <ListCard>
-      <p class="hint">开机表单字段与旧页一致，提交接口不变。请从租户行进入以带上 tenantId。</p>
+  <div class="gcp-boot-page">
+    <ListCard :aria-label="t('tenant.actions.boot')">
+      <template #toolbar><PageBackButton @click="back" /></template>
+      <p class="hint">{{ t('comingSoon') }}</p>
     </ListCard>
   </div>
 </template>
 <style scoped>
-.hint { color: var(--text-secondary); padding: 12px 0 24px; }
+.gcp-boot-page { color: var(--text-primary); font: var(--font-size-body)/1.47 var(--sans); }
+.hint { color: var(--text-secondary); padding: 12px 0 24px; font-size: var(--font-size-secondary); line-height: 1.6; }
 </style>

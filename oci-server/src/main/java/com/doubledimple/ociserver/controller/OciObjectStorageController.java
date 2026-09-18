@@ -27,7 +27,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -58,15 +57,6 @@ public class OciObjectStorageController extends BaseController {
 
     @Resource
     OciMultipartUploadService multipartUploadService;
-
-    /**
-     * 对象存储管理页面
-     */
-    @GetMapping("/page")
-    public String page(Model model) {
-        model.addAttribute("activePage", "oci-object-storage");
-        return "oci_object_storage";
-    }
 
     /**
      * 获取指定租户的存储桶列表
