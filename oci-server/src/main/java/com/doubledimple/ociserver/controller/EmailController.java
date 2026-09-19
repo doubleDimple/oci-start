@@ -33,9 +33,12 @@ import java.util.List;
  * @Author doubleDimple
  * @Date 2025-09-27 06:21
  */
+import com.doubledimple.ociserver.config.annotations.AuditLog;
+
 @Controller
 @RequestMapping("/email")
 @Slf4j
+@AuditLog(title = "邮件服务")
 public class EmailController extends BaseController{
 
     @Resource

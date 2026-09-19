@@ -6,6 +6,7 @@ struct VpsListView: View {
     @EnvironmentObject private var appearance: AppearanceController
     @StateObject private var model = VpsViewModel()
     @State private var hoveredCardId: String?
+    @State private var showQualitySheet = false
 
     private var dark: Bool { appearance.isDarkEffective }
 
@@ -68,6 +69,28 @@ struct VpsListView: View {
                 }
             }
         )
+        .sheet(isPresented: $showQualitySheet) {
+            VStack(spacing: 0) {
+                HStack {
+                    HStack(spacing: 8) {
+                        Image(systemName: "shield")
+                            .foregroundColor(Color(hex: "4a9eff"))
+                        Text("质量管理")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(AppTheme.textPrimary(dark))
+                    }
+                    Spacer()
+                    AppButton(title: "关闭", systemImage: "xmark", kind: .secondary) {
+                        showQualitySheet = false
+                    }
+                }
+                .padding(16)
+                Divider().opacity(0.4)
+                IpQualityView()
+            }
+            .frame(minWidth: 840, idealWidth: 920, maxWidth: .infinity, minHeight: 620, idealHeight: 700, maxHeight: .infinity)
+            .environmentObject(appearance)
+        }
     }
 
     // MARK: - Toolbar
@@ -250,6 +273,11 @@ struct VpsListView: View {
             }
             if model.moreMenuOpen {
                 VStack(alignment: .leading, spacing: 2) {
+                    moreItem("网络质量管理", "shield", Color(hex: "4a9eff")) {
+                        model.closeMoreMenu()
+                        showQualitySheet = true
+                    }
+                    Divider().opacity(0.4)
                     moreItem("开启自动 Ping", "play.fill", Color(hex: "10b981")) { model.enablePing() }
                     moreItem("停止自动 Ping", "stop.fill", Color(hex: "ef4444")) { model.disablePing() }
                     moreItem("手动 Ping 检测", "scope", AppTheme.sidebarActive) { model.manualPing() }
@@ -336,6 +364,7 @@ struct VpsListView: View {
                             },
                             onCopyIP: { model.copyIP(card) },
                             onSSH: { model.openSSH(card) },
+                            onQuality: { showQualitySheet = true },
                             onInstall: { model.installMonitor(card) },
                             onUninstall: { model.uninstallMonitor(card) }
                         )
@@ -357,6 +386,7 @@ private struct VpsServerCard: View {
     let onHover: (Bool) -> Void
     let onCopyIP: () -> Void
     let onSSH: () -> Void
+    let onQuality: () -> Void
     let onInstall: () -> Void
     let onUninstall: () -> Void
 
@@ -565,6 +595,7 @@ private struct VpsServerCard: View {
     private var cardActions: some View {
         HStack(spacing: 8) {
             AppButton(title: "SSH", systemImage: "terminal", kind: .secondary) { onSSH() }
+            AppButton(title: "质量", systemImage: "chart.line.uptrend.xyaxis", kind: .secondary) { onQuality() }
             if !card.item.monitorInstalled {
                 AppButton(title: "安装", systemImage: "arrow.down.circle", kind: .primary) { onInstall() }
             }

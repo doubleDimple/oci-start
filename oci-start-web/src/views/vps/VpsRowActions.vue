@@ -30,21 +30,46 @@ function command(value: unknown): void {
 
 <template>
   <div class="vps-compact-actions">
-    <button type="button" class="vps-compact-ssh" :disabled="disabled"
-      :aria-label="`${t('vps.ssh')} · ${rowName}`" @click="ssh">
-      <i class="i-mdi-console" aria-hidden="true" /><span>{{ t('vps.ssh') }}</span>
+    <button
+      type="button"
+      class="vps-action-btn"
+      :disabled="disabled"
+      :aria-label="`${t('vps.ssh')} · ${rowName}`"
+      :title="t('vps.ssh')"
+      @click="ssh"
+    >
+      <i class="i-mdi-console" aria-hidden="true" />
     </button>
-    <el-dropdown trigger="click" placement="bottom-end" :teleported="true" :hide-on-click="true"
-      :disabled="disabled" popper-class="vps-menu vps-row-actions-menu" @command="command">
-      <button type="button" class="vps-compact-more" :disabled="disabled"
-        :aria-label="`${t('vps.more')} · ${rowName}`" :title="t('vps.more')">
+    <button
+      type="button"
+      class="vps-action-btn"
+      :disabled="disabled"
+      :aria-label="`${t('vpsDetails.title')} · ${rowName}`"
+      :title="t('vpsDetails.title')"
+      @click="emit('details')"
+    >
+      <i class="i-mdi-information-outline" aria-hidden="true" />
+    </button>
+    <el-dropdown
+      trigger="click"
+      placement="bottom-end"
+      :teleported="true"
+      :hide-on-click="true"
+      :disabled="disabled"
+      popper-class="vps-menu vps-row-actions-menu"
+      @command="command"
+    >
+      <button
+        type="button"
+        class="vps-action-btn"
+        :disabled="disabled"
+        :aria-label="`${t('vps.more')} · ${rowName}`"
+        :title="t('vps.more')"
+      >
         <i class="i-mdi-dots-horizontal" aria-hidden="true" />
       </button>
       <template #dropdown>
         <el-dropdown-menu>
-          <el-dropdown-item command="details" :disabled="disabled">
-            <i class="i-mdi-information-outline" aria-hidden="true" /><span>{{ t('vpsDetails.title') }}</span>
-          </el-dropdown-item>
           <el-dropdown-item command="quality" :disabled="disabled">
             <i class="i-mdi-chart-line" aria-hidden="true" /><span>{{ t('networkQuality.details') }}</span>
           </el-dropdown-item>
@@ -61,19 +86,63 @@ function command(value: unknown): void {
 </template>
 
 <style scoped>
-.vps-compact-actions { display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; white-space: nowrap; }
-.vps-compact-ssh, .vps-compact-more {
-  display: inline-flex; flex: none; align-items: center; justify-content: center; gap: 5px;
-  height: 30px; box-sizing: border-box; padding: 4px 9px; border: 1px solid var(--border-strong);
-  border-radius: var(--r-btn); background: var(--bg-card); color: var(--text-primary);
-  font: 500 var(--font-size-body)/20px var(--sans); cursor: pointer;
+.vps-compact-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  white-space: nowrap;
 }
-.vps-compact-more { width: 30px; padding: 4px; border-color: transparent; background: transparent; }
-.vps-compact-ssh > i, .vps-compact-more > i { flex: none; width: 16px; height: 16px; }
-.vps-compact-more > i { width: 20px; height: 20px; }
-.vps-compact-ssh:not(:disabled):hover, .vps-compact-more:not(:disabled):hover { background: var(--bg-hover); border-color: var(--border-strong); }
-.vps-compact-ssh:focus-visible, .vps-compact-more:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
-.vps-compact-ssh:disabled, .vps-compact-more:disabled { opacity: .45; cursor: default; }
+
+.vps-action-btn {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  box-sizing: border-box;
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  border-radius: 9px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 15px;
+  cursor: pointer;
+  transition: all 0.16s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  flex-shrink: 0;
+}
+
+.vps-action-btn > i {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  font-size: 16px;
+}
+
+.vps-action-btn:hover:not(:disabled) {
+  color: var(--brand);
+  background: var(--status-ok-bg);
+  border-color: color-mix(in srgb, var(--brand) 30%, transparent);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--brand) 12%, transparent);
+  transform: translateY(-1px);
+}
+
+.vps-action-btn:active:not(:disabled) {
+  transform: scale(0.94);
+}
+
+.vps-action-btn:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.vps-action-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+}
 </style>
 
 <style>

@@ -36,10 +36,13 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
+import com.doubledimple.ociserver.config.annotations.AuditLog;
+
 @RestController
 @RequestMapping("/oci-start/open-api/v1")
 @Tag(name = "OCI-START OPEN-API", description = "开放API接口")
 @Slf4j
+@AuditLog(title = "开放平台接口")
 public class OpenApiController {
 
     @Resource

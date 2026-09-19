@@ -17,8 +17,11 @@ import java.net.URISyntaxException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import com.doubledimple.ociserver.config.annotations.AuditLog;
+
 @RestController
 @RequestMapping("/api/network-quality")
+@AuditLog(title = "网络质量监控")
 public class NetworkQualityController {
     @Resource private NetworkQualityService quality;
 

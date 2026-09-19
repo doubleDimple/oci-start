@@ -33,6 +33,8 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
 
+import com.doubledimple.ociserver.config.annotations.AuditLog;
+
 import static com.doubledimple.ocicommon.constant.Constants.RSA_PRIVATE_KEY;
 import static com.doubledimple.ocicommon.constant.Constants.RSA_PUBLIC_KEY;
 import static com.doubledimple.ociserver.utils.DesktopUtils.isMobileRequest;
@@ -40,6 +42,7 @@ import static com.doubledimple.ociserver.utils.DesktopUtils.isMobileRequest;
 @Controller
 @CrossOrigin
 @Slf4j
+@AuditLog(title = "登录认证")
 public class LoginController {
 
     @Resource

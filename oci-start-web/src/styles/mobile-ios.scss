@@ -153,6 +153,8 @@
   html:root .tenants-page .tenant-search { height: 40px; border-radius: 10px; }
   html:root .tenants-page .tenant-search input { font-size: 16px; }
   html:root .tenants-page .tenant-search kbd { display: none; }
+  html:root .vps-page :is(.vps-search, .nq-search) { height: 40px; border-radius: 10px; }
+  html:root .vps-page :is(.vps-search, .nq-search) input { font-size: 16px; }
 
   /* iOS-sized editing controls prevent Safari's input-focus zoom. */
   html:root :is(.shell, .el-dialog, .el-drawer, .el-message-box) button.btn { min-height: 44px; border-radius: 10px; box-shadow: none; }

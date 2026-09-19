@@ -28,9 +28,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.doubledimple.ociserver.config.annotations.AuditLog;
+
 /** Authenticated, explicit OTP backup reads and writes. Existing native/FTL routes remain separate. */
 @RestController
 @RequestMapping(value = "/api/mfa", produces = "application/json")
+@AuditLog(title = "MFA备份管理")
 public class MfaBackupController {
     private static final Set<String> ERRORS = new HashSet<>(Arrays.asList("invalidInput", "invalidSecret", "invalidUri",
             "unsupportedParameters", "invalidImage", "imageTooLarge", "qrNotFound", "qrGenerationFailed", "tooManyEntries",

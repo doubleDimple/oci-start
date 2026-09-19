@@ -27,7 +27,7 @@ export const MENU: NavGroup[] = [
       { id: 'api-fullBootList', href: '/boot/fullBootList', labelKey: 'nav.boot', icon: 'i-mdi-play-circle-outline', cloudTypes: [1] },
       { id: 'ai-models', href: '/system/ai/models', labelKey: 'nav.ai', icon: 'i-mdi-brain', cloudTypes: [1] },
       { id: 'api-delayTest', href: '/delayTest', labelKey: 'nav.speed', icon: 'i-mdi-speedometer', cloudTypes: [1] },
-      { id: 'api-openLog', href: '/system/openLogs', labelKey: 'nav.openLog', icon: 'i-mdi-text-box-search-outline', cloudTypes: [1], newTab: true },
+      { id: 'api-openLog', href: '/system/openLogs', labelKey: 'nav.openLog', icon: 'i-mdi-text-box-search-outline', cloudTypes: [1] },
       { id: 'gcp-accounts', href: '/tenants/list', labelKey: 'nav.gcpAccounts', icon: 'i-mdi-google', cloudTypes: [2] },
       { id: 'api-ociBootList', href: '/other/instances/list', labelKey: 'nav.gcpInstances', icon: 'i-mdi-server', cloudTypes: [2] },
       { id: 'azure-vms', href: '/azure/vms', labelKey: 'nav.azureVms', icon: 'i-mdi-microsoft', cloudTypes: [3] },
@@ -60,8 +60,7 @@ export const MENU: NavGroup[] = [
     id: 'system',
     labelKey: 'nav.system',
     children: [
-      { id: 'ip-settings', href: '/system/ipSettings', labelKey: 'nav.quality', icon: 'i-mdi-shield-check-outline', cloudTypes: [1] },
-      { id: 'api-logs', href: '/system/logs', labelKey: 'nav.logs', icon: 'i-mdi-file-document-outline', newTab: true },
+      { id: 'api-logs', href: '/system/logs', labelKey: 'nav.logs', icon: 'i-mdi-file-document-outline' },
       { id: 'api-settings', href: '/system/settings', labelKey: 'nav.security', icon: 'i-mdi-tune' },
       { id: 'vpnProxy-management', href: '/vpnProxy/page', labelKey: 'nav.proxyConfig', icon: 'i-mdi-swap-horizontal' },
     ],

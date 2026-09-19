@@ -27,9 +27,12 @@ import java.util.Map;
  * @Author renyx
  * @Date 2025-09-14 16:22
  */
+import com.doubledimple.ociserver.config.annotations.AuditLog;
+
 @Controller
 @RequestMapping("/vps/instances")
 @Slf4j
+@AuditLog(title = "VPS管理")
 public class VpsController extends BaseController{
 
     @Resource

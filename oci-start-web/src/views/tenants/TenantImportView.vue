@@ -27,11 +27,13 @@ const configPicker = ref<HTMLInputElement | null>(null)
 const keyPicker = ref<HTMLInputElement | null>(null)
 const keyButton = ref<HTMLButtonElement | null>(null)
 usePageMotion(root)
+const providerOptions: ImportProvider[] = [1]
 const provider = computed<ImportProvider | null>(() => {
   const value = route.query.cloudType ?? String(shell.cloudType)
-  return value === '1' ? 1 : value === '2' ? 2 : null
+  const parsed = value === '1' ? 1 : value === '2' ? 2 : null
+  if (parsed && !providerOptions.includes(parsed)) return 1
+  return parsed ?? 1
 })
-const providerOptions: ImportProvider[] = [1, 2]
 const emptyFields = (): TenantImportFields => ({ userName: '', tenantId: '', fingerprint: '', tenancy: '', region: '' })
 const form = reactive<TenantImportFields>(emptyFields())
 const fieldDefinitions = computed<FieldDefinition[]>(() => [

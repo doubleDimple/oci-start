@@ -419,8 +419,8 @@ onBeforeUnmount(cancelRequests)
                   <td v-else class="region-location">{{ row.location }}</td>
                   <td class="row-actions-column"><div class="row-actions">
                     <template v-if="activeTab === 'subscribed'">
-                      <button v-if="row.status !== 'READY'" class="toolbar-button" type="button" :disabled="checking.has(row.key) || loading.subscribed" :aria-busy="checking.has(row.key)" :aria-label="`${t('tenantSubscription.checkStatus')} · ${row.name}`" :title="t('tenantSubscription.checkStatus')" @click="checkStatus(row.key)"><i class="i-mdi-refresh" :class="{ 'subscription-spin': checking.has(row.key) }" aria-hidden="true" /></button>
-                      <button class="toolbar-button" type="button" :aria-label="`${t('tenantSubscription.details')} · ${row.name}`" :title="t('tenantSubscription.details')" @click="detailKey = row.key"><i class="i-mdi-information-outline" aria-hidden="true" /></button>
+                      <button v-if="row.status !== 'READY'" class="boot-button" type="button" :disabled="checking.has(row.key) || loading.subscribed" :aria-busy="checking.has(row.key)" :aria-label="`${t('tenantSubscription.checkStatus')} · ${row.name}`" :title="t('tenantSubscription.checkStatus')" @click="checkStatus(row.key)"><i class="i-mdi-refresh" :class="{ 'subscription-spin': checking.has(row.key) }" aria-hidden="true" /></button>
+                      <button class="boot-button" type="button" :aria-label="`${t('tenantSubscription.details')} · ${row.name}`" :title="t('tenantSubscription.details')" @click="detailKey = row.key"><i class="i-mdi-information-outline" aria-hidden="true" /></button>
                     </template>
                     <button v-else class="subscribe-row" type="button" :disabled="submitting || loading.available" @click="openSubscribe([row.key])"><i class="i-mdi-plus" aria-hidden="true" />{{ t('tenantSubscription.subscribe') }}</button>
                   </div></td>

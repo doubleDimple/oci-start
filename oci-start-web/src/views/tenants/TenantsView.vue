@@ -15,7 +15,7 @@ import {
 } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import { isCancel } from 'axios'
 import PrimaryBtn from '@/components/PrimaryBtn.vue'
 import GhostBtn from '@/components/GhostBtn.vue'
@@ -385,6 +385,7 @@ interface RowAction {
   icon: string
   path?: string
   danger?: boolean
+  divided?: boolean
 }
 function rowActions(row: TenantRow): RowAction[] {
   const items: RowAction[] = []
@@ -392,20 +393,15 @@ function rowActions(row: TenantRow): RowAction[] {
     Number(row.cloudType ?? shell.cloudType) === 1 &&
     Number(row.transferStatus || 0) !== 1
   ) {
-    if (Number(row.supportAI) === 1)
+    if (Number(row.supportAI) === 1) {
       items.push({
         id: 'chat',
         label: t('tenant.actions.chat'),
         icon: 'i-mdi-brain',
         path: '/ai/chat',
       })
+    }
     items.push(
-      {
-        id: 'boot',
-        label: t('tenant.actions.boot'),
-        icon: 'i-mdi-plus-circle-outline',
-        path: '/tenants/bootPage',
-      },
       { id: 'update', label: t('tenant.actions.update'), icon: 'i-mdi-refresh' },
       {
         id: 'regions',
@@ -420,7 +416,8 @@ function rowActions(row: TenantRow): RowAction[] {
         path: '/tenants/regionSubList',
       },
       { id: 'users', label: t('tenant.actions.users'), icon: 'i-mdi-account-group-outline' },
-      { id: 'traffic', label: t('tenant.actions.traffic'), icon: 'i-mdi-bell-outline' },
+      // 监控与审计分组
+      { id: 'traffic', label: t('tenant.actions.traffic'), icon: 'i-mdi-bell-outline', divided: true },
       {
         id: 'monitor',
         label: t('tenant.actions.monitor'),
@@ -434,7 +431,8 @@ function rowActions(row: TenantRow): RowAction[] {
         icon: 'i-mdi-wallet-outline',
         path: '/cost/costPage',
       },
-      { id: 'export', label: t('tenant.actions.export'), icon: 'i-mdi-tray-arrow-down' },
+      // 工具与扩展分组
+      { id: 'export', label: t('tenant.actions.export'), icon: 'i-mdi-tray-arrow-down', divided: true },
       { id: 'email', label: t('tenant.actions.email'), icon: 'i-mdi-email-outline' },
       { id: 'social', label: t('tenant.actions.social'), icon: 'i-mdi-share-variant-outline' },
       { id: 'quota', label: t('tenant.actions.quota'), icon: 'i-mdi-chart-box-outline' },
@@ -452,37 +450,44 @@ function rowActions(row: TenantRow): RowAction[] {
     label: t('tenant.actions.delete'),
     icon: 'i-mdi-trash-can-outline',
     danger: true,
+    divided: true,
   })
   return items
 }
 function runAction(item: RowAction, row: TenantRow) {
   if (item.path) navigate(item.path, row)
-  else if (item.id === 'delete') void removeRow(row)
+  else if (item.id === 'delete') handleOpenDeleteTenant(row)
   else openAction(item.id, row)
 }
-async function removeRow(row: TenantRow) {
-  if (busyRow.value) return
+
+const deleteDialogVisible = ref(false)
+const tenantToDelete = ref<TenantRow | null>(null)
+const deletingTenant = ref(false)
+
+function handleOpenDeleteTenant(row: TenantRow) {
+  tenantToDelete.value = row
+  deleteDialogVisible.value = true
+}
+
+async function handleConfirmDeleteTenant() {
+  if (!tenantToDelete.value || deletingTenant.value) return
+  const row = tenantToDelete.value
+  deletingTenant.value = true
   busyRow.value = row.id
   try {
-    await ElMessageBox.confirm(
-      t('tenant.delete.description'),
-      t('tenant.actions.delete'),
-      {
-        confirmButtonText: t('tenant.actions.delete'),
-        cancelButtonText: t('tenant.delete.keep'),
-        type: 'warning',
-        confirmButtonClass: 'tenant-delete-confirm',
-      },
-    )
     if (disposed) return
     await tenantGet('/tenants/deleteApi', { tenantId: row.id })
     ElMessage.success(t('tenant.delete.success'))
-    if (mobileDetailId.value === row.id) await router.replace({ path: route.path, query: { ...route.query, detail: undefined } })
+    deleteDialogVisible.value = false
+    tenantToDelete.value = null
+    if (mobileDetailId.value === row.id) {
+      await router.replace({ path: route.path, query: { ...route.query, detail: undefined } })
+    }
     await load()
   } catch (cause) {
-    if (cause !== 'cancel' && cause !== 'close')
-      ElMessage.error(tenantError(cause))
+    ElMessage.error(tenantError(cause))
   } finally {
+    deletingTenant.value = false
     busyRow.value = ''
   }
 }
@@ -829,15 +834,18 @@ onBeforeUnmount(() => {
                       :title="t('tenant.actions.boot')"
                       @click="navigate('/tenants/bootPage', row)"
                     >
-                      <i class="i-mdi-play-outline" /></button
-                    ><el-dropdown
+                      <i class="i-mdi-play-outline" />
+                    </button>
+                    <span v-else class="boot-button-placeholder" aria-hidden="true" />
+                    <el-dropdown
                       trigger="click"
                       placement="bottom-end"
                       popper-class="tenant-action-menu"
                       :show-timeout="0"
                       :hide-timeout="80"
                       @command="(item: RowAction) => runAction(item, row)"
-                      ><button
+                    >
+                      <button
                         class="more-button"
                         :disabled="busyRow === row.id"
                         :aria-label="t('tenant.list.actions')"
@@ -849,21 +857,31 @@ onBeforeUnmount(() => {
                               ? 'i-mdi-loading is-spinning'
                               : 'i-mdi-dots-horizontal'
                           "
-                        /></button
-                      ><template #dropdown
-                        ><el-dropdown-menu
-                          ><el-dropdown-item
+                        />
+                      </button>
+                      <template #dropdown>
+                        <el-dropdown-menu>
+                          <el-dropdown-item
                             v-for="item in rowActions(row)"
                             :key="item.id"
                             :command="item"
+                            :divided="item.divided"
                             :class="{ 'danger-action': item.danger }"
-                            ><i :class="item.icon" /><span>{{
-                              item.label
-                            }}</span></el-dropdown-item
-                          ></el-dropdown-menu
-                        ></template
-                      ></el-dropdown
+                          >
+                            <i :class="item.icon" />
+                            <span>{{ item.label }}</span>
+                          </el-dropdown-item>
+                        </el-dropdown-menu>
+                      </template>
+                    </el-dropdown>
+                    <button
+                      class="more-button danger-btn"
+                      :title="t('tenant.actions.delete')"
+                      :aria-label="t('tenant.actions.delete')"
+                      @click="handleOpenDeleteTenant(row)"
                     >
+                      <i class="i-mdi-delete-outline" />
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -926,7 +944,7 @@ onBeforeUnmount(() => {
               <template #actions>
                 <el-dropdown trigger="click" placement="bottom-end" popper-class="tenant-action-menu" @command="(item: RowAction) => runAction(item, row)">
                   <button class="more-button" :disabled="busyRow === row.id" :aria-label="t('tenant.list.actions')"><i :class="busyRow === row.id ? 'i-mdi-loading is-spinning' : 'i-mdi-dots-horizontal'" aria-hidden="true" /></button>
-                  <template #dropdown><el-dropdown-menu><el-dropdown-item v-for="item in rowActions(row)" :key="item.id" :command="item" :class="{ 'danger-action': item.danger }"><i :class="item.icon" aria-hidden="true" /><span>{{ item.label }}</span></el-dropdown-item></el-dropdown-menu></template>
+                  <template #dropdown><el-dropdown-menu><el-dropdown-item v-for="item in rowActions(row)" :key="item.id" :command="item" :divided="item.divided" :class="{ 'danger-action': item.danger }"><i :class="item.icon" aria-hidden="true" /><span>{{ item.label }}</span></el-dropdown-item></el-dropdown-menu></template>
                 </el-dropdown>
               </template>
               <dl class="mobile-record-fields">
@@ -1017,5 +1035,72 @@ onBeforeUnmount(() => {
         }}</PrimaryBtn></template
       ></el-dialog
     >
+
+    <!-- 租户删除专属确认弹窗（与审计日志风格一致的企业级确认弹窗） -->
+    <el-dialog
+      v-model="deleteDialogVisible"
+      :title="t('tenant.actions.delete')"
+      width="480px"
+      class="tenant-edit-dialog audit-clear-dialog"
+      destroy-on-close
+    >
+      <div v-if="tenantToDelete" class="clear-dialog-content">
+        <div
+          class="clear-warning-box"
+          style="background: rgba(239, 68, 68, 0.08); border-color: rgba(239, 68, 68, 0.25); color: var(--status-danger);"
+        >
+          <div class="warning-icon" style="background: rgba(239, 68, 68, 0.16);">
+            <i class="i-mdi-trash-can-outline" aria-hidden="true" />
+          </div>
+          <div class="warning-text">
+            <h4 style="color: var(--status-danger);">确认删除该租户？</h4>
+            <p style="color: var(--text-secondary);">
+              {{ t('tenant.delete.description') }}
+            </p>
+          </div>
+        </div>
+
+        <div class="clear-stats">
+          <div class="stat-item">
+            <span>租户标识</span>
+            <strong>#{{ tenantToDelete.id }}</strong>
+          </div>
+          <div class="stat-item">
+            <span>租户别名</span>
+            <strong :title="tenantToDelete.defName || tenantToDelete.tenancyName">
+              {{ tenantToDelete.defName || tenantToDelete.tenancyName || '-' }}
+            </strong>
+          </div>
+          <div class="stat-item">
+            <span>所属区域</span>
+            <strong>{{ tenantToDelete.region || '未记录' }}</strong>
+          </div>
+          <div class="stat-item">
+            <span>账号类型</span>
+            <strong>{{ accountType(tenantToDelete) }}</strong>
+          </div>
+          <div v-if="tenantToDelete.tenancyName" class="stat-item full-width">
+            <span>Tenancy Name</span>
+            <code>{{ tenantToDelete.tenancyName }}</code>
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="clear-dialog-footer">
+          <GhostBtn :disabled="deletingTenant" @click="deleteDialogVisible = false">
+            {{ t('tenant.delete.keep') }}
+          </GhostBtn>
+          <PrimaryBtn
+            class="danger-btn"
+            :loading="deletingTenant"
+            @click="handleConfirmDeleteTenant"
+          >
+            <i class="i-mdi-trash-can-outline" aria-hidden="true" />
+            <span>{{ deletingTenant ? '正在删除…' : t('tenant.actions.delete') }}</span>
+          </PrimaryBtn>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>

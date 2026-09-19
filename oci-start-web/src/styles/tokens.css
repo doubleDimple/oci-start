@@ -3,12 +3,13 @@
 html:root,
 html:root[data-content-theme] {
   color-scheme: light;
-  --bg-app: #f5f5f7;
-  --bg-page: #f5f5f7;
-  --bg-sidebar: #1d1d1f;
+  --bg-app: #f1f5f9;
+  --bg-page: #f1f5f9;
+  --bg-sidebar: #18181b;
   --bg-card: #ffffff;
-  --bg-search: #f5f5f7;
-  --bg-hover: #f5f5f7;
+  --bg-card-subtle: #f8fafc;
+  --bg-search: #e2e8f0;
+  --bg-hover: #f1f5f9;
   --bg-tooltip: #1d1d1f;
   --text-tooltip: #f5f5f7;
   /* User preference: all ordinary light-theme text is pure black; size/weight carry hierarchy. */
@@ -156,20 +157,21 @@ html:root[data-theme="dark"] {
 html:root[data-content-theme="dark"],
 html:root[data-theme="dark"]:not([data-content-theme]) {
   color-scheme: dark;
-  --bg-app: #000000;
-  --bg-page: #000000;
-  --bg-card: #1d1d1f;
-  --bg-search: #2c2c2e;
-  --bg-hover: #2c2c2e;
-  --bg-tooltip: #2c2c2e;
-  --text-primary: #f5f5f7;
-  --text-secondary: #d2d2d7;
-  --text-muted: #b5b5bd;
+  --bg-app: #0b0f19;
+  --bg-page: #0b0f19;
+  --bg-card: #131b2e;
+  --bg-card-subtle: #19233c;
+  --bg-search: #1c2742;
+  --bg-hover: #243254;
+  --bg-tooltip: #1c2742;
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-muted: #8193b2;
   --text-on-dark: #f5f5f7;
   --text-on-dark-muted: #a1a1a6;
-  --border: #424245;
-  --border-strong: #565658;
-  --shadow-card: 0 2px 16px rgba(0, 0, 0, 0.45);
+  --border: #243356;
+  --border-strong: #3b5288;
+  --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.45);
   --status-ok-bg: #16352c;
   --status-info-bg: #13263a;
   --status-warn-bg: #3a2c12;
@@ -203,6 +205,7 @@ html:root[data-theme="dark"]:not([data-content-theme]) {
 html:root[data-content-custom="true"] {
   --bg-app: var(--bg-page);
   --bg-card: color-mix(in srgb, var(--bg-page) 14%, #ffffff);
+  --bg-card-subtle: color-mix(in srgb, var(--bg-page) 20%, #ffffff);
   --bg-search: color-mix(in srgb, var(--bg-page) 65%, #e8e8ed);
   --bg-hover: color-mix(in srgb, var(--bg-page) 48%, #e8e8ed);
   --bg-tooltip: color-mix(in srgb, var(--bg-page) 8%, #1d1d1f);

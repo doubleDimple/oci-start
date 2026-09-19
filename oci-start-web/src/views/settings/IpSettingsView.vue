@@ -12,6 +12,7 @@ import PagePagination from '@/components/PagePagination.vue'
 import GhostBtn from '@/components/GhostBtn.vue'
 import PrimaryBtn from '@/components/PrimaryBtn.vue'
 import { isNetworkQualityId, type HistoryHours, type NetworkQualityAgent, type NetworkQualityTask, type NetworkQualityTaskInput, type NetworkQualityResult, type QualityOperator } from '@/api/networkQuality'
+import { ElMessage } from 'element-plus'
 import { useNetworkQuality } from './network-quality/useNetworkQuality'
 import NetworkQualityTaskDialog from './network-quality/NetworkQualityTaskDialog.vue'
 import './network-quality/network-quality.scss'
@@ -102,6 +103,15 @@ function time(value: number | null | undefined) { return value == null ? '—' :
 function errorText(value: { key: string } | null) { if (!value) return ''; const key = `networkQuality.errors.${value.key}`; return t(te(key) ? key : 'networkQuality.errors.request') }
 function ip(agent: NetworkQualityAgent) { return agent.publicIps ? exposed.value.has(agent.id) ? agent.publicIps : '••••••' : '—' }
 function toggleIp(agent: NetworkQualityAgent) { exposed.value.has(agent.id) ? exposed.value.delete(agent.id) : exposed.value.add(agent.id) }
+async function copyAddress(value?: string | null) {
+  if (!value) return
+  try {
+    await navigator.clipboard.writeText(value)
+    ElMessage.success(t('networkQuality.copied'))
+  } catch {
+    ElMessage.error(t('networkQuality.copyFailed'))
+  }
+}
 function carrierTasks(id: string, carrier: QualityOperator) { return carrierTaskMap.value.get(`${id}:${carrier}`) || [] }
 function resultFor(id: string, task: NetworkQualityTask) { const result = latestMap.value.get(`${id}:${task.id}`); return result?.revision === task.version ? result : undefined }
 function resultText(result: NetworkQualityResult | undefined) {
@@ -201,12 +211,83 @@ onBeforeUnmount(() => { clearInterval(timer); tween?.revert(); motion?.revert();
     <header class="nq-toolbar">
       <PageBackButton :disabled="locked" @click="back" />
       <template v-if="!detailMode">
-        <div class="nq-tabs" :aria-label="t('networkQuality.title')"><button type="button" :aria-pressed="tab === 'instances'" :disabled="locked" @click="tab = 'instances'"><i class="i-mdi-server-outline" aria-hidden="true" />{{ t('networkQuality.instances') }}</button><button type="button" :aria-pressed="tab === 'tasks'" :disabled="locked" @click="tab = 'tasks'"><i class="i-mdi-format-list-checks" aria-hidden="true" />{{ t('networkQuality.tasks') }}</button></div>
-        <label class="nq-search"><i class="i-mdi-magnify" aria-hidden="true" /><input v-model="query" type="search" :disabled="locked" :placeholder="t('networkQuality.search')" :aria-label="t('networkQuality.search')" /></label>
-        <el-select v-model="operator" class="nq-operator-select" :disabled="locked" :teleported="true" :empty-values="[null, undefined]" :aria-label="t('networkQuality.operator')"><el-option value="" :label="t('networkQuality.allOperators')" /><el-option v-for="value in operators" :key="value" :value="value" :label="t(`networkQuality.operators.${value}`)" /></el-select>
+        <div class="nq-tabs" role="tablist" :aria-label="t('networkQuality.title')">
+          <button
+            type="button"
+            role="tab"
+            class="nq-tab-btn"
+            :class="{ 'is-active': tab === 'instances' }"
+            :aria-selected="tab === 'instances'"
+            :disabled="locked"
+            @click="tab = 'instances'"
+          >
+            <i class="i-mdi-server-outline" aria-hidden="true" />
+            <span>{{ t('networkQuality.instances') }}</span>
+            <span class="nq-tab-count">{{ number(agents.length, 0) }}</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            class="nq-tab-btn"
+            :class="{ 'is-active': tab === 'tasks' }"
+            :aria-selected="tab === 'tasks'"
+            :disabled="locked"
+            @click="tab = 'tasks'"
+          >
+            <i class="i-mdi-format-list-checks" aria-hidden="true" />
+            <span>{{ t('networkQuality.tasks') }}</span>
+            <span class="nq-tab-count">{{ number(tasks.length, 0) }}</span>
+          </button>
+        </div>
+        <form class="nq-search" role="search" @submit.prevent>
+          <i class="i-mdi-magnify" aria-hidden="true" />
+          <input
+            v-model="query"
+            type="text"
+            :disabled="locked"
+            :placeholder="t('networkQuality.search')"
+            :aria-label="t('networkQuality.search')"
+            autocomplete="off"
+            @keydown.esc.prevent="query = ''"
+          />
+          <button v-if="query" type="button" class="nq-clear-btn" :title="t('vps.clear')" @click="query = ''">
+            <i class="i-mdi-close" aria-hidden="true" />
+          </button>
+        </form>
+        <el-select v-model="operator" class="nq-operator-select" :disabled="locked" :teleported="true" :empty-values="[null, undefined]" :aria-label="t('networkQuality.operator')">
+          <el-option value="" :label="t('networkQuality.allOperators')" />
+          <el-option v-for="value in operators" :key="value" :value="value" :label="t(`networkQuality.operators.${value}`)" />
+        </el-select>
       </template>
-      <template v-else-if="detail"><strong class="nq-detail-name nq-truncate" :title="detail.displayName || detail.id">{{ detail.displayName || detail.id }}</strong><button type="button" class="nq-link nq-ip" :aria-label="t(exposed.has(detail.id) ? 'networkQuality.hideIp' : 'networkQuality.showIp')" @click="toggleIp(detail)">{{ ip(detail) }}<i :class="exposed.has(detail.id) ? 'i-mdi-eye-off-outline' : 'i-mdi-eye-outline'" aria-hidden="true" /></button><span class="nq-badge" :class="`is-${detail.qualityStatus}`">{{ t(`networkQuality.agents.${detail.qualityStatus}`) }}</span></template>
-      <div class="nq-toolbar-end" data-page-error-anchor><GhostBtn v-if="detail && detailMode" :disabled="locked" @click="ssh(detail)"><i class="i-mdi-console" aria-hidden="true" />{{ t('networkQuality.ssh') }}</GhostBtn><GhostBtn :loading="loading" :disabled="locked" :title="t('networkQuality.refresh')" :aria-label="t('networkQuality.refresh')" @click="refreshAll"><i class="i-mdi-refresh" aria-hidden="true" /></GhostBtn><PrimaryBtn :disabled="!canMutate || locked" @click="openEditor()"><i class="i-mdi-plus" aria-hidden="true" />{{ t('networkQuality.create') }}</PrimaryBtn></div>
+      <template v-else-if="detail">
+        <div class="nq-detail-header-meta">
+          <strong class="nq-detail-name nq-truncate" :title="detail.displayName || detail.id">{{ detail.displayName || detail.id }}</strong>
+          <div class="nq-ip-row">
+            <span class="nq-ip-text">{{ ip(detail) }}</span>
+            <button type="button" class="nq-inline-btn" :title="t(exposed.has(detail.id) ? 'networkQuality.hideIp' : 'networkQuality.showIp')" @click="toggleIp(detail)">
+              <i :class="exposed.has(detail.id) ? 'i-mdi-eye-off-outline' : 'i-mdi-eye-outline'" aria-hidden="true" />
+            </button>
+            <button v-if="detail.publicIps" type="button" class="nq-inline-btn" :title="t('networkQuality.copy')" @click="copyAddress(detail.publicIps)">
+              <i class="i-mdi-content-copy" aria-hidden="true" />
+            </button>
+          </div>
+          <span class="oci-status-pill" :class="`is-${detail.qualityStatus}`">
+            <span class="oci-status-dot" />
+            <span>{{ t(`networkQuality.agents.${detail.qualityStatus}`) }}</span>
+          </span>
+        </div>
+      </template>
+      <div class="nq-toolbar-end" data-page-error-anchor>
+        <GhostBtn v-if="detail && detailMode" :disabled="locked" @click="ssh(detail)">
+          <i class="i-mdi-console" aria-hidden="true" />{{ t('networkQuality.ssh') }}
+        </GhostBtn>
+        <GhostBtn :loading="loading" :disabled="locked" :title="t('networkQuality.refresh')" :aria-label="t('networkQuality.refresh')" @click="refreshAll">
+          <i class="i-mdi-refresh" aria-hidden="true" />
+        </GhostBtn>
+        <PrimaryBtn :disabled="!canMutate || locked" @click="openEditor()">
+          <i class="i-mdi-plus" aria-hidden="true" />{{ t('networkQuality.create') }}
+        </PrimaryBtn>
+      </div>
     </header>
     <PageErrorNotice v-if="problem">{{ errorText(problem) }} {{ loaded ? t('networkQuality.retained') : '' }}</PageErrorNotice>
     <div v-if="blocked" class="nq-notice is-warning" role="alert">{{ t('networkQuality.blocked') }}</div>
@@ -217,7 +298,29 @@ onBeforeUnmount(() => { clearInterval(timer); tween?.revert(); motion?.revert();
       <GhostBtn v-else-if="!mutation.pending && !modalOpen" @click="clearMutation"><i class="i-mdi-check" aria-hidden="true" />{{ t('networkQuality.dismiss') }}</GhostBtn>
     </div>
     <template v-if="!detailMode">
-      <div class="nq-statusbar"><span>{{ t('networkQuality.counts', { agents: number(agents.length, 0), tasks: number(tasks.length, 0) }) }}</span><span class="nq-online"><span class="nq-dot" />{{ t('networkQuality.onlineCount', { count: number(onlineCount, 0) }) }}</span><el-select v-if="tab === 'instances'" v-model="status" class="nq-status-select" :disabled="locked" :teleported="true" :empty-values="[null, undefined]" :aria-label="t('networkQuality.agent')"><el-option value="" :label="t('networkQuality.allStatuses')" /><el-option v-for="value in ['online', 'offline', 'upgrade_required', 'not_installed']" :key="value" :value="value" :label="t(`networkQuality.agents.${value}`)" /></el-select><span class="nq-status-end">{{ t('networkQuality.autoRefresh') }}</span></div>
+      <div class="nq-statusbar">
+        <div class="nq-stat-item">
+          <span class="nq-stat-label">{{ t('networkQuality.instances') }}</span>
+          <strong class="nq-stat-val">{{ number(agents.length, 0) }}</strong>
+        </div>
+        <div class="nq-stat-item nq-stat-online">
+          <span class="nq-dot" />
+          <span class="nq-stat-label">{{ t('networkQuality.agents.online') }}</span>
+          <strong class="nq-stat-val">{{ number(onlineCount, 0) }}</strong>
+        </div>
+        <div class="nq-stat-item">
+          <span class="nq-stat-label">{{ t('networkQuality.tasks') }}</span>
+          <strong class="nq-stat-val">{{ number(tasks.length, 0) }}</strong>
+        </div>
+        <el-select v-if="tab === 'instances'" v-model="status" class="nq-status-select" :disabled="locked" :teleported="true" :empty-values="[null, undefined]" :aria-label="t('networkQuality.agent')">
+          <el-option value="" :label="t('networkQuality.allStatuses')" />
+          <el-option v-for="value in ['online', 'offline', 'upgrade_required', 'not_installed']" :key="value" :value="value" :label="t(`networkQuality.agents.${value}`)" />
+        </el-select>
+        <div class="nq-status-end">
+          <i class="i-mdi-access-point-network" aria-hidden="true" />
+          <span>{{ t('networkQuality.autoRefresh') }}</span>
+        </div>
+      </div>
       <div data-nq-surface class="nq-table-wrap" :aria-busy="loading">
         <MobileRecordList v-if="compact && tab === 'instances'" drilldown list-id="quality-agents" :record-keys="filteredAgents.map(agent => agent.id)" :loading="loading">
           <MobileRecordCard v-for="agent in mobileAgents" :key="agent.id" :record-key="agent.id" :summary-title="agent.displayName || agent.id" :summary-meta="agent.regionName || ip(agent)" :summary-status="t(`networkQuality.agents.${agent.qualityStatus}`)" :summary-tone="agent.qualityStatus === 'online' ? 'success' : 'neutral'">
@@ -233,13 +336,208 @@ onBeforeUnmount(() => { clearInterval(timer); tween?.revert(); motion?.revert();
             <template #footer><div class="nq-row-actions"><GhostBtn :disabled="!canMutate || locked" @click="openEditor(task)"><i class="i-mdi-pencil-outline" aria-hidden="true" />{{ t('networkQuality.edit') }}</GhostBtn><GhostBtn :disabled="!canMutate || locked" @click="ask({ kind: 'run', task })"><i class="i-mdi-play-outline" aria-hidden="true" />{{ t('networkQuality.run') }}</GhostBtn><GhostBtn :disabled="!canMutate || locked" :aria-label="t(task.enabled ? 'networkQuality.pause' : 'networkQuality.resume')" :title="t(task.enabled ? 'networkQuality.pause' : 'networkQuality.resume')" @click="ask({ kind: 'toggle', task })"><i :class="task.enabled ? 'i-mdi-pause' : 'i-mdi-play-circle-outline'" aria-hidden="true" /></GhostBtn><GhostBtn danger :disabled="!canMutate || locked" :aria-label="t('networkQuality.delete')" :title="t('networkQuality.delete')" @click="ask({ kind: 'delete', task })"><i class="i-mdi-trash-can-outline" aria-hidden="true" /></GhostBtn></div></template>
           </MobileRecordCard>
         </MobileRecordList>
-        <table v-else-if="tab === 'instances'" class="nq-table nq-instance-table" :aria-label="t('networkQuality.instances')"><thead><tr><th scope="col">{{ t('networkQuality.instance') }}</th><th scope="col">{{ t('networkQuality.location') }}</th><th scope="col">{{ t('networkQuality.agent') }}</th><th v-for="value in operators" :key="value" scope="col">{{ t(`networkQuality.operators.${value}`) }}</th><th scope="col">{{ t('networkQuality.actions') }}</th></tr></thead><tbody>
-          <tr v-for="agent in visibleAgents" :key="agent.id"><td><button type="button" class="nq-name nq-truncate" :disabled="locked" :title="agent.displayName || agent.id" @click="openDetail(agent)">{{ agent.displayName || agent.id }}</button><button type="button" class="nq-link nq-ip" :aria-label="t(exposed.has(agent.id) ? 'networkQuality.hideIp' : 'networkQuality.showIp')" @click="toggleIp(agent)"><span class="nq-truncate">{{ ip(agent) }}</span><i :class="exposed.has(agent.id) ? 'i-mdi-eye-off-outline' : 'i-mdi-eye-outline'" aria-hidden="true" /></button></td><td><span class="nq-truncate" :title="agent.regionName || undefined">{{ agent.regionName || '—' }}</span><small>{{ agent.cloudType === 1 ? 'Oracle Cloud' : agent.cloudType === 2 ? 'Google Cloud' : agent.cloudType === 3 ? 'Azure' : agent.cloudType === 4 ? 'AWS' : 'VPS' }}</small></td><td><span class="nq-badge" :class="`is-${agent.qualityStatus}`">{{ t(`networkQuality.agents.${agent.qualityStatus}`) }}</span><small>{{ time(agent.lastSeen) }}</small></td>
-            <td v-for="carrier in operators" :key="carrier"><template v-if="carrierTasks(agent.id, carrier).length === 1"><template v-for="task in carrierTasks(agent.id, carrier)" :key="task.id"><span class="nq-value" :class="`is-${resultFor(agent.id, task)?.status || 'empty'}`">{{ resultText(resultFor(agent.id, task)) }}</span><small class="nq-truncate" :title="`${task.name} · ${task.type.toUpperCase()}`">{{ task.name }} · {{ task.type.toUpperCase() }}</small><small v-if="oldSample(resultFor(agent.id, task), task)">{{ t('networkQuality.stale') }}</small><small v-else-if="!task.enabled">{{ t('networkQuality.paused') }}</small></template></template><button v-else-if="carrierTasks(agent.id, carrier).length > 1" type="button" class="nq-link" :disabled="locked" @click="openDetail(agent)">{{ t('networkQuality.multipleTargets', { count: carrierTasks(agent.id, carrier).length }) }}<i class="i-mdi-chevron-right" aria-hidden="true" /></button><span v-else class="nq-empty-value">—</span></td>
-            <td><div class="nq-row-actions"><GhostBtn :disabled="locked" @click="openDetail(agent)"><i class="i-mdi-chart-timeline-variant" aria-hidden="true" />{{ t('networkQuality.history') }}</GhostBtn><GhostBtn v-if="agent.qualityStatus !== 'online'" :disabled="!canMutate || locked" @click="ask({ kind: 'install', agent })"><i class="i-mdi-download-outline" aria-hidden="true" />{{ t(agent.qualityStatus === 'not_installed' ? 'networkQuality.install' : 'networkQuality.upgrade') }}</GhostBtn></div></td>
-          </tr>
-        </tbody></table>
-        <table v-else class="nq-table nq-task-table" :aria-label="t('networkQuality.tasks')"><thead><tr><th scope="col">{{ t('networkQuality.name') }}</th><th scope="col">{{ t('networkQuality.operator') }}</th><th scope="col">{{ t('networkQuality.target') }}</th><th scope="col">{{ t('networkQuality.assigned') }}</th><th scope="col">{{ t('networkQuality.cadence') }}</th><th scope="col">{{ t('networkQuality.taskState') }}</th><th scope="col">{{ t('networkQuality.actions') }}</th></tr></thead><tbody><tr v-for="task in visibleTasks" :key="task.id"><td><strong class="nq-truncate" :title="task.name">{{ task.name }}</strong><small>{{ task.type.toUpperCase() }}</small></td><td>{{ t(`networkQuality.operators.${task.operator}`) }}<small class="nq-truncate" :title="task.region">{{ task.region || '—' }}</small></td><td><span class="nq-truncate" :title="task.target">{{ task.target }}</span></td><td>{{ t('networkQuality.selected', { count: task.instanceIds.length }) }}</td><td>{{ t('networkQuality.seconds', { count: task.intervalSeconds }) }}<small>{{ t('networkQuality.sampleCount', { count: task.sampleCount }) }}</small></td><td><span class="nq-badge" :class="task.enabled ? 'is-online' : ''">{{ t(task.enabled ? 'networkQuality.active' : 'networkQuality.paused') }}</span></td><td><div class="nq-row-actions"><GhostBtn :disabled="!canMutate || locked" @click="openEditor(task)"><i class="i-mdi-pencil-outline" aria-hidden="true" />{{ t('networkQuality.edit') }}</GhostBtn><GhostBtn :disabled="!canMutate || locked" @click="ask({ kind: 'run', task })"><i class="i-mdi-play-outline" aria-hidden="true" />{{ t('networkQuality.run') }}</GhostBtn><GhostBtn :disabled="!canMutate || locked" :aria-label="t(task.enabled ? 'networkQuality.pause' : 'networkQuality.resume')" :title="t(task.enabled ? 'networkQuality.pause' : 'networkQuality.resume')" @click="ask({ kind: 'toggle', task })"><i :class="task.enabled ? 'i-mdi-pause' : 'i-mdi-play-circle-outline'" aria-hidden="true" /></GhostBtn><GhostBtn danger :disabled="!canMutate || locked" :aria-label="t('networkQuality.delete')" :title="t('networkQuality.delete')" @click="ask({ kind: 'delete', task })"><i class="i-mdi-trash-can-outline" aria-hidden="true" /></GhostBtn></div></td></tr></tbody></table>
+        <table v-else-if="tab === 'instances'" class="nq-table nq-instance-table" :aria-label="t('networkQuality.instances')">
+          <thead>
+            <tr>
+              <th scope="col" class="nq-col-instance">{{ t('networkQuality.instance') }}</th>
+              <th scope="col" class="nq-col-location">{{ t('networkQuality.location') }}</th>
+              <th scope="col" class="nq-col-agent">{{ t('networkQuality.agent') }}</th>
+              <th v-for="value in operators" :key="value" scope="col" :class="`nq-col-${value}`">{{ t(`networkQuality.operators.${value}`) }}</th>
+              <th scope="col" class="nq-col-actions">{{ t('networkQuality.actions') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="agent in visibleAgents" :key="agent.id">
+              <td class="nq-cell-instance">
+                <div class="nq-instance-identity">
+                  <button type="button" class="nq-name nq-truncate" :disabled="locked" :title="agent.displayName || agent.id" @click="openDetail(agent)">
+                    {{ agent.displayName || agent.id }}
+                  </button>
+                  <div class="nq-ip-row">
+                    <span class="nq-ip-text" :title="agent.publicIps || '—'">{{ ip(agent) }}</span>
+                    <button v-if="agent.publicIps" type="button" class="nq-inline-btn" :title="t(exposed.has(agent.id) ? 'networkQuality.hideIp' : 'networkQuality.showIp')" @click="toggleIp(agent)">
+                      <i :class="exposed.has(agent.id) ? 'i-mdi-eye-off-outline' : 'i-mdi-eye-outline'" aria-hidden="true" />
+                    </button>
+                    <button v-if="agent.publicIps" type="button" class="nq-inline-btn" :title="t('networkQuality.copy')" @click="copyAddress(agent.publicIps)">
+                      <i class="i-mdi-content-copy" aria-hidden="true" />
+                    </button>
+                  </div>
+                </div>
+              </td>
+              <td class="nq-cell-location">
+                <div class="nq-placement-meta">
+                  <div class="nq-region-line">
+                    <i class="i-mdi-earth placement-icon" aria-hidden="true" />
+                    <span class="nq-truncate" :title="agent.regionName || undefined">{{ agent.regionName || '—' }}</span>
+                  </div>
+                  <span class="nq-provider-tag">{{ agent.cloudType === 1 ? 'Oracle Cloud' : agent.cloudType === 2 ? 'Google Cloud' : agent.cloudType === 3 ? 'Azure' : agent.cloudType === 4 ? 'AWS' : 'VPS' }}</span>
+                </div>
+              </td>
+              <td class="nq-cell-agent">
+                <div class="nq-agent-cell-box">
+                  <span class="oci-status-pill" :class="`is-${agent.qualityStatus}`">
+                    <span class="oci-status-dot" />
+                    <span>{{ t(`networkQuality.agents.${agent.qualityStatus}`) }}</span>
+                  </span>
+                  <small class="nq-timestamp">{{ time(agent.lastSeen) }}</small>
+                </div>
+              </td>
+              <td v-for="carrier in operators" :key="carrier" class="nq-cell-carrier">
+                <div class="nq-carrier-box">
+                  <template v-if="carrierTasks(agent.id, carrier).length === 1">
+                    <template v-for="task in carrierTasks(agent.id, carrier)" :key="task.id">
+                      <div class="nq-quality-sample">
+                        <span class="nq-value" :class="`is-${resultFor(agent.id, task)?.status || 'empty'}`">
+                          {{ resultText(resultFor(agent.id, task)) }}
+                        </span>
+                        <div class="nq-sample-meta">
+                          <span class="nq-task-chip" :title="`${task.name} · ${task.type.toUpperCase()}`">{{ task.type.toUpperCase() }}</span>
+                          <span class="nq-sample-target nq-truncate" :title="task.name">{{ task.name }}</span>
+                        </div>
+                        <small v-if="oldSample(resultFor(agent.id, task), task)" class="nq-tag-warn">{{ t('networkQuality.stale') }}</small>
+                        <small v-else-if="!task.enabled" class="nq-tag-muted">{{ t('networkQuality.paused') }}</small>
+                      </div>
+                    </template>
+                  </template>
+                  <button v-else-if="carrierTasks(agent.id, carrier).length > 1" type="button" class="nq-multi-btn" :disabled="locked" @click="openDetail(agent)">
+                    <span>{{ t('networkQuality.multipleTargets', { count: carrierTasks(agent.id, carrier).length }) }}</span>
+                    <i class="i-mdi-chevron-right" aria-hidden="true" />
+                  </button>
+                  <span v-else class="nq-empty-dash">—</span>
+                </div>
+              </td>
+              <td class="nq-cell-actions">
+                <div class="nq-row-actions">
+                  <button
+                    type="button"
+                    class="nq-action-btn"
+                    :disabled="locked"
+                    :title="t('networkQuality.history')"
+                    :aria-label="t('networkQuality.history')"
+                    @click="openDetail(agent)"
+                  >
+                    <i class="i-mdi-chart-timeline-variant" aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    class="nq-action-btn"
+                    :disabled="locked"
+                    :title="t('networkQuality.ssh')"
+                    :aria-label="t('networkQuality.ssh')"
+                    @click="ssh(agent)"
+                  >
+                    <i class="i-mdi-console" aria-hidden="true" />
+                  </button>
+                  <button
+                    v-if="agent.qualityStatus !== 'online'"
+                    type="button"
+                    class="nq-action-btn"
+                    :disabled="!canMutate || locked"
+                    :title="t(agent.qualityStatus === 'not_installed' ? 'networkQuality.install' : 'networkQuality.upgrade')"
+                    :aria-label="t(agent.qualityStatus === 'not_installed' ? 'networkQuality.install' : 'networkQuality.upgrade')"
+                    @click="ask({ kind: 'install', agent })"
+                  >
+                    <i class="i-mdi-download-outline" aria-hidden="true" />
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <table v-else class="nq-table nq-task-table" :aria-label="t('networkQuality.tasks')">
+          <thead>
+            <tr>
+              <th scope="col" class="nq-col-task-name">{{ t('networkQuality.name') }}</th>
+              <th scope="col" class="nq-col-task-op">{{ t('networkQuality.operator') }}</th>
+              <th scope="col" class="nq-col-task-target">{{ t('networkQuality.target') }}</th>
+              <th scope="col" class="nq-col-task-assigned">{{ t('networkQuality.assigned') }}</th>
+              <th scope="col" class="nq-col-task-cadence">{{ t('networkQuality.cadence') }}</th>
+              <th scope="col" class="nq-col-task-state">{{ t('networkQuality.taskState') }}</th>
+              <th scope="col" class="nq-col-actions">{{ t('networkQuality.actions') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="task in visibleTasks" :key="task.id">
+              <td class="nq-cell-task-name">
+                <div class="nq-task-title-box">
+                  <strong class="nq-truncate" :title="task.name">{{ task.name }}</strong>
+                  <span class="nq-proto-tag">{{ task.type.toUpperCase() }}</span>
+                </div>
+              </td>
+              <td class="nq-cell-task-op">
+                <div class="nq-operator-tag-row">
+                  <span class="nq-operator-badge" :class="`is-${task.operator}`">{{ t(`networkQuality.operators.${task.operator}`) }}</span>
+                  <small v-if="task.region" class="nq-truncate nq-region-text" :title="task.region">{{ task.region }}</small>
+                </div>
+              </td>
+              <td class="nq-cell-target">
+                <div class="nq-target-code-row">
+                  <code class="nq-target-code nq-truncate" :title="task.target">{{ task.target }}</code>
+                  <button type="button" class="nq-inline-btn" :title="t('networkQuality.copy')" @click="copyAddress(task.target)">
+                    <i class="i-mdi-content-copy" aria-hidden="true" />
+                  </button>
+                </div>
+              </td>
+              <td class="nq-cell-task-assigned">
+                <span class="nq-pill-count">{{ t('networkQuality.selected', { count: task.instanceIds.length }) }}</span>
+              </td>
+              <td class="nq-cell-task-cadence">
+                <span class="nq-cadence-text">{{ t('networkQuality.seconds', { count: task.intervalSeconds }) }}</span>
+                <small class="nq-samples-text">{{ t('networkQuality.sampleCount', { count: task.sampleCount }) }}</small>
+              </td>
+              <td class="nq-cell-task-state">
+                <span class="oci-status-pill" :class="task.enabled ? 'is-online' : 'is-unknown'">
+                  <span class="oci-status-dot" />
+                  <span>{{ t(task.enabled ? 'networkQuality.active' : 'networkQuality.paused') }}</span>
+                </span>
+              </td>
+              <td class="nq-cell-actions">
+                <div class="nq-row-actions">
+                  <button
+                    type="button"
+                    class="nq-action-btn"
+                    :disabled="!canMutate || locked"
+                    :title="t('networkQuality.run')"
+                    :aria-label="t('networkQuality.run')"
+                    @click="ask({ kind: 'run', task })"
+                  >
+                    <i class="i-mdi-play-outline" aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    class="nq-action-btn"
+                    :disabled="!canMutate || locked"
+                    :title="t('networkQuality.edit')"
+                    :aria-label="t('networkQuality.edit')"
+                    @click="openEditor(task)"
+                  >
+                    <i class="i-mdi-pencil-outline" aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    class="nq-action-btn"
+                    :disabled="!canMutate || locked"
+                    :title="t(task.enabled ? 'networkQuality.pause' : 'networkQuality.resume')"
+                    :aria-label="t(task.enabled ? 'networkQuality.pause' : 'networkQuality.resume')"
+                    @click="ask({ kind: 'toggle', task })"
+                  >
+                    <i :class="task.enabled ? 'i-mdi-pause' : 'i-mdi-play-circle-outline'" aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    class="nq-action-btn is-danger"
+                    :disabled="!canMutate || locked"
+                    :title="t('networkQuality.delete')"
+                    :aria-label="t('networkQuality.delete')"
+                    @click="ask({ kind: 'delete', task })"
+                  >
+                    <i class="i-mdi-trash-can-outline" aria-hidden="true" />
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
         <div v-if="!total" class="nq-empty" role="status"><i class="i-mdi-access-point-network" aria-hidden="true" /><p>{{ !loaded ? t(loading ? 'networkQuality.loading' : 'networkQuality.notLoaded') : query || operator || status ? t('networkQuality.noMatches') : t(tab === 'tasks' ? 'networkQuality.emptyTasks' : 'networkQuality.emptyInstances') }}</p><span v-if="loaded && !tasks.length">{{ t('networkQuality.emptyTasksHint') }}</span></div>
       </div>
       <PagePagination :current-page="page" v-model:page-size="size" :total="total" :page-sizes="[10, 20, 30, 50]" :disabled="locked" @current-change="changePage"><span>{{ t('networkQuality.total', { count: number(total, 0) }) }}</span></PagePagination>
@@ -248,13 +546,41 @@ onBeforeUnmount(() => { clearInterval(timer); tween?.revert(); motion?.revert();
       <div v-if="!detail" class="nq-empty" role="status">{{ t(loading ? 'networkQuality.loading' : 'networkQuality.missingInstance') }}</div>
       <div v-else data-nq-surface class="nq-detail-scroll">
         <div v-if="detail.qualityStatus !== 'online'" class="nq-detail-agent"><span>{{ t(`networkQuality.agents.${detail.qualityStatus}`) }} · {{ t('networkQuality.lastUpdated', { time: time(detail.lastSeen) }) }}</span><GhostBtn :disabled="!canMutate || locked" @click="ask({ kind: 'install', agent: detail })"><i class="i-mdi-download-outline" aria-hidden="true" />{{ t(detail.qualityStatus === 'not_installed' ? 'networkQuality.install' : 'networkQuality.upgrade') }}</GhostBtn></div>
-        <div class="nq-history-toolbar"><label><span class="nq-sr-only">{{ t('networkQuality.targetSelect') }}</span><el-select v-model="selectedTaskId" :disabled="locked || !assigned.length" :teleported="true" :empty-values="[null, undefined]" :aria-label="t('networkQuality.targetSelect')"><el-option v-if="!assigned.length" value="" :label="t('networkQuality.noAssigned')" /><el-option v-for="task in assigned" :key="task.id" :value="task.id" :label="`${task.name} · ${task.type.toUpperCase()}`" /></el-select></label><div class="nq-periods" :aria-label="t('networkQuality.window')"><button v-for="value in periods" :key="value" type="button" :disabled="locked" :aria-pressed="hours === value" @click="hours = value">{{ t(`networkQuality.hour${value}`) }}</button></div><GhostBtn v-if="selectedTask" :disabled="!canMutate || locked" @click="ask({ kind: 'run', task: selectedTask, instanceIds: [detail.id] })"><i class="i-mdi-play-outline" aria-hidden="true" />{{ t('networkQuality.run') }}</GhostBtn></div>
+        <div class="nq-history-toolbar">
+          <label><span class="nq-sr-only">{{ t('networkQuality.targetSelect') }}</span><el-select v-model="selectedTaskId" :disabled="locked || !assigned.length" :teleported="true" :empty-values="[null, undefined]" :aria-label="t('networkQuality.targetSelect')"><el-option v-if="!assigned.length" value="" :label="t('networkQuality.noAssigned')" /><el-option v-for="task in assigned" :key="task.id" :value="task.id" :label="`${task.name} · ${task.type.toUpperCase()}`" /></el-select></label>
+          <div class="nq-periods" :aria-label="t('networkQuality.window')"><button v-for="value in periods" :key="value" type="button" :disabled="locked" :aria-pressed="hours === value" @click="hours = value">{{ t(`networkQuality.hour${value}`) }}</button></div>
+          <GhostBtn v-if="selectedTask" :disabled="!canMutate || locked" @click="ask({ kind: 'run', task: selectedTask, instanceIds: [detail.id] })"><i class="i-mdi-play-outline" aria-hidden="true" />{{ t('networkQuality.run') }}</GhostBtn>
+        </div>
         <div v-if="selectedTask" class="nq-target-caption"><span class="nq-truncate" :title="selectedTask.target">{{ t(`networkQuality.operators.${selectedTask.operator}`) }} · {{ selectedTask.region || '—' }} · {{ selectedTask.target }}</span><span v-if="!selectedTask.enabled">{{ t('networkQuality.stopped') }}</span></div>
         <PageErrorNotice v-if="historyProblem">{{ errorText(historyProblem) }} {{ historyData ? t('networkQuality.retained') : '' }}</PageErrorNotice>
         <div class="nq-history-content" :aria-busy="historyLoading">
-          <dl class="nq-stats"><div><dt>{{ t('networkQuality.avg') }}</dt><dd>{{ latency(historyData?.stats.avgMs) }}</dd></div><div><dt>{{ t('networkQuality.min') }}</dt><dd>{{ latency(historyData?.stats.minMs) }}</dd></div><div><dt>{{ t('networkQuality.max') }}</dt><dd>{{ latency(historyData?.stats.maxMs) }}</dd></div><div><dt>{{ t(selectedTask?.type === 'icmp' ? 'networkQuality.packetLoss' : 'networkQuality.failureRate') }}</dt><dd>{{ historyData?.stats.lossPercent == null ? '—' : `${number(historyData.stats.lossPercent)}%` }}</dd></div><div><dt>{{ t('networkQuality.attempts') }}</dt><dd>{{ number(historyData?.stats.successful, 0) }} / {{ number(historyData?.stats.attempts, 0) }}</dd></div></dl>
-          <NetworkQualityChart :history="historyData" :type="selectedTask?.type || 'icmp'" :operator="selectedTask?.operator" />
-          <p class="nq-chart-note">{{ t('networkQuality.protocolHint') }}</p><p class="nq-chart-note">{{ historyData?.truncated ? t('networkQuality.historyTrimmed', { count: historyData.points.length, total: historyData.totalPoints }) : t('networkQuality.historyHint') }}</p>
+          <dl class="nq-stats-grid">
+            <div class="nq-kpi-card">
+              <dt>{{ t('networkQuality.avg') }}</dt>
+              <dd class="nq-kpi-num">{{ latency(historyData?.stats.avgMs) }}</dd>
+            </div>
+            <div class="nq-kpi-card">
+              <dt>{{ t('networkQuality.min') }}</dt>
+              <dd class="nq-kpi-num">{{ latency(historyData?.stats.minMs) }}</dd>
+            </div>
+            <div class="nq-kpi-card">
+              <dt>{{ t('networkQuality.max') }}</dt>
+              <dd class="nq-kpi-num">{{ latency(historyData?.stats.maxMs) }}</dd>
+            </div>
+            <div class="nq-kpi-card" :class="{ 'is-loss': historyData?.stats.lossPercent != null && historyData.stats.lossPercent > 0 }">
+              <dt>{{ t(selectedTask?.type === 'icmp' ? 'networkQuality.packetLoss' : 'networkQuality.failureRate') }}</dt>
+              <dd class="nq-kpi-num">{{ historyData?.stats.lossPercent == null ? '—' : `${number(historyData.stats.lossPercent)}%` }}</dd>
+            </div>
+            <div class="nq-kpi-card">
+              <dt>{{ t('networkQuality.attempts') }}</dt>
+              <dd class="nq-kpi-num">{{ number(historyData?.stats.successful, 0) }} / {{ number(historyData?.stats.attempts, 0) }}</dd>
+            </div>
+          </dl>
+          <div class="nq-chart-wrapper">
+            <NetworkQualityChart :history="historyData" :type="selectedTask?.type || 'icmp'" :operator="selectedTask?.operator" />
+          </div>
+          <p class="nq-chart-note">{{ t('networkQuality.protocolHint') }}</p>
+          <p class="nq-chart-note">{{ historyData?.truncated ? t('networkQuality.historyTrimmed', { count: historyData.points.length, total: historyData.totalPoints }) : t('networkQuality.historyHint') }}</p>
         </div>
         <div class="nq-record-heading"><h2>{{ t('networkQuality.recent') }}</h2><span v-if="historyLoading" role="status">{{ t('networkQuality.loading') }}</span></div>
         <div class="nq-records"><MobileRecordList v-if="compact" drilldown :list-id="`quality-history-${instanceId}-${selectedTaskId}`" :record-keys="recent.map(item => item.executionId)" :loading="historyLoading">

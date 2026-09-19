@@ -274,7 +274,10 @@ onBeforeUnmount(() => {
       <div class="topbar"><div class="lang"><button type="button" :class="{ active: language === 'zh' }" :aria-current="language === 'zh'" @click="changeLocale('zh')">中文</button><i aria-hidden="true">/</i><button type="button" :class="{ active: language === 'en' }" :aria-current="language === 'en'" @click="changeLocale('en')">EN</button></div><button id="themeToggle" class="icon-btn" type="button" :title="theme === 'dark' ? copy.light : copy.dark" :aria-label="theme === 'dark' ? copy.light : copy.dark" @click="toggleAppearance"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button></div>
       <div class="login-card">
         <div class="mobile-auth-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2.5c0 0 6.8 7.4 6.8 12.1A6.8 6.8 0 0 1 12 21.4a6.8 6.8 0 0 1-6.8-6.8C5.2 9.9 12 2.5 12 2.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M12 17.6a3 3 0 0 1-3-3c0-1.6 3-5 3-5s3 3.4 3 5a3 3 0 0 1-3 3z" fill="currentColor"/></svg></div>
-        <h1>{{ copy.welcome }}</h1><p class="lede">{{ copy.lede }}</p>
+        <div class="auth-header">
+          <h1>{{ copy.welcome }}</h1>
+          <p class="lede">{{ copy.lede }}</p>
+        </div>
         <div v-if="notice" id="loginRedirectError" class="message" :class="`${notice.type}-message`" :role="notice.type === 'error' ? 'alert' : 'status'">{{ noticeText(notice) }}</div>
         <p v-if="configLoading" role="status">{{ copy.loading }}</p>
         <div v-else-if="configError" class="config-error"><p class="message error-message" role="alert">{{ errorText(configError) }}</p><button type="button" class="submit" @click="loadConfig()">{{ copy.retry }}</button></div>
@@ -283,32 +286,110 @@ onBeforeUnmount(() => {
           <form v-show="tab === 'login'" id="loginForm" class="auth-form active" novalidate @submit.prevent="submitLogin">
             <div v-if="config.turnstileEnabled" id="turnstileContainer" class="turnstile-container"><TurnstileChallenge ref="challenge" :site-key="config.turnstileSiteKey" :locale="language" :theme="theme" :retry-label="copy.retry" :failure-label="copy.challengeError" @token="form.turnstileToken = $event"/><p v-if="!allowed" id="turnstileHint">{{ copy.challenge }}</p></div>
             <div v-show="allowed" id="loginFormContent">
-              <div class="field form-group"><label for="username">{{ t('login.username') }}</label><div class="ctrl input-container"><input id="username" v-model="form.username" type="text" name="username" class="form-control" autocomplete="username" autocapitalize="none" spellcheck="false" required :placeholder="t('login.username.placeholder')"/></div></div>
-              <div class="field form-group"><label for="password">{{ t('login.password') }}</label><div class="ctrl input-container password-container"><input id="password" v-model="form.password" :type="showPassword ? 'text' : 'password'" name="password" class="form-control" autocomplete="current-password" required :placeholder="t('login.password.placeholder')"/><button id="loginPasswordToggle" type="button" class="peek password-toggle" aria-controls="password" :aria-pressed="showPassword" :aria-label="showPassword ? copy.hidePassword : copy.showPassword" @click="showPassword = !showPassword"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.8-6.5 10-6.5S22 12 22 12s-3.8 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.8"/></svg></button></div></div>
-              <div v-if="messageVisible" id="verificationGroup" class="field form-group"><label for="verificationCode">{{ t('login.verify.code') }}</label><div class="verification-group"><div class="verification-input"><input id="verificationCode" v-model="form.verificationCode" type="text" name="verificationCode" class="form-control" autocomplete="one-time-code" required :placeholder="t('login.verify.code.placeholder')"/></div><button id="sendCodeBtn" type="button" class="btn btn-send-code" :disabled="sending || countdown > 0" @click="sendCode">{{ sending ? t('login.input.sending') : countdown ? countdown + t('login.input.seconds.retry') : t('login.btn.send.code') }}</button></div></div>
-              <div v-if="mfaVisible" id="mfaGroup" class="field form-group"><label for="mfaCode">{{ t('login.mfa.code') }}</label><div class="ctrl input-container"><input id="mfaCode" v-model="form.mfaCode" type="text" name="mfaCode" class="form-control" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required :placeholder="t('login.mfa.code.placeholder')"/></div></div>
+              <div class="field form-group">
+                <label for="username">{{ t('login.username') }}</label>
+                <div class="ctrl input-container has-prefix">
+                  <span class="input-icon-prefix" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+                  <input id="username" v-model="form.username" type="text" name="username" class="form-control" autocomplete="username" autocapitalize="none" spellcheck="false" required :placeholder="t('login.username.placeholder')"/>
+                </div>
+              </div>
+              <div class="field form-group">
+                <label for="password">{{ t('login.password') }}</label>
+                <div class="ctrl input-container password-container has-prefix">
+                  <span class="input-icon-prefix" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
+                  <input id="password" v-model="form.password" :type="showPassword ? 'text' : 'password'" name="password" class="form-control" autocomplete="current-password" required :placeholder="t('login.password.placeholder')"/>
+                  <button id="loginPasswordToggle" type="button" class="peek password-toggle" aria-controls="password" :aria-pressed="showPassword" :aria-label="showPassword ? copy.hidePassword : copy.showPassword" @click="showPassword = !showPassword">
+                    <svg v-if="!showPassword" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.8-6.5 10-6.5S22 12 22 12s-3.8 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.8"/></svg>
+                    <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                  </button>
+                </div>
+              </div>
+              <div v-if="messageVisible" id="verificationGroup" class="field form-group">
+                <label for="verificationCode">{{ t('login.verify.code') }}</label>
+                <div class="verification-group">
+                  <div class="verification-input has-prefix">
+                    <span class="input-icon-prefix" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></span>
+                    <input id="verificationCode" v-model="form.verificationCode" type="text" name="verificationCode" class="form-control" autocomplete="one-time-code" required :placeholder="t('login.verify.code.placeholder')"/>
+                  </div>
+                  <button id="sendCodeBtn" type="button" class="btn btn-send-code" :disabled="sending || countdown > 0" @click="sendCode">{{ sending ? t('login.input.sending') : countdown ? countdown + t('login.input.seconds.retry') : t('login.btn.send.code') }}</button>
+                </div>
+              </div>
+              <div v-if="mfaVisible" id="mfaGroup" class="field form-group">
+                <label for="mfaCode">{{ t('login.mfa.code') }}</label>
+                <div class="ctrl input-container has-prefix">
+                  <span class="input-icon-prefix" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
+                  <input id="mfaCode" v-model="form.mfaCode" type="text" name="mfaCode" class="form-control" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required :placeholder="t('login.mfa.code.placeholder')"/>
+                </div>
+              </div>
               <div v-if="config.messageEnabled && config.mfaEnabled" id="verificationChoice" class="field form-group"><label>{{ t('login.verify.method') }}</label><div class="tab-group"><button id="messageTab" type="button" class="tab" :class="{ active: form.method === 'message' }" :aria-pressed="form.method === 'message'" @click="changeMethod('message')"><i class="i-mdi-email-outline" aria-hidden="true"/>{{ t('login.verify.method.msg') }}</button><button id="mfaTab" type="button" class="tab" :class="{ active: form.method === 'mfa' }" :aria-pressed="form.method === 'mfa'" @click="changeMethod('mfa')"><i class="i-mdi-shield-check-outline" aria-hidden="true"/>{{ t('login.verify.method.mfa') }}</button></div></div>
               <div class="aux form-meta"><label class="check remember-me"><input v-model="form.remember" type="checkbox" name="remember-me" value="true"/><span>{{ t('login.remember.me') }}</span></label><a href="#" class="link forgot-password-link" @click.prevent="openReset">{{ t('login.forgot.password') }}</a></div>
               <button id="loginButton" type="submit" class="submit btn btn-primary" :class="{ busy }" :disabled="busy || !allowed"><span class="spin" aria-hidden="true"/><span class="txt">{{ busy ? t('login.input.login.loading') : t('login.btn.login') }}</span></button><p class="msg" aria-hidden="true"/>
+              <div v-if="config.githubEnabled || config.googleEnabled" class="auth-divider"><span>{{ copy.orThirdParty }}</span></div>
               <div v-if="config.githubEnabled || config.googleEnabled" class="oauth-row"><button v-if="config.githubEnabled" id="githubLoginBtn" type="button" class="btn btn-github btn-oauth" :disabled="!!oauthBusy || busy" @click="oauth('github')"><i class="i-mdi-github" aria-hidden="true"/><span>{{ oauthBusy === 'github' ? t('login.input.step.next') : t('login.btn.github') }}</span></button><button v-if="config.googleEnabled" id="googleLoginBtn" type="button" class="btn btn-google btn-oauth" :disabled="!!oauthBusy || busy" @click="oauth('google')"><i class="i-mdi-google" aria-hidden="true"/><span>{{ oauthBusy === 'google' ? t('login.input.step.next') : t('login.btn.google') }}</span></button></div>
+              <div class="enterprise-trust-badge" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg><span>{{ copy.securityBadge }}</span></div>
             </div>
           </form>
           <form v-if="config.allowRegister" v-show="tab === 'register'" id="registerForm" class="auth-form" novalidate @submit.prevent="submitRegistration">
-            <div class="field form-group"><label for="registerUsername">{{ t('login.username') }}</label><div class="ctrl input-container"><input id="registerUsername" v-model="registration.username" type="text" name="username" class="form-control" autocomplete="username" autocapitalize="none" spellcheck="false" required :placeholder="t('login.username.placeholder')"/></div></div>
-            <div class="field form-group"><label for="registerPassword">{{ t('login.password') }}</label><div class="ctrl input-container"><input id="registerPassword" v-model="registration.password" type="password" name="password" class="form-control" autocomplete="new-password" required :placeholder="t('login.password.placeholder')"/></div></div>
-            <div class="field form-group"><label for="confirmPassword">{{ t('login.confirm.password') }}</label><div class="ctrl input-container"><input id="confirmPassword" v-model="registration.confirmation" type="password" name="confirmPassword" class="form-control" autocomplete="new-password" required :placeholder="t('login.confirm.password.placeholder')"/></div></div>
+            <div class="field form-group">
+              <label for="registerUsername">{{ t('login.username') }}</label>
+              <div class="ctrl input-container has-prefix">
+                <span class="input-icon-prefix" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+                <input id="registerUsername" v-model="registration.username" type="text" name="username" class="form-control" autocomplete="username" autocapitalize="none" spellcheck="false" required :placeholder="t('login.username.placeholder')"/>
+              </div>
+            </div>
+            <div class="field form-group">
+              <label for="registerPassword">{{ t('login.password') }}</label>
+              <div class="ctrl input-container has-prefix">
+                <span class="input-icon-prefix" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
+                <input id="registerPassword" v-model="registration.password" type="password" name="password" class="form-control" autocomplete="new-password" required :placeholder="t('login.password.placeholder')"/>
+              </div>
+            </div>
+            <div class="field form-group">
+              <label for="confirmPassword">{{ t('login.confirm.password') }}</label>
+              <div class="ctrl input-container has-prefix">
+                <span class="input-icon-prefix" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg></span>
+                <input id="confirmPassword" v-model="registration.confirmation" type="password" name="confirmPassword" class="form-control" autocomplete="new-password" required :placeholder="t('login.confirm.password.placeholder')"/>
+              </div>
+            </div>
             <button type="submit" class="submit btn btn-primary" :disabled="busy">{{ busy ? t('login.input.sending') : t('login.register') }}</button>
+            <div class="enterprise-trust-badge" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg><span>{{ copy.securityBadge }}</span></div>
           </form>
         </template>
       </div>
-      <div class="authfoot">{{ config?.allowRegister ? copy.newAccount : copy.contact }}</div>
+      <div class="authfoot">
+        <a href="https://github.com/doubleDimple/oci-start" target="_blank" rel="noopener noreferrer" class="authfoot-link">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+          <span>doubleDimple / oci-start</span>
+        </a>
+        <span class="authfoot-sep" aria-hidden="true">·</span>
+        <span class="authfoot-date">{{ copy.projectStartTime }}: 2025-10-01</span>
+      </div>
     </section>
     <div v-if="resetOpen" id="forgotPasswordModal" class="modal-overlay show" @click.self="!reset.busy && closeReset()" @keydown="resetKeydown">
       <div ref="resetDialog" class="modal" role="dialog" aria-modal="true" aria-labelledby="loginResetTitle" tabindex="-1">
         <div class="modal-header"><div id="loginResetTitle" class="modal-title"><i class="i-mdi-key-outline" aria-hidden="true"/> {{ t('login.reset.title') }}</div><button type="button" class="modal-close" :aria-label="copy.close" :disabled="reset.busy" @click="closeReset"><i class="i-mdi-close" aria-hidden="true"/></button></div>
         <div class="modal-steps"><div id="progressLine" class="progress-line" :style="{ width: `calc(${(reset.step - 1) / 2 * 100}% - 16px)` }"/><div v-for="step in 3" :id="`step${step}`" :key="step" class="step" :class="{ active: reset.step === step, completed: reset.step > step }"><div class="step-circle">{{ step === 3 ? '✓' : step }}</div><div class="step-label">{{ t(`login.reset.step${step}`) }}</div></div></div>
         <div class="modal-body">
-          <div v-if="reset.step === 1" id="resetStep1" class="reset-step active"><div class="step-description">{{ t('login.reset.info1') }}</div><div class="field form-group"><label for="resetUsername">{{ t('login.username') }}</label><div class="ctrl input-container"><input id="resetUsername" v-model="reset.username" type="text" class="form-control" autocomplete="username" autocapitalize="none" :disabled="reset.busy" :placeholder="t('login.username.placeholder')"/></div></div><div class="field form-group"><label for="resetVerificationCode">{{ t('login.verify.code') }}</label><div class="verification-group"><div class="verification-input"><input id="resetVerificationCode" v-model="reset.code" type="text" class="form-control" autocomplete="one-time-code" :disabled="reset.busy" :placeholder="t('login.verify.code.placeholder')" @keydown.enter.prevent="nextResetStep"/></div><button id="resetSendCodeBtn" type="button" class="btn btn-send-code" :disabled="reset.sending || resetCountdown > 0 || reset.busy" @click="sendRecoveryCode">{{ reset.sending ? t('login.input.sending') : resetCountdown ? resetCountdown + t('login.input.seconds.retry') : t('login.btn.send.code') }}</button></div></div></div>
+          <div v-if="reset.step === 1" id="resetStep1" class="reset-step active">
+            <div class="step-description">{{ t('login.reset.info1') }}</div>
+            <div class="field form-group">
+              <label for="resetUsername">{{ t('login.username') }}</label>
+              <div class="ctrl input-container has-prefix">
+                <span class="input-icon-prefix" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+                <input id="resetUsername" v-model="reset.username" type="text" class="form-control" autocomplete="username" autocapitalize="none" :disabled="reset.busy" :placeholder="t('login.username.placeholder')"/>
+              </div>
+            </div>
+            <div class="field form-group">
+              <label for="resetVerificationCode">{{ t('login.verify.code') }}</label>
+              <div class="verification-group">
+                <div class="verification-input has-prefix">
+                  <span class="input-icon-prefix" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></span>
+                  <input id="resetVerificationCode" v-model="reset.code" type="text" class="form-control" autocomplete="one-time-code" :disabled="reset.busy" :placeholder="t('login.verify.code.placeholder')" @keydown.enter.prevent="nextResetStep"/>
+                </div>
+                <button id="resetSendCodeBtn" type="button" class="btn btn-send-code" :disabled="reset.sending || resetCountdown > 0 || reset.busy" @click="sendRecoveryCode">{{ reset.sending ? t('login.input.sending') : resetCountdown ? resetCountdown + t('login.input.seconds.retry') : t('login.btn.send.code') }}</button>
+              </div>
+            </div>
+          </div>
           <div v-else-if="reset.step === 2" id="resetStep2" class="reset-step active"><div class="step-description">{{ t('login.reset.info2') }}</div><div class="field form-group"><label>{{ t('login.reset.method.title') }}</label><div class="modal-box">{{ t('login.reset.method.desc') }}<ul class="modal-box-list"><li>{{ t('login.reset.method.list1') }}</li><li>{{ t('login.reset.method.list2') }}</li></ul></div></div></div>
           <div v-else id="resetStep3" class="reset-step active"><div class="step-description">{{ t('login.reset.success') }}</div><div class="modal-success"><i class="i-mdi-send-check-outline" aria-hidden="true"/><div class="modal-success-title">{{ t('login.reset.success') }}</div><div class="modal-success-sub">{{ t('login.reset.check.msg') }}</div></div></div>
           <div id="resetMessage"><div v-if="resetNotice" class="message" :class="`${resetNotice.type}-message`" :role="resetNotice.type === 'error' ? 'alert' : 'status'">{{ noticeText(resetNotice) }}</div></div>

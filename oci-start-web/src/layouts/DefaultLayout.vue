@@ -20,6 +20,7 @@ import HeaderSearch from '@/components/header/HeaderSearch.vue'
 import HeaderMessages from '@/components/header/HeaderMessages.vue'
 import HeaderAssets from '@/components/header/HeaderAssets.vue'
 import HeaderVersion from '@/components/header/HeaderVersion.vue'
+import ThemeDrawer from '@/components/ThemeDrawer.vue'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -46,6 +47,7 @@ const sidebarToggle = ref<HTMLButtonElement | null>(null)
 const mobileSidebarToggle = ref<HTMLButtonElement | null>(null)
 const sidebar = ref<HTMLElement | null>(null)
 const mobilePreferencesOpen = ref(false)
+const themeDrawerOpen = ref(false)
 const content = ref<HTMLElement | null>(null)
 const sidebarCollapsed = computed(() => !compactViewport.value && shell.collapsed)
 const mobileLinks: Record<string, string> = {
@@ -212,6 +214,7 @@ async function signOut() {
 
 function userCommand(value: unknown) {
   if (value === 'assets') assets.value?.open()
+  else if (value === 'auditLogs') void router.push('/system/auditLogs')
   else if (value === 'about') version.value?.open()
   else if (value === 'logout') void signOut()
   else if (value === 'retry') void user.load(userRequest.signal)
@@ -308,52 +311,15 @@ function retryNavigation() {
               </el-dropdown-menu>
             </template>
           </el-dropdown>
-          <el-popover placement="bottom-end" :width="280" trigger="click">
-            <template #reference>
-              <button class="icon-btn" type="button" :title="t('chrome.title')" :aria-label="t('chrome.title')">
-                <i class="i-mdi-palette-outline" />
-              </button>
-            </template>
-            <div class="chrome-pop">
-              <p class="chrome-label">{{ t('chrome.sidebar') }}</p>
-              <div class="swatches">
-                <button
-                  v-for="c in SIDEBAR_SWATCHES"
-                  :key="'s' + c"
-                  type="button"
-                  class="swatch"
-                  :class="{ on: chrome.sidebar.toLowerCase() === c }"
-                  :style="{ background: c }"
-                  :aria-label="t('header.sidebarColor', { color: c })"
-                  :title="t('header.sidebarColor', { color: c })"
-                  :aria-pressed="chrome.sidebar.toLowerCase() === c"
-                  @click="setSidebarColor(c)"
-                />
-                <label class="swatch picker">
-                  <input type="color" :aria-label="t('header.customSidebar')" :title="t('header.customSidebar')" :value="chrome.sidebar || (theme === 'dark' ? '#000000' : '#1d1d1f')" @input="setSidebarColor(($event.target as HTMLInputElement).value)">
-                </label>
-              </div>
-              <p class="chrome-label">{{ t('chrome.page') }}</p>
-              <div class="swatches">
-                <button
-                  v-for="c in PAGE_SWATCHES"
-                  :key="'p' + c"
-                  type="button"
-                  class="swatch"
-                  :class="{ on: chrome.page.toLowerCase() === c }"
-                  :style="{ background: c }"
-                  :aria-label="t('header.pageColor', { color: c })"
-                  :title="t('header.pageColor', { color: c })"
-                  :aria-pressed="chrome.page.toLowerCase() === c"
-                  @click="setPageColor(c)"
-                />
-                <label class="swatch picker">
-                  <input type="color" :aria-label="t('header.customPage')" :title="t('header.customPage')" :value="chrome.page || (theme === 'dark' ? '#000000' : '#f5f5f7')" @input="setPageColor(($event.target as HTMLInputElement).value)">
-                </label>
-              </div>
-              <button class="reset" type="button" @click="resetChrome">{{ t('chrome.reset') }}</button>
-            </div>
-          </el-popover>
+          <button
+            class="icon-btn"
+            type="button"
+            :title="t('chrome.title')"
+            :aria-label="t('chrome.title')"
+            @click="themeDrawerOpen = true"
+          >
+            <i class="i-mdi-palette-outline" />
+          </button>
           <el-dropdown trigger="click" :disabled="localeSyncing" @command="changeLocale">
             <button class="icon-btn" type="button" :disabled="localeSyncing" :aria-busy="localeSyncing" :title="languageLabel" :aria-label="languageLabel">
               <i class="i-mdi-translate" aria-hidden="true" />
@@ -382,6 +348,7 @@ function retryNavigation() {
                 <el-dropdown-item v-if="user.loadFailed" command="retry" :disabled="user.loading"><i class="i-mdi-refresh" aria-hidden="true" />{{ t('header.retryUser') }}</el-dropdown-item>
                 <el-dropdown-item v-if="compactViewport" divided command="preferences"><i :class="themeIcon" aria-hidden="true" />{{ t('mobileShell.preferences') }}</el-dropdown-item>
                 <el-dropdown-item divided command="assets"><i class="i-mdi-chart-box-outline" aria-hidden="true" />{{ t('header.assets') }}</el-dropdown-item>
+                <el-dropdown-item command="auditLogs"><i class="i-mdi-shield-check-outline" aria-hidden="true" />{{ t('header.auditLogs') }}</el-dropdown-item>
                 <el-dropdown-item command="about"><i class="i-mdi-information-outline" aria-hidden="true" />
                   {{ t(compactViewport && headerVersionSnapshot?.needUpdate ? 'headerVersion.updateAvailable' : 'about') }}
                 </el-dropdown-item>
@@ -406,12 +373,12 @@ function retryNavigation() {
       </nav>
     </div>
     <HeaderAssets ref="assets" />
+    <ThemeDrawer v-model="themeDrawerOpen" />
     <el-dialog v-model="mobilePreferencesOpen" class="mobile-preferences-dialog" :title="t('mobileShell.preferences')" width="min(460px, calc(100vw - 24px))" align-center append-to-body>
       <div class="mobile-preferences">
         <fieldset><legend>{{ t('header.appearance') }}</legend><div class="mobile-preference-options"><button v-for="mode in ['light', 'dark', 'system']" :key="mode" type="button" :aria-pressed="themeMode === mode" @click="changeTheme(mode)">{{ t(`header.${mode}`) }}<i v-if="themeMode === mode" class="i-mdi-check" aria-hidden="true" /></button></div></fieldset>
         <fieldset><legend>{{ t('header.language') }}</legend><div class="mobile-preference-options"><button type="button" lang="zh-CN" :aria-pressed="locale === 'zh'" :disabled="localeSyncing" @click="changeLocale('zh')">简体中文<i v-if="locale === 'zh'" class="i-mdi-check" aria-hidden="true" /></button><button type="button" lang="en" :aria-pressed="locale === 'en'" :disabled="localeSyncing" @click="changeLocale('en')">English<i v-if="locale === 'en'" class="i-mdi-check" aria-hidden="true" /></button></div></fieldset>
-        <fieldset v-if="!compactViewport" class="chrome-pop"><legend>{{ t('chrome.sidebar') }}</legend><div class="swatches"><button v-for="c in SIDEBAR_SWATCHES" :key="c" type="button" class="swatch" :class="{ on: chrome.sidebar.toLowerCase() === c }" :style="{ background: c }" :aria-label="t('header.sidebarColor', { color: c })" :aria-pressed="chrome.sidebar.toLowerCase() === c" @click="setSidebarColor(c)" /><label class="swatch picker"><input type="color" :aria-label="t('header.customSidebar')" :value="chrome.sidebar || (theme === 'dark' ? '#000000' : '#1d1d1f')" @input="setSidebarColor(($event.target as HTMLInputElement).value)"></label></div></fieldset>
-        <fieldset class="chrome-pop"><legend>{{ t('chrome.page') }}</legend><div class="swatches"><button v-for="c in PAGE_SWATCHES" :key="c" type="button" class="swatch" :class="{ on: chrome.page.toLowerCase() === c }" :style="{ background: c }" :aria-label="t('header.pageColor', { color: c })" :aria-pressed="chrome.page.toLowerCase() === c" @click="setPageColor(c)" /><label class="swatch picker"><input type="color" :aria-label="t('header.customPage')" :value="chrome.page || (theme === 'dark' ? '#000000' : '#f5f5f7')" @input="setPageColor(($event.target as HTMLInputElement).value)"></label></div><button class="reset" type="button" @click="resetChrome">{{ t('chrome.reset') }}</button></fieldset>
+        <fieldset><legend>{{ t('chrome.title') }}</legend><div class="mobile-preference-options"><button type="button" @click="mobilePreferencesOpen = false; themeDrawerOpen = true"><i class="i-mdi-palette-outline" aria-hidden="true" />{{ t('chrome.subtitle') }}</button></div></fieldset>
       </div>
     </el-dialog>
   </div>
@@ -435,6 +402,7 @@ function retryNavigation() {
   padding: 22px 14px 16px;
   position: relative;
   overflow: hidden;
+  border-right: 1px solid color-mix(in srgb, var(--border) 40%, transparent);
   transition: width 0.32s cubic-bezier(0.22, 1, 0.36, 1),
               padding 0.32s cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -750,36 +718,7 @@ function retryNavigation() {
 .header-menu-label { flex: 1; margin-right: 18px; }
 .header-account-summary { color: var(--text-primary); font: var(--font-size-body)/1.5 var(--sans); max-width: 240px; overflow-wrap: anywhere; }
 .header-account-summary small { display: block; color: var(--text-secondary); font-size: var(--font-size-secondary); }
-.chrome-pop { padding: 4px 2px 2px; }
-.chrome-label {
-  margin: 0 0 8px;
-  font-size: var(--font-size-body);
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-.chrome-pop .chrome-label + .swatches + .chrome-label { margin-top: 14px; }
-.swatches { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-.swatch {
-  width: 22px; height: 22px; border-radius: 50%;
-  border: 1px solid var(--border);
-  padding: 0; cursor: pointer; background: none;
-}
-.swatch.on { outline: 2px solid var(--brand); outline-offset: 2px; }
-.swatch:focus-visible, .swatch.picker:focus-within, .chrome-pop .reset:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
-.swatch.picker {
-  display: grid; place-items: center; overflow: hidden;
-  background: conic-gradient(from 90deg, #1d1d1f, #1b8a6a, #f5f5f7, #1d1d1f);
-}
-.swatch.picker input {
-  opacity: 0; width: 22px; height: 22px; cursor: pointer; border: 0; padding: 0;
-}
-.chrome-pop .reset {
-  margin-top: 14px; width: 100%; height: 32px;
-  border: 1px solid var(--border); border-radius: 999px;
-  background: var(--bg-card); color: var(--text-primary);
-  font: inherit; font-size: var(--font-size-body); font-weight: 600; cursor: pointer;
-}
-.chrome-pop .reset:hover { background: var(--bg-hover); }
+
 .mobile-account-menu { max-width: calc(100vw - 24px); }
 .mobile-account-menu .el-dropdown-menu__item { min-height: 44px; white-space: normal; font-size: var(--font-size-body); }
 .mobile-preferences-dialog { max-width: calc(100vw - 24px); }
@@ -792,7 +731,4 @@ function retryNavigation() {
 .mobile-preference-options button[aria-pressed='true'] { border-color: var(--brand); background: var(--status-ok-bg); }
 .mobile-preference-options button:disabled { opacity: .6; cursor: wait; }
 .mobile-preference-options button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
-.mobile-preference-options button i { flex: none; width: 16px; height: 16px; }
-.mobile-preferences .swatch, .mobile-preferences .swatch.picker input { width: 44px; height: 44px; }
-.mobile-preferences .chrome-pop .reset { height: 44px; }
 </style>

@@ -62,9 +62,12 @@ import java.util.Map;
  * @Author doubleDimple
  * @Date 2024-11-21 12:55
  */
+import com.doubledimple.ociserver.config.annotations.AuditLog;
+
 @RestController
 @RequestMapping("/api/system")
 @Slf4j
+@AuditLog(title = "系统安全设置")
 public class SystemSettingsApiController  extends BaseController{
 
     @Resource

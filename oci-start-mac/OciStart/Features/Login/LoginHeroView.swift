@@ -1,7 +1,7 @@
 import SwiftUI
 import AppKit
 
-/// Public geography from the Vue login, drawn locally without account requests.
+/// Public geography from the Vue login, drawn locally with a 3D interactive rotating globe.
 struct LoginHeroView: View {
     var dark: Bool
     var locale: AppLocale = .zhCN
@@ -24,7 +24,7 @@ struct LoginHeroView: View {
                             .font(.system(size: 14))
                             .foregroundColor(LoginPalette.muted(dark))
                     }
-                    Spacer(minLength: 48)
+                    Spacer(minLength: 36)
                     VStack(alignment: .leading, spacing: 12) {
                         Text(english ? "Your cloud,\nin one workspace." : "让云端资源，\n井然有序。")
                             .font(.system(size: 30, weight: .semibold))
@@ -38,7 +38,7 @@ struct LoginHeroView: View {
                             .foregroundColor(LoginPalette.muted(dark))
                             .fixedSize(horizontal: false, vertical: true)
                     }
-                    .padding(.bottom, 26)
+                    .padding(.bottom, 20)
                     HStack {
                         Text(english ? "OCI public regions" : "OCI 公共区域")
                             .font(.system(size: 13, weight: .medium))
@@ -48,7 +48,7 @@ struct LoginHeroView: View {
                             .foregroundColor(LoginPalette.muted(dark))
                     }
                     LoginRegionMap(dark: dark, english: english)
-                        .frame(height: max(180, min(280, (geo.size.width - 68) * 0.43)))
+                        .frame(height: max(220, min(320, (geo.size.width - 68) * 0.65)))
                         .padding(.horizontal, -12)
                         .padding(.top, 12)
                         .accessibilityHidden(true)
@@ -63,12 +63,12 @@ struct LoginHeroView: View {
                     .buttonStyle(PlainButtonStyle())
                     .popover(isPresented: $showDirectory, arrowEdge: .bottom) { directory }
                     Text(english
-                         ? "City reference points · decorative connections"
-                         : "城市参考位置 · 连线为示意")
+                         ? "City reference points · interactive 3D globe"
+                         : "城市参考位置 · 3D 可交互地球示意")
                         .font(.system(size: 12))
                         .foregroundColor(LoginPalette.muted(dark))
                         .padding(.top, 8)
-                    Spacer(minLength: 32)
+                    Spacer(minLength: 24)
                     HStack(spacing: 8) {
                         Text("© 2026 doubleDimple")
                         Text("·")
@@ -142,15 +142,45 @@ private struct LoginRegionMap: NSViewRepresentable {
     }
 }
 
+private struct Point3D {
+    var vx: CGFloat
+    var vy: CGFloat
+    var vz: CGFloat
+    var continent: Int = 0
+}
+
+private struct Project3D {
+    var sx: CGFloat
+    var sy: CGFloat
+    var z: CGFloat
+}
+
+private struct RouteArc {
+    var a: LoginPublicRegion
+    var b: LoginPublicRegion
+    var samples: [Point3D]
+}
+
 private final class LoginRegionMapView: NSView {
     var dark = true
     var english = false { didSet { if oldValue != english { updateRegionTooltips() } } }
-    private var landPath = NSBezierPath()
-    private var cachedSize = NSSize.zero
     private var tooltipStrings: [NSString] = []
     private var timer: Timer?
     private var observers: [NSObjectProtocol] = []
     private var workspaceObserver: NSObjectProtocol?
+
+    // 3D rotation state (Polar spin & view pitch angle)
+    private var rotY: CGFloat = 0.3
+    private var rotX: CGFloat = 0.28
+    private var velY: CGFloat = 0
+    private var velX: CGFloat = 0
+    private var isDragging = false
+    private var lastMouseLocation = NSPoint.zero
+
+    private static let RAD = CGFloat.pi / 180.0
+    private static let TAU = CGFloat.pi * 2.0
+    private static let AXIAL_TILT: CGFloat = -0.409 // ~23.44° real Earth axial tilt
+
     override var isFlipped: Bool { true }
 
     override init(frame frameRect: NSRect) {
@@ -168,21 +198,17 @@ private final class LoginRegionMapView: NSView {
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
     deinit {
         timer?.invalidate()
         observers.forEach { NotificationCenter.default.removeObserver($0) }
         if let observer = workspaceObserver { NSWorkspace.shared.notificationCenter.removeObserver(observer) }
     }
+
     override func viewDidMoveToWindow() { super.viewDidMoveToWindow(); updateAnimation() }
+
     override func layout() {
         super.layout()
-        guard bounds.size != cachedSize else { return }
-        cachedSize = bounds.size
-        landPath = NSBezierPath()
-        for point in Self.landDots {
-            let p = project(longitude: point.x, latitude: point.y)
-            landPath.appendOval(in: NSRect(x: p.x - 1, y: p.y - 1, width: 2, height: 2))
-        }
         updateRegionTooltips()
         needsDisplay = true
     }
@@ -195,100 +221,406 @@ private final class LoginRegionMapView: NSView {
             needsDisplay = true
             return
         }
-        let next = Timer(timeInterval: 1.0 / 24, repeats: true) { [weak self] _ in self?.needsDisplay = true }
+        let next = Timer(timeInterval: 1.0 / 30, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            if !self.isDragging {
+                self.rotY += 0.0025 + self.velY
+                self.rotX += self.velX
+                self.velY *= 0.94
+                self.velX *= 0.94
+                self.rotX = max(-0.8, min(0.8, self.rotX))
+            }
+            self.needsDisplay = true
+        }
         RunLoop.main.add(next, forMode: .common)
         timer = next
     }
 
-    private func project(longitude: CGFloat, latitude: CGFloat) -> NSPoint {
-        NSPoint(x: (longitude + 180) / 360 * bounds.width,
-                y: (78 - latitude) / 130 * bounds.height)
+    // Pointer mouse drag interaction
+    override func mouseDown(with event: NSEvent) {
+        let loc = convert(event.locationInWindow, from: nil)
+        isDragging = true
+        lastMouseLocation = loc
+        velY = 0
+        velX = 0
     }
-    private func position(_ region: LoginPublicRegion) -> NSPoint {
-        project(longitude: region.longitude, latitude: region.latitude)
+
+    override func mouseDragged(with event: NSEvent) {
+        guard isDragging else { return }
+        let loc = convert(event.locationInWindow, from: nil)
+        let dx = loc.x - lastMouseLocation.x
+        let dy = loc.y - lastMouseLocation.y
+        rotY += dx * 0.006
+        rotX = max(-0.8, min(0.8, rotX + dy * 0.006))
+        velY = dx * 0.002
+        velX = dy * 0.002
+        lastMouseLocation = loc
+        needsDisplay = true
     }
+
+    override func mouseUp(with event: NSEvent) {
+        isDragging = false
+    }
+
+    private func project3D(_ vx: CGFloat, _ vy: CGFloat, _ vz: CGFloat,
+                           spinY: CGFloat, pitchX: CGFloat,
+                           cx: CGFloat, cy: CGFloat, radius: CGFloat) -> Project3D {
+        let cosSpin = cos(spinY), sinSpin = sin(spinY)
+        let cosTilt = cos(Self.AXIAL_TILT), sinTilt = sin(Self.AXIAL_TILT)
+        let cosPitch = cos(pitchX), sinPitch = sin(pitchX)
+
+        // 1. Spin around polar Y axis
+        let x1 = vx * cosSpin + vz * sinSpin
+        let y1 = vy
+        let z1 = -vx * sinSpin + vz * cosSpin
+
+        // 2. 23.44° axial tilt around Z axis
+        let x2 = x1 * cosTilt - y1 * sinTilt
+        let y2 = x1 * sinTilt + y1 * cosTilt
+        let z2 = z1
+
+        // 3. View pitch tilt around X axis
+        let x3 = x2
+        let y3 = y2 * cosPitch - z2 * sinPitch
+        let z3 = y2 * sinPitch + z2 * cosPitch
+
+        return Project3D(
+            sx: cx + x3 * radius,
+            sy: cy - y3 * radius,
+            z: z3
+        )
+    }
+
     private func updateRegionTooltips() {
         removeAllToolTips()
         tooltipStrings.removeAll()
-        // Same-city regions retain their real coordinates and every region code.
+        let cx = bounds.width / 2
+        let cy = bounds.height / 2
+        let radius = min(bounds.width, bounds.height) * 0.40
+
         for region in LoginPublicRegion.locations {
-            let p = position(region)
+            let phi = region.latitude * Self.RAD
+            let lam = region.longitude * Self.RAD
+            let cosPhi = cos(phi)
+            let p = project3D(cosPhi * sin(lam), sin(phi), cosPhi * cos(lam),
+                              spinY: rotY, pitchX: rotX, cx: cx, cy: cy, radius: radius)
+            guard p.z > 0.05 else { continue }
             let names = LoginPublicRegion.all.filter { $0.latitude == region.latitude && $0.longitude == region.longitude }
                 .map { (english ? $0.en : $0.zh) + " · " + $0.id + "\n" + $0.coordinates }
                 .joined(separator: "\n")
             let tooltip = names as NSString
             tooltipStrings.append(tooltip)
-            addToolTip(NSRect(x: p.x - 5, y: p.y - 5, width: 10, height: 10), owner: tooltip, userData: nil)
+            addToolTip(NSRect(x: p.sx - 8, y: p.sy - 8, width: 16, height: 16), owner: tooltip, userData: nil)
         }
     }
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
+        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
+
+        // Container Background Fill
         NSColor(dark ? LoginPalette.bg(true) : LoginPalette.bg(false)).setFill()
         bounds.fill()
-        NSColor(Color(hex: dark ? "1e3140" : "718d9c")).setFill()
-        landPath.fill()
-        let node = NSColor(Color(hex: dark ? "2fe0a6" : "08724f"))
-        // These connections decorate the public directory; they are not telemetry.
-        for (index, pair) in Self.routes.enumerated() {
-            guard let a = LoginPublicRegion.all.first(where: { $0.id == pair.0 }),
-                  let b = LoginPublicRegion.all.first(where: { $0.id == pair.1 }) else { continue }
-            let start = position(a), end = position(b)
-            let control = NSPoint(x: (start.x + end.x) / 2,
-                                  y: min(start.y, end.y) - min(abs(end.x - start.x) * 0.22, 60))
+
+        let width = bounds.width
+        let height = bounds.height
+        guard width > 20, height > 20 else { return }
+
+        let cx = width / 2
+        let cy = height / 2
+        let radius = min(width, height) * 0.40
+
+        let nodeColor = NSColor(Color(hex: dark ? "ff6600" : "ff4500"))
+        let lineColor = NSColor(Color(hex: dark ? "ff6600" : "ff4500")).withAlphaComponent(0.55)
+        let oceanColor = NSColor(Color(hex: dark ? "0b1219" : "edf3f8"))
+        let oceanEdgeColor = NSColor(Color(hex: dark ? "162330" : "cbdbe6"))
+        let graticuleColor = NSColor(Color(hex: dark ? "78a5c8" : "142841")).withAlphaComponent(dark ? 0.22 : 0.35)
+
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+
+        // 1. Atmosphere Outer Glow
+        let glowColors = [nodeColor.withAlphaComponent(0.14).cgColor, CGColor(red: 0, green: 0, blue: 0, alpha: 0)] as CFArray
+        if let glowGrad = CGGradient(colorsSpace: colorSpace, colors: glowColors, locations: [0.0, 1.0]) {
+            ctx.drawRadialGradient(glowGrad,
+                                   startCenter: CGPoint(x: cx, y: cy), startRadius: radius * 0.85,
+                                   endCenter: CGPoint(x: cx, y: cy), endRadius: radius * 1.22,
+                                   options: [.drawsAfterEndLocation])
+        }
+
+        // 2. 3D Globe Surface Fill
+        let bodyColors = [oceanColor.cgColor, oceanColor.cgColor, oceanEdgeColor.cgColor] as CFArray
+        if let bodyGrad = CGGradient(colorsSpace: colorSpace, colors: bodyColors, locations: [0.0, 0.65, 1.0]) {
+            ctx.drawRadialGradient(bodyGrad,
+                                   startCenter: CGPoint(x: cx - radius * 0.3, y: cy - radius * 0.3), startRadius: radius * 0.1,
+                                   endCenter: CGPoint(x: cx, y: cy), endRadius: radius,
+                                   options: [.drawsAfterEndLocation])
+        }
+
+        // Atmosphere Rim Border
+        nodeColor.withAlphaComponent(0.35).setStroke()
+        let rimPath = NSBezierPath(ovalIn: NSRect(x: cx - radius, y: cy - radius, width: radius * 2, height: radius * 2))
+        rimPath.lineWidth = 1.2
+        rimPath.stroke()
+
+        // Tilted Polar Axis Line (23.44°)
+        let poleNorth = project3D(0, 1.13, 0, spinY: rotY, pitchX: rotX, cx: cx, cy: cy, radius: radius)
+        let poleSouth = project3D(0, -1.13, 0, spinY: rotY, pitchX: rotX, cx: cx, cy: cy, radius: radius)
+        let axisPath = NSBezierPath()
+        axisPath.move(to: NSPoint(x: poleNorth.sx, y: poleNorth.sy))
+        axisPath.line(to: NSPoint(x: poleSouth.sx, y: poleSouth.sy))
+        let pattern: [CGFloat] = [4, 4]
+        axisPath.setLineDash(pattern, count: 2, phase: 0)
+        nodeColor.withAlphaComponent(0.3).setStroke()
+        axisPath.lineWidth = 1.0
+        axisPath.stroke()
+
+        // 3. Graticule Lines (Parallels & Meridians)
+        graticuleColor.setStroke()
+        for line in Self.graticules {
             let path = NSBezierPath()
-            path.move(to: start)
-            path.curve(to: end,
-                       controlPoint1: NSPoint(x: start.x + (control.x - start.x) * 2 / 3,
-                                              y: start.y + (control.y - start.y) * 2 / 3),
-                       controlPoint2: NSPoint(x: end.x + (control.x - end.x) * 2 / 3,
-                                              y: end.y + (control.y - end.y) * 2 / 3))
-            path.lineWidth = 0.75
-            node.withAlphaComponent(dark ? 0.27 : 0.36).setStroke()
+            path.lineWidth = 0.95
+            var drawing = false
+            for pt in line {
+                let p = project3D(pt.vx, pt.vy, pt.vz, spinY: rotY, pitchX: rotX, cx: cx, cy: cy, radius: radius)
+                if p.z > 0.02 {
+                    let pos = NSPoint(x: p.sx, y: p.sy)
+                    if !drawing { path.move(to: pos); drawing = true }
+                    else { path.line(to: pos) }
+                } else { drawing = false }
+            }
             path.stroke()
-            if timer != nil {
-                let t = CGFloat((Date.timeIntervalSinceReferenceDate / 6 + Double(index) * 0.17).truncatingRemainder(dividingBy: 1))
-                let s = 1 - t
-                let p = NSPoint(x: s * s * start.x + 2 * s * t * control.x + t * t * end.x,
-                                y: s * s * start.y + 2 * s * t * control.y + t * t * end.y)
-                node.withAlphaComponent(0.75).setFill()
-                NSBezierPath(ovalIn: NSRect(x: p.x - 1.5, y: p.y - 1.5, width: 3, height: 3)).fill()
+        }
+
+        // 4. Land Dots (Multi-Color Continents)
+        let baseDotR = max(0.9, radius * 0.009)
+        for c in 0..<12 {
+            let cColor = Self.continentColor(c, dark: dark)
+            cColor.setFill()
+            let path = NSBezierPath()
+            for dot in Self.landDots {
+                guard dot.continent == c else { continue }
+                let p = project3D(dot.vx, dot.vy, dot.vz, spinY: rotY, pitchX: rotX, cx: cx, cy: cy, radius: radius)
+                if p.z > 0.02 {
+                    let r = baseDotR * (0.65 + p.z * 0.45)
+                    path.appendOval(in: NSRect(x: p.sx - r, y: p.sy - r, width: r * 2, height: r * 2))
+                }
+            }
+            path.fill()
+        }
+
+        // 5. 3D Great-Circle Network Arcs & Traveling Energy Particles
+        lineColor.setStroke()
+        let now = Date.timeIntervalSinceReferenceDate
+        for (rIdx, route) in Self.routes.enumerated() {
+            let path = NSBezierPath()
+            path.lineWidth = 1.1
+            var drawing = false
+            for pt in route.samples {
+                let p = project3D(pt.vx, pt.vy, pt.vz, spinY: rotY, pitchX: rotX, cx: cx, cy: cy, radius: radius)
+                if p.z > 0.02 {
+                    let pos = NSPoint(x: p.sx, y: p.sy)
+                    if !drawing { path.move(to: pos); drawing = true }
+                    else { path.line(to: pos) }
+                } else { drawing = false }
+            }
+            path.stroke()
+
+            // Traveling Light Particle
+            if timer != nil, !route.samples.isEmpty {
+                let progress = CGFloat((now / 3.0 + Double(rIdx) * 0.22).truncatingRemainder(dividingBy: 1.0))
+                let sampleIdx = Int(progress * CGFloat(route.samples.count - 1))
+                let pt = route.samples[sampleIdx]
+                let p = project3D(pt.vx, pt.vy, pt.vz, spinY: rotY, pitchX: rotX, cx: cx, cy: cy, radius: radius)
+                if p.z > 0.05 {
+                    let alpha = sin(.pi * progress) * min(1.0, p.z * 2.0)
+                    nodeColor.withAlphaComponent(alpha).setFill()
+                    NSBezierPath(ovalIn: NSRect(x: p.sx - 2.5, y: p.sy - 2.5, width: 5.0, height: 5.0)).fill()
+                }
             }
         }
+
+        // 6. Project & Render OCI Region Nodes (Enlarged Orange Nodes + Bright White Center)
         for region in LoginPublicRegion.locations {
-            let p = position(region)
-            node.withAlphaComponent(0.10).setFill()
-            NSBezierPath(ovalIn: NSRect(x: p.x - 5, y: p.y - 5, width: 10, height: 10)).fill()
-            node.setFill()
-            NSBezierPath(ovalIn: NSRect(x: p.x - 2, y: p.y - 2, width: 4, height: 4)).fill()
+            let phi = region.latitude * Self.RAD
+            let lam = region.longitude * Self.RAD
+            let cosPhi = cos(phi)
+            let p = project3D(cosPhi * sin(lam), sin(phi), cosPhi * cos(lam),
+                              spinY: rotY, pitchX: rotX, cx: cx, cy: cy, radius: radius)
+            guard p.z > 0.05 else { continue }
+
+            let depthAlpha = min(1.0, p.z * 2.2)
+
+            // Outer Pulsing Ring
+            if timer != nil {
+                let phase = Double(region.id.hashValue & 0xffff)
+                let progress = CGFloat((now * 0.45 + phase * 0.001).truncatingRemainder(dividingBy: 1.0))
+                let ringR = 4.0 + progress * 12.0
+                nodeColor.withAlphaComponent((1.0 - progress) * 0.45 * depthAlpha).setStroke()
+                let ringPath = NSBezierPath(ovalIn: NSRect(x: p.sx - ringR, y: p.sy - ringR, width: ringR * 2, height: ringR * 2))
+                ringPath.lineWidth = 1.3
+                ringPath.stroke()
+            }
+
+            // Glowing Halo
+            let glowR: CGFloat = 12.0
+            let haloColors = [nodeColor.withAlphaComponent(0.32 * depthAlpha).cgColor, CGColor(red: 0, green: 0, blue: 0, alpha: 0)] as CFArray
+            if let haloGrad = CGGradient(colorsSpace: colorSpace, colors: haloColors, locations: [0.0, 1.0]) {
+                ctx.drawRadialGradient(haloGrad,
+                                       startCenter: CGPoint(x: p.sx, y: p.sy), startRadius: 0,
+                                       endCenter: CGPoint(x: p.sx, y: p.sy), endRadius: glowR,
+                                       options: [.drawsAfterEndLocation])
+            }
+
+            // Outer Orange Core (Enlarged)
+            nodeColor.withAlphaComponent(depthAlpha).setFill()
+            NSBezierPath(ovalIn: NSRect(x: p.sx - 3.8, y: p.sy - 3.8, width: 7.6, height: 7.6)).fill()
+
+            // Bright White Inner Beacon Center
+            NSColor.white.withAlphaComponent(depthAlpha).setFill()
+            NSBezierPath(ovalIn: NSRect(x: p.sx - 1.8, y: p.sy - 1.8, width: 3.6, height: 3.6)).fill()
         }
     }
 
-    private static let routes = [
-        ("us-sanjose-1", "ap-tokyo-1"), ("us-ashburn-1", "uk-london-1"),
-        ("eu-frankfurt-1", "ap-mumbai-1"), ("ap-mumbai-1", "ap-singapore-1"),
-        ("ap-singapore-1", "ap-sydney-1"), ("us-ashburn-1", "sa-saopaulo-1")
+    private static func continentColor(_ continent: Int, dark: Bool) -> NSColor {
+        if dark {
+            switch continent {
+            case 0: return NSColor(Color(hex: "38bdf8")) // 北美洲 Sky Blue
+            case 1: return NSColor(Color(hex: "67e8f9")) // 格陵兰 Ice Cyan
+            case 2: return NSColor(Color(hex: "fbbf24")) // 南美洲 Amber Gold
+            case 3: return NSColor(Color(hex: "eab308")) // 非洲 Sun Gold
+            case 4: return NSColor(Color(hex: "34d399")) // 欧亚大陆 Emerald Green
+            case 5: return NSColor(Color(hex: "a3e635")) // 东南亚 Lime Green
+            case 6: return NSColor(Color(hex: "c084fc")) // 大洋洲 Purple
+            case 7: return NSColor(Color(hex: "e879f9")) // 新西兰 Orchid
+            case 8: return NSColor(Color(hex: "fb7185")) // 日本 Rose Pink
+            case 9: return NSColor(Color(hex: "2dd4bf")) // 英国 Teal
+            case 10: return NSColor(Color(hex: "eab308")) // 马达加斯加
+            default: return NSColor(Color(hex: "34d399"))
+            }
+        } else {
+            switch continent {
+            case 0: return NSColor(Color(hex: "0284c7")) // 北美洲 Sky Blue
+            case 1: return NSColor(Color(hex: "0891b2")) // 格陵兰 Ice Cyan
+            case 2: return NSColor(Color(hex: "d97706")) // 南美洲 Amber
+            case 3: return NSColor(Color(hex: "ca8a04")) // 非洲 Golden Bronze
+            case 4: return NSColor(Color(hex: "059669")) // 欧亚大陆 Emerald Green
+            case 5: return NSColor(Color(hex: "65a30d")) // 东南亚 Lime Green
+            case 6: return NSColor(Color(hex: "7c3aed")) // 大洋洲 Purple
+            case 7: return NSColor(Color(hex: "9333ea")) // 新西兰 Violet
+            case 8: return NSColor(Color(hex: "e11d48")) // 日本 Rose Red
+            case 9: return NSColor(Color(hex: "0d9488")) // 英国 Teal
+            case 10: return NSColor(Color(hex: "ca8a04")) // 马达加斯加
+            default: return NSColor(Color(hex: "059669"))
+            }
+        }
+    }
+
+    private static let routePairs = [
+        ("us-phoenix-1", "us-ashburn-1"), ("us-ashburn-1", "uk-london-1"),
+        ("uk-london-1", "eu-frankfurt-1"), ("eu-frankfurt-1", "me-jeddah-1"),
+        ("me-jeddah-1", "ap-mumbai-1"), ("ap-mumbai-1", "ap-singapore-1"),
+        ("ap-singapore-1", "ap-tokyo-1"), ("ap-tokyo-1", "ap-sydney-1")
     ]
-    private static let landDots: [CGPoint] = {
-        var points: [CGPoint] = []
-        for latitude in stride(from: CGFloat(-52), through: 78, by: 2.6) {
-            for longitude in stride(from: CGFloat(-178), through: 178, by: 2.6) {
-                if land.contains(where: { polygon in
-                    var inside = false
-                    var j = polygon.count - 1
-                    for i in polygon.indices {
-                        let a = polygon[i], b = polygon[j]
-                        if (a[1] > latitude) != (b[1] > latitude),
-                           longitude < (b[0] - a[0]) * (latitude - a[1]) / (b[1] - a[1]) + a[0] {
-                            inside.toggle()
-                        }
-                        j = i
-                    }
-                    return inside
-                }) { points.append(CGPoint(x: longitude, y: latitude)) }
+
+    private static let routes: [RouteArc] = {
+        var result: [RouteArc] = []
+        for pair in routePairs {
+            guard let rA = LoginPublicRegion.all.first(where: { $0.id == pair.0 }),
+                  let rB = LoginPublicRegion.all.first(where: { $0.id == pair.1 }) else { continue }
+            let phiA = rA.latitude * RAD, lamA = rA.longitude * RAD
+            let phiB = rB.latitude * RAD, lamB = rB.longitude * RAD
+            let cosPhiA = cos(phiA), cosPhiB = cos(phiB)
+            let vA = Point3D(vx: cosPhiA * sin(lamA), vy: sin(phiA), vz: cosPhiA * cos(lamA))
+            let vB = Point3D(vx: cosPhiB * sin(lamB), vy: sin(phiB), vz: cosPhiB * cos(lamB))
+
+            var samples: [Point3D] = []
+            let numSamples = 24
+            let dotVal = max(-1.0, min(1.0, vA.vx * vB.vx + vA.vy * vB.vy + vA.vz * vB.vz))
+            let omega = acos(dotVal)
+            let sinOmega = sin(omega)
+
+            for s in 0...numSamples {
+                let t = CGFloat(s) / CGFloat(numSamples)
+                let scaleA = sinOmega > 0.001 ? sin((1 - t) * omega) / sinOmega : (1 - t)
+                let scaleB = sinOmega > 0.001 ? sin(t * omega) / sinOmega : t
+                let vx = vA.vx * scaleA + vB.vx * scaleB
+                let vy = vA.vy * scaleA + vB.vy * scaleB
+                let vz = vA.vz * scaleA + vB.vz * scaleB
+                let h = 1.0 + 0.18 * sin(.pi * t)
+                samples.append(Point3D(vx: vx * h, vy: vy * h, vz: vz * h))
+            }
+            result.append(RouteArc(a: rA, b: rB, samples: samples))
+        }
+        return result
+    }()
+
+    private static func getLandContinentIndex(longitude: CGFloat, latitude: CGFloat) -> Int {
+        for (k, polygon) in land.enumerated() {
+            var inside = false
+            var j = polygon.count - 1
+            for i in polygon.indices {
+                let a = polygon[i], b = polygon[j]
+                if (a[1] > latitude) != (b[1] > latitude),
+                   longitude < (b[0] - a[0]) * (latitude - a[1]) / (b[1] - a[1]) + a[0] {
+                    inside.toggle()
+                }
+                j = i
+            }
+            if inside { return k }
+        }
+        return -1
+    }
+
+    private static let landDots: [Point3D] = {
+        var points: [Point3D] = []
+        for latitude in stride(from: CGFloat(-72), through: 76, by: 2.4) {
+            let phi = latitude * RAD
+            let cosPhi = cos(phi)
+            if cosPhi < 0.05 { continue }
+            let lngStep = 2.4 / cosPhi
+            for longitude in stride(from: CGFloat(-180), through: 180, by: lngStep) {
+                let cIdx = getLandContinentIndex(longitude: longitude, latitude: latitude)
+                if cIdx >= 0 {
+                    let lam = longitude * RAD
+                    points.append(Point3D(vx: cosPhi * sin(lam), vy: sin(phi), vz: cosPhi * cos(lam), continent: cIdx))
+                }
+            }
+        }
+        for (k, polygon) in land.enumerated() {
+            for pt in polygon {
+                let lng = pt[0], lat = pt[1]
+                let phi = lat * RAD, lam = lng * RAD
+                let cosPhi = cos(phi)
+                points.append(Point3D(vx: cosPhi * sin(lam), vy: sin(phi), vz: cosPhi * cos(lam), continent: k))
             }
         }
         return points
+    }()
+
+    private static let graticules: [[Point3D]] = {
+        var lines: [[Point3D]] = []
+        for lat in [-60.0, -30.0, 0.0, 30.0, 60.0] {
+            var line: [Point3D] = []
+            let phi = CGFloat(lat) * RAD
+            let cosPhi = cos(phi), sinPhi = sin(phi)
+            for lng in stride(from: CGFloat(-180), through: 180, by: 8.0) {
+                let lam = lng * RAD
+                line.append(Point3D(vx: cosPhi * sin(lam), vy: sinPhi, vz: cosPhi * cos(lam)))
+            }
+            lines.append(line)
+        }
+        for lng in stride(from: CGFloat(-180), through: 180, by: 30.0) {
+            var line: [Point3D] = []
+            let lam = lng * RAD
+            let sinLam = sin(lam), cosLam = cos(lam)
+            for lat in stride(from: CGFloat(-80), through: 80, by: 8.0) {
+                let phi = lat * RAD
+                let cosPhi = cos(phi)
+                line.append(Point3D(vx: cosPhi * sinLam, vy: sin(phi), vz: cosPhi * cosLam))
+            }
+            lines.append(line)
+        }
+        return lines
     }()
 
     // Same simplified outlines as Vue `views/auth/loginMap.js`.
@@ -323,10 +655,6 @@ private struct LoginPublicRegion: Identifiable {
             locations.append(region)
         }
     }
-    // Snapshot copied from Vue `views/auth/regions.ts`, checked 2026-09-15.
-    // Scope: 45 public commercial regions (44 OC1 + 1 OC20), not tenancy availability.
-    // Oracle region identifiers: https://docs.oracle.com/en-us/iaas/Content/General/Concepts/regions.htm
-    // City reference coordinates: https://www.geonames.org/ (not data-centre coordinates).
     static let all: [LoginPublicRegion] = [
         LoginPublicRegion(id: "ap-sydney-1", zh: "悉尼", en: "Sydney", latitude: -33.8688, longitude: 151.2093),
         LoginPublicRegion(id: "ap-melbourne-1", zh: "墨尔本", en: "Melbourne", latitude: -37.8136, longitude: 144.9631),

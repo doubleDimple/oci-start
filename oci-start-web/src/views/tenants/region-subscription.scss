@@ -24,22 +24,74 @@
   input[type='checkbox']:disabled { cursor: default; }
   .subscription-table tr.is-selected > td { background: color-mix(in srgb, var(--brand) 5%, var(--bg-card)); }
   .subscription-table tr.is-selected:hover > td { background: color-mix(in srgb, var(--brand) 9%, var(--bg-card)); }
-  .row-actions-column { width: 105px; min-width: 105px; text-align: right; }
-  .row-actions { gap: 2px; }
-  .row-actions .toolbar-button { width: 32px; height: 32px; }
+  .row-actions-column { width: 110px; min-width: 110px; text-align: left; }
+  .row-actions { display: inline-flex; align-items: center; justify-content: flex-start; gap: 7px; }
+  .boot-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid var(--border-color);
+    border-radius: 9px;
+    background: var(--card-bg);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+
+    &:hover:not(:disabled) {
+      border-color: var(--brand);
+      background: var(--color-ok-bg);
+      color: var(--brand);
+      transform: translateY(-1px);
+      box-shadow: 0 3px 6px rgba(0, 0, 0, 0.08);
+    }
+    &:active:not(:disabled) {
+      transform: scale(0.94);
+    }
+    &:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+    & > i {
+      font-size: 16px;
+      line-height: 1;
+    }
+  }
   .cell-link, .region-code { font-weight: 500; white-space: nowrap; }
   .region-location { color: var(--text-secondary); }
   .home-region { display: inline-flex; align-items: center; gap: 5px; font-size: var(--font-size-body); color: var(--brand); }
   .home-region i { font-size: 16px; }
   .secondary-region { font-size: var(--font-size-body); color: var(--text-secondary); }
   .subscribe-row {
-    display: inline-flex; align-items: center; gap: 4px; min-height: 32px; padding: 5px 9px;
-    border: 1px solid color-mix(in srgb, var(--brand) 18%, transparent); border-radius: 9px;
-    background: transparent; color: var(--brand); font: 500 var(--font-size-body) var(--sans); cursor: pointer;
-    transition: background-color 160ms ease, transform 160ms ease;
-    &:not(:disabled):hover { background: var(--status-ok-bg); }
-    &:not(:disabled):active { transform: scale(.97); }
-    &:disabled { opacity: .5; cursor: default; }
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    min-height: 32px;
+    height: 32px;
+    padding: 0 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 9px;
+    background: var(--card-bg);
+    color: var(--brand);
+    font: 500 var(--font-size-body) var(--sans);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+
+    &:not(:disabled):hover {
+      border-color: var(--brand);
+      background: var(--color-ok-bg);
+      color: var(--brand);
+      transform: translateY(-1px);
+      box-shadow: 0 3px 6px rgba(0, 0, 0, 0.08);
+    }
+    &:not(:disabled):active { transform: scale(0.94); }
+    &:disabled { opacity: .45; cursor: not-allowed; }
   }
   .selection-context { padding-bottom: 10px; }
   .selection-context button:disabled { opacity: .5; cursor: default; }

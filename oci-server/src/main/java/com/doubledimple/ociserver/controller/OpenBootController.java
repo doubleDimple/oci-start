@@ -27,10 +27,13 @@ import java.util.concurrent.ThreadPoolExecutor;
  * @author doubleDimple
  * @date 2024:10:11日 22:35
  */
+import com.doubledimple.ociserver.config.annotations.AuditLog;
+
 @Controller
 @CrossOrigin
 @RequestMapping("/boot")
 @Slf4j
+@AuditLog(title = "开机管理")
 public class OpenBootController  extends BaseController{
 
     @Resource

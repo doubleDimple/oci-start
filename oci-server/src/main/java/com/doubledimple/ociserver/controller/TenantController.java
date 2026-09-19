@@ -68,9 +68,12 @@ import java.util.stream.Collectors;
  * @author doubleDimple
  * @date 2024:10:07日 21:05
  */
+import com.doubledimple.ociserver.config.annotations.AuditLog;
+
 @Controller
 @RequestMapping("/tenants")
 @Slf4j
+@AuditLog(title = "租户管理")
 public class TenantController extends BaseController{
 
     @Resource

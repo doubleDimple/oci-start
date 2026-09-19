@@ -23,7 +23,7 @@ const InstanceNetworkDialog = defineAsyncComponent(() => import('./components/In
 const InstanceReinstallDialog = defineAsyncComponent(() => import('./components/InstanceReinstallDialog.vue'))
 type Operation = 'start' | 'stop' | 'terminate' | 'remark' | 'name' | 'config' | 'volume' | 'vpu' | 'delete'
 type Action = Operation | 'ip' | 'ipv6' | 'copy4' | 'copy6' | 'ssh' | 'console' | 'network' | 'reinstall'
-interface MenuItem { id: Action; label: string; icon: string; danger?: boolean; disabled?: boolean }
+interface MenuItem { id: Action; label: string; icon: string; danger?: boolean; disabled?: boolean; divided?: boolean }
 const { t, locale } = useI18n()
 const compact = useCompactViewport()
 const route = useRoute()
@@ -119,16 +119,21 @@ function rowActions(row: InstanceRow): MenuItem[] {
   return [
     ...(stateCode(row) === 'STOPPED' ? [item('start', 'start', 'i-mdi-play-outline')] : []),
     ...(stateCode(row) === 'RUNNING' ? [item('stop', 'stop', 'i-mdi-stop-circle-outline')] : []),
-    item('terminate', 'terminate', 'i-mdi-power', { danger: true }),
-    item('remark', 'remark', 'i-mdi-note-edit-outline'), item('name', 'rename', 'i-mdi-pencil-outline'),
-    item('config', 'config', 'i-mdi-chip'), item('volume', 'resize', 'i-mdi-harddisk'),
+    item('remark', 'remark', 'i-mdi-note-edit-outline'),
+    item('name', 'rename', 'i-mdi-pencil-outline'),
+    item('config', 'config', 'i-mdi-chip'),
+    item('volume', 'resize', 'i-mdi-harddisk'),
     item('vpu', 'vpu', 'i-mdi-tune-vertical', { disabled: !row.bootVolumeId || row.bootVolumeId === '-1' }),
-    item('copy4', 'copyIpv4', 'i-mdi-content-copy', { disabled: !row.publicIps }), item('ip', 'changeIp', 'i-mdi-ip-network-outline'),
+    item('copy4', 'copyIpv4', 'i-mdi-content-copy', { disabled: !row.publicIps, divided: true }),
+    item('ip', 'changeIp', 'i-mdi-ip-network-outline'),
     ...(row.ipv6Addresses.trim() ? [item('copy6', 'copyIpv6', 'i-mdi-content-copy')] : []),
     item('ipv6', row.ipv6Addresses.trim() ? 'manageIpv6' : 'enableIpv6', 'i-mdi-web'),
-    item('ssh', 'ssh', 'i-mdi-console'), item('console', 'console', 'i-mdi-monitor'),
+    item('ssh', 'ssh', 'i-mdi-console'),
+    item('console', 'console', 'i-mdi-monitor'),
     item('network', 'network', 'i-mdi-lan', { disabled: !row.instanceId }),
-    item('reinstall', 'reinstall', 'i-mdi-restore'), item('delete', 'delete', 'i-mdi-trash-can-outline', { danger: true }),
+    item('reinstall', 'reinstall', 'i-mdi-restore', { divided: true }),
+    item('terminate', 'terminate', 'i-mdi-power', { danger: true }),
+    item('delete', 'delete', 'i-mdi-trash-can-outline', { danger: true }),
   ]
 }
 async function copyAddress(value: string) {
@@ -294,7 +299,7 @@ onBeforeUnmount(() => {
               <template #actions>
                 <el-dropdown trigger="click" placement="bottom-end" popper-class="tenant-action-menu instance-action-menu" @command="(item: MenuItem) => runAction(item, row)">
                   <button class="toolbar-button" :data-instance-actions="row.id" :disabled="loading" :aria-label="t('instances.menuLabel', { name: row.displayName || t('instances.unnamed') })"><i class="i-mdi-dots-horizontal" aria-hidden="true" /></button>
-                  <template #dropdown><el-dropdown-menu><el-dropdown-item v-for="item in rowActions(row)" :key="item.id" :command="item" :disabled="item.disabled" :class="{ 'danger-item': item.danger }"><i class="instance-action-icon" :class="item.icon" aria-hidden="true" /><span>{{ item.label }}</span></el-dropdown-item></el-dropdown-menu></template>
+                  <template #dropdown><el-dropdown-menu><el-dropdown-item v-for="item in rowActions(row)" :key="item.id" :command="item" :disabled="item.disabled" :divided="item.divided" :class="{ 'danger-item': item.danger }"><i class="instance-action-icon" :class="item.icon" aria-hidden="true" /><span>{{ item.label }}</span></el-dropdown-item></el-dropdown-menu></template>
                 </el-dropdown>
               </template>
               <dl class="mobile-record-fields">
@@ -332,10 +337,53 @@ onBeforeUnmount(() => {
                 <td><button v-if="row.publicIps" class="instance-address" :title="`${t('instances.copyIpv4')}: ${row.publicIps}`" :aria-label="`${t('instances.copyIpv4')}: ${row.publicIps}`" @click="copyAddress(row.publicIps)">{{ row.publicIps }}</button><span v-else>—</span></td>
                 <td><button v-if="row.ipv6Addresses.trim()" class="instance-ipv6" :title="row.ipv6Addresses" :aria-label="`${t('instances.copyIpv6')}: ${row.ipv6Addresses}`" @click="copyAddress(row.ipv6Addresses)"><i class="i-mdi-check-circle-outline" aria-hidden="true" />{{ t('instances.enabled') }}</button><span v-else class="instance-secondary">{{ t('instances.disabled') }}</span></td>
                 <td class="instance-date">{{ createdAt(row.createTime) }}</td>
-                <td class="instance-actions-column"><el-dropdown trigger="click" placement="bottom-end" popper-class="tenant-action-menu instance-action-menu" :show-timeout="0" :hide-timeout="80" @command="(item: MenuItem) => runAction(item, row)">
-                  <button class="toolbar-button" :data-instance-actions="row.id" :disabled="loading" :aria-label="t('instances.menuLabel', { name: row.displayName || t('instances.unnamed') })"><i class="i-mdi-dots-horizontal" aria-hidden="true" /></button>
-                  <template #dropdown><el-dropdown-menu><el-dropdown-item v-for="item in rowActions(row)" :key="item.id" :command="item" :disabled="item.disabled" :class="{ 'danger-item': item.danger }"><i class="instance-action-icon" :class="item.icon" aria-hidden="true" /><span>{{ item.label }}</span></el-dropdown-item></el-dropdown-menu></template>
-                </el-dropdown></td>
+                <td class="instance-actions-column">
+                  <div class="row-actions">
+                    <button
+                      v-if="stateCode(row) === 'STOPPED'"
+                      type="button"
+                      class="boot-button"
+                      :title="t('instances.start')"
+                      :aria-label="t('instances.start')"
+                      :disabled="loading"
+                      @click="runAction({ id: 'start', label: t('instances.start'), icon: 'i-mdi-play-outline' }, row)"
+                    >
+                      <i class="i-mdi-play-outline" aria-hidden="true" />
+                    </button>
+                    <button
+                      v-else-if="stateCode(row) === 'RUNNING'"
+                      type="button"
+                      class="boot-button"
+                      :title="t('instances.stop')"
+                      :aria-label="t('instances.stop')"
+                      :disabled="loading"
+                      @click="runAction({ id: 'stop', label: t('instances.stop'), icon: 'i-mdi-stop-circle-outline' }, row)"
+                    >
+                      <i class="i-mdi-stop-circle-outline" aria-hidden="true" />
+                    </button>
+                    <el-dropdown trigger="click" placement="bottom-end" popper-class="tenant-action-menu instance-action-menu" :show-timeout="0" :hide-timeout="80" @command="(item: MenuItem) => runAction(item, row)">
+                      <button class="more-button" :data-instance-actions="row.id" :disabled="loading" :aria-label="t('instances.menuLabel', { name: row.displayName || t('instances.unnamed') })"><i class="i-mdi-dots-horizontal" aria-hidden="true" /></button>
+                      <template #dropdown>
+                        <el-dropdown-menu>
+                          <el-dropdown-item v-for="item in rowActions(row)" :key="item.id" :command="item" :disabled="item.disabled" :divided="item.divided" :class="{ 'danger-item': item.danger }">
+                            <i class="instance-action-icon" :class="item.icon" aria-hidden="true" />
+                            <span>{{ item.label }}</span>
+                          </el-dropdown-item>
+                        </el-dropdown-menu>
+                      </template>
+                    </el-dropdown>
+                    <button
+                      type="button"
+                      class="more-button danger-btn"
+                      :title="t('instances.terminate')"
+                      :aria-label="t('instances.terminate')"
+                      :disabled="loading || stateCode(row) === 'TERMINATED' || stateCode(row) === 'TERMINATING'"
+                      @click="runAction({ id: 'terminate', label: t('instances.terminate'), icon: 'i-mdi-power', danger: true }, row)"
+                    >
+                      <i class="i-mdi-power" aria-hidden="true" />
+                    </button>
+                  </div>
+                </td>
               </tr>
             </tbody>
           </table>

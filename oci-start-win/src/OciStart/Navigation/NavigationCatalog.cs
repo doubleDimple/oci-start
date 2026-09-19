@@ -44,7 +44,6 @@ public static class NavigationCatalog
             }),
             (NavSection.System, new[]
             {
-                Item(NavId.IpQuality, "质量管理", "🛡", "/system/ipSettings", Cloud(1)),
                 Item(NavId.SystemLogs, "系统日志", "📋", "/system/logs"),
                 Item(NavId.Settings, "安全管理", "⚙", "/system/settings"),
                 Item(NavId.ProxyConfig, "代理配置", "↔", "/vpnProxy/page")

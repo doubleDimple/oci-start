@@ -51,11 +51,13 @@ import { headerZh } from './header'
 import { headerMessagesZh } from './headerMessages'
 import { headerAssetsZh } from './headerAssets'
 import { headerVersionZh } from './headerVersion'
+import { auditLogsZh } from './auditLogs'
 import { mobileTenantToolsMessages } from './mobileTenantTools'
 import { mobileShellMessages } from './mobileShell'
 import { mobileRecordsMessages } from './mobileRecords'
 
 export default {
+  auditLogs: auditLogsZh,
   mobileRecords: mobileRecordsMessages.zh,
   mobileTenantTools: mobileTenantToolsMessages.zh,
   mobileShell: mobileShellMessages.zh,
@@ -136,10 +138,32 @@ export default {
   themeDark: '暗色',
   themeLight: '浅色',
   chrome: {
-    title: '外观',
+    title: '外观与换肤',
+    subtitle: '定制企业级侧边栏、内容区域及容器层级配色',
+    modeTitle: '主题模式',
+    sidebarTitle: '侧边栏风格',
+    contentTitle: '内容区域与卡片皮肤',
+    contentDesc: '切换底色与容器层级，整站卡片、表格与输入框自动适配',
     sidebar: '侧栏背景',
     page: '内容区配色',
-    reset: '恢复默认',
+    reset: '恢复默认主题',
+    resetTip: '已恢复默认外观设置',
+    customPicker: '自定义取色',
+    customHint: '智能色彩引擎将自动为卡片、容器、输入框与边框计算协调层级，告别卡片融为一体或灰暗无对比的问题',
+    sidebarObsidian: '经典暗黑',
+    sidebarBlack: '曜石纯黑',
+    sidebarForest: 'OCI 墨绿',
+    sidebarNavy: '科技深蓝',
+    sidebarEspresso: '沉稳深咖',
+    sidebarLight: '极简素白',
+    presetSlate: '经典冷灰',
+    presetPure: '极简纯雪',
+    presetAzure: '科技蓝灰',
+    presetIvory: '温润暖米',
+    presetMidnight: '暗夜极客',
+    presetOnyx: '曜石极黑',
+    presetAurora: '极光墨夜',
+    presetCustom: '自定义皮肤',
   },
   cloudSwitch: '切换云厂商',
   noMenu: '无匹配菜单',
@@ -252,7 +276,7 @@ export default {
     vps: '资源管理',
     vpsList: '资源列表',
     system: '系统管理',
-    quality: '质量管理',
+    quality: '网络质量',
     logs: '系统日志',
     security: '安全管理',
     proxyConfig: '代理配置',

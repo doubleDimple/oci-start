@@ -46,7 +46,6 @@ enum NavigationCatalog {
             item(.vpsList, "监控看板", "desktopcomputer", "/vps/instances/list")
         ]),
         (.system, [
-            item(.ipQuality, "质量管理", "shield", "/system/ipSettings", [1]),
             item(.systemLogs, "系统日志", "doc.plaintext", "/system/logs"),
             item(.settings, "安全管理", "slider.horizontal.3", "/system/settings"),
             item(.proxyConfig, "代理配置", "arrow.left.arrow.right", "/vpnProxy/page")

@@ -47,9 +47,12 @@ import java.util.stream.Collectors;
  *
  * @author doubleDimple
  */
+import com.doubledimple.ociserver.config.annotations.AuditLog;
+
 @Controller
 @RequestMapping("/oci/storage")
 @Slf4j
+@AuditLog(title = "对象存储服务")
 public class OciObjectStorageController extends BaseController {
 
     @Resource

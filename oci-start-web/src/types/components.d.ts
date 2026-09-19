@@ -54,6 +54,7 @@ declare module 'vue' {
     PrimaryBtn: typeof import('./../components/PrimaryBtn.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    ThemeDrawer: typeof import('./../components/ThemeDrawer.vue')['default']
     UserAvatar: typeof import('./../components/UserAvatar.vue')['default']
   }
   export interface ComponentCustomProperties {

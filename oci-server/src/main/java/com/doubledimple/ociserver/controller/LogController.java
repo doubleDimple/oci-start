@@ -19,8 +19,11 @@ import java.util.Map;
  * @author doubleDimple
  * @date 2024:10:25日 21:57
  */
+import com.doubledimple.ociserver.config.annotations.AuditLog;
+
 @Controller
 @RequestMapping("/system")
+@AuditLog(title = "系统日志")
 public class LogController  extends BaseController{
 
     @Autowired

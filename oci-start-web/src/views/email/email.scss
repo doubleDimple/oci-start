@@ -25,13 +25,79 @@
   .email-cell-lines { display: grid; gap: 3px; min-width: 0; }
   .email-cell-lines > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .email-cell-lines small, .email-quota small { font-size: var(--font-size-secondary); color: var(--text-secondary); }
-  .email-row-actions { display: flex; align-items: center; justify-content: center; gap: 4px; }
-  .email-icon-button { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 36px; height: 36px; border: 1px solid transparent; border-radius: var(--r-pill); background: transparent; color: var(--text-primary); cursor: pointer; }
-  .email-icon-button > i { font-size: 18px; }
-  .email-icon-button:not(:disabled):hover { background: var(--bg-hover); border-color: var(--border); }
-  .email-text-button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 34px; padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--r-pill); background: var(--bg-card); color: var(--text-primary); font: 500 var(--font-size-body)/20px var(--sans); cursor: pointer; white-space: nowrap; }
-  .email-text-button:not(:disabled):hover { background: var(--bg-hover); }
-  .email-icon-button.danger, .email-text-button.danger { color: var(--status-danger); }
+  .email-row-actions { display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
+  .email-icon-button {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--border-color);
+    border-radius: 9px;
+    background: var(--card-bg);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+
+    &:hover:not(:disabled) {
+      border-color: var(--brand);
+      background: var(--color-ok-bg);
+      color: var(--brand);
+      transform: translateY(-1px);
+      box-shadow: 0 3px 6px rgba(0, 0, 0, 0.08);
+    }
+    &:active:not(:disabled) {
+      transform: scale(0.94);
+    }
+    & > i {
+      font-size: 16px;
+      line-height: 1;
+    }
+  }
+  .email-text-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    min-height: 32px;
+    height: 32px;
+    padding: 0 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 9px;
+    background: var(--card-bg);
+    color: var(--text-primary);
+    font: 500 var(--font-size-body)/20px var(--sans);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+
+    &:hover:not(:disabled) {
+      border-color: var(--brand);
+      background: var(--color-ok-bg);
+      color: var(--brand);
+      transform: translateY(-1px);
+      box-shadow: 0 3px 6px rgba(0, 0, 0, 0.08);
+    }
+    &:active:not(:disabled) {
+      transform: scale(0.94);
+    }
+  }
+  .email-icon-button.danger, .email-text-button.danger {
+    border-color: var(--status-danger) !important;
+    background: var(--status-danger) !important;
+    color: #ffffff !important;
+    box-shadow: 0 2px 5px color-mix(in srgb, var(--status-danger) 35%, transparent);
+
+    &:hover:not(:disabled) {
+      border-color: color-mix(in srgb, var(--status-danger) 85%, black) !important;
+      background: color-mix(in srgb, var(--status-danger) 85%, black) !important;
+      color: #ffffff !important;
+      box-shadow: 0 3px 8px color-mix(in srgb, var(--status-danger) 45%, transparent);
+    }
+  }
   button:disabled { cursor: default; opacity: .6; }
   button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
   .email-quota { display: grid; grid-template-columns: max-content minmax(45px, 1fr); align-items: center; gap: 4px 12px; }

@@ -38,12 +38,53 @@
   &:disabled { cursor: default; opacity: .6; }
 }
 .memos-row-actions {
-  display: flex; align-items: center; gap: 3px;
-  button { display: inline-flex; align-items: center; justify-content: center; flex: none; gap: 5px; min-width: 32px; height: 32px; padding: 5px 7px; border: 0; border-radius: 6px; background: transparent; color: var(--text-primary); font: inherit; cursor: pointer; white-space: nowrap; }
-  button:hover:not(:disabled) { background: var(--bg-search); }
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    gap: 5px;
+    min-width: 32px;
+    height: 32px;
+    padding: 0 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 9px;
+    background: var(--card-bg);
+    color: var(--text-primary);
+    font: 500 var(--font-size-body) var(--sans);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  }
+  button:hover:not(:disabled) {
+    border-color: var(--brand);
+    background: var(--color-ok-bg);
+    color: var(--brand);
+    transform: translateY(-1px);
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.08);
+  }
+  button:active:not(:disabled) {
+    transform: scale(0.94);
+  }
   button:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
-  button:disabled { cursor: default; opacity: .5; }
-  button.is-danger { color: var(--status-danger); }
+  button:disabled { cursor: not-allowed; opacity: .45; }
+  button.is-danger {
+    border-color: var(--status-danger) !important;
+    background: var(--status-danger) !important;
+    color: #ffffff !important;
+    box-shadow: 0 2px 5px color-mix(in srgb, var(--status-danger) 35%, transparent);
+
+    &:hover:not(:disabled) {
+      border-color: color-mix(in srgb, var(--status-danger) 85%, black) !important;
+      background: color-mix(in srgb, var(--status-danger) 85%, black) !important;
+      color: #ffffff !important;
+      box-shadow: 0 3px 8px color-mix(in srgb, var(--status-danger) 45%, transparent);
+    }
+  }
 }
 .memos-empty { height: 240px !important; text-align: center !important; color: var(--text-secondary); > i { display: block; width: 26px; height: 26px; margin: 0 auto 12px; } }
 .memos-footer { display: flex; align-items: center; justify-content: space-between; flex: none; gap: 16px; min-height: 64px; padding: 12px 20px; border-top: 1px solid var(--border); background: var(--bg-card); }

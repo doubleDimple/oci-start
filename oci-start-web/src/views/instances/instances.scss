@@ -33,8 +33,30 @@
   .instance-address { overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
   .instance-ipv6 { color: var(--brand); white-space: nowrap; }
   .instance-secondary, .instance-date { color: var(--text-secondary); }
-  .instance-actions-column { position: sticky; right: 0; z-index: 1; width: 66px; text-align: right; }
+  .instance-actions-column {
+    position: sticky;
+    right: 0;
+    z-index: 1;
+    min-width: 140px;
+    width: 140px;
+    text-align: left;
+    box-shadow: -12px 0 14px -14px color-mix(in srgb, var(--text-primary) 22%, transparent);
+  }
+  .instance-table th.instance-actions-column,
+  .instance-table td.instance-actions-column {
+    text-align: left;
+    padding-left: 14px;
+    padding-right: 18px;
+  }
   .instance-table th.instance-actions-column { z-index: 3; }
+  .row-actions {
+    display: inline-flex;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 7px;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+  }
   .instance-actions-column .toolbar-button { width: 32px; height: 32px; }
   .instance-footer-context { display: flex; gap: 12px; flex-wrap: wrap; min-width: 0; font-size: var(--font-size-secondary); font-variant-numeric: tabular-nums; }
   .instance-scope { max-width: 340px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }

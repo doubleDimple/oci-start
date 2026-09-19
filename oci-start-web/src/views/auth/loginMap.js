@@ -3,7 +3,6 @@ import directory from './regions'
 export function mountLoginMap(root) {
 
     // Coordinates and scope come from the separately sourced public-region directory.
-    // Curves are decorative, not account data, network topology or live traffic.
     var LAND = [
         [[-168,65],[-165,60],[-158,57],[-152,58],[-146,60],[-138,59],[-131,53],[-125,49],[-124,42],[-120,34],[-117,32],[-110,24],[-105,20],[-97,16],[-92,15],[-88,16],[-87,21],[-91,21],[-95,19],[-97,23],[-97,26],[-94,29],[-89,29],[-84,30],[-81,25],[-80,32],[-76,35],[-70,42],[-67,45],[-60,47],[-56,51],[-56,54],[-64,60],[-78,62],[-78,55],[-82,55],[-86,66],[-95,68],[-105,68],[-115,70],[-125,70],[-135,69],[-145,70],[-156,71],[-166,68]],
         [[-45,60],[-52,64],[-53,68],[-62,70],[-68,76],[-62,82],[-40,83],[-24,80],[-20,73],[-30,68],[-42,61]],
@@ -20,7 +19,6 @@ export function mountLoginMap(root) {
     ];
     var REGIONS = directory && Array.isArray(directory.regions) ? directory.regions : [];
     var ids = new Set();
-    // Never silently drop malformed entries and then label the rest a full directory.
     var validDirectory = REGIONS.length > 0 && REGIONS.every(function (region) {
         if (!region || typeof region.code !== 'string' || !/^[a-z0-9-]+$/.test(region.code) || ids.has(region.code)) return false;
         ids.add(region.code);
@@ -29,6 +27,7 @@ export function mountLoginMap(root) {
             && Number.isFinite(region.lng) && Math.abs(region.lng) <= 180;
     });
     if (!validDirectory) REGIONS = [];
+
     var BOUNDS = LAND.map(function (polygon) {
         return {
             polygon: polygon,
@@ -38,24 +37,27 @@ export function mountLoginMap(root) {
             top: Math.max.apply(null, polygon.map(function (point) { return point[1]; }))
         };
     });
-    var TOP = 78;
-    var BOTTOM = -52;
-    var SPAN = TOP - BOTTOM;
+
+    var RAD = Math.PI / 180;
     var TAU = Math.PI * 2;
+    var AXIAL_TILT = -0.409; // Real Earth axial tilt (~23.44° tilt to the right)
     var current = null;
 
-    function isLand(longitude, latitude) {
-        return BOUNDS.some(function (bounds) {
-            if (longitude < bounds.left || longitude > bounds.right || latitude < bounds.bottom || latitude > bounds.top) return false;
-            var polygon = bounds.polygon;
-            var inside = false;
-            for (var i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-                var a = polygon[i];
-                var b = polygon[j];
-                if ((a[1] > latitude) !== (b[1] > latitude) && longitude < (b[0] - a[0]) * (latitude - a[1]) / (b[1] - a[1]) + a[0]) inside = !inside;
+    function getLandContinentIndex(longitude, latitude) {
+        for (var k = 0; k < BOUNDS.length; k++) {
+            var bounds = BOUNDS[k];
+            if (longitude >= bounds.left && longitude <= bounds.right && latitude >= bounds.bottom && latitude <= bounds.top) {
+                var polygon = bounds.polygon;
+                var inside = false;
+                for (var i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+                    var a = polygon[i];
+                    var b = polygon[j];
+                    if ((a[1] > latitude) !== (b[1] > latitude) && longitude < (b[0] - a[0]) * (latitude - a[1]) / (b[1] - a[1]) + a[0]) inside = !inside;
+                }
+                if (inside) return k;
             }
-            return inside;
-        });
+        }
+        return -1;
     }
 
     function coordinates(region) {
@@ -63,45 +65,183 @@ export function mountLoginMap(root) {
             + ' · ' + Math.abs(region.lng).toFixed(4) + '° ' + (region.lng < 0 ? 'W' : 'E');
     }
 
-    function createMap(canvas, box, tooltip, count, list, unavailable) {
-        var base = document.createElement('canvas');
-        var context = null;
-        var baseContext = null;
-        try {
-            context = canvas.getContext('2d');
-            baseContext = base.getContext('2d');
-        } catch (_) {
-            // Keep the sourced directory usable even when canvas is unavailable.
+    function hexToRgba(hex, alpha) {
+        if (!hex) return 'rgba(47,224,166,' + alpha + ')';
+        hex = hex.trim();
+        if (hex.startsWith('rgba') || hex.startsWith('rgb')) return hex;
+        if (hex.startsWith('#')) {
+            var c = hex.substring(1);
+            if (c.length === 3) c = c[0] + c[0] + c[1] + c[1] + c[2] + c[2];
+            if (c.length === 6) {
+                var r = parseInt(c.substring(0, 2), 16);
+                var g = parseInt(c.substring(2, 4), 16);
+                var b = parseInt(c.substring(4, 6), 16);
+                return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+            }
         }
+        return hex;
+    }
+
+    function buildLandDots() {
+        var dots = [];
+        for (var lat = -72; lat <= 76; lat += 2.4) {
+            var phi = lat * RAD;
+            var cosPhi = Math.cos(phi);
+            if (cosPhi < 0.05) continue;
+            var lngStep = 2.4 / cosPhi;
+            for (var lng = -180; lng < 180; lng += lngStep) {
+                var cIdx = getLandContinentIndex(lng, lat);
+                if (cIdx >= 0) {
+                    var lam = lng * RAD;
+                    dots.push({
+                        vx: cosPhi * Math.sin(lam),
+                        vy: Math.sin(phi),
+                        vz: cosPhi * Math.cos(lam),
+                        continent: cIdx
+                    });
+                }
+            }
+        }
+        LAND.forEach(function (polygon, k) {
+            polygon.forEach(function (pt) {
+                var lng = pt[0], lat = pt[1];
+                var phi = lat * RAD, lam = lng * RAD;
+                var cosPhi = Math.cos(phi);
+                dots.push({
+                    vx: cosPhi * Math.sin(lam),
+                    vy: Math.sin(phi),
+                    vz: cosPhi * Math.cos(lam),
+                    continent: k
+                });
+            });
+        });
+        return dots;
+    }
+
+    function buildGraticules() {
+        var lines = [];
+        [-60, -30, 0, 30, 60].forEach(function (lat) {
+            var line = [];
+            var phi = lat * RAD;
+            var cosPhi = Math.cos(phi);
+            var sinPhi = Math.sin(phi);
+            for (var lng = -180; lng <= 180; lng += 8) {
+                var lam = lng * RAD;
+                line.push({
+                    vx: cosPhi * Math.sin(lam),
+                    vy: sinPhi,
+                    vz: cosPhi * Math.cos(lam)
+                });
+            }
+            lines.push(line);
+        });
+        for (var lng = -180; lng < 180; lng += 30) {
+            var line = [];
+            var lam = lng * RAD;
+            var sinLam = Math.sin(lam);
+            var cosLam = Math.cos(lam);
+            for (var lat = -80; lat <= 80; lat += 8) {
+                var phi = lat * RAD;
+                var cosPhi = Math.cos(phi);
+                line.push({
+                    vx: cosPhi * sinLam,
+                    vy: Math.sin(phi),
+                    vz: cosPhi * cosLam
+                });
+            }
+            lines.push(line);
+        }
+        return lines;
+    }
+
+    var landDots = buildLandDots();
+    var graticules = buildGraticules();
+
+    function createGlobe(canvas, box, tooltip, count, list, unavailable) {
+        var context = null;
+        try { context = canvas.getContext('2d'); } catch (_) {}
 
         var width = 0;
         var height = 0;
+        var radius = 0;
+        var cx = 0;
+        var cy = 0;
         var ratio = 1;
         var animationFrame = 0;
         var layoutFrame = 0;
         var elapsed = 0;
         var lastTime = 0;
         var disposed = false;
-        var failed = !context || !baseContext;
+        var failed = !context;
         var visible = false;
         var inViewport = true;
-        var baseDirty = true;
         var hover = null;
         var selected = null;
         var directoryLocale = '';
         var palette = {};
+
+        // 3D rotation state (Earth spin & camera pitch angle)
+        var rotY = 0.3;  // Polar spin angle
+        var rotX = 0.28; // View pitch tilt (~16 deg)
+        var velY = 0;
+        var velX = 0;
+        var targetRotY = null;
+        var targetRotX = null;
+
+        // Pointer drag interaction
+        var isPointerDown = false;
+        var dragMoved = false;
+        var startX = 0, startY = 0;
+        var startRotY = 0, startRotX = 0;
+        var lastPointerX = 0, lastPointerY = 0;
+
         var regions = REGIONS.map(function (region, index) {
-            return Object.assign({ x: 0, y: 0, phase: index * 173 }, region);
+            var phi = region.lat * RAD;
+            var lam = region.lng * RAD;
+            var cosPhi = Math.cos(phi);
+            return Object.assign({
+                vx: cosPhi * Math.sin(lam),
+                vy: Math.sin(phi),
+                vz: cosPhi * Math.cos(lam),
+                screenX: 0, screenY: 0, visible: false, z2: 0,
+                phase: index * 173
+            }, region);
         });
+
         var locations = regions.filter(function (region, index) {
-            return regions.findIndex(function (candidate) { return candidate.lat === region.lat && candidate.lng === region.lng; }) === index;
+            return regions.findIndex(function (c) { return c.lat === region.lat && c.lng === region.lng; }) === index;
         });
+
+        var routeCodes = ['us-phoenix-1', 'us-ashburn-1', 'uk-london-1', 'eu-frankfurt-1', 'me-jeddah-1', 'ap-mumbai-1', 'ap-singapore-1', 'ap-tokyo-1', 'ap-sydney-1'];
+        var routeRegions = routeCodes.map(function (code) { return regions.find(function (r) { return r.code === code; }); }).filter(Boolean);
         var routes = [];
+        for (var i = 0; i < routeRegions.length - 1; i++) {
+            var rA = routeRegions[i];
+            var rB = routeRegions[i + 1];
+            var samples = [];
+            var numSamples = 24;
+            var dotVal = Math.max(-1, Math.min(1, rA.vx * rB.vx + rA.vy * rB.vy + rA.vz * rB.vz));
+            var omega = Math.acos(dotVal);
+            var sinOmega = Math.sin(omega);
+            for (var s = 0; s <= numSamples; s++) {
+                var t = s / numSamples;
+                var scaleA = sinOmega > 0.001 ? Math.sin((1 - t) * omega) / sinOmega : (1 - t);
+                var scaleB = sinOmega > 0.001 ? Math.sin(t * omega) / sinOmega : t;
+                var vx = rA.vx * scaleA + rB.vx * scaleB;
+                var vy = rA.vy * scaleA + rB.vy * scaleB;
+                var vz = rA.vz * scaleA + rB.vz * scaleB;
+                var h = 1 + 0.18 * Math.sin(Math.PI * t);
+                samples.push({ vx: vx * h, vy: vy * h, vz: vz * h });
+            }
+            routes.push({ a: rA, b: rB, samples: samples });
+        }
+
         var resizeObserver = null;
         var intersectionObserver = null;
         var themeObserver = null;
         var motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
         var reducedMotion = motionQuery.matches;
+
         var tooltipName = document.createElement('strong');
         var tooltipCode = document.createElement('span');
         var tooltipCoordinates = document.createElement('span');
@@ -112,10 +252,11 @@ export function mountLoginMap(root) {
             tooltipCode.style.display = 'block';
             Object.assign(tooltip.style, { transform: 'none', pointerEvents: 'none', maxWidth: '260px' });
         }
-        Object.assign(canvas.style, { display: failed ? 'none' : 'block', width: '100%', cursor: 'default' });
+
+        Object.assign(canvas.style, { display: failed ? 'none' : 'block', width: '100%', cursor: 'grab', touchAction: 'none' });
         if (count) count.textContent = regions.length ? String(regions.length) : '—';
         if (unavailable) unavailable.hidden = regions.length > 0;
-        var checkedAt = root.querySelector('#' + 'loginMapCheckedAt');
+        var checkedAt = root.querySelector('#loginMapCheckedAt');
         if (checkedAt && validDirectory && /^\d{4}-\d{2}-\d{2}$/.test(directory.checkedAt)) {
             checkedAt.dateTime = directory.checkedAt;
             checkedAt.textContent = directory.checkedAt;
@@ -123,6 +264,7 @@ export function mountLoginMap(root) {
 
         function isChinese() { return (document.documentElement.lang || 'zh').toLowerCase().indexOf('zh') === 0; }
         function activeRegion() { return hover || selected; }
+
         function renderDirectory() {
             var language = isChinese() ? 'zh' : 'en';
             if (!list || directoryLocale === language) return;
@@ -141,40 +283,52 @@ export function mountLoginMap(root) {
                 var code = document.createElement('span');
                 code.className = 'login-region-code';
                 code.textContent = region.code;
-                var location = document.createElement('span');
-                location.className = 'login-region-coordinates';
-                location.textContent = coordinates(region);
-                button.append(name, code, location);
+                var loc = document.createElement('span');
+                loc.className = 'login-region-coordinates';
+                loc.textContent = coordinates(region);
+                button.append(name, code, loc);
                 item.appendChild(button);
                 fragment.appendChild(item);
             });
             list.replaceChildren(fragment);
         }
+
         function selectRegion(region) {
             selected = region;
             if (list) list.querySelectorAll('button[data-region-code]').forEach(function (button) {
                 button.setAttribute('aria-pressed', region && button.dataset.regionCode === region.code ? 'true' : 'false');
             });
+            if (region) {
+                targetRotY = -region.lng * RAD;
+                targetRotX = region.lat * RAD * 0.5;
+            }
             updateTooltip();
             if (reducedMotion) paint();
         }
+
         function onDirectorySelect(event) {
             var button = event.target instanceof Element && event.target.closest('button[data-region-code]');
             if (!button || !list || !list.contains(button)) return;
             hover = null;
-            selectRegion(regions.find(function (region) { return region.code === button.dataset.regionCode; }) || null);
+            selectRegion(regions.find(function (r) { return r.code === button.dataset.regionCode; }) || null);
         }
 
         function readPalette() {
             var styles = getComputedStyle(box);
             function color(name, fallback) { return styles.getPropertyValue('--login-map-' + name).trim() || fallback; }
-            var next = {
+            var continents = [];
+            for (var c = 0; c < 12; c++) {
+                continents.push(color('c' + c, ''));
+            }
+            palette = {
                 land: color('land', '#1e3140'), node: color('node', '#2fe0a6'),
                 line: color('line', 'rgba(47,224,166,.28)'), text: color('text', '#e8eef4'),
-                muted: color('muted', '#7d8f9d'), surface: color('surface', '#111922')
+                muted: color('muted', '#7d8f9d'), surface: color('surface', '#111922'),
+                ocean: color('ocean', color('surface', '#111922')),
+                oceanEdge: color('ocean-edge', ''),
+                graticule: color('graticule', ''),
+                continents: continents
             };
-            if (next.land !== palette.land || next.line !== palette.line) baseDirty = true;
-            palette = next;
             if (tooltip) {
                 tooltip.style.background = palette.surface;
                 tooltip.style.color = palette.text;
@@ -182,6 +336,7 @@ export function mountLoginMap(root) {
                 tooltipCoordinates.style.color = palette.muted;
             }
         }
+
         function hideTooltip() {
             if (!tooltip) return;
             tooltip.hidden = true;
@@ -189,12 +344,13 @@ export function mountLoginMap(root) {
             tooltip.style.opacity = '0';
             tooltip.style.visibility = 'hidden';
         }
+
         function updateTooltip() {
             var region = activeRegion();
-            if (!tooltip || !region || !visible || document.hidden) { hideTooltip(); return; }
-            var colocated = regions.filter(function (candidate) { return candidate.lat === region.lat && candidate.lng === region.lng; });
+            if (!tooltip || !region || !region.visible || !visible || document.hidden) { hideTooltip(); return; }
+            var colocated = regions.filter(function (c) { return c.lat === region.lat && c.lng === region.lng; });
             tooltipName.textContent = isChinese() ? region.zh : region.en;
-            tooltipCode.textContent = colocated.map(function (candidate) { return candidate.code; }).join('\n');
+            tooltipCode.textContent = colocated.map(function (c) { return c.code; }).join('\n');
             tooltipCoordinates.textContent = coordinates(region);
             tooltip.hidden = false;
             tooltip.style.display = 'block';
@@ -203,195 +359,377 @@ export function mountLoginMap(root) {
             tooltip.style.maxWidth = Math.max(80, Math.min(260, width - 16)) + 'px';
             var tooltipWidth = tooltip.offsetWidth;
             var tooltipHeight = tooltip.offsetHeight;
-            var top = region.y - tooltipHeight - 12;
-            if (top < 6) top = region.y + 12;
-            tooltip.style.left = Math.max(6, Math.min(width - tooltipWidth - 6, region.x - tooltipWidth / 2)) + 'px';
+            var top = region.screenY - tooltipHeight - 12;
+            if (top < 6) top = region.screenY + 12;
+            tooltip.style.left = Math.max(6, Math.min(width - tooltipWidth - 6, region.screenX - tooltipWidth / 2)) + 'px';
             tooltip.style.top = Math.max(6, Math.min(height - tooltipHeight - 6, top)) + 'px';
         }
+
         function stopAnimation() {
             cancelAnimationFrame(animationFrame);
             animationFrame = 0;
             lastTime = 0;
         }
-        function buildBase() {
-            base.width = Math.max(1, Math.round(width * ratio));
-            base.height = Math.max(1, Math.round(height * ratio));
-            baseContext.setTransform(ratio, 0, 0, ratio, 0, 0);
-            baseContext.clearRect(0, 0, width, height);
-            baseContext.fillStyle = palette.land;
-            var step = width > 620 ? 5 : 6;
-            var radius = Math.max(.7, step * .21);
-            baseContext.beginPath();
-            for (var y = step / 2; y < height; y += step) {
-                var latitude = TOP - y / height * SPAN;
-                for (var x = step / 2; x < width; x += step) {
-                    if (!isLand(x / width * 360 - 180, latitude)) continue;
-                    baseContext.moveTo(x + radius, y);
-                    baseContext.arc(x, y, radius, 0, TAU);
-                }
-            }
-            baseContext.fill();
-            baseContext.strokeStyle = palette.line;
-            baseContext.lineWidth = .85;
-            routes.forEach(function (route) {
-                baseContext.beginPath();
-                baseContext.moveTo(route.a.x, route.a.y);
-                baseContext.quadraticCurveTo(route.x, route.y, route.b.x, route.b.y);
-                baseContext.stroke();
-            });
-            baseDirty = false;
-        }
-        function draw() {
+
+        function drawGlobe() {
             if (!visible || failed || disposed || document.hidden || !width || !height) return;
-            if (baseDirty) buildBase();
             context.setTransform(ratio, 0, 0, ratio, 0, 0);
             context.clearRect(0, 0, width, height);
-            context.drawImage(base, 0, 0, width, height);
-            if (!reducedMotion) {
-                routes.forEach(function (route, index) {
-                    var progress = (elapsed / 3200 + index * .17) % 1;
-                    var inverse = 1 - progress;
-                    var x = inverse * inverse * route.a.x + 2 * inverse * progress * route.x + progress * progress * route.b.x;
-                    var y = inverse * inverse * route.a.y + 2 * inverse * progress * route.y + progress * progress * route.b.y;
-                    context.save();
-                    context.globalAlpha = Math.sin(Math.PI * progress) * .85;
-                    context.fillStyle = palette.node;
-                    context.shadowColor = palette.node;
-                    context.shadowBlur = 5;
-                    context.beginPath();
-                    context.arc(x, y, 1.55, 0, TAU);
-                    context.fill();
-                    context.restore();
-                });
+
+            // Precalculate 3D Transformation matrices with 23.44° Axial Tilt
+            var cosSpin = Math.cos(rotY), sinSpin = Math.sin(rotY);
+            var cosTilt = Math.cos(AXIAL_TILT), sinTilt = Math.sin(AXIAL_TILT);
+            var cosPitch = Math.cos(rotX), sinPitch = Math.sin(rotX);
+
+            function project(vx, vy, vz) {
+                // 1. Spin around Earth's polar Y axis
+                var x1 = vx * cosSpin + vz * sinSpin;
+                var y1 = vy;
+                var z1 = -vx * sinSpin + vz * cosSpin;
+
+                // 2. Apply Earth's 23.44° axial tilt around Z axis
+                var x2 = x1 * cosTilt - y1 * sinTilt;
+                var y2 = x1 * sinTilt + y1 * cosTilt;
+                var z2 = z1;
+
+                // 3. Apply view pitch tilt around X axis
+                var x3 = x2;
+                var y3 = y2 * cosPitch - z2 * sinPitch;
+                var z3 = y2 * sinPitch + z2 * cosPitch;
+
+                return {
+                    sx: cx + x3 * radius,
+                    sy: cy - y3 * radius,
+                    z: z3
+                };
             }
+
+            // 1. Atmosphere Outer Glow
+            var glowGrad = context.createRadialGradient(cx, cy, radius * 0.85, cx, cy, radius * 1.22);
+            glowGrad.addColorStop(0, hexToRgba(palette.node, 0.14));
+            glowGrad.addColorStop(0.7, hexToRgba(palette.node, 0.04));
+            glowGrad.addColorStop(1, 'rgba(0,0,0,0)');
+            context.fillStyle = glowGrad;
+            context.beginPath();
+            context.arc(cx, cy, radius * 1.22, 0, TAU);
+            context.fill();
+
+            // 2. 3D Globe Surface Fill
+            var bodyGrad = context.createRadialGradient(
+                cx - radius * 0.3, cy - radius * 0.3, radius * 0.1,
+                cx, cy, radius
+            );
+            bodyGrad.addColorStop(0, palette.ocean);
+            bodyGrad.addColorStop(0.65, palette.ocean);
+            bodyGrad.addColorStop(1, palette.oceanEdge || hexToRgba(palette.land, 0.45));
+
+            context.fillStyle = bodyGrad;
+            context.beginPath();
+            context.arc(cx, cy, radius, 0, TAU);
+            context.fill();
+
+            // Globe Atmosphere Rim Border
+            context.strokeStyle = hexToRgba(palette.node, 0.35);
+            context.lineWidth = 1.2;
+            context.beginPath();
+            context.arc(cx, cy, radius, 0, TAU);
+            context.stroke();
+
+            // Tilted Polar Axis Line (North - South Pole Axis)
+            var poleNorth = project(0, 1.13, 0);
+            var poleSouth = project(0, -1.13, 0);
+            context.strokeStyle = hexToRgba(palette.node, 0.3);
+            context.lineWidth = 1.0;
+            context.setLineDash([4, 4]);
+            context.beginPath();
+            context.moveTo(poleNorth.sx, poleNorth.sy);
+            context.lineTo(poleSouth.sx, poleSouth.sy);
+            context.stroke();
+            context.setLineDash([]);
+
+            // 3. Graticule Lines (Parallels & Meridians)
+            context.strokeStyle = palette.graticule || hexToRgba(palette.land, 0.2);
+            context.lineWidth = 0.95;
+            graticules.forEach(function (line) {
+                context.beginPath();
+                var drawing = false;
+                line.forEach(function (pt) {
+                    var p = project(pt.vx, pt.vy, pt.vz);
+                    if (p.z > 0.02) {
+                        if (!drawing) { context.moveTo(p.sx, p.sy); drawing = true; }
+                        else { context.lineTo(p.sx, p.sy); }
+                    } else { drawing = false; }
+                });
+                context.stroke();
+            });
+
+            // 4. Land Dots (Multi-Color Continents)
+            var baseDotR = Math.max(0.9, radius * 0.009);
+            for (var c = 0; c < 12; c++) {
+                var cColor = palette.continents && palette.continents[c] ? palette.continents[c] : palette.land;
+                context.fillStyle = cColor;
+                context.beginPath();
+                landDots.forEach(function (dot) {
+                    if (dot.continent !== c) return;
+                    var p = project(dot.vx, dot.vy, dot.vz);
+                    if (p.z > 0.02) {
+                        var r = baseDotR * (0.65 + p.z * 0.45);
+                        context.moveTo(p.sx + r, p.sy);
+                        context.arc(p.sx, p.sy, r, 0, TAU);
+                    }
+                });
+                context.fill();
+            }
+
+            // 5. 3D Decorative Great-Circle Network Arcs
+            routes.forEach(function (route, rIdx) {
+                context.strokeStyle = palette.line;
+                context.lineWidth = 1.0;
+                context.beginPath();
+                var drawing = false;
+                route.samples.forEach(function (pt) {
+                    var p = project(pt.vx, pt.vy, pt.vz);
+                    if (p.z > 0.02) {
+                        if (!drawing) { context.moveTo(p.sx, p.sy); drawing = true; }
+                        else { context.lineTo(p.sx, p.sy); }
+                    } else { drawing = false; }
+                });
+                context.stroke();
+
+                // Traveling Light Particle along Arc
+                if (!reducedMotion && route.samples.length) {
+                    var progress = (elapsed / 3000 + rIdx * 0.22) % 1;
+                    var sampleIdx = Math.floor(progress * (route.samples.length - 1));
+                    var pt = route.samples[sampleIdx];
+                    if (pt) {
+                        var p = project(pt.vx, pt.vy, pt.vz);
+                        if (p.z > 0.05) {
+                            context.save();
+                            context.globalAlpha = Math.sin(Math.PI * progress) * Math.min(1, p.z * 2);
+                            context.fillStyle = palette.node;
+                            context.shadowColor = palette.node;
+                            context.shadowBlur = 8;
+                            context.beginPath();
+                            context.arc(p.sx, p.sy, 2.5, 0, TAU);
+                            context.fill();
+                            context.restore();
+                        }
+                    }
+                }
+            });
+
+            // 6. Project & Render OCI Region Nodes
             locations.forEach(function (region) {
+                var p = project(region.vx, region.vy, region.vz);
+
+                region.z2 = p.z;
+                region.screenX = p.sx;
+                region.screenY = p.sy;
+                region.visible = (p.z > 0.05);
+
+                if (!region.visible) return;
+
                 var active = activeRegion();
                 var on = active && region.lat === active.lat && region.lng === active.lng;
+                var depthAlpha = Math.min(1, p.z * 2.2);
+
+                // Pulsing outer ring
                 if (!reducedMotion) {
                     var progress = ((elapsed + region.phase) % 2400) / 2400;
                     context.strokeStyle = palette.node;
-                    context.globalAlpha = (1 - progress) * (on ? .7 : .32);
-                    context.lineWidth = 1.1;
+                    context.globalAlpha = (1 - progress) * (on ? 0.85 : 0.4) * depthAlpha;
+                    context.lineWidth = 1.3;
                     context.beginPath();
-                    context.arc(region.x, region.y, 2.5 + progress * (on ? 15 : 10), 0, TAU);
+                    context.arc(region.screenX, region.screenY, 4 + progress * (on ? 18 : 12), 0, TAU);
                     context.stroke();
                     context.globalAlpha = 1;
                 }
-                var radius = on ? 12 : 8;
-                var glow = context.createRadialGradient(region.x, region.y, 0, region.x, region.y, radius);
-                glow.addColorStop(0, palette.node);
-                glow.addColorStop(1, 'rgba(0,0,0,0)');
-                context.globalAlpha = on ? .45 : .26;
-                context.fillStyle = glow;
+
+                // Glowing Halo
+                var glowR = on ? 18 : 12;
+                var halo = context.createRadialGradient(region.screenX, region.screenY, 0, region.screenX, region.screenY, glowR);
+                halo.addColorStop(0, palette.node);
+                halo.addColorStop(1, 'rgba(0,0,0,0)');
+                context.globalAlpha = (on ? 0.6 : 0.32) * depthAlpha;
+                context.fillStyle = halo;
                 context.beginPath();
-                context.arc(region.x, region.y, radius, 0, TAU);
+                context.arc(region.screenX, region.screenY, glowR, 0, TAU);
                 context.fill();
                 context.globalAlpha = 1;
+
+                // Core Dot & Bright White Beacon Center (Enlarged)
                 context.fillStyle = palette.node;
+                context.globalAlpha = depthAlpha;
                 context.beginPath();
-                context.arc(region.x, region.y, on ? 3.2 : 2.3, 0, TAU);
+                context.arc(region.screenX, region.screenY, on ? 5.2 : 3.8, 0, TAU);
                 context.fill();
+
+                context.fillStyle = '#ffffff';
+                context.beginPath();
+                context.arc(region.screenX, region.screenY, on ? 2.5 : 1.8, 0, TAU);
+                context.fill();
+                context.globalAlpha = 1;
             });
         }
+
         function paint() {
-            try { draw(); }
+            try { drawGlobe(); }
             catch (_) { failed = true; stopAnimation(); hideTooltip(); }
         }
-        function tick(now) {
+
+        function tick(nowTime) {
             animationFrame = 0;
-            if (disposed || failed || !visible || document.hidden || reducedMotion) return;
-            if (lastTime) elapsed += Math.min(50, now - lastTime);
-            lastTime = now;
+            if (disposed || failed || !visible || document.hidden) return;
+            if (lastTime) elapsed += Math.min(50, nowTime - lastTime);
+            lastTime = nowTime;
+
+            // Handle Target Rotation Interpolation (when region clicked in list)
+            if (targetRotY !== null && targetRotX !== null) {
+                var diffY = Math.atan2(Math.sin(targetRotY - rotY), Math.cos(targetRotY - rotY));
+                var diffX = targetRotX - rotX;
+                rotY += diffY * 0.08;
+                rotX += diffX * 0.08;
+                if (Math.abs(diffY) < 0.001 && Math.abs(diffX) < 0.001) {
+                    rotY = targetRotY;
+                    rotX = targetRotX;
+                    targetRotY = null;
+                    targetRotX = null;
+                }
+            } else if (!isPointerDown && !reducedMotion) {
+                // Auto spin & inertia momentum
+                rotY += 0.0025 + velY;
+                rotX += velX;
+                velY *= 0.94;
+                velX *= 0.94;
+                rotX = Math.max(-0.8, Math.min(0.8, rotX));
+            }
+
             paint();
+            updateTooltip();
             startAnimation();
         }
+
         function startAnimation() {
-            if (!disposed && !failed && visible && !document.hidden && !reducedMotion && !animationFrame) animationFrame = requestAnimationFrame(tick);
+            if (!disposed && !failed && visible && !document.hidden && !animationFrame) {
+                animationFrame = requestAnimationFrame(tick);
+            }
         }
+
         function refresh() {
             layoutFrame = 0;
             if (disposed) return;
             renderDirectory();
             if (failed) return;
             readPalette();
-            var boxStyle = getComputedStyle(box);
-            var nextWidth = canvas.clientWidth || box.clientWidth;
-            var hasLayout = nextWidth > 0 && canvas.getClientRects().length > 0 && boxStyle.visibility !== 'hidden' && boxStyle.visibility !== 'collapse';
-            if (!hasLayout) {
-                visible = false;
-                stopAnimation();
-                hideTooltip();
-                return;
-            }
-            var nextHeight = Math.max(1, Math.round(nextWidth * SPAN / 360));
+
+            var nextWidth = canvas.clientWidth || box.clientWidth || 400;
+            var nextHeight = Math.max(240, Math.round(nextWidth * 0.72));
             var nextRatio = Math.min(window.devicePixelRatio || 1, 2);
+
             if (nextWidth !== width || nextHeight !== height || nextRatio !== ratio) {
                 width = nextWidth;
                 height = nextHeight;
                 ratio = nextRatio;
+                radius = Math.min(width, height) * 0.40;
+                cx = width / 2;
+                cy = height / 2;
                 canvas.width = Math.max(1, Math.round(width * ratio));
                 canvas.height = Math.max(1, Math.round(height * ratio));
                 canvas.style.height = height + 'px';
-                regions.forEach(function (region) {
-                    region.x = (region.lng + 180) / 360 * width;
-                    region.y = (TOP - region.lat) / SPAN * height;
-                });
-                // A bounded set of decorative routes avoids drawing a dense graph as the directory grows.
-                var routeCodes = ['us-phoenix-1', 'us-ashburn-1', 'uk-london-1', 'eu-frankfurt-1', 'me-jeddah-1', 'ap-mumbai-1', 'ap-singapore-1', 'ap-tokyo-1', 'ap-sydney-1'];
-                var routeRegions = routeCodes.map(function (code) { return regions.find(function (region) { return region.code === code; }); }).filter(Boolean);
-                routes = routeRegions.slice(1).map(function (region, index) {
-                    var previous = routeRegions[index];
-                    var dx = region.x - previous.x;
-                    var dy = region.y - previous.y;
-                    return { a: previous, b: region, x: (previous.x + region.x) / 2 - dy * .22, y: (previous.y + region.y) / 2 + dx * .22 };
-                });
-                baseDirty = true;
             }
+
             var rect = canvas.getBoundingClientRect();
             var onscreen = rect.bottom > 0 && rect.top < window.innerHeight && rect.right > 0 && rect.left < window.innerWidth;
             visible = !document.hidden && onscreen && (!intersectionObserver || inViewport);
             if (!visible) { stopAnimation(); hideTooltip(); return; }
-            if (reducedMotion) stopAnimation();
+
             paint();
             updateTooltip();
             startAnimation();
         }
+
         function requestRefresh() {
             if (disposed) return;
             if (document.hidden) { stopAnimation(); hideTooltip(); return; }
             if (!layoutFrame) layoutFrame = requestAnimationFrame(refresh);
         }
-        function nearestRegion(event) {
+
+        function nearestRegion(clientX, clientY) {
             var rect = canvas.getBoundingClientRect();
             if (!rect.width || !rect.height) return null;
-            var x = (event.clientX - rect.left) * width / rect.width;
-            var y = (event.clientY - rect.top) * height / rect.height;
+            var x = (clientX - rect.left) * width / rect.width;
+            var y = (clientY - rect.top) * height / rect.height;
             var closest = null;
-            var distance = 14 * 14;
+            var distance = 16 * 16;
             locations.forEach(function (region) {
-                var candidate = Math.pow(region.x - x, 2) + Math.pow(region.y - y, 2);
-                if (candidate < distance) { closest = region; distance = candidate; }
+                if (!region.visible) return;
+                var d = Math.pow(region.screenX - x, 2) + Math.pow(region.screenY - y, 2);
+                if (d < distance) { closest = region; distance = d; }
             });
             return closest;
         }
-        function onMove(event) {
-            if (!visible || disposed || failed || event.pointerType === 'touch') return;
-            var closest = nearestRegion(event);
-            if (hover === closest) return;
-            hover = closest;
-            updateTooltip();
-            if (reducedMotion) paint();
-        }
-        function onMapClick(event) {
+
+        function onPointerDown(event) {
             if (!visible || disposed || failed) return;
-            hover = null;
-            selectRegion(nearestRegion(event));
+            isPointerDown = true;
+            dragMoved = false;
+            startX = event.clientX;
+            startY = event.clientY;
+            startRotY = rotY;
+            startRotX = rotX;
+            lastPointerX = event.clientX;
+            lastPointerY = event.clientY;
+            velY = 0;
+            velX = 0;
+            targetRotY = null;
+            targetRotX = null;
+            canvas.style.cursor = 'grabbing';
+            try { canvas.setPointerCapture(event.pointerId); } catch (_) {}
         }
-        function onLeave() {
-            hover = null;
-            updateTooltip();
-            if (reducedMotion) paint();
+
+        function onPointerMove(event) {
+            if (!visible || disposed || failed) return;
+            if (isPointerDown) {
+                var dx = event.clientX - startX;
+                var dy = event.clientY - startY;
+                if (Math.hypot(dx, dy) > 4) dragMoved = true;
+                rotY = startRotY + dx * 0.006;
+                rotX = Math.max(-0.8, Math.min(0.8, startRotX + dy * 0.006));
+                velY = (event.clientX - lastPointerX) * 0.002;
+                velX = (event.clientY - lastPointerY) * 0.002;
+                lastPointerX = event.clientX;
+                lastPointerY = event.clientY;
+                paint();
+                updateTooltip();
+            } else {
+                var closest = nearestRegion(event.clientX, event.clientY);
+                canvas.style.cursor = closest ? 'pointer' : 'grab';
+                if (hover === closest) return;
+                hover = closest;
+                updateTooltip();
+                if (reducedMotion) paint();
+            }
         }
+
+        function onPointerUp(event) {
+            if (!isPointerDown) return;
+            isPointerDown = false;
+            canvas.style.cursor = 'grab';
+            try { canvas.releasePointerCapture(event.pointerId); } catch (_) {}
+            if (!dragMoved) {
+                hover = null;
+                selectRegion(nearestRegion(event.clientX, event.clientY));
+            }
+        }
+
+        function onPointerLeave() {
+            if (!isPointerDown) {
+                hover = null;
+                updateTooltip();
+                if (reducedMotion) paint();
+            }
+        }
+
         function onVisibility() {
             if (document.hidden) {
                 stopAnimation();
@@ -400,13 +738,17 @@ export function mountLoginMap(root) {
                 hideTooltip();
             } else requestRefresh();
         }
+
         function onMotionChange() { reducedMotion = motionQuery.matches; requestRefresh(); }
         function onContextLost(event) { event.preventDefault(); failed = true; stopAnimation(); hideTooltip(); }
-        function onContextRestored() { failed = !context || !baseContext; baseDirty = true; requestRefresh(); }
+        function onContextRestored() { failed = !context; requestRefresh(); }
 
-        canvas.addEventListener('pointermove', onMove, { passive: true });
-        canvas.addEventListener('pointerleave', onLeave, { passive: true });
-        canvas.addEventListener('click', onMapClick);
+        canvas.addEventListener('pointerdown', onPointerDown);
+        canvas.addEventListener('pointermove', onPointerMove);
+        canvas.addEventListener('pointerup', onPointerUp);
+        canvas.addEventListener('pointercancel', onPointerUp);
+        canvas.addEventListener('pointerleave', onPointerLeave);
+
         if (list) {
             list.addEventListener('click', onDirectorySelect);
             list.addEventListener('focusin', onDirectorySelect);
@@ -415,8 +757,10 @@ export function mountLoginMap(root) {
         canvas.addEventListener('contextrestored', onContextRestored);
         window.addEventListener('resize', requestRefresh, { passive: true });
         document.addEventListener('visibilitychange', onVisibility);
+
         if (motionQuery.addEventListener) motionQuery.addEventListener('change', onMotionChange);
         else motionQuery.addListener(onMotionChange);
+
         if (window.ResizeObserver) {
             resizeObserver = new ResizeObserver(requestRefresh);
             resizeObserver.observe(box);
@@ -430,11 +774,13 @@ export function mountLoginMap(root) {
             });
             intersectionObserver.observe(canvas);
         } else window.addEventListener('scroll', requestRefresh, { passive: true, capture: true });
+
         if (window.MutationObserver) {
             themeObserver = new MutationObserver(requestRefresh);
             themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'class', 'style', 'lang'] });
             if (document.body) themeObserver.observe(document.body, { attributes: true, attributeFilter: ['data-theme', 'class', 'style'] });
         }
+
         hideTooltip();
         refresh();
 
@@ -450,9 +796,13 @@ export function mountLoginMap(root) {
                 if (themeObserver) themeObserver.disconnect();
                 if (motionQuery.removeEventListener) motionQuery.removeEventListener('change', onMotionChange);
                 else motionQuery.removeListener(onMotionChange);
-                canvas.removeEventListener('pointermove', onMove);
-                canvas.removeEventListener('pointerleave', onLeave);
-                canvas.removeEventListener('click', onMapClick);
+
+                canvas.removeEventListener('pointerdown', onPointerDown);
+                canvas.removeEventListener('pointermove', onPointerMove);
+                canvas.removeEventListener('pointerup', onPointerUp);
+                canvas.removeEventListener('pointercancel', onPointerUp);
+                canvas.removeEventListener('pointerleave', onPointerLeave);
+
                 if (list) {
                     list.removeEventListener('click', onDirectorySelect);
                     list.removeEventListener('focusin', onDirectorySelect);
@@ -465,8 +815,8 @@ export function mountLoginMap(root) {
                 document.removeEventListener('visibilitychange', onVisibility);
                 hideTooltip();
                 if (context) context.clearRect(0, 0, canvas.width, canvas.height);
-                canvas.width = base.width = 1;
-                canvas.height = base.height = 1;
+                canvas.width = 1;
+                canvas.height = 1;
                 regions = [];
                 locations = [];
                 routes = [];
@@ -478,11 +828,11 @@ export function mountLoginMap(root) {
 
     function mount() {
         if (current) return;
-        var canvas = root.querySelector('#' + 'loginRegionMap');
+        var canvas = root.querySelector('#loginRegionMap');
         var box = canvas && canvas.closest('.login-mapbox');
         if (!canvas || !box) return;
-        current = createMap(canvas, box, root.querySelector('#' + 'loginMapTooltip'), root.querySelector('#' + 'loginMapRegionCount'), root.querySelector('#' + 'loginRegionList'), root.querySelector('#' + 'loginMapUnavailable'));
+        current = createGlobe(canvas, box, root.querySelector('#loginMapTooltip'), root.querySelector('#loginMapRegionCount'), root.querySelector('#loginRegionList'), root.querySelector('#loginMapUnavailable'));
     }
     mount();
-    return () => { if (current) current.dispose(); current = null; };
+    return function () { if (current) current.dispose(); current = null; };
 }

@@ -51,11 +51,13 @@ import { headerEn } from './header'
 import { headerMessagesEn } from './headerMessages'
 import { headerAssetsEn } from './headerAssets'
 import { headerVersionEn } from './headerVersion'
+import { auditLogsEn } from './auditLogs'
 import { mobileTenantToolsMessages } from './mobileTenantTools'
 import { mobileShellMessages } from './mobileShell'
 import { mobileRecordsMessages } from './mobileRecords'
 
 export default {
+  auditLogs: auditLogsEn,
   mobileRecords: mobileRecordsMessages.en,
   mobileTenantTools: mobileTenantToolsMessages.en,
   mobileShell: mobileShellMessages.en,
@@ -136,10 +138,32 @@ export default {
   themeDark: 'Dark',
   themeLight: 'Light',
   chrome: {
-    title: 'Appearance',
+    title: 'Appearance & Theme',
+    subtitle: 'Customize sidebar, content area, and container surface hierarchy',
+    modeTitle: 'Theme Mode',
+    sidebarTitle: 'Sidebar Style',
+    contentTitle: 'Content Area & Card Surfaces',
+    contentDesc: 'Synchronizes page canvas, cards, containers, tables, and borders',
     sidebar: 'Sidebar',
     page: 'Content palette',
-    reset: 'Reset',
+    reset: 'Reset to Default',
+    resetTip: 'Restored default theme settings',
+    customPicker: 'Custom Color',
+    customHint: 'Smart color engine derives harmonized cards, inputs, and borders for clear visual contrast',
+    sidebarObsidian: 'Obsidian Dark',
+    sidebarBlack: 'Pure Black',
+    sidebarForest: 'OCI Forest',
+    sidebarNavy: 'Navy Blue',
+    sidebarEspresso: 'Espresso',
+    sidebarLight: 'Clean Light',
+    presetSlate: 'Classic Slate',
+    presetPure: 'Pure Snow',
+    presetAzure: 'Cloud Azure',
+    presetIvory: 'Warm Ivory',
+    presetMidnight: 'Midnight Slate',
+    presetOnyx: 'Onyx Black',
+    presetAurora: 'Aurora Forest',
+    presetCustom: 'Custom Palette',
   },
   cloudSwitch: 'Cloud provider',
   noMenu: 'No matching menu',
@@ -252,7 +276,7 @@ export default {
     vps: 'VPS',
     vpsList: 'Instances',
     system: 'System',
-    quality: 'IP quality',
+    quality: 'Network quality',
     logs: 'System logs',
     security: 'Security',
     proxyConfig: 'Proxy config',

@@ -25,9 +25,12 @@ import java.util.Map;
  * @author doubleDimple
  * @date 2025-08-31
  */
+import com.doubledimple.ociserver.config.annotations.AuditLog;
+
 @Slf4j
 @Controller
 @RequestMapping("/ai")
+@AuditLog(title = "AI对话服务")
 public class AiChatController  extends BaseController{
 
     @Resource

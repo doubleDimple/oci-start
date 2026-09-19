@@ -2,7 +2,7 @@ export default {
   zh: {
     title: '线路质量', instances: '实例', tasks: '检测任务', search: '搜索实例、任务或目标…', allOperators: '全部运营商', allStatuses: '全部探针',
     create: '新建任务', edit: '编辑任务', save: '保存任务', cancel: '取消', close: '关闭', confirm: '确认', refresh: '刷新', history: '历史趋势', details: '查看详情',
-    install: '安装探针', upgrade: '升级探针', run: '立即检测', pause: '暂停', resume: '启用', delete: '删除', ssh: 'SSH 终端', showIp: '显示 IP', hideIp: '隐藏 IP',
+    install: '安装探针', upgrade: '升级探针', run: '立即检测', pause: '暂停', resume: '启用', delete: '删除', ssh: 'SSH 终端', showIp: '显示 IP', hideIp: '隐藏 IP', copy: '复制', copied: '已复制', copyFailed: '复制失败，请手动复制。',
     instance: '实例', location: '区域', agent: '网络探针', actions: '操作', name: '任务名称', target: '检测目标', protocol: '检测方式', operator: '运营商', region: '目标地区',
     interval: '检测间隔（秒）', samples: '每次采样数', enabled: '自动检测', assigned: '检测实例', cadence: '检测频率', taskState: '任务状态', active: '已启用', paused: '已暂停',
     selected: '已选 {count} 台', selectVisible: '选择当前结果', clearSelection: '清空选择', instanceSearch: '搜索实例名称或 IP…', instanceLimit: '每个任务最多选择 256 台实例',
@@ -35,7 +35,7 @@ export default {
   en: {
     title: 'Network quality', instances: 'Instances', tasks: 'Checks', search: 'Search instances, checks or targets…', allOperators: 'All carriers', allStatuses: 'All agents',
     create: 'New check', edit: 'Edit check', save: 'Save check', cancel: 'Cancel', close: 'Close', confirm: 'Confirm', refresh: 'Refresh', history: 'History', details: 'View details',
-    install: 'Install agent', upgrade: 'Upgrade agent', run: 'Run now', pause: 'Pause', resume: 'Enable', delete: 'Delete', ssh: 'SSH terminal', showIp: 'Show IP', hideIp: 'Hide IP',
+    install: 'Install agent', upgrade: 'Upgrade agent', run: 'Run now', pause: 'Pause', resume: 'Enable', delete: 'Delete', ssh: 'SSH terminal', showIp: 'Show IP', hideIp: 'Hide IP', copy: 'Copy', copied: 'Copied', copyFailed: 'Could not copy. Please copy manually.',
     instance: 'Instance', location: 'Region', agent: 'Network agent', actions: 'Actions', name: 'Check name', target: 'Target', protocol: 'Protocol', operator: 'Carrier', region: 'Target region',
     interval: 'Interval (seconds)', samples: 'Samples per check', enabled: 'Automatic checks', assigned: 'Instances', cadence: 'Schedule', taskState: 'Status', active: 'Enabled', paused: 'Paused',
     selected: '{count} selected', selectVisible: 'Select results', clearSelection: 'Clear selection', instanceSearch: 'Search instance name or IP…', instanceLimit: 'Up to 256 instances per check',
