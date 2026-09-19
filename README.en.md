@@ -280,15 +280,13 @@ Thanks to everyone who has supported this project. The donation QR code is avail
 
 ## Disclaimer
 
-- This project and all related scripts are intended **strictly for testing, learning, and research**. Commercial use is prohibited.
+- This project and all related scripts are intended **strictly for testing, learning, and research**.
 - No guarantee is made regarding the legality, accuracy, completeness, or effectiveness of any content. Use at your own discretion.
 - Users must comply with the laws and regulations of their jurisdiction. All consequences arising from use are the sole responsibility of the user.
 - The maintainer is **not liable** for any issues caused by the scripts, including but not limited to data loss or damage.
 - If any party believes this project infringes on their rights, please provide proof of identity and ownership. Relevant content will be removed upon verification.
 - Viewing this project, in any way, or using any of its scripts — directly or indirectly — constitutes acceptance of this disclaimer.
 - The maintainer reserves the right to modify or supplement this disclaimer at any time.
-- You must completely delete the contents within **24 hours** of downloading.
-
 ---
 
 <div align="center">
