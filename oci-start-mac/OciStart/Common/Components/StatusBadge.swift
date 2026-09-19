@@ -17,8 +17,8 @@ enum StatusTone {
     static func fromState(_ state: String?) -> StatusTone {
         switch (state ?? "").uppercased() {
         case "RUNNING", "ACTIVE", "AVAILABLE", "ONLINE": return .success
-        case "STOPPED", "STOPPING", "TERMINATED", "FAILED", "ERROR": return .danger
-        case "PROVISIONING", "STARTING", "CREATING": return .warning
+        case "TERMINATING", "TERMINATED", "FAILED", "ERROR": return .danger
+        case "PROVISIONING", "STARTING", "STOPPING", "CREATING": return .warning
         default: return .neutral
         }
     }
@@ -39,7 +39,7 @@ struct StatusBadge: View {
             .foregroundColor(c)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
-            .background(c.opacity(0.15))
+            .background(tone == .neutral ? AppTheme.hover(dark) : AppTheme.statusBg(c, dark))
             .cornerRadius(10)
     }
 

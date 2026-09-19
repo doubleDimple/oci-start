@@ -125,9 +125,8 @@ struct TenantsView: View {
                 content: {
                     VStack(spacing: 0) {
                         filterBar(width: proxy.size.width - AppTheme.pagePadding * 2)
-                        if let err = model.errorText, !err.isEmpty { errorBanner(err) }
                         listBody
-                        PaginationBar(state: $model.pageState) {
+                        PaginationBar(state: $model.pageState, disabled: model.isLoading) {
                             Task { await model.reload() }
                         }
                     }
@@ -141,34 +140,29 @@ struct TenantsView: View {
 
     private var toolbar: some View {
         HStack(spacing: 8) {
-            AppButton(
-                title: model.namesHidden ? "显示名称" : "隐藏名称",
-                systemImage: model.namesHidden ? "eye" : "eye.slash",
-                kind: .secondary
-            ) {
-                model.namesHidden.toggle()
+            if let error = model.errorText, !error.isEmpty {
+                PageErrorIndicator(message: error, retry: { Task { await model.reload() } })
             }
-            AppButton(title: "API 导入", systemImage: "bolt.fill", kind: .primary) {
-                model.openAdd()
-            }
-            AppButton(title: "导出", systemImage: "square.and.arrow.down", kind: .secondary) {
-                model.openExportAll()
-            }
-            AppButton(title: "导入", systemImage: "square.and.arrow.up", kind: .secondary) {
-                model.importJSON()
-            }
-            AppButton(title: "账号检测", systemImage: "checkmark.circle", kind: .secondary) {
-                model.startAccountCheck()
-            }
-            AppButton(title: "刷新", systemImage: "arrow.clockwise", kind: .secondary) {
+            PageToolbarIcon(title: model.namesHidden ? "显示名称" : "隐藏名称",
+                            systemImage: model.namesHidden ? "eye" : "eye.slash") { model.namesHidden.toggle() }
+            PageToolbarIcon(title: "刷新", systemImage: "arrow.clockwise", disabled: model.isLoading) {
                 Task { await model.reload() }
             }
+            Menu {
+                Button("导出全部") { model.openExportAll() }
+                Button("导入 JSON") { model.importJSON() }
+                Button("账号检测") { model.startAccountCheck() }
+            } label: {
+                Image(systemName: "ellipsis").font(.system(size: 16)).frame(width: 32, height: 36)
+            }
+            .menuStyle(BorderlessButtonMenuStyle()).fixedSize().help("更多操作")
+            AppButton(title: "API 导入", systemImage: "plus", kind: .primary) { model.openAdd() }
         }
     }
 
     private func filterBar(width: CGFloat) -> some View {
         AdaptiveListToolbar(
-            compactBelow: 920,
+            compactBelow: 640,
             availableWidth: width,
             filters: {
                 SearchField(
@@ -191,17 +185,6 @@ struct TenantsView: View {
         .zIndex(40)
     }
 
-    private func errorBanner(_ text: String) -> some View {
-        HStack {
-            Image(systemName: "exclamationmark.triangle.fill")
-            Text(text).font(.system(size: 14))
-            Spacer()
-            Button("重试") { Task { await model.reload() } }.buttonStyle(PlainButtonStyle())
-        }
-        .foregroundColor(Color(hex: "f85149"))
-        .padding(12)
-        .background(Color(hex: "f85149").opacity(0.1))
-    }
 
     // MARK: - List（铺满内容区）
 
@@ -253,8 +236,6 @@ struct TenantsView: View {
                     task: m.task, region: wRegion, multi: m.multi, type: m.type,
                     create: m.create, time: m.time, status: wStatus, action: wAction, hPad: hPad
                 )
-                let needsHScroll = totalW > geo.size.width + 0.5
-
                 // 表头固定在顶部 + 仅纵向滚动。禁止双轴 ScrollView：内容矮于视口时
                 // macOS 会把表格竖直居中，搜索栏和分页之间出现大块空白。
                 let table = VStack(spacing: 0) {
@@ -269,14 +250,7 @@ struct TenantsView: View {
                 }
                 .frame(width: totalW, height: geo.size.height, alignment: .topLeading)
 
-                Group {
-                    if needsHScroll {
-                        ScrollView(.horizontal, showsIndicators: true) { table }
-                            .frame(width: geo.size.width, height: geo.size.height)
-                    } else {
-                        table
-                    }
-                }
+                NativeFixedTrailingTable(contentWidth: totalW, viewportWidth: geo.size.width, height: geo.size.height) { table }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(tableCardBackground)
@@ -309,13 +283,16 @@ struct TenantsView: View {
                 colHeader("创建", cols.create)
                 colHeader("创建时间", cols.time)
                 colHeader("状态", cols.status)
-                colHeader("操作", cols.action, align: .center)
+                Color.clear.frame(width: cols.action, height: 1)
             }
         }
         .padding(.horizontal, cols.hPad)
         .padding(.vertical, 9)
         .frame(width: width, alignment: .leading)
         .background(AppTheme.inputBg(dark))
+        .modifier(NativeFixedTableActions(width: cols.action, trailingPadding: cols.hPad, background: AppTheme.inputBg(dark)) {
+            colHeader("操作", cols.action, align: .center)
+        })
         .overlay(
             Rectangle().frame(height: 1).foregroundColor(AppTheme.border(dark).opacity(0.5)),
             alignment: .bottom
@@ -341,7 +318,7 @@ struct TenantsView: View {
                 cell(item.createdAt.isEmpty ? "—" : item.createdAt, cols.time, muted: true)
                 StatusBadge(text: item.statusText, tone: item.isActive ? .success : .danger)
                     .frame(width: cols.status, alignment: .leading)
-                actionCell(item, width: cols.action)
+                Color.clear.frame(width: cols.action, height: 28)
             }
         }
         .padding(.horizontal, cols.hPad)
@@ -357,6 +334,10 @@ struct TenantsView: View {
                 ? AppTheme.hover(dark).opacity(0.18)
                 : Color.clear
         )
+        .modifier(NativeFixedTableActions(width: cols.action, trailingPadding: cols.hPad,
+                                         background: index % 2 == 1 ? AppTheme.mix(AppTheme.hover(dark), fraction: 0.18, with: AppTheme.cardBg(dark)) : AppTheme.cardBg(dark)) {
+            actionCell(item, width: cols.action)
+        })
     }
 
     // MARK: - Cells
@@ -915,5 +896,183 @@ struct TenantActionMenuContent: View {
         .frame(width: TenantActionMenuLayout.width, height: panelHeight, alignment: .topLeading)
         .background(AppTheme.pageBg(dark))
         .cornerRadius(12)
+    }
+}
+
+// MARK: - Shared table trailing column (macOS 11)
+
+private struct NativeTableTrailingInset: EnvironmentKey {
+    static let defaultValue: CGFloat = 0
+}
+private extension EnvironmentValues {
+    var nativeTableTrailingInset: CGFloat {
+        get { self[NativeTableTrailingInset.self] }
+        set { self[NativeTableTrailingInset.self] = newValue }
+    }
+}
+
+/// Retains the existing single vertical scroll view. The native clip bounds
+/// supply the trailing overlay offset; row heights never need syncing.
+struct NativeFixedTrailingTable<Content: View>: View {
+    let contentWidth: CGFloat
+    let viewportWidth: CGFloat
+    let height: CGFloat
+    @ViewBuilder var content: () -> Content
+    @State private var measuredTrailingInset: CGFloat?
+
+    private var overflow: CGFloat { max(0, contentWidth - viewportWidth) }
+    private var trailingInset: CGFloat { overflow > 0.5 ? (measuredTrailingInset ?? overflow) : 0 }
+
+    var body: some View {
+        Group {
+            if overflow > 0.5 {
+                ScrollView(.horizontal, showsIndicators: true) {
+                    content()
+                        .frame(width: contentWidth, height: height, alignment: .topLeading)
+                        .background(NativeTableScrollProbe { inset in
+                            // Hover transitions must not animate scroll compensation.
+                            var transaction = Transaction()
+                            transaction.animation = nil
+                            transaction.disablesAnimations = true
+                            withTransaction(transaction) { measuredTrailingInset = inset }
+                        })
+                }
+                .frame(width: viewportWidth, height: height)
+            } else {
+                content().frame(width: viewportWidth, height: height, alignment: .topLeading)
+            }
+        }
+        .environment(\.nativeTableTrailingInset, trailingInset)
+    }
+}
+
+/// On macOS 11, a SwiftUI named coordinate space can retain its original frame
+/// while the containing NSClipView scrolls. Observe the actual clip instead.
+private struct NativeTableScrollProbe: NSViewRepresentable {
+    let onChange: (CGFloat) -> Void
+
+    func makeNSView(context: Context) -> NativeTableScrollProbeView {
+        let view = NativeTableScrollProbeView()
+        view.onChange = onChange
+        return view
+    }
+
+    func updateNSView(_ view: NativeTableScrollProbeView, context: Context) {
+        view.onChange = onChange
+        view.refresh()
+    }
+
+    static func dismantleNSView(_ view: NativeTableScrollProbeView, coordinator: ()) {
+        view.stopObserving()
+        view.onChange = nil
+    }
+}
+
+private final class NativeTableScrollProbeView: NSView {
+    var onChange: ((CGFloat) -> Void)?
+    private weak var observedScroll: NSScrollView?
+    private var measurementQueued = false
+    private var lastInset: CGFloat?
+
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    override func viewDidMoveToSuperview() {
+        super.viewDidMoveToSuperview()
+        refresh()
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if window == nil { stopObserving() } else { refresh() }
+    }
+
+    override func layout() {
+        super.layout()
+        refresh()
+    }
+
+    func refresh() {
+        guard !measurementQueued else { return }
+        measurementQueued = true
+        // Coalesce clip notifications and publish outside SwiftUI's layout pass.
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.measurementQueued = false
+            guard self.window != nil else { return }
+            self.attachToHorizontalScroll()
+            guard let scroll = self.observedScroll, let document = scroll.documentView else { return }
+            let clip = scroll.contentView
+            let overflow = max(0, document.bounds.width - clip.bounds.width)
+            let inset = max(0, min(overflow, document.bounds.maxX - clip.bounds.maxX))
+            if let previous = self.lastInset, abs(previous - inset) < 0.01 { return }
+            self.lastInset = inset
+            self.onChange?(inset)
+        }
+    }
+
+    private func attachToHorizontalScroll() {
+        var ancestor = superview
+        var horizontalScroll: NSScrollView?
+        while let view = ancestor {
+            if let scroll = view as? NSScrollView,
+               scroll.hasHorizontalScroller || (scroll.documentView?.bounds.width ?? 0) > scroll.contentView.bounds.width + 0.5 {
+                horizontalScroll = scroll
+                break
+            }
+            ancestor = view.superview
+        }
+        guard horizontalScroll !== observedScroll else { return }
+        stopObserving()
+        guard let scroll = horizontalScroll else { return }
+        observedScroll = scroll
+        let clip = scroll.contentView
+        clip.postsBoundsChangedNotifications = true
+        clip.postsFrameChangedNotifications = true
+        let center = NotificationCenter.default
+        center.addObserver(self, selector: #selector(clipGeometryDidChange(_:)), name: NSView.boundsDidChangeNotification, object: clip)
+        center.addObserver(self, selector: #selector(clipGeometryDidChange(_:)), name: NSView.frameDidChangeNotification, object: clip)
+        if let document = scroll.documentView {
+            document.postsFrameChangedNotifications = true
+            center.addObserver(self, selector: #selector(clipGeometryDidChange(_:)), name: NSView.frameDidChangeNotification, object: document)
+        }
+    }
+
+    @objc private func clipGeometryDidChange(_ notification: Notification) { refresh() }
+
+    func stopObserving() {
+        NotificationCenter.default.removeObserver(self)
+        observedScroll = nil
+        lastInset = nil
+    }
+
+    deinit { NotificationCenter.default.removeObserver(self) }
+}
+
+/// The real action controls live here once. The scrolling row reserves their
+/// width using a noninteractive spacer, so the overlay never duplicates actions.
+struct NativeFixedTableActions<Actions: View>: ViewModifier {
+    let width: CGFloat
+    let trailingPadding: CGFloat
+    let background: Color
+    @ViewBuilder var actions: () -> Actions
+    @Environment(\.nativeTableTrailingInset) private var inset
+    @EnvironmentObject private var appearance: AppearanceController
+
+    func body(content: Content) -> some View {
+        content.overlay(
+            actions()
+                .frame(width: width)
+                .padding(.trailing, trailingPadding)
+                .frame(maxHeight: .infinity)
+                .background(background)
+                .overlay(Rectangle().fill(AppTheme.border(appearance.isDarkEffective).opacity(0.3)).frame(height: 1), alignment: .bottom)
+                .overlay(
+                    Rectangle().fill(Color.black.opacity(inset > 0.5 ? 0.08 : 0)).frame(width: 1),
+                    alignment: .leading
+                )
+                .offset(x: -inset)
+                .zIndex(1),
+            alignment: .trailing
+        )
     }
 }

@@ -1,11 +1,17 @@
 import SwiftUI
 
 /// 原生通知管理（对齐 Web `/system/notifySettings`）。
-/// UI 标准：`ModuleSettingsCard` + `EqualHeightCardRow`（同质量管理页）。
+/// Section navigation and a single settings editor follow the current Vue page.
 struct NotifyView: View {
     @EnvironmentObject private var session: AppSession
     @EnvironmentObject private var appearance: AppearanceController
     @StateObject private var model = NotifyViewModel()
+    @StateObject private var aiModel = AiModelsViewModel(pageSize: 7, telegram: true)
+    @EnvironmentObject private var navigation: NavigationState
+    @ObservedObject private var language = LanguageManager.shared
+    @State private var active = "task"
+    @State private var guardID = UUID()
+    @State private var showAI = false
 
     private var dark: Bool { appearance.isDarkEffective }
 
@@ -15,78 +21,61 @@ struct NotifyView: View {
     private let taskMinHeight: CGFloat = 340
 
     var body: some View {
-        PageScaffold(
-            title: "通知管理",
-            subtitle: "定时任务 · Telegram · Bark · 钉钉 · 飞书",
-            systemImage: "bell",
-            layout: .workspace,
-            toolbar: { toolbar },
-            content: {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 14) {
-                        if let err = model.errorText, !err.isEmpty {
-                            errorBanner(err)
-                        }
-
-                        // 1) 定时任务：全宽独立区（与 Web 一致，避免与通道表单混排）
-                        taskCard
-
-                        // 2) 通知通道：相关卡片成对
-                        EqualHeightCardRow(minHeight: channelMinHeight) {
-                            telegramCard
-                        } second: {
-                            proxyCard
-                        }
-                        EqualHeightCardRow(minHeight: channelMinHeight) {
-                            barkCard
-                        } second: {
-                            dingTalkCard
-                        }
-                        // 飞书与 Bark / 钉钉同尺寸：半宽 + 同 minHeight
-                        EqualHeightCardRow(minHeight: channelMinHeight) {
-                            feishuCard
-                        } second: {
-                            Color.clear
-                        }
-                    }
-                    .padding(AppTheme.pagePadding)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .appLoading(model.isLoading)
+        NativeSettingsWorkspace(sections: [
+            ("task", language.text("定时任务", "Scheduled tasks")), ("telegram", "Telegram"),
+            ("proxy", language.text("Telegram 代理", "Telegram proxy")), ("bark", "Bark"),
+            ("dingTalk", language.text("钉钉", "DingTalk")), ("feishu", language.text("飞书", "Feishu"))
+        ], selection: Binding(get: { active }, set: { next in
+            guard next != active, model.canLeave() else { return }
+            active = next
+            if model.hasUnsavedChanges || model.requiresReview { Task { await model.reload() } }
+        }), disabled: model.savingKey != nil || model.isLoading, toolbar: {
+            HStack {
+                if let notice = model.notice { Text(notice).font(.system(size: AppTheme.secondarySize)) }
+                Spacer()
+                AppButton(title: language.text("刷新配置", "Refresh settings"), systemImage: "arrow.clockwise", kind: .secondary,
+                          isLoading: model.isLoading, enabled: model.savingKey == nil) { model.requestReload() }
             }
-        )
-        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
-        .onAppear { model.start() }
-        .onReceive(NotificationCenter.default.publisher(for: .ociReloadCurrentPage)) { _ in
-            Task { await model.reload() }
+        }, content: {
+            VStack(alignment: .leading, spacing: 12) {
+                if let error = model.errorText { errorBanner(error) }
+                Group {
+                    switch active {
+                    case "telegram": telegramCard
+                    case "proxy": proxyCard
+                    case "bark": barkCard
+                    case "dingTalk": dingTalkCard
+                    case "feishu": feishuCard
+                    default: taskCard
+                    }
+                }.disabled(!model.canMutate)
+            }
+        })
+        .sheet(isPresented: Binding(get: { showAI }, set: { value in
+            if value || aiModel.canLeave() { showAI = value }
+        })) {
+            TelegramAiDialog(model: aiModel, onClose: { showAI = false }).environmentObject(appearance)
         }
-        .environmentObject(appearance)
-    }
-
-    private var toolbar: some View {
-        AppButton(
-            title: "刷新",
-            systemImage: "arrow.clockwise",
-            kind: .secondary,
-            isLoading: model.isLoading
-        ) {
-            Task { await model.reload() }
+        .onAppear {
+            navigation.setLeaveGuard(owner: guardID) { (!showAI || aiModel.canLeave()) && model.canLeave() }
+            model.start()
         }
+        .onDisappear { showAI = false; model.stop(); aiModel.stop(); navigation.removeLeaveGuard(owner: guardID) }
+        .onReceive(NotificationCenter.default.publisher(for: .ociReloadCurrentPage)) { _ in model.requestReload() }
     }
 
     // MARK: - 定时任务（全宽）
 
     private var taskCard: some View {
-        ModuleSettingsCard(
-            title: "定时任务",
-            subtitle: "每天固定时刻执行所选检测任务",
+        NativeSettingsPanel(
+            title: language.text("定时任务", "Scheduled tasks"),
+            subtitle: language.text("每天固定时刻执行所选检测任务", "Run selected checks at a scheduled time each day"),
             systemImage: "clock",
             accent: Color(hex: "4a9eff"),
             enabled: $model.task.enabled,
             minHeight: taskMinHeight
         ) {
-            FormFieldRow(label: "执行时间") {
+            FormFieldRow(label: language.text("执行时间", "Scheduled time")) {
                 VStack(alignment: .leading, spacing: 6) {
                     SelectMenu(
                         options: model.hourOptions,
@@ -99,7 +88,7 @@ struct NotifyView: View {
                         allowClear: false,
                         searchable: false
                     )
-                    Text("系统时区下每天 \(String(format: "%02d:00", model.task.executeHour)) 触发")
+                    Text(language.text("服务器时区", "Server time zone") + " · \(model.serverTimeZone) · \(String(format: "%02d:00", model.task.executeHour))")
                         .font(.system(size: 13))
                         .foregroundColor(AppTheme.textSecondary(dark))
                         .lineLimit(1)
@@ -107,24 +96,24 @@ struct NotifyView: View {
             }
 
             // 下排：三项任务等宽选项卡
-            FormFieldRow(label: "任务项目") {
-                HStack(alignment: .top, spacing: 10) {
+            FormFieldRow(label: language.text("任务项目", "Checks")) {
+                VStack(alignment: .leading, spacing: 10) {
                     taskOptionTile(
-                        title: "账号测活",
+                        title: language.text("账号测活", "Account checks"),
                         subtitle: "检测租户账号可用性",
                         systemImage: "person.2",
                         accent: Color(hex: "3fb950"),
                         isOn: $model.task.enableAccountCheck
                     )
                     taskOptionTile(
-                        title: "开机日志统计",
+                        title: language.text("开机日志统计", "Launch log summary"),
                         subtitle: "汇总抢机/开机日志",
                         systemImage: "doc.text",
                         accent: Color(hex: "4a9eff"),
                         isOn: $model.task.enableBootLog
                     )
                     taskOptionTile(
-                        title: "OCI 费用检查",
+                        title: language.text("OCI 费用检查", "OCI cost checks"),
                         subtitle: "检查账单与费用异常",
                         systemImage: "creditcard",
                         accent: Color(hex: "f0881a"),
@@ -132,9 +121,12 @@ struct NotifyView: View {
                     )
                 }
             }
+            NativeSecretEditor(title: language.text("通知校验密钥", "Notification verification secret"),
+                               hasSaved: model.task.hasNotificationSecret, mode: $model.task.secretMode,
+                               value: $model.task.notificationSecret)
         } footer: {
             AppButton(
-                title: "保存配置",
+                title: language.text("保存配置", "Save settings"),
                 systemImage: "square.and.arrow.down",
                 kind: .primary,
                 isLoading: model.savingKey == "task"
@@ -152,58 +144,22 @@ struct NotifyView: View {
         accent: Color,
         isOn: Binding<Bool>
     ) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(accent.opacity(0.15))
-                        .frame(width: 30, height: 30)
-                    Image(systemName: systemImage)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(accent)
-                }
-                Spacer(minLength: 4)
-                Toggle("", isOn: isOn)
-                    .toggleStyle(SwitchToggleStyle())
-                    .labelsHidden()
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title).font(.system(size: AppTheme.bodySize, weight: .medium))
+                Text(subtitle).font(.system(size: AppTheme.secondarySize))
             }
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(AppTheme.textPrimary(dark))
-                    .lineLimit(1)
-                Text(subtitle)
-                    .font(.system(size: 13))
-                    .foregroundColor(AppTheme.textSecondary(dark))
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            Spacer(minLength: 0)
+            Spacer()
+            Toggle(title, isOn: isOn).toggleStyle(SwitchToggleStyle()).labelsHidden()
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, minHeight: 96, alignment: .topLeading)
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(AppInputStyle.fill(dark))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(
-                    isOn.wrappedValue
-                        ? accent.opacity(dark ? 0.45 : 0.35)
-                        : AppTheme.border(dark).opacity(0.7),
-                    lineWidth: 1
-                )
-        )
-        .animation(.easeInOut(duration: 0.15), value: isOn.wrappedValue)
+        .foregroundColor(AppTheme.textPrimary(dark))
+        .padding(.vertical, 8)
     }
 
     // MARK: - 通道卡片
 
     private var telegramCard: some View {
-        ModuleSettingsCard(
+        NativeSettingsPanel(
             title: "Telegram",
             subtitle: "Bot 消息推送",
             systemImage: "paperplane",
@@ -211,9 +167,8 @@ struct NotifyView: View {
             enabled: $model.telegram.enabled,
             minHeight: channelMinHeight
         ) {
-            FormFieldRow(label: "Bot Token") {
-                AppTextField(text: $model.telegram.botToken, placeholder: "从 @BotFather 获取")
-            }
+            NativeSecretEditor(title: "Bot Token", hasSaved: model.telegram.hasBotToken,
+                               mode: $model.telegram.secretMode, value: $model.telegram.botToken, required: model.telegram.enabled)
             FormFieldRow(label: "Chat ID") {
                 AppTextField(
                     text: $model.telegram.chatId,
@@ -228,38 +183,35 @@ struct NotifyView: View {
                     leadingSystemImage: "person"
                 )
             }
+            Text(language.text("测试消息由服务器直接发送，不使用机器人代理；请在接收端确认。", "Test messages are sent directly by the server, without the bot proxy. Confirm delivery in Telegram."))
+                .font(.system(size: AppTheme.secondarySize))
         } footer: {
-            HStack(spacing: 8) {
-                AppButton(
-                    title: "测试",
-                    systemImage: "paperplane",
-                    kind: .secondary,
-                    isLoading: model.savingKey == "telegramTest"
-                ) {
-                    model.testTelegram()
+            VStack(alignment: .trailing, spacing: 8) {
+                HStack(spacing: 8) {
+                    AppButton(title: language.text("AI 模型配置", "AI models"), kind: .secondary) { showAI = true }
+                    AppButton(title: language.text("重新注册机器人", "Re-register bot"), kind: .secondary,
+                              enabled: !model.hasUnsavedChanges) { model.startBot() }
                 }
-                AppButton(
-                    title: "保存",
-                    systemImage: "square.and.arrow.down",
-                    kind: .primary,
-                    isLoading: model.savingKey == "telegram"
-                ) {
-                    model.saveTelegram()
+                HStack(spacing: 8) {
+                    AppButton(title: language.text("测试", "Send test"), systemImage: "paperplane", kind: .secondary,
+                              isLoading: model.savingKey == "telegramTest") { model.testTelegram() }
+                    AppButton(title: language.text("保存", "Save"), systemImage: "square.and.arrow.down", kind: .primary,
+                              isLoading: model.savingKey == "telegram") { model.saveTelegram() }
                 }
             }
         }
     }
 
     private var proxyCard: some View {
-        ModuleSettingsCard(
-            title: "Telegram 代理",
+        NativeSettingsPanel(
+            title: language.text("Telegram 代理", "Telegram proxy"),
             subtitle: "访问 Telegram API 的出站代理",
             systemImage: "globe",
             accent: Color(hex: "9b59b6"),
             enabled: $model.proxy.enabled,
             minHeight: channelMinHeight
         ) {
-            FormFieldRow(label: "代理类型") {
+            FormFieldRow(label: language.text("代理类型", "Proxy type")) {
                 SelectMenu(
                     options: model.proxyTypeOptions,
                     selection: Binding(
@@ -272,14 +224,14 @@ struct NotifyView: View {
                     searchable: false
                 )
             }
-            FormFieldRow(label: "地址") {
+            FormFieldRow(label: language.text("地址", "Host")) {
                 AppTextField(
                     text: $model.proxy.host,
                     placeholder: "127.0.0.1",
                     leadingSystemImage: "server.rack"
                 )
             }
-            FormFieldRow(label: "端口") {
+            FormFieldRow(label: language.text("端口", "Port")) {
                 AppTextField(
                     text: Binding(
                         get: { model.proxy.port == 0 ? "" : "\(model.proxy.port)" },
@@ -289,18 +241,17 @@ struct NotifyView: View {
                     leadingSystemImage: "number"
                 )
             }
-            HStack(spacing: 10) {
-                FormFieldRow(label: "用户名") {
-                    AppTextField(text: $model.proxy.username, placeholder: "可选")
-                }
-                FormFieldRow(label: "密码") {
-                    AppTextField(text: $model.proxy.password, placeholder: "可选", secure: true)
-                }
+            FormFieldRow(label: language.text("用户名", "Username")) {
+                AppTextField(text: $model.proxy.username, placeholder: language.text("可选", "Optional"))
             }
+            NativeSecretEditor(title: language.text("代理密码", "Proxy password"), hasSaved: model.proxy.hasPassword,
+                               mode: $model.proxy.secretMode, value: $model.proxy.password)
+            Text(language.text("端口检测只检查 TCP 连接，不验证代理认证。保存代理后可重新注册 Telegram 机器人。", "The port check tests TCP connectivity, without verifying proxy authentication. Re-register the Telegram bot after saving proxy settings."))
+                .font(.system(size: AppTheme.secondarySize))
         } footer: {
             HStack(spacing: 8) {
                 AppButton(
-                    title: "测试",
+                    title: language.text("检测端口", "Check port"),
                     systemImage: "network",
                     kind: .secondary,
                     isLoading: model.savingKey == "proxyTest"
@@ -308,7 +259,7 @@ struct NotifyView: View {
                     model.testProxy()
                 }
                 AppButton(
-                    title: "保存",
+                    title: language.text("保存", "Save"),
                     systemImage: "square.and.arrow.down",
                     kind: .primary,
                     isLoading: model.savingKey == "proxy"
@@ -320,7 +271,7 @@ struct NotifyView: View {
     }
 
     private var barkCard: some View {
-        ModuleSettingsCard(
+        NativeSettingsPanel(
             title: "Bark",
             subtitle: "iOS 推送通知",
             systemImage: "bell.badge",
@@ -328,12 +279,11 @@ struct NotifyView: View {
             enabled: $model.bark.enabled,
             minHeight: channelMinHeight
         ) {
-            FormFieldRow(label: "服务 URL") {
+            FormFieldRow(label: language.text("服务 URL", "Service URL")) {
                 AppTextField(text: $model.bark.url, placeholder: "https://api.day.app")
             }
-            FormFieldRow(label: "Device Key") {
-                AppTextField(text: $model.bark.deviceKey, placeholder: "设备密钥", leadingSystemImage: "key")
-            }
+            NativeSecretEditor(title: "Device Key", hasSaved: model.bark.hasDeviceKey,
+                               mode: $model.bark.secretMode, value: $model.bark.deviceKey, required: model.bark.enabled)
             Text("用于 iOS Bark App 接收推送；服务 URL 可自建。")
                 .font(.system(size: 13))
                 .foregroundColor(AppTheme.textSecondary(dark))
@@ -341,7 +291,7 @@ struct NotifyView: View {
         } footer: {
             HStack(spacing: 8) {
                 AppButton(
-                    title: "测试",
+                    title: language.text("测试", "Send test"),
                     systemImage: "paperplane",
                     kind: .secondary,
                     isLoading: model.savingKey == "barkTest"
@@ -349,7 +299,7 @@ struct NotifyView: View {
                     model.testBark()
                 }
                 AppButton(
-                    title: "保存",
+                    title: language.text("保存", "Save"),
                     systemImage: "square.and.arrow.down",
                     kind: .primary,
                     isLoading: model.savingKey == "bark"
@@ -361,20 +311,18 @@ struct NotifyView: View {
     }
 
     private var dingTalkCard: some View {
-        ModuleSettingsCard(
-            title: "钉钉",
+        NativeSettingsPanel(
+            title: language.text("钉钉", "DingTalk"),
             subtitle: "群机器人 Webhook",
             systemImage: "message",
             accent: Color(hex: "0089ff"),
             enabled: $model.dingTalk.enabled,
             minHeight: channelMinHeight
         ) {
-            FormFieldRow(label: "Webhook") {
-                AppTextField(text: $model.dingTalk.webhook, placeholder: "https://oapi.dingtalk.com/...")
-            }
-            FormFieldRow(label: "加签密钥") {
-                AppTextField(text: $model.dingTalk.secret, placeholder: "可选 Secret", secure: true)
-            }
+            NativeSecretEditor(title: "Webhook", hasSaved: model.dingTalk.hasWebhook,
+                               mode: $model.dingTalk.webhookMode, value: $model.dingTalk.webhook, required: model.dingTalk.enabled)
+            NativeSecretEditor(title: language.text("签名密钥", "Signing secret"), hasSaved: model.dingTalk.hasSecret,
+                               mode: $model.dingTalk.secretMode, value: $model.dingTalk.secret, required: model.dingTalk.enabled)
             Text("在钉钉群「智能群助手」中添加自定义机器人获取 Webhook。")
                 .font(.system(size: 13))
                 .foregroundColor(AppTheme.textSecondary(dark))
@@ -382,7 +330,7 @@ struct NotifyView: View {
         } footer: {
             HStack(spacing: 8) {
                 AppButton(
-                    title: "测试",
+                    title: language.text("测试", "Send test"),
                     systemImage: "paperplane",
                     kind: .secondary,
                     isLoading: model.savingKey == "dingTalkTest"
@@ -390,7 +338,7 @@ struct NotifyView: View {
                     model.testDingTalk()
                 }
                 AppButton(
-                    title: "保存",
+                    title: language.text("保存", "Save"),
                     systemImage: "square.and.arrow.down",
                     kind: .primary,
                     isLoading: model.savingKey == "dingTalk"
@@ -402,8 +350,8 @@ struct NotifyView: View {
     }
 
     private var feishuCard: some View {
-        ModuleSettingsCard(
-            title: "飞书",
+        NativeSettingsPanel(
+            title: language.text("飞书", "Feishu"),
             subtitle: "群机器人 Webhook",
             systemImage: "bubble.left.and.bubble.right",
             accent: Color(hex: "00d6b9"),
@@ -411,12 +359,10 @@ struct NotifyView: View {
             minHeight: channelMinHeight
         ) {
             // 与 Bark / 钉钉同结构：单列 Webhook + 签名密钥
-            FormFieldRow(label: "Webhook") {
-                AppTextField(text: $model.feishu.webhook, placeholder: "https://open.feishu.cn/...")
-            }
-            FormFieldRow(label: "签名密钥") {
-                AppTextField(text: $model.feishu.secret, placeholder: "可选 Secret", secure: true)
-            }
+            NativeSecretEditor(title: "Webhook", hasSaved: model.feishu.hasWebhook,
+                               mode: $model.feishu.webhookMode, value: $model.feishu.webhook, required: model.feishu.enabled)
+            NativeSecretEditor(title: language.text("签名密钥", "Signing secret"), hasSaved: model.feishu.hasSecret,
+                               mode: $model.feishu.secretMode, value: $model.feishu.secret, required: false)
             Text("在飞书群「设置 → 群机器人」中添加自定义机器人。")
                 .font(.system(size: 13))
                 .foregroundColor(AppTheme.textSecondary(dark))
@@ -424,7 +370,7 @@ struct NotifyView: View {
         } footer: {
             HStack(spacing: 8) {
                 AppButton(
-                    title: "测试",
+                    title: language.text("测试", "Send test"),
                     systemImage: "paperplane",
                     kind: .secondary,
                     isLoading: model.savingKey == "feishuTest"
@@ -432,7 +378,7 @@ struct NotifyView: View {
                     model.testFeishu()
                 }
                 AppButton(
-                    title: "保存",
+                    title: language.text("保存", "Save"),
                     systemImage: "square.and.arrow.down",
                     kind: .primary,
                     isLoading: model.savingKey == "feishu"
@@ -449,7 +395,8 @@ struct NotifyView: View {
                 .foregroundColor(Color(hex: "f85149"))
             Text(text).font(.system(size: 14))
             Spacer()
-            Button("重试") { Task { await model.reload() } }
+            Button(language.text("重新读取并核对", "Reload and review")) { model.requestReload() }
+                .disabled(model.isLoading || model.savingKey != nil)
                 .buttonStyle(PlainButtonStyle())
         }
         .foregroundColor(Color(hex: "f85149"))

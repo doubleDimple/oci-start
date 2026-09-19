@@ -6,10 +6,12 @@ struct TopNavDropdownOverlay: View {
     @ObservedObject var chrome: TopNavChromeState
     @ObservedObject var header: HeaderViewModel
     @EnvironmentObject private var session: AppSession
+    @EnvironmentObject private var navigation: NavigationState
+    @ObservedObject private var language = LanguageManager.shared
     @EnvironmentObject private var appearance: AppearanceController
 
     @Environment(\.colorScheme) private var colorScheme
-    private var dark: Bool { appearance.isDarkEffective || colorScheme == .dark }
+    private var dark: Bool { appearance.isDarkEffective }
 
     /// Match MainShell top bar height
     private let topBarHeight: CGFloat = AppTheme.topBarHeight
@@ -31,6 +33,19 @@ struct TopNavDropdownOverlay: View {
                         .onTapGesture { chrome.close() }
                 }
 
+                if chrome.open == .search && !header.showMessages {
+                    searchPanel
+                        .padding(.top, topBarHeight + 4)
+                        .padding(.leading, (navigation.sidebarCollapsed ? AppTheme.sidebarCollapsedWidth : AppTheme.sidebarWidth) + AppTheme.pagePadding + 48)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                if chrome.open == .appearance && !header.showMessages {
+                    appearancePanel
+                        .padding(.top, topBarHeight + 4)
+                        .padding(.trailing, trailingPad + 180)
+                }
+
                 if chrome.open == .language && !header.showMessages {
                     languagePanel
                         .padding(.top, topBarHeight + 4)
@@ -49,13 +64,14 @@ struct TopNavDropdownOverlay: View {
                             chrome.close()
                             header.openAssetAnalysis()
                         },
-                        onCloud: { type, _ in
+                        onAuditLogs: {
                             chrome.close()
-                            session.setCloudProvider(type)
+                            navigation.select(.auditLogs)
                         },
                         onAbout: {
                             chrome.close()
                             header.showAbout = true
+                            Task { await header.checkVersion() }
                         },
                         onLogout: {
                             chrome.close()
@@ -82,6 +98,89 @@ struct TopNavDropdownOverlay: View {
         .allowsHitTesting(anyOverlayOpen)
     }
 
+    private var searchPanel: some View {
+        let results = NavigationCatalog.filtered(search: navigation.searchText, cloudType: 1).flatMap { $0.1 }
+        return VStack(alignment: .leading, spacing: 0) {
+            Text(language.text("找到 \(results.count) 个页面", "\(results.count) matching pages"))
+                .font(.system(size: AppTheme.secondarySize))
+                .padding(12)
+            ScrollViewReader { scroll in
+                ScrollView {
+                    VStack(spacing: 0) {
+                    ForEach(Array(results.enumerated()), id: \.element.id) { index, item in
+                        Button(action: {
+                            navigation.select(item.nav)
+                            navigation.searchText = ""
+                            chrome.close()
+                            chrome.blurSearch()
+                        }) {
+                            HStack(spacing: 10) {
+                                Image(systemName: item.systemImage).frame(width: 20)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(item.title).font(.system(size: AppTheme.bodySize))
+                                    Text(NavigationCatalog.section(for: item.nav)?.title ?? "")
+                                        .font(.system(size: AppTheme.secondarySize))
+                                }
+                                Spacer()
+                                Image(systemName: "arrow.up.left").font(.system(size: AppTheme.captionSize))
+                            }
+                            .padding(12)
+                            .background(index == chrome.searchActiveIndex ? AppTheme.hover(dark) : Color.clear)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .id(item.id)
+                        .onHover { inside in if inside { chrome.searchActiveIndex = index } }
+                        .accessibilityValue(index == chrome.searchActiveIndex ? language.text("已选中", "Selected") : "")
+                    }
+                    }
+                }
+                .onChange(of: chrome.searchActiveIndex) { index in
+                    if results.indices.contains(index) { scroll.scrollTo(results[index].id) }
+                }
+                .onChange(of: navigation.searchText) { _ in
+                    if let first = results.first { scroll.scrollTo(first.id, anchor: .top) }
+                }
+            }
+            .frame(maxHeight: 320)
+            Text(language.text("↑↓ 选择 · Enter 打开 · Esc 清空", "↑↓ Select · Enter Open · Esc Clear"))
+                .font(.system(size: AppTheme.secondarySize)).padding(12)
+        }
+        .foregroundColor(AppTheme.textPrimary(dark))
+        .frame(width: 320)
+        .background(AppTheme.cardBg(dark))
+        .cornerRadius(16)
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(AppTheme.border(dark), lineWidth: 1))
+        .shadow(color: Color.black.opacity(0.15), radius: 16, y: 8)
+    }
+
+    private var appearancePanel: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            ForEach([AppAppearanceMode.light, .dark, .system], id: \.rawValue) { mode in
+                Button(action: {
+                    appearance.mode = mode
+                    chrome.close()
+                }) {
+                    HStack {
+                        Text(mode.title)
+                        Spacer()
+                        if appearance.mode == mode { Image(systemName: "checkmark") }
+                    }
+                    .font(.system(size: AppTheme.bodySize))
+                    .foregroundColor(AppTheme.textPrimary(dark))
+                    .padding(12)
+                    .contentShape(Rectangle())
+                }.buttonStyle(PlainButtonStyle())
+            }
+        }
+        .frame(width: 180)
+        .padding(6)
+        .background(AppTheme.cardBg(dark))
+        .cornerRadius(16)
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(AppTheme.border(dark), lineWidth: 1))
+        .shadow(color: Color.black.opacity(0.15), radius: 16, y: 8)
+    }
+
     // MARK: - Language
 
     private var languagePanel: some View {
@@ -93,10 +192,11 @@ struct TopNavDropdownOverlay: View {
                 .padding(.top, 10)
                 .padding(.bottom, 4)
 
-            ForEach(AppLocale.allCases) { loc in
+            ForEach([AppLocale.zhCN, .enUS]) { loc in
                 Button(action: {
-                    header.setLocale(loc)
-                    chrome.close()
+                    Task {
+                        if await header.setLocale(loc) { chrome.close() }
+                    }
                 }) {
                     HStack {
                         Text(loc.title)
@@ -114,6 +214,7 @@ struct TopNavDropdownOverlay: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(PlainButtonStyle())
+                .disabled(header.localeSyncing)
             }
         }
         .padding(.bottom, 8)
@@ -168,6 +269,14 @@ struct MessageCenterDrawerPanel: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            if let error = header.messagesError ?? header.unreadError {
+                HStack(alignment: .top) {
+                    Text(error).font(.system(size: AppTheme.secondarySize))
+                    Button("重试") { Task { await header.loadMessages(page: header.messagePage.pageNum); await header.refreshUnread() } }
+                }
+                .foregroundColor(AppTheme.danger)
+                .padding(12)
+            }
             if let detail = header.messageDetail {
                 detailHeader(detail)
                 detailBody(detail)
@@ -179,6 +288,7 @@ struct MessageCenterDrawerPanel: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(surface)
+        .disabled(header.messageMutationBusy)
         .overlay(
             Rectangle()
                 .fill(border)

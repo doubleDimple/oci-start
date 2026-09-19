@@ -40,9 +40,16 @@ final class NativeWSClient: NSObject {
         config.timeoutIntervalForResource = 3600
 
         let session = URLSession(configuration: config, delegate: nil, delegateQueue: nil)
-        let task = session.webSocketTask(with: url)
+        var request = URLRequest(url: url)
+        let httpURL = url.absoluteString.replacingOccurrences(of: "wss://", with: "https://").replacingOccurrences(of: "ws://", with: "http://")
+        if let cookie = APIClient.shared.cookieHeader(for: httpURL), !cookie.isEmpty {
+            request.setValue(cookie, forHTTPHeaderField: "Cookie")
+        }
+        let task = session.webSocketTask(with: request)
+        lock.lock()
         self.session = session
         self.task = task
+        lock.unlock()
         task.resume()
         onState?(.open)
         startReceiveLoop()
@@ -52,11 +59,10 @@ final class NativeWSClient: NSObject {
         lock.lock()
         let t = task
         lock.unlock()
-        t?.send(.string(text)) { [weak self] error in
+        guard let t = t else { return }
+        t.send(.string(text)) { [weak self] error in
             if let error = error {
-                DispatchQueue.main.async {
-                    self?.onState?(.closed(error.localizedDescription))
-                }
+                DispatchQueue.main.async { self?.fail(t, reason: error.localizedDescription) }
             }
         }
     }
@@ -95,24 +101,32 @@ final class NativeWSClient: NSObject {
         guard active, let t = t else { return }
 
         t.receive { [weak self] result in
-            guard let self = self else { return }
-            switch result {
-            case .failure(let error):
-                DispatchQueue.main.async {
-                    self.onState?(.closed(error.localizedDescription))
+            DispatchQueue.main.async {
+                guard let self = self, self.isCurrent(t) else { return }
+                switch result {
+                case .failure(let error):
+                    self.fail(t, reason: error.localizedDescription)
+                case .success(let message):
+                    switch message {
+                    case .string(let text): self.onText?(text)
+                    case .data(let data): self.onBinary?(data)
+                    @unknown default: break
+                    }
+                    if self.isCurrent(t) { self.receiveNext() }
                 }
-            case .success(let message):
-                switch message {
-                case .string(let text):
-                    DispatchQueue.main.async { self.onText?(text) }
-                case .data(let data):
-                    DispatchQueue.main.async { self.onBinary?(data) }
-                @unknown default:
-                    break
-                }
-                self.receiveNext()
             }
         }
+    }
+
+    private func isCurrent(_ candidate: URLSessionWebSocketTask) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return receiveLoopActive && task === candidate
+    }
+
+    private func fail(_ candidate: URLSessionWebSocketTask, reason: String) {
+        guard isCurrent(candidate) else { return }
+        disconnect(reason: reason)
     }
 }
 

@@ -8,26 +8,31 @@ struct LoginHeroView: View {
     @State private var showDirectory = false
 
     private var english: Bool { locale == .enUS }
+    private var heroText: Color { Color(hex: dark ? "e4eee9" : "1a332b") }
+    private var heroMuted: Color { Color(hex: dark ? "8caaa0" : "667c73") }
 
     var body: some View {
         GeometryReader { geo in
             ScrollView(.vertical) {
                 VStack(alignment: .leading, spacing: 0) {
                     HStack(spacing: 11) {
-                        Image(systemName: "drop")
-                            .font(.system(size: 22, weight: .medium))
-                            .foregroundColor(LoginPalette.highlight(dark))
+                        Image(systemName: "leaf.fill")
+                            .font(.system(size: 19, weight: .medium))
+                            .foregroundColor(.white)
+                            .frame(width: 36, height: 36)
+                            .background(LoginPalette.primary(dark))
+                            .cornerRadius(11)
                         Text("OCI-START")
                             .font(.system(size: 15, weight: .semibold))
                             .tracking(0.4)
                         Text(english ? "/ Workspace" : "/ 云端工作台")
                             .font(.system(size: 14))
-                            .foregroundColor(LoginPalette.muted(dark))
+                            .foregroundColor(heroMuted)
                     }
-                    Spacer(minLength: 36)
+                    Spacer(minLength: 30)
                     VStack(alignment: .leading, spacing: 12) {
                         Text(english ? "Your cloud,\nin one workspace." : "让云端资源，\n井然有序。")
-                            .font(.system(size: 30, weight: .semibold))
+                            .font(.system(size: geo.size.width < 540 ? 30 : 34, weight: .semibold))
                             .lineSpacing(6)
                             .fixedSize(horizontal: false, vertical: true)
                         Text(english
@@ -35,39 +40,35 @@ struct LoginHeroView: View {
                              : "从实例到网络，从监控到运维，\n在一个工作台中管理你的云端资源。")
                             .font(.system(size: 14))
                             .lineSpacing(6)
-                            .foregroundColor(LoginPalette.muted(dark))
+                            .foregroundColor(heroMuted)
                             .fixedSize(horizontal: false, vertical: true)
                     }
-                    .padding(.bottom, 20)
-                    HStack {
-                        Text(english ? "OCI public regions" : "OCI 公共区域")
-                            .font(.system(size: 13, weight: .medium))
-                        Spacer()
-                        Text("\(LoginPublicRegion.all.count) " + (english ? "regions" : "个区域"))
-                            .font(.system(size: 12, design: .monospaced))
-                            .foregroundColor(LoginPalette.muted(dark))
-                    }
+                    .padding(.bottom, 4)
                     LoginRegionMap(dark: dark, english: english)
-                        .frame(height: max(220, min(320, (geo.size.width - 68) * 0.65)))
-                        .padding(.horizontal, -12)
-                        .padding(.top, 12)
+                        .frame(height: max(250, min(360, geo.size.height * 0.44)))
+                        .padding(.horizontal, -18)
+                        .padding(.vertical, 4)
                         .accessibilityHidden(true)
-                    Button(action: { showDirectory.toggle() }) {
-                        HStack(spacing: 6) {
-                            Text(english ? "Browse region directory" : "查看区域目录")
-                            Image(systemName: "arrow.up.right")
+                    HStack(alignment: .center) {
+                        HStack(spacing: 7) {
+                            Circle().fill(LoginPalette.primary(dark)).frame(width: 5, height: 5)
+                            Text(english ? "\(LoginPublicRegion.all.count) public regions" : "\(LoginPublicRegion.all.count) 个公共区域")
                         }
                         .font(.system(size: 12))
-                        .foregroundColor(LoginPalette.muted(dark))
+                        .foregroundColor(heroMuted)
+                        Spacer()
+                        Button(action: { showDirectory.toggle() }) {
+                            HStack(spacing: 5) {
+                                Text(english ? "Region directory" : "查看区域目录")
+                                Image(systemName: "arrow.up.right").font(.system(size: 10, weight: .medium))
+                            }
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(LoginPalette.highlight(dark))
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .popover(isPresented: $showDirectory, arrowEdge: .bottom) { directory }
                     }
-                    .buttonStyle(PlainButtonStyle())
-                    .popover(isPresented: $showDirectory, arrowEdge: .bottom) { directory }
-                    Text(english
-                         ? "City reference points · interactive 3D globe"
-                         : "城市参考位置 · 3D 可交互地球示意")
-                        .font(.system(size: 12))
-                        .foregroundColor(LoginPalette.muted(dark))
-                        .padding(.top, 8)
+                    .padding(.horizontal, 4)
                     Spacer(minLength: 24)
                     HStack(spacing: 8) {
                         Text("© 2026 doubleDimple")
@@ -77,10 +78,10 @@ struct LoginHeroView: View {
                         Link(english ? "Docs" : "文档", destination: URL(string: "https://github.com/doubleDimple/oci-start#readme")!)
                     }
                     .font(.system(size: 12))
-                    .foregroundColor(LoginPalette.muted(dark))
+                    .foregroundColor(heroMuted)
                 }
-                .foregroundColor(LoginPalette.text(dark))
-                .padding(.horizontal, geo.size.width < 500 ? 30 : 46)
+                .foregroundColor(heroText)
+                .padding(.horizontal, geo.size.width < 500 ? 34 : 52)
                 .padding(.top, 34)
                 .padding(.bottom, 30)
                 .frame(minHeight: geo.size.height, alignment: .topLeading)
@@ -170,8 +171,9 @@ private final class LoginRegionMapView: NSView {
     private var workspaceObserver: NSObjectProtocol?
 
     // 3D rotation state (Polar spin & view pitch angle)
-    private var rotY: CGFloat = 0.3
-    private var rotX: CGFloat = 0.28
+    private var rotY: CGFloat = -1.1
+    private var rotX: CGFloat = 0.14
+    private var animationFrames = 0
     private var velY: CGFloat = 0
     private var velX: CGFloat = 0
     private var isDragging = false
@@ -221,16 +223,18 @@ private final class LoginRegionMapView: NSView {
             needsDisplay = true
             return
         }
-        let next = Timer(timeInterval: 1.0 / 30, repeats: true) { [weak self] _ in
+        let next = Timer(timeInterval: 1.0 / 24, repeats: true) { [weak self] _ in
             guard let self = self else { return }
             if !self.isDragging {
-                self.rotY += 0.0025 + self.velY
+                self.rotY += 0.0014 + self.velY
                 self.rotX += self.velX
                 self.velY *= 0.94
                 self.velX *= 0.94
                 self.rotX = max(-0.8, min(0.8, self.rotX))
             }
             self.needsDisplay = true
+            self.animationFrames += 1
+            if self.animationFrames % 24 == 0 { self.updateRegionTooltips() }
         }
         RunLoop.main.add(next, forMode: .common)
         timer = next
@@ -260,6 +264,7 @@ private final class LoginRegionMapView: NSView {
 
     override func mouseUp(with event: NSEvent) {
         isDragging = false
+        updateRegionTooltips()
     }
 
     private func project3D(_ vx: CGFloat, _ vy: CGFloat, _ vz: CGFloat,
@@ -296,7 +301,7 @@ private final class LoginRegionMapView: NSView {
         tooltipStrings.removeAll()
         let cx = bounds.width / 2
         let cy = bounds.height / 2
-        let radius = min(bounds.width, bounds.height) * 0.40
+        let radius = min(bounds.width, bounds.height) * 0.43
 
         for region in LoginPublicRegion.locations {
             let phi = region.latitude * Self.RAD
@@ -328,57 +333,51 @@ private final class LoginRegionMapView: NSView {
 
         let cx = width / 2
         let cy = height / 2
-        let radius = min(width, height) * 0.40
+        let radius = min(width, height) * 0.43
 
-        let nodeColor = NSColor(Color(hex: dark ? "ff6600" : "ff4500"))
-        let lineColor = NSColor(Color(hex: dark ? "ff6600" : "ff4500")).withAlphaComponent(0.55)
-        let oceanColor = NSColor(Color(hex: dark ? "0b1219" : "edf3f8"))
-        let oceanEdgeColor = NSColor(Color(hex: dark ? "162330" : "cbdbe6"))
-        let graticuleColor = NSColor(Color(hex: dark ? "78a5c8" : "142841")).withAlphaComponent(dark ? 0.22 : 0.35)
+        let nodeColor = NSColor(Color(hex: dark ? "53c7a3" : "16836a"))
+        let lineColor = nodeColor.withAlphaComponent(dark ? 0.3 : 0.25)
+        let oceanColor = NSColor(Color(hex: dark ? "12251f" : "f7faf8"))
+        let oceanEdgeColor = NSColor(Color(hex: dark ? "10221c" : "e0ebe5"))
+        let graticuleColor = nodeColor.withAlphaComponent(dark ? 0.11 : 0.1)
 
         let colorSpace = CGColorSpaceCreateDeviceRGB()
 
         // 1. Atmosphere Outer Glow
-        let glowColors = [nodeColor.withAlphaComponent(0.14).cgColor, CGColor(red: 0, green: 0, blue: 0, alpha: 0)] as CFArray
+        let glowColors = [nodeColor.withAlphaComponent(dark ? 0.08 : 0.06).cgColor, nodeColor.withAlphaComponent(0).cgColor] as CFArray
         if let glowGrad = CGGradient(colorsSpace: colorSpace, colors: glowColors, locations: [0.0, 1.0]) {
             ctx.drawRadialGradient(glowGrad,
                                    startCenter: CGPoint(x: cx, y: cy), startRadius: radius * 0.85,
-                                   endCenter: CGPoint(x: cx, y: cy), endRadius: radius * 1.22,
+                                   endCenter: CGPoint(x: cx, y: cy), endRadius: radius * 1.15,
                                    options: [.drawsAfterEndLocation])
         }
 
         // 2. 3D Globe Surface Fill
+        // Clip the ocean gradient to the sphere. Extending its last color to the
+        // canvas edge was the blue rectangle that separated the globe from the page.
+        ctx.saveGState()
+        ctx.addEllipse(in: CGRect(x: cx - radius, y: cy - radius, width: radius * 2, height: radius * 2))
+        ctx.clip()
         let bodyColors = [oceanColor.cgColor, oceanColor.cgColor, oceanEdgeColor.cgColor] as CFArray
         if let bodyGrad = CGGradient(colorsSpace: colorSpace, colors: bodyColors, locations: [0.0, 0.65, 1.0]) {
             ctx.drawRadialGradient(bodyGrad,
-                                   startCenter: CGPoint(x: cx - radius * 0.3, y: cy - radius * 0.3), startRadius: radius * 0.1,
+                                   startCenter: CGPoint(x: cx - radius * 0.3, y: cy - radius * 0.3), startRadius: 0,
                                    endCenter: CGPoint(x: cx, y: cy), endRadius: radius,
                                    options: [.drawsAfterEndLocation])
         }
+        ctx.restoreGState()
 
         // Atmosphere Rim Border
-        nodeColor.withAlphaComponent(0.35).setStroke()
+        nodeColor.withAlphaComponent(dark ? 0.17 : 0.13).setStroke()
         let rimPath = NSBezierPath(ovalIn: NSRect(x: cx - radius, y: cy - radius, width: radius * 2, height: radius * 2))
-        rimPath.lineWidth = 1.2
+        rimPath.lineWidth = 0.7
         rimPath.stroke()
-
-        // Tilted Polar Axis Line (23.44°)
-        let poleNorth = project3D(0, 1.13, 0, spinY: rotY, pitchX: rotX, cx: cx, cy: cy, radius: radius)
-        let poleSouth = project3D(0, -1.13, 0, spinY: rotY, pitchX: rotX, cx: cx, cy: cy, radius: radius)
-        let axisPath = NSBezierPath()
-        axisPath.move(to: NSPoint(x: poleNorth.sx, y: poleNorth.sy))
-        axisPath.line(to: NSPoint(x: poleSouth.sx, y: poleSouth.sy))
-        let pattern: [CGFloat] = [4, 4]
-        axisPath.setLineDash(pattern, count: 2, phase: 0)
-        nodeColor.withAlphaComponent(0.3).setStroke()
-        axisPath.lineWidth = 1.0
-        axisPath.stroke()
 
         // 3. Graticule Lines (Parallels & Meridians)
         graticuleColor.setStroke()
         for line in Self.graticules {
             let path = NSBezierPath()
-            path.lineWidth = 0.95
+            path.lineWidth = 0.55
             var drawing = false
             for pt in line {
                 let p = project3D(pt.vx, pt.vy, pt.vz, spinY: rotY, pitchX: rotX, cx: cx, cy: cy, radius: radius)
@@ -391,16 +390,16 @@ private final class LoginRegionMapView: NSView {
             path.stroke()
         }
 
-        // 4. Land Dots (Multi-Color Continents)
-        let baseDotR = max(0.9, radius * 0.009)
-        for c in 0..<12 {
-            let cColor = Self.continentColor(c, dark: dark)
-            cColor.setFill()
+        // The same quiet green family as the brand; depth defines the continents.
+        let baseDotR = max(0.8, radius * 0.0067)
+        let landColor = NSColor(Color(hex: dark ? "65a58d" : "578775"))
+        for band in 0..<8 {
+            let depth = CGFloat(band + 1) / 8
+            landColor.withAlphaComponent(0.2 + depth * 0.64).setFill()
             let path = NSBezierPath()
             for dot in Self.landDots {
-                guard dot.continent == c else { continue }
                 let p = project3D(dot.vx, dot.vy, dot.vz, spinY: rotY, pitchX: rotX, cx: cx, cy: cy, radius: radius)
-                if p.z > 0.02 {
+                if p.z > 0.02 && min(7, Int(p.z * 8)) == band {
                     let r = baseDotR * (0.65 + p.z * 0.45)
                     path.appendOval(in: NSRect(x: p.sx - r, y: p.sy - r, width: r * 2, height: r * 2))
                 }
@@ -413,7 +412,7 @@ private final class LoginRegionMapView: NSView {
         let now = Date.timeIntervalSinceReferenceDate
         for (rIdx, route) in Self.routes.enumerated() {
             let path = NSBezierPath()
-            path.lineWidth = 1.1
+            path.lineWidth = 0.8
             var drawing = false
             for pt in route.samples {
                 let p = project3D(pt.vx, pt.vy, pt.vz, spinY: rotY, pitchX: rotX, cx: cx, cy: cy, radius: radius)
@@ -434,12 +433,12 @@ private final class LoginRegionMapView: NSView {
                 if p.z > 0.05 {
                     let alpha = sin(.pi * progress) * min(1.0, p.z * 2.0)
                     nodeColor.withAlphaComponent(alpha).setFill()
-                    NSBezierPath(ovalIn: NSRect(x: p.sx - 2.5, y: p.sy - 2.5, width: 5.0, height: 5.0)).fill()
+                    NSBezierPath(ovalIn: NSRect(x: p.sx - 1.5, y: p.sy - 1.5, width: 3, height: 3)).fill()
                 }
             }
         }
 
-        // 6. Project & Render OCI Region Nodes (Enlarged Orange Nodes + Bright White Center)
+        // Region beacons remain readable without overpowering the map.
         for region in LoginPublicRegion.locations {
             let phi = region.latitude * Self.RAD
             let lam = region.longitude * Self.RAD
@@ -451,19 +450,19 @@ private final class LoginRegionMapView: NSView {
             let depthAlpha = min(1.0, p.z * 2.2)
 
             // Outer Pulsing Ring
-            if timer != nil {
+            if timer != nil && ["ap-tokyo-1", "ap-singapore-1", "eu-frankfurt-1", "us-ashburn-1"].contains(region.id) {
                 let phase = Double(region.id.hashValue & 0xffff)
                 let progress = CGFloat((now * 0.45 + phase * 0.001).truncatingRemainder(dividingBy: 1.0))
-                let ringR = 4.0 + progress * 12.0
-                nodeColor.withAlphaComponent((1.0 - progress) * 0.45 * depthAlpha).setStroke()
+                let ringR = 3.0 + progress * 8.0
+                nodeColor.withAlphaComponent((1.0 - progress) * 0.2 * depthAlpha).setStroke()
                 let ringPath = NSBezierPath(ovalIn: NSRect(x: p.sx - ringR, y: p.sy - ringR, width: ringR * 2, height: ringR * 2))
-                ringPath.lineWidth = 1.3
+                ringPath.lineWidth = 0.7
                 ringPath.stroke()
             }
 
             // Glowing Halo
-            let glowR: CGFloat = 12.0
-            let haloColors = [nodeColor.withAlphaComponent(0.32 * depthAlpha).cgColor, CGColor(red: 0, green: 0, blue: 0, alpha: 0)] as CFArray
+            let glowR: CGFloat = 7.0
+            let haloColors = [nodeColor.withAlphaComponent(0.15 * depthAlpha).cgColor, nodeColor.withAlphaComponent(0).cgColor] as CFArray
             if let haloGrad = CGGradient(colorsSpace: colorSpace, colors: haloColors, locations: [0.0, 1.0]) {
                 ctx.drawRadialGradient(haloGrad,
                                        startCenter: CGPoint(x: p.sx, y: p.sy), startRadius: 0,
@@ -473,11 +472,11 @@ private final class LoginRegionMapView: NSView {
 
             // Outer Orange Core (Enlarged)
             nodeColor.withAlphaComponent(depthAlpha).setFill()
-            NSBezierPath(ovalIn: NSRect(x: p.sx - 3.8, y: p.sy - 3.8, width: 7.6, height: 7.6)).fill()
+            NSBezierPath(ovalIn: NSRect(x: p.sx - 2.7, y: p.sy - 2.7, width: 5.4, height: 5.4)).fill()
 
             // Bright White Inner Beacon Center
             NSColor.white.withAlphaComponent(depthAlpha).setFill()
-            NSBezierPath(ovalIn: NSRect(x: p.sx - 1.8, y: p.sy - 1.8, width: 3.6, height: 3.6)).fill()
+            NSBezierPath(ovalIn: NSRect(x: p.sx - 1.1, y: p.sy - 1.1, width: 2.2, height: 2.2)).fill()
         }
     }
 

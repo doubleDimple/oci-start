@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import CoreFoundation
 
 // MARK: - Service
 
@@ -15,37 +16,45 @@ struct InstanceSSHService {
     }
 
     func loadConfig(localId: String) async throws -> SSHConfig {
+        guard let id = Int64(localId), id > 0, String(id) == localId else { throw APIError.invalidURL }
         let url = try client.makeURL(baseURL, path: "/oci/ssh/config/\(localId)")
         let raw = try await client.getJSON(url)
-        guard let obj = try JSONSerialization.jsonObject(with: raw) as? [String: Any] else {
-            return SSHConfig()
+        guard let root = try JSONSerialization.jsonObject(with: raw) as? [String: Any],
+              root["success"] as? Bool == true, let value = root["data"] else { throw APIError.invalidResponse }
+        if value is NSNull { return SSHConfig() }
+        guard let data = value as? [String: Any] else { throw APIError.invalidResponse }
+        var config = SSHConfig()
+        for key in ["host", "username", "sshPassword"] {
+            if let value = data[key], !(value is NSNull), !(value is String) { throw APIError.invalidResponse }
         }
-        let ok = (obj["success"] as? Bool) ?? false
-        guard ok, let data = obj["data"] as? [String: Any] else {
-            return SSHConfig()
+        config.host = data["host"] as? String ?? ""
+        config.username = data["username"] as? String ?? ""
+        config.password = data["sshPassword"] as? String ?? ""
+        if let value = data["port"], !(value is NSNull) {
+            guard let number = value as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID(),
+                  number.doubleValue.rounded() == number.doubleValue,
+                  (1...65535).contains(number.intValue) else { throw APIError.invalidResponse }
+            config.port = String(number.intValue)
         }
-        var c = SSHConfig()
-        c.username = InstanceJSON.string(data["username"]).isEmpty ? "root" : InstanceJSON.string(data["username"])
-        c.host = InstanceJSON.string(data["host"])
-        let p = InstanceJSON.string(data["port"])
-        c.port = p.isEmpty ? "22" : p
-        c.password = InstanceJSON.string(data["sshPassword"])
-        if c.password.isEmpty {
-            c.password = InstanceJSON.string(data["password"])
-        }
-        return c
+        return config
     }
 
     func saveConfig(localId: String, username: String, port: String, password: String) async throws {
+        guard let id = Int64(localId), id > 0, String(id) == localId,
+              !username.isEmpty, username.rangeOfCharacter(from: .controlCharacters) == nil,
+              !password.contains("\0"), let p = Int(port), (1...65535).contains(p) else { throw APIError.invalidURL }
         let url = try client.makeURL(baseURL, path: "/oci/ssh/config")
         let raw = try await client.postJSON(url, body: [
-            "instanceId": localId,
-            "username": username,
-            "port": port,
-            "password": password
-        ])
-        let r = InstanceJSON.successMessage(raw, fallback: "SSH 配置已保存")
-        if !r.ok { throw APIError.serverMessage(r.message) }
+            "instanceId": localId, "username": username, "port": String(p), "password": password
+        ], longTimeout: true)
+        let receipt = InstanceJSON.successMessage(raw, fallback: "SSH 配置已保存")
+        guard receipt.ok else { throw APIError.serverMessage(receipt.message) }
+        let saved: SSHConfig
+        do { saved = try await loadConfig(localId: localId) }
+        catch { throw APIError.serverMessage("保存已获服务端回执，但读取核对失败。请重新加载配置核对，勿重复保存。") }
+        guard saved.username == username, saved.port == String(p), saved.password == password else {
+            throw APIError.serverMessage("保存已获服务端回执，但配置核对不一致。请重新加载配置核对。")
+        }
     }
 
     /// POST `/oci/sftp/upload` multipart
@@ -79,7 +88,7 @@ struct InstanceSSHService {
             }
             return dataMsg.isEmpty ? (msg.isEmpty ? remotePath : msg) : dataMsg
         }
-        return remotePath
+        throw APIError.serverMessage("上传结果未知，请核对远程文件，勿重复上传。")
     }
 
     /// POST `/oci/sftp/download` → binary file
@@ -108,6 +117,9 @@ struct InstanceSSHService {
             let msg = String(data: data, encoding: .utf8) ?? "HTTP \(http.statusCode)"
             throw APIError.serverMessage(msg.isEmpty ? "下载失败" : msg)
         }
+        guard http.mimeType?.lowercased() == "application/octet-stream" else {
+            throw APIError.serverMessage("下载响应不是文件，请核对路径与权限。")
+        }
         var name = remotePath.split(separator: "/").last.map(String.init) ?? "download"
         if let cd = http.value(forHTTPHeaderField: "Content-Disposition") {
             if let r = cd.range(of: "filename\\*=UTF-8''([^;]+)", options: .regularExpression) {
@@ -119,6 +131,8 @@ struct InstanceSSHService {
                     .replacingOccurrences(of: "\"", with: "")
             }
         }
+        name = (name.replacingOccurrences(of: "\\", with: "/") as NSString).lastPathComponent
+        if name.isEmpty || name == "." || name == ".." || name.rangeOfCharacter(from: .controlCharacters) != nil { name = "download" }
         return (data, name)
     }
 }
@@ -137,7 +151,7 @@ final class InstanceSSHViewModel: ObservableObject {
     @Published var port = "22"
     @Published var password = ""
     @Published var showPassword = false
-    @Published var output = ""
+    let terminal = TerminalSessionController()
     @Published var statusText = "未连接"
     @Published var isConnected = false
     @Published var isConnecting = false
@@ -146,7 +160,7 @@ final class InstanceSSHViewModel: ObservableObject {
     @Published var transferProgress: Double = 0
     @Published var errorText: String?
     @Published var fontSize: CGFloat = 14
-    @Published var themeKey: String = "matrix"
+    @Published var themeKey: String = "system"
     @Published var termCols: Int = 80
     @Published var termRows: Int = 24
     @Published var showSearch = false
@@ -154,9 +168,15 @@ final class InstanceSSHViewModel: ObservableObject {
     @Published var searchHitText = ""
 
     private var lastResizeSent = (0, 0)
+    private var active = false
+    private var connectionGeneration = 0
+    private var connectDeadline: DispatchWorkItem?
+    private var savedDraft: (String, String, String)?
+    @Published private(set) var saveRequiresReview = false
 
     var themeOptions: [SelectOption] {
         [
+            SelectOption(id: "system", title: "跟随系统"),
             SelectOption(id: "matrix", title: "Matrix"),
             SelectOption(id: "tokyonight", title: "Tokyo Night"),
             SelectOption(id: "dracula", title: "Dracula"),
@@ -181,6 +201,15 @@ final class InstanceSSHViewModel: ObservableObject {
             themeKey = th
         }
         wireWS()
+        terminal.onOverflow = { [weak self] in
+            guard let self = self else { return }
+            self.disconnect(userInitiated: false)
+            self.errorText = "终端输出超过缓冲上限，连接已停止。请重新连接。"
+        }
+        terminal.onSearchResult = { [weak self] index, total in
+            guard let self = self else { return }
+            self.searchHitText = self.searchQuery.isEmpty ? "" : (total == 0 ? "无结果" : "\(index) / \(total)")
+        }
     }
 
     private func wireWS() {
@@ -195,60 +224,60 @@ final class InstanceSSHViewModel: ObservableObject {
             case .open:
                 break
             case .closed(let reason):
+                self.connectDeadline?.cancel()
                 if self.isConnected || self.isConnecting {
+                    self.connectionGeneration += 1
                     self.isConnected = false
                     self.isConnecting = false
                     self.statusText = reason.map { "已断开：\($0)" } ?? "已断开"
+                    self.terminal.reset()
                 }
             }
         }
         ws.onText = { [weak self] text in
             self?.handleWSText(text)
         }
+        ws.onBinary = { [weak self] data in
+            guard let self = self, self.active, self.isConnected || self.isConnecting else { return }
+            self.terminal.write(data)
+        }
     }
 
     private func handleWSText(_ text: String) {
-        // 服务端多为裸文本；兼容 JSON {type,data/message}
+        guard active, isConnected || isConnecting else { return }
         if let data = text.data(using: .utf8),
-           let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-           let type = obj["type"] as? String {
+           let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let type = object["type"] as? String {
             if type == "output" {
-                let d = InstanceJSON.string(obj["data"])
-                if !d.isEmpty { append(d) }
+                append(InstanceJSON.string(object["data"]))
             } else if type == "error" {
-                let msg = InstanceJSON.string(obj["message"])
-                append("\r\n\u{001B}[31m\(msg.isEmpty ? "错误" : msg)\u{001B}[0m\r\n")
+                let message = InstanceJSON.string(object["message"])
                 disconnect(userInitiated: false)
-                return
-            } else {
-                append(text)
-            }
-        } else {
-            append(text)
-        }
-
-        if !isConnected {
-            if text.contains("SSH conn success") || text.contains("✅") {
-                isConnected = true
-                isConnecting = false
-                statusText = "已连接 \(username)@\(host)"
-                // 连接后同步终端尺寸
-                sendResize(cols: termCols, rows: termRows, force: true)
-            } else if text.contains("SSH conn error") || text.contains("❌") {
-                isConnecting = false
-                isConnected = false
+                errorText = message.replacingOccurrences(of: password, with: password.isEmpty ? "" : "[redacted]")
                 statusText = "连接失败"
-            } else {
-                // 任意输出也视为已连通（对齐 Web：首包后 connected=true）
+            }
+            return
+        }
+        if isConnecting {
+            if text == "\r\n✅ SSH conn success\r\n" {
+                connectDeadline?.cancel()
                 isConnected = true
                 isConnecting = false
                 statusText = "已连接 \(username)@\(host)"
                 sendResize(cols: termCols, rows: termRows, force: true)
+            } else if text.hasPrefix("\r\n❌ SSH conn error: ") {
+                disconnect(userInitiated: false)
+                errorText = "SSH 连接失败，请核对连接参数。"
+                statusText = "连接失败"
+                return
             }
         }
+        append(text)
     }
 
     func start() {
+        guard !active else { return }
+        active = true
         append("欢迎使用 OCI-Start SSH 终端\r\n\r\n")
         Task { await loadConfig() }
     }
@@ -258,17 +287,23 @@ final class InstanceSSHViewModel: ObservableObject {
         defer { isBusy = false }
         do {
             let c = try await service.loadConfig(localId: item.id)
+            guard active else { return }
             if !c.username.isEmpty { username = c.username }
             if !c.host.isEmpty { host = c.host }
             else if host.isEmpty { host = item.publicIps }
             if !c.port.isEmpty { port = c.port }
-            if !c.password.isEmpty { password = c.password }
+            password = c.password
+            savedDraft = (username, port, password)
+            saveRequiresReview = false
+            errorText = nil
         } catch {
-            if host.isEmpty { host = item.publicIps }
+            guard active else { return }
+            errorText = error.localizedDescription
         }
     }
 
     func connect() {
+        guard active, !isConnecting, !isConnected, !isBusy, !isTransferring else { return }
         let u = username.trimmingCharacters(in: .whitespacesAndNewlines)
         let h = host.trimmingCharacters(in: .whitespacesAndNewlines)
         let p = port.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -281,6 +316,14 @@ final class InstanceSSHViewModel: ObservableObject {
             errorText = "端口无效"
             return
         }
+        guard u.rangeOfCharacter(from: .controlCharacters) == nil,
+              h.rangeOfCharacter(from: CharacterSet(charactersIn: "/\\?#@").union(.whitespacesAndNewlines).union(.controlCharacters)) == nil,
+              !password.contains("\0") else { errorText = "连接参数无效"; return }
+        let secret = password
+        terminal.reset(clearLog: true)
+        searchHitText = ""
+        connectionGeneration += 1
+        let generation = connectionGeneration
         errorText = nil
         isConnecting = true
         statusText = "连接中…"
@@ -289,15 +332,24 @@ final class InstanceSSHViewModel: ObservableObject {
         do {
             let url = try NativeWSURL.make(baseHTTP: session.serverURL, path: "/ws/ssh")
             ws.connect(url: url)
+            let timeout = DispatchWorkItem { [weak self] in
+                guard let self = self, self.connectionGeneration == generation, self.isConnecting else { return }
+                self.disconnect(userInitiated: false)
+                self.errorText = "SSH 连接超时，请核对连接参数。"
+                self.statusText = "连接超时"
+            }
+            connectDeadline?.cancel()
+            connectDeadline = timeout
+            DispatchQueue.main.asyncAfter(deadline: .now() + 30, execute: timeout)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
-                guard let self = self else { return }
+                guard let self = self, self.active, self.isConnecting, self.connectionGeneration == generation else { return }
                 self.ws.sendJSON([
                     "type": "connect",
                     "data": [
                         "host": h,
                         "port": portNum,
                         "username": u,
-                        "password": self.password
+                        "password": secret
                     ]
                 ])
             }
@@ -309,9 +361,14 @@ final class InstanceSSHViewModel: ObservableObject {
     }
 
     func disconnect(userInitiated: Bool = true) {
-        ws.disconnect(reason: nil)
+        connectionGeneration += 1
+        connectDeadline?.cancel()
+        connectDeadline = nil
+        lastResizeSent = (0, 0)
         isConnected = false
         isConnecting = false
+        terminal.reset()
+        ws.disconnect(reason: nil)
         statusText = "已断开"
         if userInitiated {
             append("\r\n\u{001B}[33m● 连接已断开\u{001B}[0m\r\n")
@@ -320,8 +377,10 @@ final class InstanceSSHViewModel: ObservableObject {
 
     func reconnect() {
         disconnect(userInitiated: true)
+        let generation = connectionGeneration
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
-            self?.connect()
+            guard let self = self, self.active, self.connectionGeneration == generation else { return }
+            self.connect()
         }
     }
 
@@ -347,18 +406,20 @@ final class InstanceSSHViewModel: ObservableObject {
     }
 
     func saveConfig() {
+        guard !isBusy, !isTransferring, !saveRequiresReview else { return }
+        let draft = (username.trimmingCharacters(in: .whitespacesAndNewlines),
+                     port.trimmingCharacters(in: .whitespacesAndNewlines), password)
+        isBusy = true
         Task {
-            isBusy = true
             do {
-                try await service.saveConfig(
-                    localId: item.id,
-                    username: username.trimmingCharacters(in: .whitespacesAndNewlines),
-                    port: port.trimmingCharacters(in: .whitespacesAndNewlines),
-                    password: password
-                )
-                ToastCenter.shared.success("SSH 配置已保存")
+                try await service.saveConfig(localId: item.id, username: draft.0, port: draft.1, password: draft.2)
+                savedDraft = draft
+                ToastCenter.shared.success("SSH 配置已保存并核对")
             } catch {
-                ToastCenter.shared.error(error.localizedDescription)
+                saveRequiresReview = true
+                let message = draft.2.isEmpty ? error.localizedDescription : error.localizedDescription.replacingOccurrences(of: draft.2, with: "[redacted]")
+                errorText = message
+                ToastCenter.shared.error(message)
             }
             isBusy = false
         }
@@ -391,12 +452,12 @@ final class InstanceSSHViewModel: ObservableObject {
     }
 
     func clearOutput() {
-        output = ""
+        terminal.clear()
         searchHitText = ""
     }
 
     func downloadLog() {
-        let plain = TerminalANSI.plainForLog(output)
+        let plain = terminal.exportText()
         guard !plain.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             ToastCenter.shared.error("暂无终端输出内容")
             return
@@ -546,32 +607,39 @@ final class InstanceSSHViewModel: ObservableObject {
         isTransferring = false
     }
 
-    func updateSearch() {
-        let q = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !q.isEmpty else {
-            searchHitText = ""
-            return
-        }
-        let plain = TerminalANSI.strip(output).lowercased()
-        let needle = q.lowercased()
-        var count = 0
-        var range = plain.startIndex..<plain.endIndex
-        while let r = plain.range(of: needle, options: [], range: range) {
-            count += 1
-            range = r.upperBound..<plain.endIndex
-        }
-        searchHitText = count == 0 ? "无结果" : "\(count) 处"
+    func updateSearch(direction: Int = 0) {
+        terminal.search(searchQuery, direction: direction)
     }
 
     private func append(_ s: String) {
-        output += s
-        if output.count > 400_000 {
-            output = String(output.suffix(300_000))
+        terminal.write(s)
+    }
+
+    func canLeave() -> Bool {
+        if isBusy || isTransferring {
+            ToastCenter.shared.error("配置或文件传输进行中，请等待完成。")
+            return false
         }
+        let dirty = savedDraft.map { $0 != (username, port, password) } ?? false
+        if isConnected || isConnecting || dirty || saveRequiresReview {
+            return AppAlert.confirm(title: "离开 SSH", message: saveRequiresReview
+                ? "保存结果尚未核对，请重新进入后加载配置核对，勿重复保存。终端连接将断开。"
+                : "终端连接将断开，未保存的配置更改将丢弃。")
+        }
+        return true
     }
 
     func teardown() {
-        ws.disconnect(reason: nil)
+        active = false
+        disconnect(userInitiated: false)
+        password = ""
+        savedDraft = nil
+        saveRequiresReview = false
+        showPassword = false
+        terminal.reset(clearLog: true)
+        searchQuery = ""
+        searchHitText = ""
+        errorText = nil
     }
 }
 
@@ -582,6 +650,8 @@ struct InstanceSSHView: View {
     var onBack: (() -> Void)?
     @EnvironmentObject private var appearance: AppearanceController
     @EnvironmentObject private var session: AppSession
+    @EnvironmentObject private var navigation: NavigationState
+    @State private var leaveGuardOwner = UUID()
     @StateObject private var model: InstanceSSHViewModel
 
     init(item: InstanceItem, onBack: (() -> Void)? = nil) {
@@ -615,12 +685,20 @@ struct InstanceSSHView: View {
                     .padding(.vertical, 4)
             }
             TerminalEmulatorView(
-                output: $model.output,
+                controller: model.terminal,
                 isInteractive: model.isConnected,
                 onInput: { model.sendInput($0) },
                 fontSize: model.fontSize,
                 theme: model.terminalTheme,
-                onResize: { cols, rows in model.onTerminalResize(cols: cols, rows: rows) }
+                onResize: { cols, rows in model.onTerminalResize(cols: cols, rows: rows) },
+                onShortcut: { shortcut in
+                    switch shortcut {
+                    case .search: model.showSearch = true
+                    case .increaseFont: model.changeFont(1)
+                    case .decreaseFont: model.changeFont(-1)
+                    case .fullscreen: NSApp.keyWindow?.toggleFullScreen(nil)
+                    }
+                }
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             footer
@@ -630,8 +708,12 @@ struct InstanceSSHView: View {
         .onAppear {
             FloatingMenuDismiss.all()
             model.start()
+            navigation.setLeaveGuard(owner: leaveGuardOwner) { model.canLeave() }
         }
-        .onDisappear { model.teardown() }
+        .onDisappear {
+            navigation.removeLeaveGuard(owner: leaveGuardOwner)
+            model.teardown()
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in }
     }
 
@@ -641,6 +723,7 @@ struct InstanceSSHView: View {
         HStack(spacing: 10) {
             if onBack != nil {
                 AppButton(title: "返回", systemImage: "chevron.left", kind: .secondary) {
+                    guard model.canLeave() else { return }
                     model.teardown()
                     onBack?()
                 }
@@ -663,6 +746,12 @@ struct InstanceSSHView: View {
                 }
             }
             Spacer()
+            if model.saveRequiresReview {
+                AppButton(title: "重新加载核对", systemImage: "arrow.clockwise", kind: .secondary) {
+                    guard !model.isBusy, !model.isTransferring else { return }
+                    Task { await model.loadConfig() }
+                }
+            }
             AppButton(
                 title: "保存配置",
                 systemImage: "square.and.arrow.down",
@@ -671,6 +760,7 @@ struct InstanceSSHView: View {
             ) {
                 model.saveConfig()
             }
+            .disabled(model.isBusy || model.isTransferring || model.saveRequiresReview)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
@@ -734,7 +824,7 @@ struct InstanceSSHView: View {
         // macOS 11 ViewBuilder HStack 最多 10 个子视图，分组打包
         HStack(spacing: 6) {
             Group {
-                toolBtn("清屏", "eraser", tip: "Ctrl+L") { model.clearOutput() }
+                toolBtn("清屏", "eraser", tip: "清除当前终端显示") { model.clearOutput() }
                 toolBtn("复制命令", "link", tip: "复制 ssh 命令") { model.copySSHCommand() }
                 toolBtn("下载日志", "arrow.down.doc", tip: "导出终端日志") { model.downloadLog() }
             }
@@ -761,7 +851,7 @@ struct InstanceSSHView: View {
                 options: model.themeOptions,
                 selection: Binding(
                     get: { model.themeKey },
-                    set: { model.setTheme($0 ?? "matrix") }
+                    set: { model.setTheme($0 ?? "system") }
                 ),
                 placeholder: "主题",
                 width: 130,
@@ -787,7 +877,7 @@ struct InstanceSSHView: View {
             Image(systemName: "magnifyingglass")
                 .foregroundColor(AppTheme.textSecondary(dark))
             TextField("搜索终端内容…", text: $model.searchQuery, onCommit: {
-                model.updateSearch()
+                model.updateSearch(direction: 1)
             })
             .textFieldStyle(PlainTextFieldStyle())
             .font(.system(size: 12))
@@ -797,6 +887,14 @@ struct InstanceSSHView: View {
                     .font(.system(size: 11))
                     .foregroundColor(AppTheme.textSecondary(dark))
             }
+            Button(action: { model.updateSearch(direction: -1) }) {
+                Image(systemName: "chevron.up")
+            }.buttonStyle(PlainButtonStyle()).help("上一个结果")
+                .disabled(model.searchQuery.isEmpty)
+            Button(action: { model.updateSearch(direction: 1) }) {
+                Image(systemName: "chevron.down")
+            }.buttonStyle(PlainButtonStyle()).help("下一个结果")
+                .disabled(model.searchQuery.isEmpty)
             Button(action: { model.showSearch = false; model.searchQuery = ""; model.searchHitText = "" }) {
                 Image(systemName: "xmark")
                     .font(.system(size: 11, weight: .semibold))

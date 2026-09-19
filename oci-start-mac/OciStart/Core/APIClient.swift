@@ -7,6 +7,7 @@ final class APIClient {
     private let session: URLSession
     /// 长耗时接口（如 `/tenants/syncOci`，Web 侧约 3 分钟进度窗口）
     private let longSession: URLSession
+    private let importSession: URLSession
 
     private init() {
         let config = URLSessionConfiguration.default
@@ -24,21 +25,38 @@ final class APIClient {
         longConfig.timeoutIntervalForRequest = 200
         longConfig.timeoutIntervalForResource = 210
         longSession = URLSession(configuration: longConfig)
+        let importConfig = URLSessionConfiguration.default
+        importConfig.httpCookieStorage = HTTPCookieStorage.shared
+        importConfig.timeoutIntervalForRequest = 86_400
+        importConfig.timeoutIntervalForResource = 86_400
+        importSession = URLSession(configuration: importConfig)
     }
 
     // MARK: - Raw
 
-    func data(for request: URLRequest) async throws -> (Data, HTTPURLResponse) {
-        try await data(for: request, using: session)
+    func data(for request: URLRequest, longRunning: Bool = false) async throws -> (Data, HTTPURLResponse) {
+        try await data(for: request, using: longRunning ? importSession : session)
     }
 
     private func data(for request: URLRequest, using session: URLSession) async throws -> (Data, HTTPURLResponse) {
+        let authContext = await MainActor.run {
+            (AppSession.shared.authenticationGeneration, AppSession.shared.serverURL, AppSession.shared.isLoggedIn)
+        }
         do {
             let (data, response) = try await session.compatData(for: request)
             guard let http = response as? HTTPURLResponse else {
                 throw APIError.invalidResponse
             }
-            if http.statusCode == 401 {
+            let body = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+            let redirectedToLogin = http.url?.path == "/login" || http.url?.path == "/m/login"
+            let expired = http.statusCode == 401 || (body?["code"] as? NSNumber)?.intValue == 401
+                || (redirectedToLogin && request.url?.path != http.url?.path)
+            if expired {
+                if authContext.2, Self.sameOrigin(request.url, URL(string: authContext.1)) {
+                    await AppSession.shared.expireSession(generation: authContext.0, baseURL: authContext.1)
+                }
+                // The login endpoint owns its invalid-password / factor error message.
+                if !authContext.2, request.url?.path == "/perform_login" { return (data, http) }
                 throw APIError.unauthorized
             }
             return (data, http)
@@ -47,6 +65,13 @@ final class APIClient {
         } catch {
             throw APIError.network(error)
         }
+    }
+
+    private static func sameOrigin(_ left: URL?, _ right: URL?) -> Bool {
+        guard let left = left, let right = right else { return false }
+        func port(_ url: URL) -> Int { url.port ?? (url.scheme?.lowercased() == "https" ? 443 : 80) }
+        return left.scheme?.lowercased() == right.scheme?.lowercased()
+            && left.host?.lowercased() == right.host?.lowercased() && port(left) == port(right)
     }
 
     func getHTML(_ url: URL) async throws -> String {

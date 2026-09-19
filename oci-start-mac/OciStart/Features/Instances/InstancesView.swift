@@ -71,9 +71,8 @@ struct InstancesView: View {
                 content: {
                     VStack(spacing: 0) {
                         filterBar(width: proxy.size.width - AppTheme.pagePadding * 2)
-                        if let err = model.errorText, !err.isEmpty { errorBanner(err) }
                         listBody
-                        PaginationBar(state: $model.pageState) {
+                        PaginationBar(state: $model.pageState, disabled: model.isLoading) {
                             model.onPageChange()
                         }
                     }
@@ -96,6 +95,9 @@ struct InstancesView: View {
 
     private var toolbar: some View {
         HStack(spacing: 8) {
+            if let error = model.errorText, !error.isEmpty {
+                PageErrorIndicator(message: error, retry: { Task { await model.reload() } })
+            }
             AppButton(
                 title: model.namesHidden ? "显示名称" : "隐藏名称",
                 systemImage: model.namesHidden ? "eye" : "eye.slash",
@@ -186,22 +188,6 @@ struct InstancesView: View {
 
     // MARK: - Summary
 
-    private func errorBanner(_ text: String) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "exclamationmark.triangle.fill")
-            Text(text).font(.system(size: 14))
-            Spacer()
-            Button("重试") { Task { await model.reload() } }
-                .buttonStyle(PlainButtonStyle())
-                .font(.system(size: 12, weight: .semibold))
-        }
-        .foregroundColor(Color(hex: "f85149"))
-        .padding(12)
-        .background(Color(hex: "f85149").opacity(0.1))
-        .cornerRadius(10)
-        .padding(.horizontal, 16)
-        .padding(.top, 4)
-    }
 
     // MARK: - Table
 
@@ -236,8 +222,6 @@ struct InstancesView: View {
                 let flex = max(0, totalW - fixedColsWidth)
                 let wName = minName + flex * 0.55
                 let wIp = minIp + flex * 0.45
-                let needsHScroll = totalW > geo.size.width + 0.5
-
                 let table = VStack(spacing: 0) {
                     headerRow(wName: wName, wIp: wIp, width: totalW)
                     ScrollView {
@@ -250,14 +234,7 @@ struct InstancesView: View {
                 }
                 .frame(width: totalW, height: geo.size.height, alignment: .topLeading)
 
-                Group {
-                    if needsHScroll {
-                        ScrollView(.horizontal, showsIndicators: true) { table }
-                            .frame(width: geo.size.width, height: geo.size.height)
-                    } else {
-                        table
-                    }
-                }
+                NativeFixedTrailingTable(contentWidth: totalW, viewportWidth: geo.size.width, height: geo.size.height) { table }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(tableCardBackground)
@@ -283,13 +260,16 @@ struct InstancesView: View {
                 colHeader("公网 IPv4", wIp)
                 colHeader("IPv6", wIpv6, align: .center)
                 colHeader("创建时间", wTime)
-                colHeader("操作", wAction, align: .center)
+                Color.clear.frame(width: wAction, height: 1)
             }
         }
         .padding(.horizontal, hPad)
         .padding(.vertical, 10)
         .frame(width: width, alignment: .leading)
         .background(AppTheme.inputBg(dark))
+        .modifier(NativeFixedTableActions(width: wAction, trailingPadding: hPad, background: AppTheme.inputBg(dark)) {
+            colHeader("操作", wAction, align: .center)
+        })
         .overlay(
             Rectangle().frame(height: 1).foregroundColor(AppTheme.border(dark).opacity(0.5)),
             alignment: .bottom
@@ -313,8 +293,7 @@ struct InstancesView: View {
                 ipCell(item, width: wIp)
                 ipv6Cell(item, width: wIpv6)
                 cellText(item.createDateText, wTime, muted: true)
-                actionBar(item)
-                    .frame(width: wAction, alignment: .center)
+                Color.clear.frame(width: wAction, height: 26)
             }
         }
         .padding(.horizontal, hPad)
@@ -331,6 +310,10 @@ struct InstancesView: View {
                 hoveredRowId = inside ? item.id : (hoveredRowId == item.id ? nil : hoveredRowId)
             }
         }
+        .modifier(NativeFixedTableActions(width: wAction, trailingPadding: hPad,
+                                         background: hovered ? AppTheme.mix(AppTheme.sidebarActive, fraction: dark ? 0.12 : 0.08, with: AppTheme.cardBg(dark)) : grp % 2 == 1 ? AppTheme.hover(dark) : AppTheme.cardBg(dark)) {
+            actionBar(item).frame(width: wAction, alignment: .center)
+        })
     }
 
     private func rowBackground(group: Int, hovered: Bool) -> Color {

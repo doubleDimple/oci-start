@@ -112,6 +112,7 @@ private final class SelectMenuPanelState: ObservableObject {
 
 private struct SelectMenuPanelView: View {
     @ObservedObject var state: SelectMenuPanelState
+    @ObservedObject private var appearance = AppearanceController.shared
 
     private var dark: Bool { state.dark }
     private var accent: Color {
@@ -184,14 +185,15 @@ private struct SelectMenuPanelView: View {
         }
         .frame(width: state.panelWidth, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: AppInputStyle.radius)
+            RoundedRectangle(cornerRadius: 14)
                 .fill(panelBg)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: AppInputStyle.radius)
-                .stroke(AppInputStyle.border(dark, focused: true).opacity(0.7), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(AppTheme.border(dark), lineWidth: 1)
         )
-        .shadow(color: Color.black.opacity(dark ? 0.45 : 0.14), radius: 14, y: 6)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .shadow(color: AppTheme.cardShadow(dark), radius: AppTheme.cardShadowRadius, y: AppTheme.cardShadowY)
     }
 
     private var searchBar: some View {
@@ -235,8 +237,8 @@ private struct SelectMenuPanelView: View {
         }()
         let bg: Color = {
             guard enabled else { return .clear }
-            if selected { return accent.opacity(dark ? 0.16 : 0.12) }
-            if hovering { return accent.opacity(dark ? 0.10 : 0.07) }
+            if selected { return AppTheme.statusBg(accent, dark) }
+            if hovering { return AppTheme.hover(dark) }
             return .clear
         }()
 
@@ -257,7 +259,7 @@ private struct SelectMenuPanelView: View {
                 Spacer(minLength: 4)
                 if selected && !muted {
                     Image(systemName: "checkmark")
-                        .font(.system(size: 11, weight: .bold))
+                        .font(.system(size: AppTheme.captionSize, weight: .bold))
                         .foregroundColor(accent)
                 }
             }
@@ -569,11 +571,11 @@ struct SelectMenu: View {
             .padding(.horizontal, AppInputStyle.hPad)
             .frame(width: resolvedWidth, height: AppInputStyle.height)
             .background(
-                RoundedRectangle(cornerRadius: AppInputStyle.radius)
+                RoundedRectangle(cornerRadius: AppInputStyle.pillRadius)
                     .fill(AppInputStyle.fill(dark, focused: panelState.isOpen))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: AppInputStyle.radius)
+                RoundedRectangle(cornerRadius: AppInputStyle.pillRadius)
                     .stroke(
                         AppInputStyle.border(dark, focused: panelState.isOpen),
                         lineWidth: panelState.isOpen ? 1.5 : 1

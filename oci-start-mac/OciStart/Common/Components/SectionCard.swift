@@ -25,5 +25,6 @@ struct SectionCard<Content: View>: View {
             RoundedRectangle(cornerRadius: AppTheme.cardRadius)
                 .stroke(AppTheme.border(dark).opacity(0.7), lineWidth: 1)
         )
+        .shadow(color: AppTheme.cardShadow(dark), radius: AppTheme.cardShadowRadius, y: AppTheme.cardShadowY)
     }
 }

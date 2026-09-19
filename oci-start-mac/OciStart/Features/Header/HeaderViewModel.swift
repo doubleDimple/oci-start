@@ -12,6 +12,11 @@ final class HeaderViewModel: ObservableObject {
     @Published private(set) var levelBadgeTitle: String = "Lvl.1"
     @Published private(set) var levelBadgeLevel: Int = 1
     @Published var locale: AppLocale = .zhCN
+    @Published private(set) var localeSyncing = false
+    @Published private(set) var messagesError: String?
+    @Published private(set) var messageMutationBusy = false
+    @Published private(set) var unreadError: String?
+    @Published private(set) var unreadLoaded = false
     @Published var showMessages = false
     @Published var showAsset = false
     @Published var showAbout = false
@@ -25,6 +30,10 @@ final class HeaderViewModel: ObservableObject {
 
     private let session: AppSession
     private var pollTimer: Timer?
+    private var active = false
+    private var messageGeneration = 0
+    private var detailGeneration = 0
+    private var unreadGeneration = 0
     private let localeKey = "appLocale"
 
     init(session: AppSession = .shared) {
@@ -36,32 +45,48 @@ final class HeaderViewModel: ObservableObject {
     }
 
     func start() {
-        Task {
+        active = true
+        locale = LanguageManager.shared.locale
+        version.currentVersion = Self.appMarketingVersion
+        Task { @MainActor in
             await refreshUserInfo()
             await refreshUnread()
-            await checkVersion()
-        }
-        stopPoll()
-        pollTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
-            guard let self = self else { return }
-            Task { @MainActor in
-                await self.refreshUnread()
-                await self.checkVersion()
-            }
-        }
-        if let pollTimer = pollTimer {
-            RunLoop.main.add(pollTimer, forMode: .common)
         }
     }
 
     func stop() {
+        active = false
+        messageGeneration += 1
+        detailGeneration += 1
+        unreadGeneration += 1
         stopPoll()
     }
 
-    func setLocale(_ loc: AppLocale) {
-        locale = loc
-        UserDefaults.standard.set(loc.rawValue, forKey: localeKey)
-        // Instant — no text toast; selection checkmark is enough.
+    func setLocale(_ loc: AppLocale) async -> Bool {
+        guard !localeSyncing else { return false }
+        if locale == loc { return true }
+        localeSyncing = true
+        defer { localeSyncing = false }
+        do {
+            let url = try APIClient.shared.makeURL(session.serverURL, path: "/api/userInfo", query: ["lang": loc.rawValue])
+            let raw = try await APIClient.shared.getJSON(url)
+            try requireSuccess(raw)
+            guard active else { return false }
+            LanguageManager.shared.setLocale(loc)
+            locale = LanguageManager.shared.locale
+            return true
+        } catch {
+            if active { ToastCenter.shared.error(LanguageManager.shared.text("语言切换未完成，请重试。", "Could not change the language. Please try again.")) }
+            return false
+        }
+    }
+
+    private func requireSuccess(_ raw: Data) throws {
+        guard let object = try JSONSerialization.jsonObject(with: raw) as? [String: Any],
+              object["success"] as? Bool == true else { throw APIError.invalidResponse }
+        if let code = object["code"], !["0", "200"].contains(String(describing: code)) {
+            throw APIError.serverMessage(object["message"] as? String ?? "请求未确认完成")
+        }
     }
 
     // MARK: - User
@@ -70,6 +95,7 @@ final class HeaderViewModel: ObservableObject {
         do {
             let url = try APIClient.shared.makeURL(session.serverURL, path: "/api/userInfo")
             let raw = try await APIClient.shared.getJSON(url)
+            guard active else { return }
             if let env = try? JSONDecoder().decode(APIEnvelope<[String: String]>.self, from: raw),
                env.success, let name = env.data?["username"], !name.isEmpty {
                 session.applyRemoteUsername(name)
@@ -86,21 +112,20 @@ final class HeaderViewModel: ObservableObject {
     // MARK: - Messages
 
     func refreshUnread() async {
+        unreadGeneration += 1
+        let generation = unreadGeneration
         do {
             let url = try APIClient.shared.makeURL(session.serverURL, path: "/sysMessage/countUnread")
             let raw = try await APIClient.shared.postJSON(url, body: [:])
-            if let env = try? JSONDecoder().decode(APIEnvelope<Int>.self, from: raw), env.success {
-                unreadCount = env.data ?? 0
-            } else if let obj = try? JSONSerialization.jsonObject(with: raw) as? [String: Any],
-                      let success = obj["success"] as? Bool, success {
-                if let n = obj["data"] as? Int {
-                    unreadCount = n
-                } else if let n = obj["data"] as? Int64 {
-                    unreadCount = Int(n)
-                }
-            }
+            try requireSuccess(raw)
+            guard let object = try JSONSerialization.jsonObject(with: raw) as? [String: Any],
+                  let count = object["data"] as? Int, count >= 0 else { throw APIError.invalidResponse }
+            guard active, generation == unreadGeneration else { return }
+            unreadCount = count
+            unreadLoaded = true
+            unreadError = nil
         } catch {
-            // ignore poll errors
+            if active, generation == unreadGeneration { unreadError = error.localizedDescription }
         }
     }
 
@@ -108,10 +133,13 @@ final class HeaderViewModel: ObservableObject {
         messageDetail = nil
         selectedMessage = nil
         showMessages = true
-        Task { await loadMessages(page: 1) }
+        Task { @MainActor in await loadMessages(page: 1); await refreshUnread() }
     }
 
     func closeMessages() {
+        guard !messageMutationBusy else { return }
+        messageGeneration += 1
+        detailGeneration += 1
         showMessages = false
         messageDetail = nil
         selectedMessage = nil
@@ -132,25 +160,37 @@ final class HeaderViewModel: ObservableObject {
     }
 
     func loadMessages(page: Int) async {
+        messageGeneration += 1
+        let generation = messageGeneration
         messagesLoading = true
-        defer { messagesLoading = false }
+        defer { if generation == messageGeneration { messagesLoading = false } }
         do {
             let url = try APIClient.shared.makeURL(session.serverURL, path: "/sysMessage/list")
             let raw = try await APIClient.shared.postJSON(url, body: [
                 "pageNum": page,
-                "pageSize": 12
+                "pageSize": 5
             ])
+            try requireSuccess(raw)
+            guard let object = try JSONSerialization.jsonObject(with: raw) as? [String: Any],
+                  let body = object["data"] as? [String: Any],
+                  body["content"] is [[String: Any]], body["totalElements"] is Int else { throw APIError.invalidResponse }
+            guard active, generation == messageGeneration else { return }
             messagePage = parseMessagePage(raw, pageNum: page)
+            messagesError = nil
         } catch {
-            ToastCenter.shared.error(error.localizedDescription)
+            if active, generation == messageGeneration { messagesError = error.localizedDescription }
         }
     }
 
     func markAllRead() async {
+        guard !messageMutationBusy else { return }
+        messageMutationBusy = true
+        defer { messageMutationBusy = false }
         await LoadingHUD.shared.during {
             do {
                 let url = try APIClient.shared.makeURL(session.serverURL, path: "/sysMessage/read")
-                _ = try await APIClient.shared.postJSON(url, body: [:])
+                let raw = try await APIClient.shared.postJSON(url, body: nil)
+                try requireSuccess(raw)
                 await loadMessages(page: messagePage.pageNum)
                 await refreshUnread()
             } catch {
@@ -160,9 +200,14 @@ final class HeaderViewModel: ObservableObject {
     }
 
     func deleteMessage(_ id: String) async {
+        guard !messageMutationBusy else { return }
+        messageMutationBusy = true
+        defer { messageMutationBusy = false }
         do {
             let url = try APIClient.shared.makeURL(session.serverURL, path: "/sysMessage/del")
-            _ = try await APIClient.shared.postJSON(url, body: ["businessId": id])
+            let raw = try await APIClient.shared.postJSON(url, body: ["businessId": id])
+            try requireSuccess(raw)
+            if messageDetail?.businessId == id { messageDetail = nil }
             await loadMessages(page: messagePage.pageNum)
             await refreshUnread()
         } catch {
@@ -171,10 +216,15 @@ final class HeaderViewModel: ObservableObject {
     }
 
     func openMessageDetail(_ item: SysMessageItem) async {
+        guard !messageMutationBusy else { return }
+        detailGeneration += 1
+        let generation = detailGeneration
         selectedMessage = item
         do {
             let url = try APIClient.shared.makeURL(session.serverURL, path: "/sysMessage/get")
             let raw = try await APIClient.shared.postJSON(url, body: ["businessId": item.businessId])
+            try requireSuccess(raw)
+            guard active, generation == detailGeneration else { return }
             if let detail = parseSingleMessage(raw) {
                 messageDetail = detail
             } else {
@@ -183,8 +233,8 @@ final class HeaderViewModel: ObservableObject {
             await refreshUnread()
             await loadMessages(page: messagePage.pageNum)
         } catch {
-            messageDetail = item
-            ToastCenter.shared.error(error.localizedDescription)
+            guard active, generation == detailGeneration else { return }
+            messagesError = error.localizedDescription
         }
     }
 
@@ -240,7 +290,7 @@ final class HeaderViewModel: ObservableObject {
             cancelTitle: "稍后"
         ) else { return }
 
-        Task { await self.executeDMGUpdate() }
+        Task { @MainActor in await self.executeDMGUpdate() }
     }
 
     func dismissUpdateProgress() {
@@ -410,7 +460,7 @@ final class HeaderViewModel: ObservableObject {
         showAsset = true
         asset = nil
         assetError = nil
-        Task { await loadAsset() }
+        Task { @MainActor in await loadAsset() }
     }
 
     func loadAsset() async {

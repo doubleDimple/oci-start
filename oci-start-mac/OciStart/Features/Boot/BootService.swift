@@ -61,7 +61,7 @@ struct BootService {
 
     func manualBoot(bootId: Int64) async throws {
         let url = try client.makeURL(baseURL, path: "/boot/manualBoot", query: ["bootId": "\(bootId)"])
-        let raw = try await client.getJSON(url)
+        let raw = try await client.postJSON(url, body: [:])
         try BootJSON.ensureSuccess(raw, fallback: "手动抢机失败")
     }
 
@@ -99,10 +99,28 @@ struct BootService {
 
     // MARK: - Detail
 
-    func bootDetail(bootId: Int64) async throws -> [BootDetailItem] {
-        let url = try client.makeURL(baseURL, path: "/boot/bootDetail", query: ["bootId": "\(bootId)"])
+    func bootDetail(tenantId: Int64, architecture: String) async throws -> [BootDetailItem] {
+        guard tenantId > 0, !architecture.isEmpty else { throw APIError.invalidURL }
+        let lookupURL = try client.makeURL(baseURL, path: "/boot/bootDetailList")
+        let lookup = try await client.postJSON(lookupURL, body: [
+            "tenantId": "\(tenantId)", "architecture": architecture
+        ])
+        try BootJSON.ensureSuccess(lookup, fallback: "加载详情失败")
+        guard let root = BootJSON.obj(lookup), let representative = root["bootId"] else {
+            throw APIError.invalidResponse
+        }
+        if representative is NSNull { return [] }
+        let rawID = BootJSON.string(representative)
+        guard let bootId = Int64(rawID), bootId > 0, "\(bootId)" == rawID else {
+            throw APIError.invalidResponse
+        }
+        let url = try client.makeURL(baseURL, path: "/boot/bootDetail", query: ["bootId": rawID])
         let raw = try await client.getJSON(url)
-        return try BootJSON.parseDetailList(raw)
+        let rows = try BootJSON.parseDetailList(raw)
+        guard Set(rows.map(\.id)).count == rows.count,
+              rows.allSatisfy({ $0.id > 0 && $0.tenantId == tenantId && $0.architecture == architecture })
+        else { throw APIError.invalidResponse }
+        return rows
     }
 
     func deleteBootDetail(bootId: Int64) async throws {
@@ -164,16 +182,7 @@ struct BootService {
         guard (200..<300).contains(http.statusCode) else {
             throw APIError.serverMessage(String(data: data, encoding: .utf8) ?? "保存失败")
         }
-        if let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-            if let ok = obj["success"] as? Bool, !ok {
-                let msg = (obj["message"] as? String) ?? "保存失败"
-                throw APIError.serverMessage(msg)
-            }
-            if let status = obj["status"] as? String, status.lowercased() != "success" {
-                let msg = (obj["message"] as? String) ?? "保存失败"
-                throw APIError.serverMessage(msg)
-            }
-        }
+        try BootJSON.ensureSuccess(data, fallback: "保存失败")
     }
 
     // MARK: - Boot log (web openBootLogDrawer)

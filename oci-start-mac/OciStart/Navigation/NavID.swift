@@ -1,7 +1,7 @@
 import Foundation
 
 /// Menu identifiers. Order of cases is not the sidebar order — see NavigationCatalog.
-/// Source of truth for labels/paths: sidebar.ftl
+/// Source of truth for labels/paths: oci-start-web/src/nav/menu.ts
 enum NavID: String, CaseIterable, Hashable {
     // service
     case dashboard
@@ -33,6 +33,7 @@ enum NavID: String, CaseIterable, Hashable {
     // system
     case ipQuality
     case systemLogs
+    case auditLogs
     case settings
     case proxyConfig
     // tools
@@ -55,12 +56,12 @@ enum NavSection: String, CaseIterable {
 
     var title: String {
         switch self {
-        case .service: return "服务管理"
-        case .proxy: return "代理管理"
-        case .vps: return "VPS 管理"
-        case .system: return "系统管理"
-        case .tools: return "我的工具"
-        case .dev: return "开发者"
+        case .service: return LanguageManager.shared.text("服务管理", "Service")
+        case .proxy: return LanguageManager.shared.text("代理管理", "Proxy")
+        case .vps: return LanguageManager.shared.text("资源管理", "VPS")
+        case .system: return LanguageManager.shared.text("系统管理", "System")
+        case .tools: return LanguageManager.shared.text("我的工具", "Tools")
+        case .dev: return LanguageManager.shared.text("开发配置", "Developer")
         }
     }
 

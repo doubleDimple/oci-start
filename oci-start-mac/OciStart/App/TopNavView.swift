@@ -11,8 +11,10 @@ struct TopNavView: View {
     @EnvironmentObject private var chrome: TopNavChromeState
     @Environment(\.colorScheme) private var colorScheme
     @State private var hoveredTool: String?
+    @State private var showThemePreferences = false
+    @ObservedObject private var language = LanguageManager.shared
 
-    private var dark: Bool { appearance.isDarkEffective || colorScheme == .dark }
+    private var dark: Bool { appearance.isDarkEffective }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -20,10 +22,24 @@ struct TopNavView: View {
                 sidebarToggle
                 SearchField(
                     text: $navigation.searchText,
-                    placeholder: "搜索菜单…",
-                    maxWidth: 320
+                    placeholder: language.text("搜索并打开页面…", "Find and open a page…"),
+                    onSubmit: openSelectedSearchResult,
+                    maxWidth: 320,
+                    onMoveSelection: { step in
+                        guard !navigation.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+                        chrome.moveSearchSelection(step, count: searchResults.count)
+                    },
+                    onCancel: { navigation.searchText = ""; chrome.close() },
+                    onFocusChange: { focused in
+                        if focused && !navigation.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { chrome.open = .search }
+                        else if !focused && NSApp.currentEvent?.type == .keyDown { chrome.close() }
+                    },
+                    onClear: { chrome.focusSearch() },
+                    focusRequest: chrome.searchFocusRequest,
+                    blurRequest: chrome.searchBlurRequest,
+                    shortcutHint: "⌘K"
                 )
-                .accessibilityLabel("搜索菜单")
+                .accessibilityLabel(language.text("搜索菜单", "Search menu"))
             }
 
             Spacer(minLength: 12)
@@ -43,9 +59,18 @@ struct TopNavView: View {
         .onAppear { header.start() }
         .onDisappear { header.stop() }
         .onChange(of: navigation.searchText) { query in
-            if !query.isEmpty { navigation.sidebarCollapsed = false }
+            chrome.searchActiveIndex = 0
+            if !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                header.closeMessages()
+                chrome.open = .search
+            } else if chrome.open == .search { chrome.close() }
         }
+        .onChange(of: language.locale) { _ in chrome.searchActiveIndex = 0 }
         // 消息中心改为右侧滑出抽屉（见 TopNavDropdownOverlay），不再用居中 sheet
+        .sheet(isPresented: $showThemePreferences) {
+            ThemePreferencesView(onClose: { showThemePreferences = false })
+                .environmentObject(appearance)
+        }
         .sheet(isPresented: $header.showAsset) {
             AssetAnalysisSheet(header: header, dark: dark)
                 .environmentObject(appearance)
@@ -89,16 +114,22 @@ struct TopNavView: View {
 
             iconButton(
                 systemName: themeIcon,
-                help: "主题：\(appearance.mode.title)（⌘T）"
+                help: language.text("外观模式", "Appearance mode") + " · \(appearance.mode.title)（⌘T）"
             ) {
+                header.closeMessages()
+                chrome.toggle(.appearance)
+            }
+
+            iconButton(systemName: "paintpalette", help: language.text("主题配色", "Theme colors")) {
                 chrome.close()
-                appearance.cycle()
+                header.closeMessages()
+                showThemePreferences = true
             }
 
             languageButton
             messageButton
 
-            iconButton(systemName: "arrow.clockwise", help: "刷新（⌘R）") {
+            iconButton(systemName: "arrow.clockwise", help: language.text("刷新（⌘R）", "Refresh (⌘R)")) {
                 chrome.close()
                 NotificationCenter.default.post(name: .ociReloadCurrentPage, object: nil)
             }
@@ -148,8 +179,8 @@ struct TopNavView: View {
                 .background(circleBg(highlight: chrome.open == .language, tool: "language"))
         }
         .buttonStyle(PlainButtonStyle())
-        .help("语言")
-        .accessibilityLabel("语言")
+        .help(language.text("语言", "Language"))
+        .accessibilityLabel(language.text("语言", "Language"))
         .onHover { hoveredTool = $0 ? "language" : nil }
     }
 
@@ -164,7 +195,10 @@ struct TopNavView: View {
                     .foregroundColor(AppTheme.navIcon(dark))
                     .frame(width: 36, height: 36)
                     .background(circleBg(highlight: header.showMessages, tool: "messages"))
-                if header.unreadCount > 0 {
+                if header.unreadError != nil {
+                    Image(systemName: "exclamationmark.circle.fill")
+                        .font(.system(size: 12)).foregroundColor(AppTheme.warning(dark))
+                } else if header.unreadCount > 0 {
                     Text(header.unreadCount > 99 ? "99+" : "\(header.unreadCount)")
                         .font(.system(size: 9, weight: .bold))
                         .foregroundColor(.white)
@@ -176,8 +210,8 @@ struct TopNavView: View {
             }
         }
         .buttonStyle(PlainButtonStyle())
-        .help("消息中心")
-        .accessibilityLabel("消息中心")
+        .help(header.unreadError ?? language.text("消息中心", "Messages"))
+        .accessibilityLabel(language.text("消息中心", "Messages"))
         .onHover { hoveredTool = $0 ? "messages" : nil }
     }
 
@@ -187,20 +221,23 @@ struct TopNavView: View {
             chrome.toggle(.user)
         }) {
             HStack(spacing: 6) {
-                ZStack {
-                    Circle()
-                        .fill(AppTheme.brand(dark).opacity(0.12))
-                        .frame(width: 30, height: 30)
-                    Text(avatarLetter)
+                NativeUserAvatar(name: session.username, dark: dark)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(session.username.isEmpty ? language.text("当前用户", "Current user") : session.username)
                         .font(.system(size: AppTheme.bodySize, weight: .semibold))
-                        .foregroundColor(AppTheme.brand(dark))
+                        .lineLimit(1)
+                    Text("Oracle Cloud")
+                        .font(.system(size: AppTheme.secondarySize))
                 }
+                .foregroundColor(AppTheme.textPrimary(dark))
+                .frame(maxWidth: 140, alignment: .leading)
                 Image(systemName: "chevron.down")
                     .font(.system(size: 9, weight: .bold))
                     .foregroundColor(AppTheme.textSecondary(dark))
                     .rotationEffect(.degrees(chrome.open == .user ? 180 : 0))
             }
-            .frame(width: 60, height: 36)
+            .padding(.horizontal, 8)
+            .frame(height: 40)
             .background(
                 Capsule()
                     .fill(chrome.open == .user || hoveredTool == "user" ? AppTheme.hover(dark) : .clear)
@@ -220,10 +257,19 @@ struct TopNavView: View {
         }
     }
 
-    private var avatarLetter: String {
-        let name = session.username
-        if let c = name.first { return String(c).uppercased() }
-        return "A"
+    private var searchResults: [NavigationItem] {
+        guard !navigation.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return [] }
+        return NavigationCatalog.filtered(search: navigation.searchText, cloudType: 1).flatMap { $0.1 }
+    }
+
+    private func openSelectedSearchResult() {
+        let results = searchResults
+        guard !results.isEmpty else { return }
+        let result = results[min(max(0, chrome.searchActiveIndex), results.count - 1)]
+        navigation.select(result.nav)
+        navigation.searchText = ""
+        chrome.close()
+        chrome.blurSearch()
     }
 
     private func iconButton(systemName: String, help: String, action: @escaping () -> Void) -> some View {
@@ -259,13 +305,14 @@ struct UserDropdownPanel: View {
     var level: Int
     var cloudProvider: Int
     var onAsset: () -> Void
-    var onCloud: (Int, String) -> Void
+    var onAuditLogs: () -> Void
     var onAbout: () -> Void
     var onLogout: () -> Void
     @State private var hoveredRow: String?
+    @ObservedObject private var language = LanguageManager.shared
 
     private var welcome: String {
-        username.isEmpty ? "欢迎" : "欢迎，\(username)"
+        username.isEmpty ? language.text("当前用户", "Current user") : username
     }
 
     private var levelName: String {
@@ -283,7 +330,6 @@ struct UserDropdownPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             topPart
-            cloudPart
             bottomPart
         }
         .padding(.bottom, 6)
@@ -300,26 +346,17 @@ struct UserDropdownPanel: View {
         VStack(alignment: .leading, spacing: 0) {
             headerBlock
             thinLine
-            menuRow(icon: "chart.pie.fill", color: AppTheme.brand(dark), title: "云资产报告", action: onAsset)
+            menuRow(icon: "chart.pie.fill", color: AppTheme.brand(dark), title: language.text("OCI 资产报告", "OCI asset report"), action: onAsset)
+            menuRow(icon: "checkmark.shield", color: textMuted, title: language.text("审计日志", "Audit logs"), action: onAuditLogs)
             thinLine
-        }
-    }
-
-    private var cloudPart: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            sectionLabel("切换云厂商")
-            menuRow(icon: "cloud", color: checkColor(1), title: cloudLabel(1, "Oracle Cloud"), action: { onCloud(1, "Oracle Cloud") })
-            menuRow(icon: "g.circle", color: checkColor(2), title: cloudLabel(2, "Google Cloud"), action: { onCloud(2, "Google Cloud") })
-            menuRow(icon: "square.stack.3d.up", color: checkColor(3), title: cloudLabel(3, "Azure Cloud"), action: { onCloud(3, "Azure Cloud") })
-            menuRow(icon: "server.rack", color: checkColor(4), title: cloudLabel(4, "Amazon Cloud"), action: { onCloud(4, "Amazon Cloud") })
         }
     }
 
     private var bottomPart: some View {
         VStack(alignment: .leading, spacing: 0) {
             thinLine
-            menuRow(icon: "info.circle", color: textMuted, title: "关于 OCI Start", action: onAbout)
-            menuRow(icon: "arrow.right.square", color: AppTheme.danger, title: "退出登录", action: onLogout)
+            menuRow(icon: "info.circle", color: textMuted, title: language.text("关于 OCI Start", "About OCI Start"), action: onAbout)
+            menuRow(icon: "arrow.right.square", color: AppTheme.danger, title: language.text("退出登录", "Sign out"), action: onLogout)
         }
     }
 
@@ -328,7 +365,7 @@ struct UserDropdownPanel: View {
             Text(welcome)
                 .font(.system(size: AppTheme.bodySize, weight: .semibold))
                 .foregroundColor(textPrimary)
-            Text(levelName)
+            Text("Oracle Cloud")
                 .font(.system(size: AppTheme.secondarySize, weight: .medium))
                 .foregroundColor(AppTheme.brand(dark))
                 .padding(.horizontal, 8)

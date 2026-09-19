@@ -13,6 +13,7 @@ final class MainShellViewController: NSViewController {
     private var statusOverlayHost: DropdownHostingView?
     private var dropdownHost: DropdownHostingView?
     private var cancellables = Set<AnyCancellable>()
+    private var searchKeyMonitor: Any?
 
     private var topHost: NSHostingController<AnyView>!
     private var sidebarHost: NSHostingController<AnyView>!
@@ -45,6 +46,8 @@ final class MainShellViewController: NSViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        // Vue exposes OCI only; a cached hidden provider must not hide its menus.
+        if session.cloudProvider != 1 { session.setCloudProvider(1) }
 
         let top = TopNavView()
             .environmentObject(session)
@@ -83,6 +86,7 @@ final class MainShellViewController: NSViewController {
 
         // Full-window dropdown overlay (above content, below toast)
         let overlay = TopNavDropdownOverlay(chrome: chrome, header: header)
+            .environmentObject(navigation)
             .environmentObject(session)
             .environmentObject(appearance)
         let drop = DropdownHostingView(rootView: AnyView(overlay))
@@ -90,6 +94,12 @@ final class MainShellViewController: NSViewController {
             guard let self = self else { return false }
             // 语言/用户下拉 或 右侧消息抽屉打开时接收点击
             return self.chrome.open != .none || self.header.showMessages
+        }
+        drop.shouldPassThrough = { [weak self] point in
+            guard let self = self, !self.header.showMessages else { return false }
+            // hitTest receives a point in this overlay's superview coordinates.
+            // Keep the actual top bar editable/clickable while a dropdown is open.
+            return self.topHost.view.frame.contains(point)
         }
         drop.translatesAutoresizingMaskIntoConstraints = true
         drop.autoresizingMask = [.width, .height]
@@ -110,6 +120,7 @@ final class MainShellViewController: NSViewController {
         statusOverlayHost = status
 
         layoutChildren()
+        installSearchShortcut()
 
         navigation.$sidebarCollapsed
             .receive(on: DispatchQueue.main)
@@ -133,6 +144,25 @@ final class MainShellViewController: NSViewController {
     override func viewDidLayout() {
         super.viewDidLayout()
         layoutChildren()
+    }
+
+    deinit {
+        if let searchKeyMonitor = searchKeyMonitor { NSEvent.removeMonitor(searchKeyMonitor) }
+    }
+
+    private func installSearchShortcut() {
+        guard searchKeyMonitor == nil else { return }
+        searchKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self = self, let window = self.view.window, event.window === window,
+                  window.isKeyWindow, self.session.isLoggedIn, window.attachedSheet == nil, NSApp.modalWindow == nil,
+                  !self.header.showMessages, !LoadingHUD.shared.isVisible else { return event }
+            let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            guard (modifiers.contains(.command) || modifiers.contains(.control)), !modifiers.contains(.option),
+                  event.charactersIgnoringModifiers?.lowercased() == "k" else { return event }
+            if let editor = window.firstResponder as? NSTextView, editor.hasMarkedText() { return event }
+            self.chrome.focusSearch()
+            return nil
+        }
     }
 
     private func layoutChildren() {

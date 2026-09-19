@@ -6,7 +6,7 @@ struct NotifyService {
     private let client = APIClient.shared
 
     func fetchConfigs() async throws -> NotifyConfigs {
-        let url = try client.makeURL(baseURL, path: "/api/system/notifyConfigs")
+        let url = try client.makeURL(baseURL, path: "/api/system/notifyConfigs", query: ["redacted": "true"])
         let raw = try await client.getJSON(url)
         return try NotifyJSON.parseConfigs(raw)
     }
@@ -16,8 +16,9 @@ struct NotifyService {
         let raw = try await client.postJSON(url, body: [
             "enabled": form.enabled,
             "executeHour": form.executeHour,
-            // 通知密钥已废弃，保存时固定清空
-            "notificationSecret": "",
+            "notificationSecret": form.secretMode.payload(form.notificationSecret).trimmingCharacters(in: .whitespacesAndNewlines),
+            "keepNotificationSecret": form.secretMode == .keep,
+            "clearNotificationSecret": form.secretMode == .clear,
             "enableAccountCheck": form.enableAccountCheck,
             "enableBootLog": form.enableBootLog,
             "enableCostCheck": form.enableCostCheck
@@ -29,9 +30,10 @@ struct NotifyService {
         let url = try client.makeURL(baseURL, path: "/api/system/updateTelegramConfig")
         let raw = try await client.postJSON(url, body: [
             "enabled": form.enabled,
-            "botToken": form.botToken,
-            "chatId": form.chatId,
-            "chatName": form.chatName
+            "keepBotToken": form.secretMode == .keep,
+            "botToken": form.secretMode.payload(form.botToken),
+            "chatId": form.chatId.trimmingCharacters(in: .whitespacesAndNewlines),
+            "chatName": form.chatName.trimmingCharacters(in: .whitespacesAndNewlines)
         ])
         try NotifyJSON.ensureOK(raw, fallback: "保存 Telegram 配置失败")
     }
@@ -47,33 +49,34 @@ struct NotifyService {
         let raw = try await client.postJSON(url, body: [
             "enabled": form.enabled,
             "type": form.type,
-            "host": form.host,
+            "host": form.host.trimmingCharacters(in: .whitespacesAndNewlines),
             "port": form.port,
-            "username": form.username,
-            "password": form.password
+            "username": form.username.trimmingCharacters(in: .whitespacesAndNewlines),
+            "keepPassword": form.secretMode == .keep,
+            "password": form.secretMode.payload(form.password)
         ])
         try NotifyJSON.ensureOK(raw, fallback: "保存 Telegram 代理失败")
     }
 
     func testProxy(_ form: NotifyProxyForm) async throws -> String {
         let url = try client.makeURL(baseURL, path: "/api/system/testProxyConnection")
-        let raw = try await client.postJSON(url, body: [
-            "enabled": form.enabled,
-            "type": form.type,
-            "host": form.host,
-            "port": form.port,
-            "username": form.username,
-            "password": form.password
-        ])
+        let raw = try await client.postJSON(url, body: ["type": form.type, "host": form.host.trimmingCharacters(in: .whitespacesAndNewlines), "port": form.port])
         return try NotifyJSON.parseProxyTest(raw)
+    }
+
+    func startBot() async throws {
+        let url = try client.makeURL(baseURL, path: "/system/startTgRobot")
+        let raw = try await client.postJSON(url, body: nil)
+        try NotifyJSON.ensureOK(raw, fallback: "机器人重新注册结果未确认")
     }
 
     func updateBark(_ form: NotifyBarkForm) async throws {
         let url = try client.makeURL(baseURL, path: "/api/system/updateBarkConfig")
         let raw = try await client.postJSON(url, body: [
             "enabled": form.enabled,
-            "url": form.url,
-            "deviceKey": form.deviceKey
+            "url": form.url.trimmingCharacters(in: .whitespacesAndNewlines),
+            "keepDeviceKey": form.secretMode == .keep,
+            "deviceKey": form.secretMode.payload(form.deviceKey)
         ])
         try NotifyJSON.ensureOK(raw, fallback: "保存 Bark 配置失败")
     }
@@ -88,8 +91,10 @@ struct NotifyService {
         let url = try client.makeURL(baseURL, path: "/api/system/updateDingTalkConfig")
         let raw = try await client.postJSON(url, body: [
             "enabled": form.enabled,
-            "webhook": form.webhook,
-            "secret": form.secret
+            "keepWebhook": form.webhookMode == .keep,
+            "webhook": form.webhookMode.payload(form.webhook).trimmingCharacters(in: .whitespacesAndNewlines),
+            "keepSecret": form.secretMode == .keep,
+            "secret": form.secretMode.payload(form.secret)
         ])
         try NotifyJSON.ensureOK(raw, fallback: "保存钉钉配置失败")
     }
@@ -104,8 +109,10 @@ struct NotifyService {
         let url = try client.makeURL(baseURL, path: "/api/system/updateFeishuConfig")
         let raw = try await client.postJSON(url, body: [
             "enabled": form.enabled,
-            "webhook": form.webhook,
-            "secret": form.secret
+            "keepWebhook": form.webhookMode == .keep,
+            "webhook": form.webhookMode.payload(form.webhook).trimmingCharacters(in: .whitespacesAndNewlines),
+            "keepSecret": form.secretMode == .keep,
+            "secret": form.secretMode.payload(form.secret)
         ])
         try NotifyJSON.ensureOK(raw, fallback: "保存飞书配置失败")
     }

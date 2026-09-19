@@ -54,6 +54,7 @@ final class LoadingHUD: ObservableObject {
 /// Centered native `ProgressView` spinner (no text). Host once in the main shell.
 struct LoadingHost: View {
     @ObservedObject var hud: LoadingHUD = .shared
+    @EnvironmentObject private var appearance: AppearanceController
 
     var body: some View {
         ZStack {
@@ -67,7 +68,7 @@ struct LoadingHost: View {
                     .padding(22)
                     .background(
                         RoundedRectangle(cornerRadius: 12)
-                            .fill(Color(NSColor.controlBackgroundColor))
+                            .fill(AppTheme.cardBg(appearance.isDarkEffective))
                             .shadow(color: Color.black.opacity(0.22), radius: 12, y: 4)
                     )
             }
@@ -93,7 +94,7 @@ struct PageLoadingView: View {
                 .scaleEffect(0.9)
             if !message.isEmpty {
                 Text(message)
-                    .font(.system(size: 12))
+                    .font(.system(size: AppTheme.secondarySize))
                     .foregroundColor(AppTheme.textSecondary(dark))
             }
         }

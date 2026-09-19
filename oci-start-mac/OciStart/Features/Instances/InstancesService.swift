@@ -213,6 +213,9 @@ struct InstancesService {
         var req = URLRequest(url: url)
         req.setValue("text/event-stream", forHTTPHeaderField: "Accept")
         req.setValue("XMLHttpRequest", forHTTPHeaderField: "X-Requested-With")
+        if let cookie = client.cookieHeader(for: baseURL), !cookie.isEmpty {
+            req.setValue(cookie, forHTTPHeaderField: "Cookie")
+        }
         req.timeoutInterval = 600
         try await TenantSSEClient.shared.stream(request: req, onEvent: onEvent)
     }

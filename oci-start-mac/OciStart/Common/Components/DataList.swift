@@ -15,8 +15,8 @@ struct DataList<Header: View, Content: View>: View {
                 header()
             }
             .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .background(AppTheme.hover(dark).opacity(0.65))
+            .padding(.vertical, 9)
+            .background(AppTheme.cardBg(dark))
             .overlay(
                 Rectangle()
                     .frame(height: 1)
@@ -34,6 +34,7 @@ struct DataList<Header: View, Content: View>: View {
 }
 
 struct DataListRow<Content: View>: View {
+    @State private var hovered = false
     var isSelected: Bool = false
     let action: (() -> Void)?
     @ViewBuilder var content: () -> Content
@@ -60,11 +61,12 @@ struct DataListRow<Content: View>: View {
             .background(
                 isSelected
                     ? AppTheme.sidebarActive.opacity(0.18)
-                    : Color.clear
+                    : (hovered ? AppTheme.hover(dark) : Color.clear)
             )
             .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())
+        .onHover { hovered = $0 }
         .overlay(
             Rectangle()
                 .frame(height: 1)
@@ -85,7 +87,7 @@ struct DataListColumnHeader: View {
 
     var body: some View {
         Text(title)
-            .font(.system(size: AppTheme.bodySize, weight: .semibold))
+            .font(.system(size: AppTheme.bodySize, weight: .medium))
             .foregroundColor(AppTheme.textSecondary(dark))
             .frame(width: width, alignment: alignment)
             .frame(maxWidth: width == nil ? .infinity : nil, alignment: alignment)

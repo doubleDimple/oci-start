@@ -1,4 +1,5 @@
 import Foundation
+import CoreFoundation
 
 // MARK: - List item (`InstanceDetailsRes` / `/oci/list/json`)
 
@@ -223,25 +224,31 @@ enum InstanceJSON {
         return it
     }
 
+    /// Mutations require an explicit acknowledgement. Invalid payloads are never successes.
     static func successMessage(_ data: Data, fallback: String = "成功") -> (ok: Bool, message: String) {
+        let unconfirmed = "服务端未返回明确回执，操作结果未知；请刷新核对，勿重复提交。"
         guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            return (true, fallback)
+            return (false, unconfirmed)
         }
+        let supplied = string(obj["message"] ?? obj["msg"] ?? obj["error"]).trimmingCharacters(in: .whitespacesAndNewlines)
+        var acknowledged = false
+        var rejected = false
+        if let value = obj["success"] as? NSNumber {
+            if CFGetTypeID(value) != CFBooleanGetTypeID() { return (false, unconfirmed) }
+            acknowledged = true
+            rejected = !value.boolValue
+        } else if obj["success"] != nil { return (false, unconfirmed) }
         if let status = obj["status"] as? String {
-            let msg = string(obj["message"]).isEmpty ? fallback : string(obj["message"])
-            return (status.lowercased() == "success", msg)
-        }
-        if let ok = obj["success"] as? Bool {
-            let msg = string(obj["message"]).isEmpty ? (ok ? fallback : "失败") : string(obj["message"])
-            return (ok, msg)
-        }
-        if let code = obj["code"] as? Int {
-            let ok = code == 200 || code == 0
-            let msg = string(obj["message"]).isEmpty ? (ok ? fallback : "失败") : string(obj["message"])
-            return (ok, msg)
-        }
-        // 无明确字段时视为成功（部分接口只返回 data）
-        return (true, string(obj["message"]).isEmpty ? fallback : string(obj["message"]))
+            acknowledged = true
+            rejected = rejected || status.lowercased() != "success"
+        } else if obj["status"] != nil { return (false, unconfirmed) }
+        if let code = obj["code"] as? NSNumber {
+            guard CFGetTypeID(code) != CFBooleanGetTypeID() else { return (false, unconfirmed) }
+            acknowledged = true
+            rejected = rejected || !(code.doubleValue == 200 || code.doubleValue == 0)
+        } else if obj["code"] != nil { return (false, unconfirmed) }
+        guard acknowledged else { return (false, unconfirmed) }
+        return (!rejected, supplied.isEmpty ? (rejected ? "操作被服务端拒绝" : fallback) : supplied)
     }
 }
 

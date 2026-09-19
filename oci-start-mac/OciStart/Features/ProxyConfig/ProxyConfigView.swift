@@ -18,18 +18,13 @@ struct ProxyConfigView: View {
             toolbar: { toolbar },
             content: {
                 VStack(spacing: 0) {
-                    if let err = model.errorText, !err.isEmpty {
-                        errorBanner(err)
-                            .padding(.horizontal, 16)
-                            .padding(.top, 12)
-                    }
                     listBody
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
                 .appLoading(model.isLoading && model.items.isEmpty)
             },
             footer: {
-                PaginationBar(state: $model.pageState) {
+                PaginationBar(state: $model.pageState, disabled: model.isLoading) {
                     model.onPageChange()
                 }
             }
@@ -48,6 +43,9 @@ struct ProxyConfigView: View {
 
     private var toolbar: some View {
         HStack(spacing: 8) {
+            if let error = model.errorText, !error.isEmpty {
+                PageErrorIndicator(message: error, retry: { Task { await model.reload() } })
+            }
             AppButton(
                 title: "一键全部测试",
                 systemImage: "network",
@@ -251,18 +249,4 @@ struct ProxyConfigView: View {
             .frame(maxWidth: width == nil ? .infinity : nil, alignment: .leading)
     }
 
-    private func errorBanner(_ text: String) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundColor(Color(hex: "f85149"))
-            Text(text).font(.system(size: 14))
-            Spacer()
-            Button("重试") { Task { await model.reload() } }
-                .buttonStyle(PlainButtonStyle())
-        }
-        .foregroundColor(Color(hex: "f85149"))
-        .padding(12)
-        .background(Color(hex: "f85149").opacity(0.1))
-        .cornerRadius(8)
-    }
 }

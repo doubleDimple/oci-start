@@ -17,6 +17,6 @@ enum LoginPalette {
     static func oauthBorder(_ dark: Bool) -> Color { line(dark) }
     static func tabActiveBg(_ dark: Bool) -> Color { primary(dark).opacity(dark ? 0.13 : 0.09) }
     static func tabActiveText(_ dark: Bool) -> Color { highlight(dark) }
-    static func divider(_ dark: Bool) -> Color { line(dark) }
+    static func divider(_ dark: Bool) -> Color { Color(hex: dark ? "1f242a" : "dce0e3") }
     static func chipBg(_ dark: Bool) -> Color { card(dark) }
 }

@@ -10,8 +10,9 @@ struct LoginView: View {
     @StateObject private var model = LoginFormModel()
     @State private var countdownTask: Task<Void, Never>?
     @State private var resetCountdownTask: Task<Void, Never>?
+    @State private var metaGeneration = 0
 
-    private var dark: Bool { appearance.isDarkEffective }
+    private var dark: Bool { appearance.isShellDark }
 
     var body: some View {
         ZStack {
@@ -37,7 +38,7 @@ struct LoginView: View {
                         onDeploymentMode: { mode in Task { await switchDeploymentMode(mode) } },
                         onForgotPassword: { model.openForgotPassword() },
                         onLocale: { loc in
-                            UserDefaults.standard.set(loc.rawValue, forKey: "appLocale")
+                            LanguageManager.shared.setLocale(loc)
                         }
                     )
                     .frame(width: geo.size.width >= 820 ? max(420, geo.size.width * 0.38) : geo.size.width)
@@ -76,7 +77,7 @@ struct LoginView: View {
             if !session.username.isEmpty { model.username = session.username }
             if let raw = UserDefaults.standard.string(forKey: "appLocale"),
                let loc = AppLocale(rawValue: raw) {
-                model.locale = loc
+                model.locale = loc == .enUS ? .enUS : .zhCN
             }
             // First install: wait for explicit pick.
             // Already chosen before: restore last mode and start/connect automatically.
@@ -92,6 +93,7 @@ struct LoginView: View {
             }
         }
         .onDisappear {
+            metaGeneration += 1
             countdownTask?.cancel()
             resetCountdownTask?.cancel()
         }
@@ -99,13 +101,12 @@ struct LoginView: View {
 
     // MARK: - Meta
 
+    @MainActor
     private func loadMeta(force: Bool) async {
-        let activated = await MainActor.run { model.modeActivated }
-        guard activated else { return }
+        guard model.modeActivated else { return }
 
-        let mode = await MainActor.run { model.deploymentMode }
-        let raw = await MainActor.run { model.serverURL }
-        await MainActor.run { session.serverURL = raw }
+        let mode = model.deploymentMode
+        session.serverURL = model.serverURL
         let target = session.serverURL
 
         if mode == .local, !backend.isReadyForLogin {
@@ -117,10 +118,10 @@ struct LoginView: View {
             if host.isEmpty { return }
         }
 
-        let skip = await MainActor.run { () -> Bool in
-            !force && model.metaLoadedURL == target && !model.isLoadingMeta
-        }
+        let skip = !force && model.metaLoadedURL == target && !model.isLoadingMeta
         if skip { return }
+        metaGeneration += 1
+        let generation = metaGeneration
 
         await MainActor.run {
             withAnimation(.easeInOut(duration: 0.2)) {
@@ -132,9 +133,11 @@ struct LoginView: View {
         }
 
         do {
-            let meta = try await session.fetchLoginPageMeta()
-            let factors = await session.fetchLoginFactors()
+            let meta = try await APIClient.shared.fetchLoginPageMeta(baseURL: target)
+            let factors = await APIClient.shared.fetchLoginFactorConfig(baseURL: target)
             await MainActor.run {
+                guard generation == metaGeneration, model.deploymentMode == mode,
+                      AppSession.normalize(model.serverURL) == target, model.modeActivated else { return }
                 withAnimation(.easeInOut(duration: 0.28)) {
                     model.allowRegister = meta.allowRegister
                     model.githubEnabled = meta.githubEnabled
@@ -155,6 +158,8 @@ struct LoginView: View {
             }
         } catch {
             await MainActor.run {
+                guard generation == metaGeneration, model.deploymentMode == mode,
+                      AppSession.normalize(model.serverURL) == target, model.modeActivated else { return }
                 withAnimation(.easeInOut(duration: 0.22)) {
                     model.isLoadingMeta = false
                     model.metaLoadedURL = nil
@@ -177,6 +182,7 @@ struct LoginView: View {
     @MainActor
     private func applyRememberedDeployment() async {
         let mode = session.deploymentMode
+        metaGeneration += 1
         withAnimation(.easeInOut(duration: 0.22)) {
             model.deploymentMode = mode
             model.modeActivated = true
@@ -196,6 +202,7 @@ struct LoginView: View {
             await loadMeta(force: false)
         } else {
             await backend.start()
+            guard model.deploymentMode == mode else { return }
             await loadMeta(force: true)
         }
     }
@@ -205,6 +212,7 @@ struct LoginView: View {
     private func switchDeploymentMode(_ mode: DeploymentMode) async {
         // Ignore only if already active same mode (re-tap after restore / pick).
         if model.modeActivated, model.deploymentMode == mode { return }
+        metaGeneration += 1
 
         withAnimation(.easeInOut(duration: 0.22)) {
             model.deploymentMode = mode
@@ -230,17 +238,26 @@ struct LoginView: View {
             await Task.detached(priority: .userInitiated) {
                 BackendController.shared.stop()
             }.value
+            guard model.deploymentMode == mode else { return }
             // User connects via「连接」when URL ready; auto-try if host already filled.
             await loadMeta(force: false)
         } else {
             await backend.start()
+            guard model.deploymentMode == mode else { return }
             await loadMeta(force: true)
         }
     }
 
     func applyServerAndLoadMeta() {
+        metaGeneration += 1
         let raw = model.serverURL.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !raw.isEmpty else { return }
+        let normalized = AppSession.normalize(raw)
+        guard let host = URL(string: normalized)?.host, !host.isEmpty else {
+            model.isLoadingMeta = false
+            model.errorText = model.locale == .enUS ? "Enter a remote server URL first" : "请先填写完整的服务器地址"
+            return
+        }
 
         // Remote form but user pasted localhost → flip to local smoothly.
         if model.deploymentMode == .remote, AppSession.isLocalServerURL(raw) {

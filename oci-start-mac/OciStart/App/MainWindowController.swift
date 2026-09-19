@@ -205,7 +205,9 @@ final class MainWindowController: NSWindowController {
 }
 
 extension MainWindowController: NSWindowDelegate {
-    func windowShouldClose(_ sender: NSWindow) -> Bool { true }
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        !session.isLoggedIn || navigation.canLeaveCurrentPage()
+    }
 
     func windowWillResize(_ sender: NSWindow, to frameSize: NSSize) -> NSSize {
         NSSize(

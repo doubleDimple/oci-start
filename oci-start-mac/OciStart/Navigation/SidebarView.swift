@@ -5,11 +5,12 @@ struct SidebarView: View {
     @EnvironmentObject private var navigation: NavigationState
     @EnvironmentObject private var session: AppSession
     @EnvironmentObject private var appearance: AppearanceController
+    @ObservedObject private var language = LanguageManager.shared
     @ObservedObject private var backend = BackendController.shared
     @Environment(\.colorScheme) private var colorScheme
     @State private var hoveredItem: NavID?
 
-    private var dark: Bool { appearance.isDarkEffective || colorScheme == .dark }
+    private var dark: Bool { appearance.isShellDark }
     private var collapsed: Bool { navigation.sidebarCollapsed }
 
     var body: some View {
@@ -20,10 +21,10 @@ struct SidebarView: View {
                 LazyVStack(alignment: .leading, spacing: 4) {
                     let catalog = NavigationCatalog.filtered(
                         search: navigation.searchText,
-                        cloudType: session.cloudProvider
+                        cloudType: 1
                     )
                     if catalog.isEmpty {
-                        Text("无匹配菜单")
+                        Text(language.text("无匹配菜单", "No matching pages"))
                             .font(.system(size: AppTheme.secondarySize))
                             .foregroundColor(AppTheme.sidebarText(dark))
                             .frame(maxWidth: .infinity)
@@ -35,12 +36,8 @@ struct SidebarView: View {
                             } else {
                                 Color.clear.frame(height: 8)
                             }
-                            // The compact rail keeps every destination accessible.
-                            if collapsed || navigation.isSectionExpanded(section)
-                                || !navigation.searchText.isEmpty {
-                                ForEach(items) { item in
-                                    row(item)
-                                }
+                            ForEach(items) { item in
+                                row(item)
                             }
                         }
                     }
@@ -57,7 +54,7 @@ struct SidebarView: View {
 
     private var brand: some View {
         HStack(spacing: 10) {
-            Button(action: { navigation.sidebarCollapsed.toggle() }) {
+            Button(action: { navigation.select(.dashboard) }) {
                 Image(systemName: "leaf.fill")
                     .font(.system(size: 20, weight: .medium))
                     .foregroundColor(.white)
@@ -65,17 +62,17 @@ struct SidebarView: View {
                     .background(RoundedRectangle(cornerRadius: 12).fill(AppTheme.brand(dark)))
             }
             .buttonStyle(PlainButtonStyle())
-            .help(collapsed ? "展开侧栏（⌘⌥S）" : "收起侧栏（⌘⌥S）")
-            .accessibilityLabel(collapsed ? "展开侧栏" : "收起侧栏")
+            .help(language.text("返回首页", "Back to home"))
+            .accessibilityLabel(language.text("返回首页", "Back to home"))
 
             if !collapsed {
                 Button(action: { navigation.select(.dashboard) }) {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(session.siteName)
                             .font(.system(size: AppTheme.sectionSize, weight: .semibold))
-                            .foregroundColor(.white)
+                            .foregroundColor(AppTheme.sidebarPrimary(dark))
                             .lineLimit(1)
-                        Text("云资源控制台")
+                        Text(language.text("云资源控制台", "Cloud console"))
                             .font(.system(size: AppTheme.captionSize))
                             .foregroundColor(AppTheme.sidebarText(dark))
                     }
@@ -91,21 +88,13 @@ struct SidebarView: View {
     }
 
     private func sectionHeader(_ section: NavSection) -> some View {
-        Button(action: { navigation.toggleSection(section) }) {
-            HStack(spacing: 8) {
-                Text(section.title)
-                    .font(.system(size: AppTheme.captionSize, weight: .medium))
-                Spacer(minLength: 4)
-                Image(systemName: navigation.isSectionExpanded(section) ? "chevron.down" : "chevron.right")
-                    .font(.system(size: 9, weight: .semibold))
-            }
-            .foregroundColor(AppTheme.sidebarText(dark).opacity(0.8))
+        Text(section.title)
+            .font(.system(size: AppTheme.captionSize, weight: .medium))
+            .foregroundColor(AppTheme.sidebarText(dark))
             .padding(.horizontal, 12)
             .padding(.top, 16)
             .padding(.bottom, 8)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(PlainButtonStyle())
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func row(_ item: NavigationItem) -> some View {
@@ -140,7 +129,7 @@ struct SidebarView: View {
 
     private var footer: some View {
         VStack(spacing: 14) {
-            Rectangle().fill(Color.white.opacity(0.1)).frame(height: 1)
+            Rectangle().fill(AppTheme.sidebarBorder(dark)).frame(height: 1)
 
             HStack(spacing: 8) {
                 Image(systemName: session.isRemoteDeployment ? "network" : "desktopcomputer")
@@ -162,27 +151,21 @@ struct SidebarView: View {
             .help("\(serviceTitle) · \(session.serverURL)")
 
             HStack(spacing: 10) {
-                ZStack {
-                    Circle().fill(AppTheme.brand(dark).opacity(0.32))
-                    Text(String(session.username.first ?? "A").uppercased())
-                        .font(.system(size: AppTheme.bodySize, weight: .semibold))
-                        .foregroundColor(.white)
-                }
-                .frame(width: 34, height: 34)
+                NativeUserAvatar(name: session.username, dark: dark, sidebar: true)
                 if !collapsed {
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(session.username.isEmpty ? "Admin" : session.username)
+                        Text(session.username.isEmpty ? language.text("当前用户", "Current user") : session.username)
                             .font(.system(size: AppTheme.bodySize, weight: .semibold))
-                            .foregroundColor(.white)
+                            .foregroundColor(AppTheme.sidebarPrimary(dark))
                             .lineLimit(1)
-                        Text(session.cloudProviderName)
+                        Text("Oracle Cloud")
                             .font(.system(size: AppTheme.captionSize))
                             .foregroundColor(AppTheme.sidebarText(dark))
                     }
                     Spacer(minLength: 0)
                 }
             }
-            .help(session.username.isEmpty ? "Admin" : session.username)
+            .help(session.username.isEmpty ? language.text("当前用户", "Current user") : session.username)
         }
         .padding(.horizontal, collapsed ? 21 : 20)
         .padding(.bottom, 20)
@@ -200,5 +183,32 @@ struct SidebarView: View {
         case .ready: return "本机服务已就绪"
         case .failed: return "本机服务异常"
         }
+    }
+}
+
+/// Shared by the header and sidebar; neutral initials do not imply connection status.
+struct NativeUserAvatar: View {
+    let name: String
+    let dark: Bool
+    var sidebar = false
+
+    private var initial: String {
+        guard let scalar = name.unicodeScalars.first(where: { CharacterSet.alphanumerics.contains($0) }) else { return "" }
+        return String(String(scalar).uppercased().prefix(1))
+    }
+    private var foreground: Color { sidebar ? AppTheme.sidebarPrimary(dark) : AppTheme.textPrimary(dark) }
+    var body: some View {
+        ZStack {
+            Circle().fill(sidebar ? foreground.opacity(0.10) : AppTheme.inputBg(dark))
+            Circle().stroke(foreground.opacity(sidebar ? 0.22 : 0.14), lineWidth: 1)
+            if initial.isEmpty {
+                Image(systemName: "person").font(.system(size: 16, weight: .regular))
+            } else {
+                Text(initial).font(.system(size: 16, weight: .semibold))
+            }
+        }
+        .foregroundColor(foreground)
+        .frame(width: sidebar ? 36 : 32, height: sidebar ? 36 : 32)
+        .accessibilityHidden(true)
     }
 }

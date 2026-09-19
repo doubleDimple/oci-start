@@ -1,166 +1,133 @@
 import SwiftUI
 import AppKit
 
-/// 原生数据迁移（对齐 Web `/migration/migPage`）。
-/// UI 标准：两列 `ModuleSettingsCard` 等宽等高。
+/// Native tabbed flow matching Vue MigrationView.
 struct MigrationView: View {
-    @EnvironmentObject private var session: AppSession
     @EnvironmentObject private var appearance: AppearanceController
     @StateObject private var model = MigrationViewModel()
-
+    @ObservedObject private var language = LanguageManager.shared
+    @State private var importing = false
+    @State private var revealKey = false
+    @State private var guardOwner = UUID()
     private var dark: Bool { appearance.isDarkEffective }
-    private let cardMinHeight: CGFloat = 360
 
     var body: some View {
-        PageScaffold(
-            title: "数据迁移",
-            subtitle: "加密导出备份 · 导入恢复",
-            systemImage: "arrow.left.and.right",
-            layout: .workspace,
-            toolbar: { EmptyView() },
-            content: {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 14) {
-                        EqualHeightCardRow(minHeight: cardMinHeight) {
-                            exportCard
-                        } second: {
-                            importCard
-                        }
-                        if let key = model.lastMasterKey, !key.isEmpty {
-                            masterKeyBanner(key)
-                        }
-                        if let status = model.statusText, !status.isEmpty {
-                            Text(status)
-                                .font(.system(size: 13))
-                                .foregroundColor(AppTheme.textSecondary(dark))
-                        }
-                    }
-                    .padding(AppTheme.pagePadding)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-        )
-        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
-        .environmentObject(appearance)
-    }
-
-    private var exportCard: some View {
-        ModuleSettingsCard(
-            title: "数据导出",
-            subtitle: "生成加密 .enc 备份",
-            systemImage: "square.and.arrow.up",
-            accent: Color(hex: "4a9eff"),
-            enabled: nil,
-            minHeight: cardMinHeight
-        ) {
-            infoLine(icon: "lock.shield", text: "导出为加密备份文件，密钥仅显示一次。")
-            infoLine(icon: "1.circle", text: "点击「导出加密备份」下载 .enc 文件")
-            infoLine(icon: "2.circle", text: "务必单独保存 Master Key，导入时需要")
-            infoLine(icon: "exclamationmark.triangle", text: "密钥丢失将无法解密恢复")
-        } footer: {
-            AppButton(
-                title: "导出加密备份",
-                systemImage: "lock",
-                kind: .primary,
-                isLoading: model.isExporting
-            ) {
-                model.exportEncrypted()
-            }
-        }
-    }
-
-    private var importCard: some View {
-        ModuleSettingsCard(
-            title: "数据导入",
-            subtitle: "上传 .enc 并填写密钥",
-            systemImage: "square.and.arrow.down",
-            accent: Color(hex: "1abc9c"),
-            enabled: nil,
-            minHeight: cardMinHeight
-        ) {
-            FormFieldRow(label: "备份文件") {
-                HStack(spacing: 8) {
-                    Text(model.selectedFileName ?? "未选择文件")
-                        .font(.system(size: 14))
-                        .foregroundColor(
-                            model.selectedFileName == nil
-                                ? AppTheme.textSecondary(dark)
-                                : (AppTheme.textPrimary(dark))
-                        )
-                        .lineLimit(1)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    AppButton(title: "选择", systemImage: "folder", kind: .secondary) {
-                        model.pickImportFile()
-                    }
-                    if model.selectedFileName != nil {
-                        AppButton(title: "清除", kind: .secondary) {
-                            model.clearImportFile()
-                        }
-                    }
-                }
-            }
-            FormFieldRow(label: "Master Key") {
-                AppTextField(
-                    text: $model.masterKeyInput,
-                    placeholder: "加密备份的解密密钥",
-                    secure: true,
-                    leadingSystemImage: "key"
-                )
-            }
-            Text("导入会覆盖当前库中相关数据，操作前请确认已备份。")
-                .font(.system(size: 13))
-                .foregroundColor(AppTheme.textSecondary(dark))
-                .fixedSize(horizontal: false, vertical: true)
-        } footer: {
-            AppButton(
-                title: "开始导入",
-                systemImage: "tray.and.arrow.down",
-                kind: .primary,
-                isLoading: model.isImporting
-            ) {
-                model.importEncrypted()
-            }
-        }
-    }
-
-    private func infoLine(icon: String, text: String) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: icon)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(Color(hex: "4a9eff"))
-                .frame(width: 16)
-            Text(text)
-                .font(.system(size: 13))
-                .foregroundColor(AppTheme.textSecondary(dark))
-                .fixedSize(horizontal: false, vertical: true)
-        }
-    }
-
-    private func masterKeyBanner(_ key: String) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("最近一次导出的 Master Key")
-                .font(.system(size: 14, weight: .semibold))
-            Text(key)
-                .font(.system(size: 12, design: .monospaced))
-            HStack {
+        PageScaffold(title: "数据迁移", toolbar: {
+            HStack(spacing: 12) {
+                tab(language.text("数据导出", "Export"), selected: !importing) { importing = false }
+                tab(language.text("数据导入", "Import"), selected: importing) { importing = true }
                 Spacer()
-                AppButton(title: "复制密钥", systemImage: "doc.on.doc", kind: .secondary) {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(key, forType: .string)
+                if let error = model.errorText { PageErrorIndicator(message: error) }
+            }
+        }, content: {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 22) {
+                    if importing { importContent } else { exportContent }
+                }
+                .padding(24)
+                .frame(maxWidth: 720, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+            }
+        })
+        .onAppear { NavigationState.shared.setLeaveGuard(owner: guardOwner) { model.canLeave() } }
+        .onDisappear { NavigationState.shared.removeLeaveGuard(owner: guardOwner) }
+    }
+
+    private func tab(_ title: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title).font(.system(size: 14, weight: selected ? .semibold : .regular))
+                .foregroundColor(selected ? AppTheme.sidebarActive : AppTheme.textSecondary(dark))
+                .padding(.horizontal, 12).padding(.vertical, 8)
+                .background(selected ? AppTheme.sidebarActive.opacity(0.1) : Color.clear).cornerRadius(8)
+        }.buttonStyle(PlainButtonStyle()).disabled(model.busy || model.requiresReview)
+    }
+
+    private var exportContent: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Text(language.text(model.artifact == nil ? "导出加密备份" : "加密备份已生成", model.artifact == nil ? "Export encrypted backup" : "Backup generated"))
+                .font(.system(size: AppTheme.sectionSize, weight: .semibold))
+            Text(language.text("导出业务数据并单独保存解密密钥。", "Export business data and save the decryption key separately."))
+                .font(.system(size: 13)).foregroundColor(AppTheme.textSecondary(dark))
+            if let artifact = model.artifact {
+                Text(artifact.filename).font(.system(size: 14))
+                Text(ByteCountFormatter.string(fromByteCount: Int64(artifact.data.count), countStyle: .file))
+                    .font(.system(size: 13))
+                AppButton(title: language.text("保存备份文件", "Save backup"), systemImage: "square.and.arrow.down", kind: .secondary) { model.saveBackup() }
+                Divider()
+                Text("Master Key").font(.system(size: 14, weight: .semibold))
+                HStack {
+                    Text(revealKey ? artifact.masterKey : String(repeating: "•", count: 24))
+                        .font(.system(size: 14, design: .monospaced)).lineLimit(1)
+                    Spacer()
+                    Button(action: { revealKey.toggle() }) { Image(systemName: revealKey ? "eye.slash" : "eye") }
+                        .buttonStyle(PlainButtonStyle()).help(language.text("显示或隐藏密钥", "Show or hide key"))
+                    Button(action: {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(artifact.masterKey, forType: .string)
+                    }) { Image(systemName: "doc.on.doc") }
+                        .buttonStyle(PlainButtonStyle()).help(language.text("复制密钥", "Copy key"))
+                }
+                AppButton(title: language.text("保存密钥文件", "Save key"), systemImage: "key", kind: .secondary) { model.saveKey() }
+                Toggle(language.text("我已分别保存备份文件和密钥", "I saved both the backup and its key"), isOn: $model.savedAcknowledged)
+                    .toggleStyle(CheckboxToggleStyle()).font(.system(size: 14))
+            }
+            AppButton(title: language.text(model.artifact == nil ? "生成加密备份" : "重新生成", model.artifact == nil ? "Generate backup" : "Regenerate"),
+                      systemImage: "lock", kind: .primary, isLoading: model.isExporting) { model.exportEncrypted() }
+                .disabled(model.busy || model.requiresReview)
+        }
+    }
+
+    private var importContent: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Text(language.text(model.receipt == nil ? "导入加密备份" : "导入完成", model.receipt == nil ? "Import encrypted backup" : "Import complete"))
+                .font(.system(size: 16, weight: .semibold))
+            if let receipt = model.receipt {
+                Text(language.text("新增 \(receipt.importedRows) 条 · 保留 \(receipt.preservedRows) 条", "\(receipt.importedRows) imported · \(receipt.preservedRows) preserved"))
+                    .font(.system(size: 14))
+                HStack { Text(language.text("数据表", "Table")); Spacer(); Text(language.text("新增 / 保留", "Imported / preserved")) }
+                    .font(.system(size: 14, weight: .semibold))
+                ForEach(receipt.tables) { row in
+                    HStack { Text(row.table); Spacer(); Text("\(row.importedRows) / \(row.preservedRows)") }.font(.system(size: 14))
+                }
+                AppButton(title: language.text("完成", "Done"), kind: .secondary) { model.clearImportFile() }
+            } else {
+                Text(language.text("选择 .enc 文件并输入对应的 Master Key。", "Choose an .enc file and enter its Master Key."))
+                    .font(.system(size: 13)).foregroundColor(AppTheme.textSecondary(dark))
+                HStack {
+                    Image(systemName: "doc.badge.arrow.up")
+                    Text(model.selectedFileName ?? language.text("选择或拖入加密备份（最大 10 MiB）", "Choose or drop a backup (up to 10 MiB)"))
+                        .lineLimit(2)
+                    Spacer()
+                    AppButton(title: language.text("选择文件", "Choose file"), kind: .secondary) { model.pickImportFile() }
+                }
+                .font(.system(size: 14)).padding(20)
+                .background(AppTheme.inputBg(dark)).cornerRadius(12)
+                .onDrop(of: ["public.file-url"], isTargeted: nil) { providers in
+                    guard !model.busy, !model.requiresReview, let provider = providers.first else { return false }
+                    _ = provider.loadObject(ofClass: URL.self) { url, _ in
+                        if let url = url { DispatchQueue.main.async { model.selectFile(url) } }
+                    }
+                    return true
+                }
+                FormFieldRow(label: "Master Key", required: true) {
+                    AppTextField(text: $model.masterKeyInput, placeholder: language.text("备份的解密密钥", "Backup decryption key"), secure: true)
+                }
+                .disabled(model.busy || model.requiresReview)
+                if model.requiresReview {
+                    Text(language.text("导入结果未知，需先在服务器核对。", "Import outcome is unknown. Review the server before continuing."))
+                        .font(.system(size: 14)).foregroundColor(AppTheme.warning(dark))
+                    AppButton(title: language.text("已在服务器核对结果", "Confirm server review"), kind: .secondary) { model.acknowledgeReview() }
+                } else {
+                    if model.outcome == .rolledBack {
+                        Text(language.text("本次导入已回滚。", "This import was rolled back.")).font(.system(size: 13))
+                    }
+                    HStack {
+                        AppButton(title: language.text("开始导入", "Import"), systemImage: "tray.and.arrow.down", kind: .primary, isLoading: model.isImporting) { model.importEncrypted() }
+                            .disabled(!model.canImport)
+                        AppButton(title: language.text("清除", "Clear"), kind: .secondary) { model.clearImportFile() }.disabled(model.busy)
+                    }
                 }
             }
         }
-        .foregroundColor(AppTheme.textPrimary(dark))
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(hex: "f0881a").opacity(0.12))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color(hex: "f0881a").opacity(0.35), lineWidth: 1)
-        )
     }
 }

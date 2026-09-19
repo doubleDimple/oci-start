@@ -1,8 +1,9 @@
 import SwiftUI
+import AppKit
 
 // MARK: - Shared modal tokens (Vue console)
 
-/// Color tokens aligned with Web tenant modals (`--surface`, `--text-primary`, …).
+/// Shared modal surfaces follow the same effective content palette as the page.
 enum AppSheetSurface {
     static func surface(_ dark: Bool) -> Color {
         AppTheme.cardBg(dark)
@@ -13,11 +14,11 @@ enum AppSheetSurface {
     }
 
     static func panelBg(_ dark: Bool) -> Color {
-        AppTheme.hover(dark) // --hover-bg
+        AppTheme.cardSubtle(dark)
     }
 
     static func rowHover(_ dark: Bool) -> Color {
-        panelBg(dark)
+        AppTheme.hover(dark)
     }
 
     static func primaryText(_ dark: Bool) -> Color {
@@ -339,14 +340,11 @@ struct AppTextEditor: View {
 
     @EnvironmentObject private var appearance: AppearanceController
     @Environment(\.colorScheme) private var colorScheme
-    private var dark: Bool { appearance.isDarkEffective || colorScheme == .dark }
+    @Environment(\.isEnabled) private var enabled
+    private var dark: Bool { appearance.isDarkEffective }
 
     var body: some View {
-        TextEditor(text: $text)
-            .font(.system(size: AppTheme.bodySize,
-                          design: monospaced ? .monospaced : .default))
-            .foregroundColor(AppSheetSurface.primaryText(dark))
-            .padding(8)
+        ThemedTextEditor(text: $text, monospaced: monospaced, enabled: enabled, dark: dark)
             .frame(minHeight: minHeight)
             .background(
                 RoundedRectangle(cornerRadius: 8)
@@ -357,6 +355,81 @@ struct AppTextEditor: View {
                     .stroke(AppSheetSurface.border(dark), lineWidth: 1)
             )
             .colorScheme(dark ? .dark : .light)
+    }
+}
+
+/// NSTextView owns its surface on macOS 11, so a SwiftUI background alone cannot
+/// recolor TextEditor. Keep native editing and scrolling while updating its colors.
+private struct ThemedTextEditor: NSViewRepresentable {
+    @Binding var text: String
+    let monospaced: Bool
+    let enabled: Bool
+    let dark: Bool
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let scroll = NSScrollView()
+        scroll.hasVerticalScroller = true
+        scroll.hasHorizontalScroller = false
+        scroll.autohidesScrollers = true
+        scroll.borderType = .noBorder
+        let editor = NSTextView(frame: scroll.bounds)
+        editor.delegate = context.coordinator
+        editor.isRichText = false
+        editor.importsGraphics = false
+        editor.allowsUndo = true
+        editor.isAutomaticQuoteSubstitutionEnabled = false
+        editor.isAutomaticDashSubstitutionEnabled = false
+        editor.isAutomaticTextReplacementEnabled = false
+        editor.isHorizontallyResizable = false
+        editor.isVerticallyResizable = true
+        editor.minSize = NSSize(width: 0, height: 0)
+        editor.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        editor.autoresizingMask = [.width]
+        editor.textContainer?.widthTracksTextView = true
+        editor.textContainer?.containerSize = NSSize(width: scroll.contentSize.width, height: CGFloat.greatestFiniteMagnitude)
+        editor.textContainerInset = NSSize(width: 8, height: 8)
+        editor.string = text
+        scroll.documentView = editor
+        applyStyle(editor, scroll: scroll)
+        return scroll
+    }
+
+    func updateNSView(_ scroll: NSScrollView, context: Context) {
+        context.coordinator.parent = self
+        guard let editor = scroll.documentView as? NSTextView else { return }
+        applyStyle(editor, scroll: scroll)
+        if editor.string != text && !editor.hasMarkedText() {
+            let selection = editor.selectedRange()
+            editor.string = text
+            let count = (text as NSString).length
+            let location = min(selection.location, count)
+            editor.setSelectedRange(NSRange(location: location, length: min(selection.length, count - location)))
+        }
+    }
+
+    private func applyStyle(_ editor: NSTextView, scroll: NSScrollView) {
+        let background = NSColor(enabled ? AppTheme.inputBg(dark) : AppTheme.hover(dark))
+        scroll.drawsBackground = true
+        scroll.backgroundColor = background
+        editor.drawsBackground = true
+        editor.backgroundColor = background
+        editor.textColor = NSColor(enabled ? AppTheme.textPrimary(dark) : AppTheme.textMuted(dark))
+        editor.insertionPointColor = NSColor(AppTheme.textPrimary(dark))
+        editor.font = monospaced ? NSFont.monospacedSystemFont(ofSize: AppTheme.bodySize, weight: .regular)
+            : NSFont.systemFont(ofSize: AppTheme.bodySize)
+        editor.isEditable = enabled
+        editor.isSelectable = true
+    }
+
+    final class Coordinator: NSObject, NSTextViewDelegate {
+        var parent: ThemedTextEditor
+        init(_ parent: ThemedTextEditor) { self.parent = parent }
+        func textDidChange(_ notification: Notification) {
+            guard let editor = notification.object as? NSTextView else { return }
+            parent.text = editor.string
+        }
     }
 }
 
@@ -387,7 +460,7 @@ struct AppSheetInfoBox: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(AppSheetSurface.accentBlue(dark).opacity(0.10))
+        .background(AppTheme.statusBg(AppTheme.info, dark))
         .cornerRadius(4)
     }
 }

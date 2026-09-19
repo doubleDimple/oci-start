@@ -1,429 +1,450 @@
 import SwiftUI
+import AppKit
 
-/// Native OCI regions page using the Vue console's shared visual tokens.
 struct RegionsView: View {
-    @EnvironmentObject private var session: AppSession
     @EnvironmentObject private var appearance: AppearanceController
     @StateObject private var model = RegionsViewModel()
-
+    @AppStorage("appLocale") private var locale = "zh_CN"
     private var dark: Bool { appearance.isDarkEffective }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                header
-                if let err = model.errorText, !err.isEmpty {
-                    errorBanner(err)
+        GeometryReader { viewport in
+            PageScaffold(title: regionText("区域管理", "Regions"), subtitle: "", systemImage: "globe", layout: .workspace,
+                         toolbar: { toolbar }, content: {
+                VStack(spacing: 14) {
+                    if model.showMapBoard {
+                        mapCard.frame(height: max(250, min(390, viewport.size.height * 0.44)))
+                    }
+                    listCard
+                    footer
                 }
-                statsGrid
-                mapCard
-                listCard
-            }
-            .padding(.horizontal, 24)
-            .padding(.top, 8)
-            .padding(.bottom, 24)
-            .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, AppTheme.pagePadding)
+                .padding(.bottom, AppTheme.pagePadding)
+                .foregroundColor(AppTheme.textPrimary(dark))
+            })
         }
-        .background(RegionsTheme.bg(dark).ignoresSafeArea())
-        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+        .background(AppTheme.pageBg(dark))
         .onAppear { model.start() }
         .onDisappear { model.stop() }
-        .onReceive(NotificationCenter.default.publisher(for: .ociReloadCurrentPage)) { _ in
-            Task { await model.refresh() }
-        }
-        .environmentObject(appearance)
+        .onChange(of: locale) { _ in model.localeChanged() }
+        .onReceive(NotificationCenter.default.publisher(for: .ociReloadCurrentPage)) { _ in Task { await model.refresh() } }
     }
 
-    // MARK: - Header
-
-    private var header: some View {
-        HStack {
-            Spacer()
-            HStack(spacing: 7) {
-                Circle().fill(RegionsTheme.green(dark)).frame(width: 7, height: 7)
-                Text(model.lastUpdateText)
-                    .font(.system(size: 13))
-                    .foregroundColor(RegionsTheme.muted(dark))
-            }
-            AppButton(title: "刷新", systemImage: "arrow.clockwise", kind: .secondary) {
-                Task { await model.refresh() }
-            }
+    private var toolbar: some View {
+        HStack(spacing: 12) {
+            AppTextField(text: $model.searchText, placeholder: regionText("搜索区域名称或标识", "Search region name or identifier"), leadingSystemImage: "magnifyingglass")
+                .frame(minWidth: 180, maxWidth: 320)
+            SelectMenu(options: RegionContinent.allCases.map { SelectOption(id: $0.rawValue, title: $0.title) },
+                       selection: Binding(get: { model.continent.rawValue }, set: { model.continent = RegionContinent(rawValue: $0 ?? "") ?? .all }),
+                       width: 150, allowClear: false)
+            SelectMenu(options: RegionStatusFilter.allCases.map { SelectOption(id: $0.rawValue, title: $0.title) },
+                       selection: Binding(get: { model.statusFilter.rawValue }, set: { model.statusFilter = RegionStatusFilter(rawValue: $0 ?? "") ?? .all }),
+                       width: 140, allowClear: false)
+            Spacer(minLength: 0)
+            sourceError(regionText("ARM 开机记录", "ARM launch records"), model.armError)
+            sourceError(regionText("我的区域", "My regions"), model.mineError)
+            AppButton(title: "", systemImage: model.showMapBoard ? "map.fill" : "map", kind: .secondary) { model.showMapBoard.toggle() }
+                .help(regionText("显示 / 隐藏地图", "Show / hide map"))
+            AppButton(title: "", systemImage: "arrow.clockwise", kind: .secondary, isLoading: model.isLoading) { Task { await model.refresh() } }
+                .help(regionText("刷新区域数据", "Refresh regions"))
         }
     }
-
-    private func errorBanner(_ text: String) -> some View {
-        HStack {
-            Image(systemName: "exclamationmark.triangle.fill")
-            Text(text).font(.system(size: 14))
-            Spacer()
-            Button("重试") { Task { await model.refresh() } }
-                .buttonStyle(PlainButtonStyle())
-        }
-        .foregroundColor(RegionsTheme.red(dark))
-        .padding(12)
-        .background(RegionsTheme.red(dark).opacity(0.1))
-        .cornerRadius(10)
-    }
-
-    // MARK: - Stats
-
-    private var statsGrid: some View {
-        HStack(spacing: 14) {
-            statCard(icon: "mappin.and.ellipse", color: RegionsTheme.blue(dark),
-                     title: "总区域数", value: "\(model.totalRegions)")
-            statCard(icon: "cpu", color: RegionsTheme.green(dark),
-                     title: "已开ARM架构区域数", value: "\(model.openArmCount)")
-            statCard(icon: "bell.fill", color: RegionsTheme.orange(dark),
-                     title: "今日新开机区域数", value: "\(model.todayNewCount)")
-        }
-    }
-
-    private func statCard(icon: String, color: Color, title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(color.opacity(0.14))
-                        .frame(width: 38, height: 38)
-                    Image(systemName: icon)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(color)
-                }
-                Spacer()
-                Text(title)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(RegionsTheme.muted(dark))
-                    .multilineTextAlignment(.trailing)
-                    .lineLimit(2)
-            }
-            Text(value)
-                .font(.system(size: 28, weight: .bold))
-                .foregroundColor(RegionsTheme.text(dark))
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, minHeight: 100, alignment: .topLeading)
-        .background(RegionsTheme.surface2(dark))
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(RegionsTheme.border(dark), lineWidth: 1))
-        .cornerRadius(18)
-    }
-
-    // MARK: - Map board (native stand-in for Leaflet)
 
     private var mapCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(RegionsTheme.green(dark).opacity(0.14))
-                        .frame(width: 38, height: 38)
-                    Image(systemName: "globe")
-                        .foregroundColor(RegionsTheme.green(dark))
-                }
-                Text("数量: \(model.mapCount)")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(RegionsTheme.text(dark))
-
-                Spacer(minLength: 8)
-
-                HStack(spacing: 0) {
-                    mapToggle("ARM放货区域", mode: .arm)
-                    mapToggle("我的区域", mode: .mine)
-                }
-                .background(RegionsTheme.surface(dark))
-                .cornerRadius(8)
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(RegionsTheme.border(dark), lineWidth: 1))
-
-                Button(action: { model.showMapBoard.toggle() }) {
-                    HStack(spacing: 6) {
-                        Image(systemName: model.showMapBoard ? "map.fill" : "map")
-                        Text(model.showMapBoard ? "隐藏地图" : "显示地图")
-                            .font(.system(size: 14, weight: .medium))
+        VStack(spacing: 0) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 14) {
+                    Group {
+                    Toggle(regionText("ARM 记录", "ARM history"), isOn: $model.showArm)
+                    Toggle(regionText("我的区域", "My regions"), isOn: $model.showMine)
+                    Toggle(regionText("交集", "Overlap"), isOn: $model.onlyShared)
+                    Divider().frame(height: 20)
+                    Toggle(regionText("标签", "Labels"), isOn: $model.showLabels)
+                    Toggle(regionText("脉冲", "Pulse"), isOn: $model.showPulse)
+                        .disabled(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)
+                    Toggle(regionText("连线", "Links"), isOn: $model.showLinks)
                     }
-                    .foregroundColor(model.showMapBoard ? .white : RegionsTheme.text(dark))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(model.showMapBoard ? AppTheme.sidebarActive : RegionsTheme.surface(dark))
-                    .cornerRadius(12)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(RegionsTheme.border(dark), lineWidth: model.showMapBoard ? 0 : 1)
-                    )
+                    Group {
+                    SelectMenu(options: model.mapRows.map { SelectOption(id: $0.regionCode, title: "\($0.displayName) · \($0.regionCode)") },
+                               selection: $model.selectedRegion, placeholder: regionText("定位区域", "Locate region"), width: 205, allowClear: true)
+                    Button { model.zoom = min(5, model.zoom * 1.25) } label: { Image(systemName: "plus.magnifyingglass") }
+                        .help(regionText("放大", "Zoom in"))
+                    Button { model.zoom = max(1, model.zoom / 1.25) } label: { Image(systemName: "minus.magnifyingglass") }
+                        .help(regionText("缩小", "Zoom out"))
+                    Button { model.zoom = 1; model.selectedRegion = nil } label: { Image(systemName: "arrow.counterclockwise") }
+                        .help(regionText("复位地图", "Reset map"))
+                    }
                 }
+                .toggleStyle(CheckboxToggleStyle())
                 .buttonStyle(PlainButtonStyle())
+                .font(.system(size: 13))
+                .padding(12)
             }
-
-            if model.showMapBoard {
-                regionBoard
-            }
-        }
-        .padding(18)
-        .background(RegionsTheme.surface2(dark))
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(RegionsTheme.border(dark), lineWidth: 1))
-        .cornerRadius(18)
-    }
-
-    private func mapToggle(_ title: String, mode: RegionsMapViewMode) -> some View {
-        Button(action: { model.mapMode = mode }) {
-            Text(title)
-                .font(.system(size: 14, weight: model.mapMode == mode ? .semibold : .regular))
-                .foregroundColor(model.mapMode == mode ? .white : RegionsTheme.muted(dark))
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(model.mapMode == mode ? AppTheme.sidebarActive : Color.clear)
-        }
-        .buttonStyle(PlainButtonStyle())
-    }
-
-    private var regionBoard: some View {
-        let openSet = Set(model.openRecords.filter { $0.openCount > 0 }.map(\.region))
-        let mineSet = Set(model.myRecords.map(\.region))
-        let groups: [(String, [String])] = [
-            ("亚太", KnownRegions.codes.filter { $0.hasPrefix("ap-") }),
-            ("欧洲/英国", KnownRegions.codes.filter { $0.hasPrefix("eu-") || $0.hasPrefix("uk-") || $0.hasPrefix("il-") }),
-            ("北美", KnownRegions.codes.filter { $0.hasPrefix("us-") || $0.hasPrefix("ca-") || $0.hasPrefix("mx-") }),
-            ("南美", KnownRegions.codes.filter { $0.hasPrefix("sa-") }),
-            ("中东/非洲", KnownRegions.codes.filter { $0.hasPrefix("me-") || $0.hasPrefix("af-") })
-        ]
-
-        return VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 14) {
-                legendDot(RegionsTheme.orange(dark), "已放货")
-                legendDot(RegionsTheme.green(dark), "我的区域")
-                legendDot(RegionsTheme.muted(dark).opacity(0.45), "未放货")
-                Spacer()
-                Text("原生区域状态板（Web 端为 Leaflet 地图）")
-                    .font(.system(size: 11))
-                    .foregroundColor(RegionsTheme.muted(dark))
-            }
-            ForEach(groups, id: \.0) { title, codes in
-                if !codes.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(title)
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(RegionsTheme.muted(dark))
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 8)], spacing: 8) {
-                            ForEach(codes, id: \.self) { code in
-                                let name = model.regionMap[code] ?? code
-                                let isOpen = openSet.contains(code)
-                                let isMine = mineSet.contains(code)
-                                let active: Bool = {
-                                    switch model.mapMode {
-                                    case .arm: return isOpen
-                                    case .mine: return isMine
-                                    }
-                                }()
-                                let color: Color = {
-                                    if model.mapMode == .mine && isMine { return RegionsTheme.green(dark) }
-                                    if model.mapMode == .arm && isOpen { return RegionsTheme.orange(dark) }
-                                    return RegionsTheme.muted(dark).opacity(0.35)
-                                }()
-                                HStack(spacing: 8) {
-                                    Circle()
-                                        .fill(color)
-                                        .frame(width: active ? 10 : 8, height: active ? 10 : 8)
-                                    VStack(alignment: .leading, spacing: 1) {
-                                        Text(name)
-                                            .font(.system(size: 11, weight: .medium))
-                                            .foregroundColor(RegionsTheme.text(dark))
-                                            .lineLimit(1)
-                                        Text(code)
-                                            .font(.system(size: 10))
-                                            .foregroundColor(RegionsTheme.muted(dark))
-                                            .lineLimit(1)
-                                    }
-                                    Spacer(minLength: 0)
-                                }
-                                .padding(8)
-                                .background(RegionsTheme.surface(dark))
-                                .cornerRadius(8)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .stroke(active ? color.opacity(0.5) : RegionsTheme.border(dark), lineWidth: 1)
-                                )
-                            }
-                        }
-                    }
+            NativeRegionWorldMap(rows: model.mapRows, selected: model.selectedRegion, zoom: model.zoom,
+                                 labels: model.showLabels, pulse: model.showPulse, links: model.showLinks, dark: dark,
+                                 onSelect: { row in model.select(row, locateTable: true) }, onZoom: { model.zoom = $0 })
+                .overlay(selectedDetail, alignment: .bottomLeading)
+                .clipped()
+            HStack(spacing: 16) {
+                legend(Color(hex: "f4b760"), regionText("ARM 记录", "ARM history"))
+                legend(Color(hex: "1b8a6a"), regionText("我的区域", "My regions"))
+                legend(Color(hex: "1b8a6a"), regionText("交集 \(model.sharedCount)", "Overlap \(model.sharedCount)"), outlined: true)
+                Spacer(minLength: 0)
+                if model.unknownCoordinates > 0 {
+                    Text(regionText("\(model.unknownCoordinates) 个区域无坐标，仍保留在列表", "\(model.unknownCoordinates) unmapped regions remain in the table"))
+                        .font(.system(size: 12))
                 }
+                Text(regionText("地图连线仅作示意", "Links are illustrative")).font(.system(size: 12))
+            }.padding(.horizontal, 12).padding(.vertical, 8)
+        }
+        .background(AppTheme.cardBg(dark))
+        .cornerRadius(AppTheme.cardRadius)
+        .overlay(RoundedRectangle(cornerRadius: AppTheme.cardRadius).stroke(AppTheme.border(dark), lineWidth: 1))
+    }
+
+    @ViewBuilder
+    private var selectedDetail: some View {
+        if let row = model.selectedRow {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(row.displayName).font(.system(size: 14, weight: .semibold))
+                    Spacer(minLength: 12)
+                    Button { model.selectedRegion = nil } label: { Image(systemName: "xmark") }
+                        .buttonStyle(PlainButtonStyle()).help(regionText("关闭详情", "Close details"))
+                }
+                Text(row.regionCode).font(.system(size: 12))
+                Text(regionText("开机记录 \(row.openCount) · 本月 \(row.monthlyOpenCount)", "Launches \(row.openCount) · This month \(row.monthlyOpenCount)")).font(.system(size: 13))
+                Text(regionText("最近上报：", "Last report: ") + (row.lastNotifyTime ?? "—")).font(.system(size: 12))
+                if row.coordinate == nil { Text(regionText("暂无公开坐标", "No known coordinates")).font(.system(size: 12)) }
             }
-        }
-        .padding(.top, 4)
-    }
-
-    private func legendDot(_ color: Color, _ title: String) -> some View {
-        HStack(spacing: 6) {
-            Circle().fill(color).frame(width: 8, height: 8)
-            Text(title).font(.system(size: 13)).foregroundColor(RegionsTheme.muted(dark))
+            .padding(12).frame(width: 270)
+            .background(AppTheme.cardBg(dark).opacity(0.95)).cornerRadius(10)
+            .padding(12)
         }
     }
-
-    // MARK: - List
 
     private var listCard: some View {
-        // ZStack so filter dropdown can float above the table without pushing rows.
-        ZStack(alignment: .topLeading) {
-            // Table block (full card content, with top inset for the filter row)
-            VStack(alignment: .leading, spacing: 0) {
-                // Spacer matching filter row height
-                Color.clear
-                    .frame(height: AppInputStyle.height + 14)
-
-                HStack(spacing: 0) {
-                    col("状态", 80)
-                    col("区域代码", 140)
-                    col("区域名称", 140)
-                    col("架构类型", 90)
-                    col("开机时间", 140)
-                    col("总开机数量", 90)
-                    col("当月开机数量", 100)
-                    col("最后开机时间", 140)
-                }
-                .padding(.vertical, 10)
-                .padding(.horizontal, 8)
-                .background(AppTheme.inputBg(dark))
-                .overlay(Rectangle().fill(RegionsTheme.border(dark)).frame(height: 1), alignment: .bottom)
-
-                if model.pageRows.isEmpty {
-                    Text(model.isLoading ? "加载中..." : "没有找到匹配的区域")
-                        .font(.system(size: 13))
-                        .foregroundColor(RegionsTheme.muted(dark))
-                        .frame(maxWidth: .infinity)
-                        .padding(40)
-                } else {
-                    ForEach(model.pageRows) { row in
+        VStack(spacing: 0) {
+            GeometryReader { geometry in
+                ScrollView(.horizontal, showsIndicators: true) {
+                    VStack(spacing: 0) {
                         HStack(spacing: 0) {
-                            StatusBadge(text: row.isOpen ? "已放货" : "未放货",
-                                        tone: row.isOpen ? .success : .neutral)
-                                .frame(width: 80, alignment: .leading)
-                            cell(row.regionCode, 140)
-                            cell(row.name, 140)
-                            cell(row.architectureType, 90)
-                            cell(Self.fmt(row.openTime), 140)
-                            cell("\(row.openCount)", 90)
-                            cell("\(row.monthlyOpenCount)", 100)
-                            cell(Self.fmt(row.lastNotifyTime), 140)
+                            tableCell(regionText("区域", "Region"), 260)
+                            tableCell(regionText("状态", "Status"), 145)
+                            tableCell(regionText("架构", "Architecture"), 85)
+                            tableCell(regionText("开机次数", "Launches"), 85)
+                            tableCell(regionText("本月", "This month"), 85)
+                            tableCell(regionText("首次开机", "First launch"), 175)
+                            tableCell(regionText("最近上报", "Last report"), 175)
+                            Spacer(minLength: 0)
                         }
-                        .padding(.vertical, 11)
-                        .padding(.horizontal, 8)
-                        .overlay(Rectangle().fill(RegionsTheme.border(dark).opacity(0.6)).frame(height: 1), alignment: .bottom)
+                        .font(.system(size: 14, weight: .medium))
+                        .frame(height: 42).background(AppTheme.hover(dark))
+                        ScrollView(.vertical, showsIndicators: true) {
+                            LazyVStack(spacing: 0) {
+                                ForEach(model.pageRows) { row in
+                                    Button { model.select(row) } label: { tableRow(row) }
+                                        .buttonStyle(PlainButtonStyle())
+                                        .accessibilityLabel("\(row.displayName), \(row.regionCode)")
+                                }
+                            }.frame(maxWidth: .infinity, alignment: .topLeading)
+                        }.overlay(Group {
+                            if model.pageRows.isEmpty {
+                                EmptyStateView(icon: "globe", title: model.isLoading ? regionText("加载中…", "Loading…") : regionText("没有匹配的区域", "No matching regions"),
+                                               subtitle: regionText("调整搜索或筛选", "Adjust the search or filters"))
+                            }
+                        })
                     }
-                }
-
-                // Common drop-in pagination (SelectMenu size + AppInputStyle jump)
-                PaginationBar(state: $model.pageState) {
-                    model.goPage { _ in }
-                }
-                .padding(.top, 8)
-            }
-
-            // Filter row on top layer — SelectMenu panel floats over the table
-            HStack(alignment: .top, spacing: 10) {
-                SearchField(
-                    text: $model.searchText,
-                    placeholder: "搜索区域...",
-                    maxWidth: 260
-                )
-
-                SelectMenu(
-                    options: continentOptions,
-                    selection: continentSelection,
-                    placeholder: "全部大洲",
-                    width: 132,
-                    allowClear: false
-                )
-                SelectMenu(
-                    options: statusOptions,
-                    selection: statusSelection,
-                    placeholder: "全部状态",
-                    width: 120,
-                    allowClear: false
-                )
-
-                Spacer(minLength: 0)
-                if model.isLoading {
-                    ProgressView().scaleEffect(0.7)
-                        .frame(width: 20, height: AppInputStyle.height)
+                    .frame(width: max(1010, geometry.size.width), height: geometry.size.height)
                 }
             }
-            .zIndex(50)
+            PaginationBar(state: $model.pageState, onChange: { model.goPage { _ in } })
         }
-        .padding(18)
-        // Background without .cornerRadius (that clips floating menus)
-        .background(
-            RoundedRectangle(cornerRadius: 18)
-                .fill(RegionsTheme.surface2(dark))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 18)
-                .stroke(RegionsTheme.border(dark), lineWidth: 1)
-        )
+        .background(AppTheme.cardBg(dark))
+        .cornerRadius(AppTheme.cardRadius)
+        .overlay(RoundedRectangle(cornerRadius: AppTheme.cardRadius).stroke(AppTheme.border(dark), lineWidth: 1))
     }
 
-    private var continentOptions: [SelectOption] {
-        RegionContinent.allCases.map { SelectOption(id: $0.rawValue, title: $0.title) }
+    private func tableRow(_ row: RegionRow) -> some View {
+        HStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(row.displayName).font(.system(size: 14, weight: .medium))
+                Text(row.regionCode).font(.system(size: 13))
+            }.lineLimit(1).padding(.horizontal, 12).frame(width: 260, alignment: .leading)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(!model.armLoaded ? "—" : row.isOpen ? regionText("有开机记录", "Has launch history") : regionText("无开机记录", "No launch history"))
+                if row.isMine { Text(regionText("我的区域", "My region")).foregroundColor(AppTheme.brand(dark)).font(.system(size: 12)) }
+            }.padding(.horizontal, 12).frame(width: 145, alignment: .leading)
+            tableCell(row.architectureType, 85)
+            tableCell(model.armLoaded ? "\(row.openCount)" : "—", 85)
+            tableCell(model.armLoaded ? "\(row.monthlyOpenCount)" : "—", 85)
+            tableCell(row.openTime ?? "—", 175)
+            tableCell(row.lastNotifyTime ?? "—", 175)
+            Spacer(minLength: 0)
+        }
+        .font(.system(size: 14))
+        .frame(height: 64)
+        .background(model.selectedRegion == row.regionCode ? AppTheme.hover(dark) : AppTheme.cardBg(dark))
+        .overlay(Rectangle().fill(AppTheme.border(dark)).frame(height: 1), alignment: .bottom)
     }
-
-    private var statusOptions: [SelectOption] {
-        RegionStatusFilter.allCases.map { SelectOption(id: $0.rawValue, title: $0.title) }
+    private var footer: some View {
+        HStack(spacing: 16) {
+            Text(regionText("区域 \(model.totalRegions)", "\(model.totalRegions) regions"))
+            Text(regionText("ARM \(model.armLoaded ? "\(model.openArmCount)" : "—")", "ARM \(model.armLoaded ? "\(model.openArmCount)" : "—")"))
+            Text(regionText("我的区域 \(model.mineLoaded ? "\(model.mineCount)" : "—")", "My regions \(model.mineLoaded ? "\(model.mineCount)" : "—")"))
+            Text(regionText("今日新增 \(model.armLoaded ? "\(model.todayNewCount)" : "—")", "New today \(model.armLoaded ? "\(model.todayNewCount)" : "—")"))
+            Spacer(minLength: 0)
+            Text(model.lastUpdateText).help(regionText("最近完整刷新时间", "Last complete refresh"))
+        }.font(.system(size: 13)).lineLimit(1)
     }
-
-    private var continentSelection: Binding<String?> {
-        Binding(
-            get: { model.continent.rawValue },
-            set: { raw in
-                if let raw = raw, let c = RegionContinent(rawValue: raw) {
-                    model.continent = c
-                } else {
-                    model.continent = .all
-                }
-            }
-        )
+    private func tableCell(_ text: String, _ width: CGFloat) -> some View {
+        Text(text).lineLimit(2).padding(.horizontal, 12).frame(width: width, alignment: .leading).help(text)
     }
-
-    private var statusSelection: Binding<String?> {
-        Binding(
-            get: { model.statusFilter.rawValue },
-            set: { raw in
-                if let raw = raw, let s = RegionStatusFilter(rawValue: raw) {
-                    model.statusFilter = s
-                } else {
-                    model.statusFilter = .all
-                }
-            }
-        )
+    private func legend(_ color: Color, _ text: String, outlined: Bool = false) -> some View {
+        HStack(spacing: 5) {
+            Circle().fill(color).frame(width: 7, height: 7)
+                .overlay(Circle().stroke(Color(hex: "f4b760"), lineWidth: outlined ? 2 : 0))
+            Text(text).font(.system(size: 12))
+        }
     }
-
-    private func col(_ title: String, _ w: CGFloat) -> some View {
-        Text(title)
-            .font(.system(size: 13, weight: .semibold))
-            .foregroundColor(RegionsTheme.muted(dark))
-            .frame(width: w, alignment: .leading)
-    }
-
-    private func cell(_ text: String, _ w: CGFloat) -> some View {
-        Text(text)
-            .font(.system(size: 14))
-            .foregroundColor(RegionsTheme.text(dark))
-            .lineLimit(1)
-            .frame(width: w, alignment: .leading)
-    }
-
-    private static func fmt(_ s: String?) -> String {
-        guard let s = s, !s.isEmpty else { return "--" }
-        return s
+    @ViewBuilder private func sourceError(_ source: String, _ detail: String?) -> some View {
+        if let detail = detail {
+            Button {
+                let alert = NSAlert()
+                alert.messageText = source
+                alert.informativeText = detail
+                alert.addButton(withTitle: regionText("关闭", "Close"))
+                alert.runModal()
+            } label: { Image(systemName: "exclamationmark.circle.fill").foregroundColor(.red) }
+            .buttonStyle(PlainButtonStyle()).help(source + " · " + regionText("刷新失败，保留上次数据", "Refresh failed; previous data retained"))
+        }
     }
 }
 
-// MARK: - Theme (arm_records.css)
+private struct NativeRegionWorldMap: NSViewRepresentable {
+    let rows: [RegionRow]
+    let selected: String?
+    let zoom: Double
+    let labels: Bool
+    let pulse: Bool
+    let links: Bool
+    let dark: Bool
+    let onSelect: (RegionRow) -> Void
+    let onZoom: (Double) -> Void
+    func makeNSView(context: Context) -> RegionWorldCanvas { RegionWorldCanvas() }
+    func updateNSView(_ view: RegionWorldCanvas, context: Context) {
+        view.configure(rows: rows, selected: selected, zoom: zoom, labels: labels, pulse: pulse, links: links,
+                       dark: dark, onSelect: onSelect, onZoom: onZoom)
+    }
+    static func dismantleNSView(_ view: RegionWorldCanvas, coordinator: ()) { view.stop() }
+}
 
-enum RegionsTheme {
-    static func bg(_ dark: Bool) -> Color { AppTheme.pageBg(dark) }
-    static func surface(_ dark: Bool) -> Color { AppTheme.cardBg(dark) }
-    static func surface2(_ dark: Bool) -> Color { AppTheme.cardBg(dark) }
-    static func border(_ dark: Bool) -> Color { AppTheme.border(dark) }
-    static func text(_ dark: Bool) -> Color { AppTheme.textPrimary(dark) }
-    static func muted(_ dark: Bool) -> Color { AppTheme.textSecondary(dark) }
-    static func blue(_ dark: Bool) -> Color { dark ? Color(hex: "4d9eff") : Color(hex: "3b82f6") }
-    static func green(_ dark: Bool) -> Color { dark ? Color(hex: "3fb950") : Color(hex: "22c55e") }
-    static func orange(_ dark: Bool) -> Color { dark ? Color(hex: "f78166") : Color(hex: "f97316") }
-    static func red(_ dark: Bool) -> Color { dark ? Color(hex: "ff6b6b") : Color(hex: "ef4444") }
+/// Draws the same supplied 5px dot artwork as Vue using AppKit, without web content.
+private final class RegionWorldCanvas: NSView {
+    override var isFlipped: Bool { true }
+    override var acceptsFirstResponder: Bool { true }
+    private var rows: [RegionRow] = []
+    private var selected: String?
+    private var magnification = 1.0
+    private var labels = true, pulse = true, links = true, dark = false
+    private var center = RegionCoordinate(lat: 13, lng: 0)
+    private var onSelect: ((RegionRow) -> Void)?
+    private var onZoom: ((Double) -> Void)?
+    private var timer: Timer?
+    private var phase = 0.0
+    private var cachedBase: NSBezierPath?
+    private var cacheKey = ""
+    private var dragOrigin: NSPoint?
+    private var dragCenter: RegionCoordinate?
+    private var dragged = false
+    private var tracking: NSTrackingArea?
+    private var markerFrames: [(RegionRow, NSPoint)] = []
+    private var hovered: String?
+    private static let landShapes: [NSBezierPath] = KnownRegions.land.map { polygon in
+        let path = NSBezierPath()
+        for (index, coordinate) in polygon.enumerated() {
+            let point = NSPoint(x: coordinate[0], y: coordinate[1])
+            if index == 0 { path.move(to: point) } else { path.line(to: point) }
+        }
+        path.close()
+        return path
+    }
+    private var scale: CGFloat { max(0.001, min(max(1, bounds.width - 24) / 360, max(1, bounds.height - 24) / 142)) * CGFloat(magnification) }
+
+    func configure(rows: [RegionRow], selected: String?, zoom: Double, labels: Bool, pulse: Bool, links: Bool,
+                   dark: Bool, onSelect: @escaping (RegionRow) -> Void, onZoom: @escaping (Double) -> Void) {
+        if selected != self.selected {
+            if let row = rows.first(where: { $0.regionCode == selected }), let coordinate = row.coordinate, zoom > 1.01 { center = coordinate }
+            else if selected == nil { center = RegionCoordinate(lat: 13, lng: 0) }
+        }
+        self.rows = rows
+        self.selected = selected
+        self.magnification = zoom
+        self.labels = labels
+        self.pulse = pulse
+        self.links = links
+        self.dark = dark
+        self.onSelect = onSelect
+        self.onZoom = onZoom
+        toolTip = regionText("拖动平移，双指缩放；点击区域查看记录。", "Drag to pan, pinch to zoom, and select a region to view records.")
+        needsDisplay = true
+        updateTimer()
+    }
+    override func viewDidMoveToWindow() { super.viewDidMoveToWindow(); updateTimer() }
+    func stop() { timer?.invalidate(); timer = nil }
+    private func updateTimer() {
+        guard window != nil, pulse, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { stop(); return }
+        guard timer == nil else { return }
+        timer = Timer.scheduledTimer(withTimeInterval: 1.0 / 24.0, repeats: true) { [weak self] _ in
+            guard let self = self, self.window?.isVisible == true, !self.isHiddenOrHasHiddenAncestor, NSApp.isActive,
+                  !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
+            self.phase = Date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 2.4) / 2.4
+            self.needsDisplay = true
+        }
+    }
+    override func updateTrackingAreas() {
+        if let tracking = tracking { removeTrackingArea(tracking) }
+        let area = NSTrackingArea(rect: bounds, options: [.activeInKeyWindow, .mouseMoved, .mouseEnteredAndExited, .inVisibleRect], owner: self, userInfo: nil)
+        addTrackingArea(area)
+        tracking = area
+        super.updateTrackingAreas()
+    }
+    private func project(_ coordinate: RegionCoordinate) -> NSPoint {
+        NSPoint(x: bounds.midX + CGFloat(coordinate.lng - center.lng) * scale,
+                y: bounds.midY + CGFloat(center.lat - coordinate.lat) * scale)
+    }
+    private func color(_ hex: UInt32) -> NSColor {
+        NSColor(srgbRed: CGFloat((hex >> 16) & 255) / 255, green: CGFloat((hex >> 8) & 255) / 255,
+                blue: CGFloat(hex & 255) / 255, alpha: 1)
+    }
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        (dark ? color(0x0a1420) : NSColor.white).setFill()
+        bounds.fill()
+        buildBaseIfNeeded()
+        (dark ? color(0x22506b) : color(0xc3d2dc)).setFill()
+        cachedBase?.fill()
+        markerFrames = rows.compactMap { row in
+            guard let coordinate = row.coordinate else { return nil }
+            return (row, project(coordinate))
+        }.filter { bounds.insetBy(dx: -16, dy: -16).contains($0.1) }
+        if links { drawLinks() }
+        var labelRects: [NSRect] = []
+        let ordered = markerFrames.sorted { ($0.0.regionCode == selected ? 1 : 0) < ($1.0.regionCode == selected ? 1 : 0) }
+        for (row, point) in ordered {
+            let mine = dark ? color(0x4fe3c1) : color(0x1b8a6a)
+            let arm = dark ? color(0xf4b760) : color(0xb7791f)
+            let markerColor = row.isMine ? mine : arm
+            let active = row.regionCode == selected || row.regionCode == hovered
+            if pulse && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+                let radius = CGFloat(5 + phase * 10)
+                markerColor.withAlphaComponent(CGFloat((1 - phase) * 0.5)).setStroke()
+                let ring = NSBezierPath(ovalIn: NSRect(x: point.x - radius, y: point.y - radius, width: radius * 2, height: radius * 2))
+                ring.lineWidth = 1
+                ring.stroke()
+            }
+            let radius: CGFloat = active ? 5 : 3.5
+            markerColor.setFill()
+            NSBezierPath(ovalIn: NSRect(x: point.x - radius, y: point.y - radius, width: radius * 2, height: radius * 2)).fill()
+            if row.isMine && row.isOpen || active {
+                (row.isOpen ? arm : mine).setStroke()
+                let ring = NSBezierPath(ovalIn: NSRect(x: point.x - radius - 2, y: point.y - radius - 2, width: radius * 2 + 4, height: radius * 2 + 4))
+                ring.lineWidth = active ? 2 : 1
+                ring.stroke()
+            }
+            if labels || active {
+                let name = KnownRegions.cityName(row.regionCode) as NSString
+                let attributes: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 11, weight: active ? .semibold : .regular),
+                                                                .foregroundColor: dark ? color(0xdcecf3) : color(0x25323d)]
+                let size = name.size(withAttributes: attributes)
+                var placement: NSRect?
+                for vertical in [CGFloat(-15), 3, -30, 18, -45, 33] {
+                    let x = point.x > bounds.maxX - size.width - 20 ? point.x - size.width - 9 : point.x + 9
+                    let candidate = NSRect(x: max(4, x), y: point.y + vertical, width: size.width, height: size.height)
+                    if bounds.insetBy(dx: 4, dy: 4).contains(candidate) &&
+                        (active || !labelRects.contains(where: { $0.insetBy(dx: -3, dy: -2).intersects(candidate) })) {
+                        placement = candidate
+                        break
+                    }
+                }
+                if let placement = placement { name.draw(in: placement, withAttributes: attributes); labelRects.append(placement) }
+            }
+        }
+    }
+    private func buildBaseIfNeeded() {
+        let key = "\(bounds.size.width):\(bounds.size.height):\(magnification):\(center.lat):\(center.lng)"
+        guard cacheKey != key else { return }
+        cacheKey = key
+        let path = NSBezierPath()
+        let step: CGFloat = 5
+        for y in stride(from: CGFloat(2.5), to: bounds.height, by: step) {
+            let latitude = center.lat - Double((y - bounds.midY) / scale)
+            guard latitude >= -58, latitude <= 84 else { continue }
+            for x in stride(from: CGFloat(2.5), to: bounds.width, by: step) {
+                let longitude = center.lng + Double((x - bounds.midX) / scale)
+                guard longitude >= -180, longitude <= 180 else { continue }
+                let coordinate = NSPoint(x: longitude, y: latitude)
+                if Self.landShapes.contains(where: { $0.bounds.contains(coordinate) && $0.contains(coordinate) }) {
+                    path.appendOval(in: NSRect(x: x - 1.1, y: y - 1.1, width: 2.2, height: 2.2))
+                }
+            }
+        }
+        cachedBase = path
+    }
+    private func drawLinks() {
+        guard markerFrames.count > 1 else { return }
+        let origin = markerFrames.first(where: { $0.0.regionCode == selected }) ?? markerFrames[0]
+        (dark ? color(0x4fe3c1) : color(0x1b8a6a)).withAlphaComponent(0.22).setStroke()
+        for destination in markerFrames where destination.0.regionCode != origin.0.regionCode {
+            let a = origin.1, b = destination.1
+            let curve = NSBezierPath()
+            curve.move(to: a)
+            let lift = min(CGFloat(70), abs(a.x - b.x) * 0.18)
+            curve.curve(to: b, controlPoint1: NSPoint(x: a.x + (b.x - a.x) / 3, y: a.y - lift),
+                        controlPoint2: NSPoint(x: a.x + (b.x - a.x) * 2 / 3, y: b.y - lift))
+            curve.lineWidth = 0.7
+            curve.stroke()
+        }
+    }
+    override func mouseDown(with event: NSEvent) {
+        window?.makeFirstResponder(self)
+        dragOrigin = convert(event.locationInWindow, from: nil)
+        dragCenter = center
+        dragged = false
+    }
+    override func mouseDragged(with event: NSEvent) {
+        guard let origin = dragOrigin, let original = dragCenter else { return }
+        let point = convert(event.locationInWindow, from: nil)
+        let delta = NSPoint(x: point.x - origin.x, y: point.y - origin.y)
+        if abs(delta.x) + abs(delta.y) > 4 { dragged = true }
+        center = RegionCoordinate(lat: max(-58, min(84, original.lat + Double(delta.y / scale))),
+                                  lng: max(-180, min(180, original.lng - Double(delta.x / scale))))
+        needsDisplay = true
+    }
+    override func mouseUp(with event: NSEvent) {
+        defer { dragOrigin = nil; dragCenter = nil }
+        guard !dragged else { return }
+        let point = convert(event.locationInWindow, from: nil)
+        if let nearest = closest(to: point) { onSelect?(nearest.0) }
+    }
+    override func magnify(with event: NSEvent) { onZoom?(max(1, min(5, magnification * (1 + Double(event.magnification))))) }
+    override func mouseMoved(with event: NSEvent) {
+        let point = convert(event.locationInWindow, from: nil)
+        let nearest = closest(to: point)
+        hovered = nearest?.0.regionCode
+        toolTip = nearest.map { "\($0.0.displayName) · \($0.0.regionCode)" }
+        if nearest == nil { NSCursor.arrow.set() } else { NSCursor.pointingHand.set() }
+        needsDisplay = true
+    }
+    override func mouseExited(with event: NSEvent) { hovered = nil; NSCursor.arrow.set(); needsDisplay = true }
+    override func keyDown(with event: NSEvent) {
+        if event.charactersIgnoringModifiers == "+" { onZoom?(min(5, magnification * 1.25)); return }
+        if event.charactersIgnoringModifiers == "-" { onZoom?(max(1, magnification / 1.25)); return }
+        super.keyDown(with: event)
+    }
+    private func closest(to point: NSPoint) -> (RegionRow, NSPoint)? {
+        markerFrames.filter { hypot($0.1.x - point.x, $0.1.y - point.y) <= 14 }
+            .min { hypot($0.1.x - point.x, $0.1.y - point.y) < hypot($1.1.x - point.x, $1.1.y - point.y) }
+    }
+    deinit { timer?.invalidate() }
 }

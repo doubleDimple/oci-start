@@ -16,11 +16,6 @@ struct EdgeOneView: View {
             toolbar: { toolbar },
             content: {
                 VStack(spacing: 0) {
-                    if let err = model.errorText, !err.isEmpty {
-                        errorBanner(err)
-                            .padding(.horizontal, 16)
-                            .padding(.top, 12)
-                    }
                     modePicker
                         .padding(.horizontal, 16)
                         .padding(.top, 12)
@@ -33,7 +28,7 @@ struct EdgeOneView: View {
                 .appLoading((model.isLoading || model.isZonesLoading) && model.zones.isEmpty)
             },
             footer: {
-                PaginationBar(state: $model.pageState) {
+                PaginationBar(state: $model.pageState, disabled: model.isLoading) {
                     model.onPageChange()
                 }
             }
@@ -60,6 +55,9 @@ struct EdgeOneView: View {
 
     private var toolbar: some View {
         HStack(spacing: 8) {
+            if let error = model.errorText, !error.isEmpty {
+                PageErrorIndicator(message: error, retry: { Task { await model.reloadRecords() } })
+            }
             AppButton(title: "密钥配置", systemImage: "key", kind: .secondary) {
                 model.openConfig()
             }
@@ -348,22 +346,4 @@ struct EdgeOneView: View {
         .help(tip)
     }
 
-    private func errorBanner(_ text: String) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundColor(Color(hex: "f85149"))
-            Text(text).font(.system(size: 14))
-            Spacer()
-            Button("密钥配置") { model.openConfig() }
-                .buttonStyle(PlainButtonStyle())
-            Button("重试") {
-                Task { await model.loadZones(selectFirst: true) }
-            }
-            .buttonStyle(PlainButtonStyle())
-        }
-        .foregroundColor(Color(hex: "f85149"))
-        .padding(12)
-        .background(Color(hex: "f85149").opacity(0.1))
-        .cornerRadius(8)
-    }
 }

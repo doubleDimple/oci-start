@@ -1,254 +1,142 @@
 import SwiftUI
 
-/// Drop-in pagination bar (Web `pagination.ftl`, 0-based page).
-///
-/// ```swift
-/// PaginationBar(state: $model.pageState) {
-///     model.reload()   // or apply slice
-/// }
-/// ```
-///
-/// - Page size: shared `SelectMenu`
-/// - Jump field: `AppCompactField` / `AppInputStyle` (no system focus ring)
+/// Native equivalent of Vue PagePagination; the server page remains zero based.
 struct PaginationBar: View {
     @Binding var state: PageState
-    /// 是否显示每页条数选择（token 游标分页等场景可关）
     var showsSizeSelector: Bool = true
-    /// 是否显示跳转输入
-    var showsJump: Bool = true
-    /// 覆盖默认 `rangeText`（例如「共 100+ 条」）
+    var showsJump: Bool = false
     var rangeTextOverride: String? = nil
+    var disabled: Bool = false
     var onChange: () -> Void = {}
 
-    @State private var jumpText: String = ""
-    @State private var compactLayout = false
-
+    @ObservedObject private var language = LanguageManager.shared
     @EnvironmentObject private var appearance: AppearanceController
-    @Environment(\.colorScheme) private var colorScheme
-    private var dark: Bool { appearance.isDarkEffective || colorScheme == .dark }
-
-    private let controlHeight: CGFloat = 32
-    private let compactWidth: CGFloat = 800
-    private var rowHeight: CGFloat { max(controlHeight, AppInputStyle.height) }
-
-    private var sizeOptions: [SelectOption] {
-        PageState.sizeOptions.map { SelectOption(id: "\($0)", title: "\($0)") }
-    }
-
-    private var sizeSelection: Binding<String?> {
-        Binding(
-            get: { "\(state.size)" },
-            set: { newVal in
-                guard let raw = newVal, let n = Int(raw), n > 0 else { return }
-                guard n != state.size else { return }
-                state.changeSize(n)
-                onChange()
-            }
-        )
-    }
+    @State private var compact = false
+    @State private var jumpText = ""
+    private var dark: Bool { appearance.isDarkEffective }
 
     var body: some View {
         GeometryReader { proxy in
-            VStack(spacing: 4) {
-                if proxy.size.width < compactWidth {
-                    scrollingRow(width: proxy.size.width) {
-                        if showsSizeSelector {
-                            sizeSelector.fixedSize(horizontal: true, vertical: false)
-                            Spacer(minLength: 12)
-                        }
-                        infoAndJump.fixedSize(horizontal: true, vertical: false)
-                    }
-                    scrollingRow(width: proxy.size.width) {
-                        Spacer(minLength: 0)
-                        navControls.fixedSize(horizontal: true, vertical: false)
+            Group {
+                if proxy.size.width < 680 {
+                    VStack(alignment: .leading, spacing: 10) {
+                        summary
+                        controls(compact: true)
                     }
                 } else {
-                    scrollingRow(width: proxy.size.width) {
-                        if showsSizeSelector {
-                            sizeSelector.fixedSize(horizontal: true, vertical: false)
-                            Spacer(minLength: 8)
-                        }
-                        navControls.fixedSize(horizontal: true, vertical: false)
-                        Spacer(minLength: 8)
-                        infoAndJump.fixedSize(horizontal: true, vertical: false)
+                    HStack(spacing: 10) {
+                        summary
+                        Spacer(minLength: 10)
+                        controls(compact: false)
                     }
                 }
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .onAppear { updateLayout(width: proxy.size.width) }
-            .onChange(of: proxy.size.width) { updateLayout(width: $0) }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 12)
+            .onAppear { compact = proxy.size.width < 680 }
+            .onChange(of: proxy.size.width) { compact = $0 < 680 }
         }
-        .frame(height: compactLayout ? rowHeight * 2 + 24 : rowHeight + 20)
+        .frame(height: compact ? 86 : 56)
         .background(AppTheme.cardBg(dark))
-        .overlay(
-            Rectangle()
-                .frame(height: 1)
-                .foregroundColor(AppTheme.border(dark).opacity(0.7)),
-            alignment: .top
-        )
+        .overlay(Rectangle().fill(AppTheme.border(dark).opacity(0.4)).frame(height: 1), alignment: .top)
+        .disabled(disabled)
+        .accessibilityLabel(language.text("分页", "Pagination"))
     }
 
-    /// Preserve all controls even for long ranges or unusually small embedded panels.
-    private func scrollingRow<Content: View>(width: CGFloat, @ViewBuilder content: () -> Content) -> some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(alignment: .center, spacing: 12, content: content)
-                .frame(minWidth: max(0, width - 24), minHeight: rowHeight, alignment: .leading)
-        }
-        .frame(height: rowHeight)
+    private var summary: some View {
+        Text(rangeTextOverride ?? language.text("共 \(state.totalElements) 条", "\(state.totalElements) records"))
+            .font(.system(size: AppTheme.secondarySize))
+            .foregroundColor(AppTheme.textSecondary(dark))
+            .lineLimit(1)
     }
 
-    private func updateLayout(width: CGFloat) {
-        let compact = width < compactWidth
-        if compactLayout != compact { compactLayout = compact }
-    }
-
-    // MARK: - Size
-
-    private var sizeSelector: some View {
+    private func controls(compact: Bool) -> some View {
         HStack(spacing: 8) {
-            Text("每页")
-                .font(.system(size: AppTheme.bodySize))
-                .foregroundColor(AppTheme.textSecondary(dark))
-            SelectMenu(
-                options: sizeOptions,
-                selection: sizeSelection,
-                placeholder: "\(state.size)",
-                width: 78,
-                allowClear: false,
-                searchable: false
-            )
-            Text("条")
-                .font(.system(size: AppTheme.bodySize))
-                .foregroundColor(AppTheme.textSecondary(dark))
-        }
-    }
-
-    // MARK: - Pages
-
-    private var navControls: some View {
-        HStack(spacing: 4) {
-            pageButton(systemName: "chevron.left", disabled: state.isFirst) {
-                state.goPrev()
-                onChange()
+            if showsSizeSelector {
+                SelectMenu(options: PageState.sizeOptions.map {
+                    SelectOption(id: "\($0)", title: language.text("\($0) 条/页", "\($0) / page"))
+                }, selection: Binding(get: { "\(state.size)" }, set: { value in
+                    guard !disabled, let value = value, let size = Int(value), size != state.size else { return }
+                    state.changeSize(size)
+                    onChange()
+                }), placeholder: language.text("\(state.size) 条/页", "\(state.size) / page"),
+                   width: compact ? 112 : 128, allowClear: false, searchable: false)
+                    .padding(.trailing, 8)
             }
-            ForEach(visiblePages, id: \.self) { p in
-                if p < 0 {
-                    Text("…")
-                        .font(.system(size: AppTheme.bodySize))
-                        .foregroundColor(AppTheme.textSecondary(dark))
-                        .frame(width: 22, height: controlHeight)
-                } else {
-                    Button(action: {
-                        state.go(to: p)
-                        onChange()
-                    }) {
-                        Text("\(p + 1)")
-                            .font(.system(size: AppTheme.bodySize, weight: p == state.page ? .bold : .regular))
-                            .frame(minWidth: controlHeight, minHeight: controlHeight)
-                            .background(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(p == state.page ? AppTheme.sidebarActive : AppInputStyle.fill(dark))
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .stroke(
-                                        p == state.page ? Color.clear : AppInputStyle.border(dark),
-                                        lineWidth: 1
-                                    )
-                            )
-                            .foregroundColor(p == state.page ? .white : AppInputStyle.text(dark))
+            arrow("chevron.left", label: language.text("上一页", "Previous page"), unavailable: state.isFirst) {
+                state.goPrev(); onChange()
+            }
+            if compact {
+                number(state.page)
+            } else {
+                ForEach(visiblePages, id: \.self) { page in
+                    if page < 0 {
+                        Text("…").frame(width: 24, height: 32)
+                            .foregroundColor(AppTheme.textSecondary(dark))
+                    } else {
+                        number(page)
                     }
-                    .buttonStyle(PlainButtonStyle())
                 }
             }
-            pageButton(systemName: "chevron.right", disabled: state.isLast) {
-                state.goNext()
-                onChange()
+            arrow("chevron.right", label: language.text("下一页", "Next page"), unavailable: state.isLast) {
+                state.goNext(); onChange()
             }
-        }
-    }
-
-    // MARK: - Jump
-
-    private var infoAndJump: some View {
-        HStack(spacing: 8) {
-            Text(rangeTextOverride ?? state.rangeText)
-                .font(.system(size: AppTheme.bodySize))
-                .foregroundColor(AppTheme.textSecondary(dark))
-                .lineLimit(1)
-
             if showsJump {
-                Text("跳至")
-                    .font(.system(size: AppTheme.bodySize))
-                    .foregroundColor(AppTheme.textSecondary(dark))
-
-                AppCompactField(
-                    text: $jumpText,
-                    placeholder: "\(state.displayPage)",
-                    width: 56,
-                    height: controlHeight,
-                    onCommit: { jump() }
-                )
-
-                Button(action: jump) {
-                    Text("Go")
-                        .font(.system(size: AppTheme.bodySize, weight: .semibold))
-                        .foregroundColor(AppTheme.textPrimary(dark))
-                        .padding(.horizontal, 12)
-                        .frame(height: controlHeight)
-                        .background(AppTheme.inputBg(dark))
-                        .cornerRadius(8)
-                }
-                .buttonStyle(PlainButtonStyle())
+                AppCompactField(text: $jumpText, placeholder: "\(state.displayPage)", width: 48, height: 32, onCommit: jump)
+                    .accessibilityLabel(language.text("跳至页码", "Go to page"))
             }
         }
+        .font(.system(size: AppTheme.bodySize))
+        .fixedSize(horizontal: true, vertical: false)
     }
 
-    private func pageButton(systemName: String, disabled: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: systemName)
-                .font(.system(size: AppTheme.bodySize, weight: .semibold))
-                .frame(width: controlHeight, height: controlHeight)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(AppInputStyle.fill(dark))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(AppInputStyle.border(dark), lineWidth: 1)
-                )
-                .foregroundColor(AppInputStyle.text(dark))
-                .opacity(disabled ? 0.35 : 1)
+    private func number(_ page: Int) -> some View {
+        Button {
+            guard !disabled, page != state.page else { return }
+            state.go(to: page)
+            onChange()
+        } label: {
+            Text("\(page + 1)")
+                .font(.system(size: AppTheme.bodySize, weight: page == state.page ? .semibold : .regular))
+                .foregroundColor(page == state.page ? .white : AppTheme.textPrimary(dark))
+                .frame(minWidth: 32, minHeight: 32)
+                .background(page == state.page ? AppTheme.sidebarActive : AppTheme.inputBg(dark))
+                .cornerRadius(8)
         }
         .buttonStyle(PlainButtonStyle())
-        .disabled(disabled)
+        .accessibilityLabel(language.text("第 \(page + 1) 页", "Page \(page + 1)"))
+    }
+
+    private func arrow(_ symbol: String, label: String, unavailable: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(AppTheme.textPrimary(dark))
+                .frame(width: 32, height: 32)
+                .background(AppTheme.inputBg(dark))
+                .cornerRadius(8)
+                .opacity(unavailable ? 0.35 : 1)
+        }
+        .buttonStyle(PlainButtonStyle())
+        .disabled(unavailable || disabled)
+        .accessibilityLabel(label)
+        .help(label)
     }
 
     private var visiblePages: [Int] {
-        let total = state.totalPages
-        guard total > 0 else { return [] }
-        if total <= 7 { return Array(0..<total) }
-
-        var result: [Int] = []
-        let current = state.page
-        result.append(0)
-        let start = max(1, current - 1)
-        let end = min(total - 2, current + 1)
-        if start > 1 { result.append(-1) }
-        if start <= end {
-            result.append(contentsOf: start...end)
-        }
-        if end < total - 2 { result.append(-2) }
-        result.append(total - 1)
-        return result
+        let total = max(1, state.totalPages)
+        if total <= 5 { return Array(0..<total) }
+        let start = max(1, min(state.page - 1, total - 4))
+        let end = min(total - 2, max(state.page + 1, 3))
+        return [0] + (start > 1 ? [-1] : []) + Array(start...end)
+            + (end < total - 2 ? [-2] : []) + [total - 1]
     }
 
     private func jump() {
-        let trimmed = jumpText.trimmingCharacters(in: .whitespaces)
-        guard let oneBased = Int(trimmed), oneBased > 0 else { return }
-        state.go(to: oneBased - 1)
+        guard !disabled, let page = Int(jumpText.trimmingCharacters(in: .whitespaces)), page > 0 else { return }
+        let old = state.page
+        state.go(to: page - 1)
         jumpText = ""
-        onChange()
+        if old != state.page { onChange() }
     }
 }

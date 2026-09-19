@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		B3B1840FE19342BF96265001 /* SwiftTerm in Frameworks */ = {isa = PBXBuildFile; productRef = B3B1840FE19342BF96265002 /* SwiftTerm */; };
 		014D28371D1278113F3CA955 /* AiChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAD83EDE8924CC5C1727A753 /* AiChatView.swift */; };
 		017E9BC8CF95687AB42B89FB /* StorageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5F1CB709C483CF6BB04BCE7 /* StorageView.swift */; };
 		02283880F8A614B023289D25 /* MainWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EA1CC535DFDCB4CB16C160C /* MainWindowController.swift */; };
@@ -185,6 +186,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		B3B1840FE19342BF96265004 /* SwiftTerm 1.2.5 */ = {isa = PBXFileReference; lastKnownFileType = folder; name = SwiftTerm; path = Vendor/SwiftTerm; sourceTree = "<group>"; };
 		0311A36B9784FA6C202AEC59 /* EmailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmailViewModel.swift; sourceTree = "<group>"; };
 		04F6FD2C53D6A133ACF79D88 /* MemoService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoService.swift; sourceTree = "<group>"; };
 		0759DFE51FE9FD56D219EA96 /* OpenLogsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenLogsViewModel.swift; sourceTree = "<group>"; };
@@ -365,6 +367,17 @@
 		FF7C8043AA68448CE2BC7E73 /* SectionCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectionCard.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
+/* Begin PBXFrameworksBuildPhase section */
+		B3B1840FE19342BF96265003 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B3B1840FE19342BF96265001 /* SwiftTerm in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
 /* Begin PBXGroup section */
 		03428377284F679B63E6A7B9 /* SystemLogs */ = {
 			isa = PBXGroup;
@@ -447,6 +460,7 @@
 		3A94B4D6D342EBCB1626995B = {
 			isa = PBXGroup;
 			children = (
+				B3B1840FE19342BF96265004 /* SwiftTerm 1.2.5 */,
 				FDA1366E259E61244A4414B6 /* OciStart */,
 				EF4A2335C19EBAF423F16893 /* Products */,
 			);
@@ -872,6 +886,7 @@
 			buildConfigurationList = 39FCC3739F1836FBFA0068F0 /* Build configuration list for PBXNativeTarget "OciStart" */;
 			buildPhases = (
 				5E4141F305F0EDF0FF620C05 /* Sources */,
+				B3B1840FE19342BF96265003 /* Frameworks */,
 				00B8ABA64DB65D81B6EB1F5E /* Resources */,
 			);
 			buildRules = (
@@ -880,6 +895,7 @@
 			);
 			name = OciStart;
 			packageProductDependencies = (
+				B3B1840FE19342BF96265002 /* SwiftTerm */,
 			);
 			productName = OciStart;
 			productReference = 3C1377BD1A0EFAD5A6961399 /* OciStart.app */;
@@ -907,6 +923,8 @@
 				en,
 			);
 			mainGroup = 3A94B4D6D342EBCB1626995B;
+			packageReferences = (
+			);
 			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 77;
 			productRefGroup = EF4A2335C19EBAF423F16893 /* Products */;
@@ -1241,7 +1259,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 9;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = OciStart/Info.plist;
@@ -1267,7 +1285,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 9;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = OciStart/Info.plist;
@@ -1307,6 +1325,13 @@
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		B3B1840FE19342BF96265002 /* SwiftTerm */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SwiftTerm;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 877A08F2E8D33676B4C68BA8 /* Project object */;
 }

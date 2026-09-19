@@ -1,304 +1,182 @@
 import SwiftUI
 
-/// 原生 Token 配置（对齐 Web `/system/apiTokens`）。
-/// UI 标准：`ModuleSettingsCard` + `EqualHeightCardRow`（同质量管理页）。
+/// Native counterpart of settings/ApiTokensView.vue: overview and full-page generation editor.
 struct ApiTokensView: View {
-    @EnvironmentObject private var session: AppSession
     @EnvironmentObject private var appearance: AppearanceController
+    @ObservedObject private var language = LanguageManager.shared
     @StateObject private var model = ApiTokensViewModel()
-
     private var dark: Bool { appearance.isDarkEffective }
-    private let cardMinHeight: CGFloat = 360
+    private func t(_ zh: String, _ en: String) -> String { language.text(zh, en) }
 
     var body: some View {
-        PageScaffold(
-            title: "Token 配置",
-            subtitle: "Open API 访问令牌 · 生成 / 撤销 / 使用说明",
-            systemImage: "key.fill",
-            layout: .workspace,
-            toolbar: { toolbar },
-            content: {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 14) {
-                        if let err = model.errorText, !err.isEmpty {
-                            errorBanner(err)
-                        }
-                        VStack(spacing: 14) {
-                            EqualHeightCardRow(minHeight: cardMinHeight) {
-                                statusCard
-                            } second: {
-                                configCard
-                            }
-                            EqualHeightCardRow(minHeight: cardMinHeight) {
-                                docsCard
-                            } second: {
-                                usageCard
-                            }
-                        }
+        PageScaffold(title: model.editing ? t("生成 Token", "Generate token") : t("Token 配置", "API token"),
+                     subtitle: "", systemImage: "key", layout: .card,
+                     toolbar: { toolbar }, content: {
+            VStack(spacing: 0) {
+                Rectangle().fill(AppTheme.border(dark)).frame(height: 1)
+                if let notice = model.notice {
+                    HStack(alignment: .top, spacing: 12) {
+                        Image(systemName: model.requiresReview ? "exclamationmark.triangle" : "checkmark.circle")
+                        Text(notice).fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 0)
                     }
-                    .padding(AppTheme.pagePadding)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .font(.system(size: 14)).foregroundColor(model.requiresReview ? AppTheme.warning(dark) : AppTheme.textSecondary(dark))
+                    .padding(16).frame(maxWidth: .infinity, alignment: .leading)
+                    .background(AppTheme.hover(dark))
+                }
+                if model.requiresReview { review }
+                ScrollView {
+                    if model.editing { editor.padding(24) }
+                    else { overview.padding(24) }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .appLoading(model.isLoading)
+                .appLoading(model.isLoading && model.status == nil)
             }
-        )
-        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+        }, footer: { footer })
         .onAppear { model.start() }
-        .onReceive(NotificationCenter.default.publisher(for: .ociReloadCurrentPage)) { _ in
-            Task { await model.reload() }
-        }
-        .environmentObject(appearance)
+        .onDisappear { model.stop() }
+        .onReceive(NotificationCenter.default.publisher(for: .ociReloadCurrentPage)) { _ in Task { await model.reload() } }
     }
 
     private var toolbar: some View {
-        AppButton(
-            title: "刷新",
-            systemImage: "arrow.clockwise",
-            kind: .secondary,
-            isLoading: model.isLoading
-        ) {
-            Task { await model.reload() }
-        }
-    }
-
-    // MARK: - Status
-
-    private var statusCard: some View {
-        ModuleSettingsCard(
-            title: "Token 状态",
-            subtitle: model.status.enabled ? "已启用" : "未启用 / 已撤销",
-            systemImage: "info.circle",
-            accent: model.status.enabled ? Color(hex: "3fb950") : Color(hex: "adbac7"),
-            enabled: nil,
-            minHeight: cardMinHeight
-        ) {
-            infoRow("名称", model.status.tokenName.isEmpty ? "—" : model.status.tokenName)
-            infoRow("状态", model.status.hasToken ? (model.status.enabled ? "已生成 · 有效" : "已生成 · 已停用") : "未生成")
-            if !model.status.expiresAt.isEmpty {
-                infoRow("过期时间", model.status.expiresAt)
-                let days = model.status.daysUntilExpiration
-                infoRow(
-                    "剩余天数",
-                    model.status.isExpired ? "已过期" : "\(days) 天",
-                    warn: days < 7 || model.status.isExpired
-                )
-            }
-            infoRow("说明", model.status.description.isEmpty ? "—" : model.status.description)
-
-            if model.status.hasToken, model.status.enabled, !model.displayToken.isEmpty {
-                FormFieldRow(label: "当前 Token") {
-                    HStack(spacing: 8) {
-                        AppTextField(text: .constant(model.displayToken), placeholder: "—")
-                            .disabled(true)
-                        AppButton(title: "复制", systemImage: "doc.on.doc", kind: .secondary) {
-                            model.copyToken()
-                        }
-                    }
-                }
-            }
-        } footer: {
-            if model.status.enabled {
-                StatusBadge(text: "运行中", tone: .success)
+        HStack(spacing: 10) {
+            AppButton(title: t("返回上一页", "Go back"), systemImage: "arrow.left", kind: .secondary,
+                      enabled: !model.busy && !model.requiresReview) { model.back() }
+            if !model.editing { Text(statusText).font(.system(size: 14)).foregroundColor(AppTheme.textSecondary(dark)) }
+            Spacer(minLength: 8)
+            if let error = model.errorText { PageErrorIndicator(message: error) { Task { await model.reload() } } }
+            PageToolbarIcon(title: t("刷新", "Refresh"), systemImage: "arrow.clockwise",
+                            disabled: model.isLoading || model.busy) { Task { await model.reload() } }
+            if model.editing {
+                AppButton(title: t("取消", "Cancel"), kind: .secondary, enabled: !model.busy && !model.requiresReview) { model.back() }
             } else {
-                StatusBadge(text: "未启用", tone: .neutral)
+                AppButton(title: t("撤销", "Revoke"), kind: .danger,
+                          enabled: model.canMutate && (model.status?.hasToken == true || model.status?.enabled == true)) { model.revoke() }
+                AppButton(title: model.status?.hasToken == true ? t("替换 Token", "Replace token") : t("生成 Token", "Generate token"),
+                          systemImage: "key", kind: .primary, enabled: model.canMutate) { model.openEditor() }
             }
         }
     }
 
-    // MARK: - Config
-
-    private var configCard: some View {
-        ModuleSettingsCard(
-            title: "Token 配置",
-            subtitle: "生成或撤销 API 访问令牌",
-            systemImage: "gearshape",
-            accent: Color(hex: "4a9eff"),
-            enabled: nil,
-            minHeight: cardMinHeight
-        ) {
-            FormFieldRow(label: "Token 名称", required: true) {
-                AppTextField(
-                    text: $model.form.tokenName,
-                    placeholder: "如：生产环境 API",
-                    leadingSystemImage: "tag"
-                )
-            }
-            FormFieldRow(label: "有效期") {
-                SelectMenu(
-                    options: model.expireOptions,
-                    selection: Binding(
-                        get: { "\(model.form.expirationDays)" },
-                        set: { model.form.expirationDays = Int($0 ?? "30") ?? 30 }
-                    ),
-                    placeholder: "选择天数",
-                    width: 140,
-                    allowClear: false,
-                    searchable: false
-                )
-            }
-            FormFieldRow(label: "描述") {
-                AppTextField(
-                    text: $model.form.description,
-                    placeholder: "可选说明"
-                )
-            }
-            Text("生成新 Token 会使旧 Token 立即失效。")
-                .font(.system(size: 13))
-                .foregroundColor(AppTheme.textSecondary(dark))
-        } footer: {
-            HStack(spacing: 8) {
-                AppButton(
-                    title: "生成 Token",
-                    systemImage: "key",
-                    kind: .primary,
-                    isLoading: model.savingKey == "generate"
-                ) {
-                    model.generate()
-                }
-                AppButton(
-                    title: "撤销",
-                    systemImage: "xmark.shield",
-                    kind: .danger,
-                    isLoading: model.savingKey == "revoke"
-                ) {
-                    model.revoke()
-                }
-            }
-        }
+    private var statusText: String {
+        guard let state = model.status else { return t("尚未加载", "Not loaded") }
+        if !state.hasToken { return t("未生成", "Not generated") }
+        if !state.enabled { return t("已停用", "Disabled") }
+        if model.expired == true { return t("已过期", "Expired") }
+        if model.expired == nil { return t("有效期未确认", "Expiry unverified") }
+        return t("有效", "Active")
     }
 
-    // MARK: - Docs
-
-    private var docsCard: some View {
-        ModuleSettingsCard(
-            title: "API 文档",
-            subtitle: "Swagger / OpenAPI",
-            systemImage: "book",
-            accent: Color(hex: "9b59b6"),
-            enabled: nil,
-            minHeight: cardMinHeight
-        ) {
-            Text("使用 Bearer Token 调用 Open API。可在浏览器打开 Swagger 或下载 OpenAPI JSON。")
-                .font(.system(size: 13))
-                .foregroundColor(AppTheme.textSecondary(dark))
-                .fixedSize(horizontal: false, vertical: true)
-
-            VStack(alignment: .leading, spacing: 10) {
-                docLinkRow(title: "Swagger UI", path: "/swagger-ui/index.html", icon: "safari")
-                docLinkRow(title: "OpenAPI JSON", path: "/v3/api-docs", icon: "curlybraces")
+    private var overview: some View {
+        VStack(alignment: .leading, spacing: 24) {
+            HStack(alignment: .top, spacing: 32) {
+                detail(t("名称", "Name"), model.status?.tokenName)
+                detail(t("有效期", "Validity"), model.status.map { t("\($0.expirationDays) 天", "\($0.expirationDays) days") })
             }
-            .padding(.top, 4)
-        } footer: {
-            AppButton(title: "打开 Swagger", systemImage: "arrow.up.right.square", kind: .secondary) {
-                model.openURL("/swagger-ui/index.html")
+            HStack(alignment: .top, spacing: 32) {
+                detail(t("创建时间", "Created"), model.status?.createdAt?.replacingOccurrences(of: "T", with: " "))
+                VStack(alignment: .leading, spacing: 5) {
+                    detail(t("过期时间", "Expires"), model.status?.expiresAt?.replacingOccurrences(of: "T", with: " "))
+                    if let zone = model.status?.serverTimeZone, !zone.isEmpty {
+                        Text(zone).font(.system(size: 12)).foregroundColor(AppTheme.textMuted(dark))
+                    }
+                }.frame(maxWidth: .infinity, alignment: .leading)
             }
-        }
-    }
-
-    // MARK: - Usage
-
-    private var usageCard: some View {
-        ModuleSettingsCard(
-            title: "使用说明",
-            subtitle: "请求头携带 Authorization",
-            systemImage: "terminal",
-            accent: Color(hex: "f0881a"),
-            enabled: nil,
-            minHeight: cardMinHeight
-        ) {
-            Text("在 HTTP 请求头中加入：")
-                .font(.system(size: 13))
-                .foregroundColor(AppTheme.textSecondary(dark))
-
-            Text(authHeaderSample)
-                .font(.system(size: 12, design: .monospaced))
-                .foregroundColor(AppTheme.textPrimary(dark))
-                .padding(12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(AppTheme.inputBg(dark))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(AppTheme.border(dark).opacity(0.7), lineWidth: 1)
-                )
-
-            Text("示例路径：/open-api/v1/system/info")
-                .font(.system(size: 13))
-                .foregroundColor(AppTheme.textSecondary(dark))
-        } footer: {
-            AppButton(title: "复制请求头", systemImage: "doc.on.doc", kind: .secondary) {
-                model.copyAuthHeader()
-            }
-        }
-    }
-
-    private var authHeaderSample: String {
-        let token = model.displayToken.isEmpty ? "{your_token}" : model.displayToken
-        return "Authorization: Bearer \(token)"
-    }
-
-    private func docLinkRow(title: String, path: String, icon: String) -> some View {
-        Button(action: { model.openURL(path) }) {
-            HStack(spacing: 10) {
-                Image(systemName: icon)
-                    .foregroundColor(Color(hex: "9b59b6"))
-                    .frame(width: 18)
-                Text(title)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(AppTheme.textPrimary(dark))
+            detail(t("描述", "Description"), model.status?.description)
+            Rectangle().fill(AppTheme.border(dark)).frame(height: 1)
+            HStack {
+                Text(t("Token 密钥", "Token secret")).font(.system(size: 16, weight: .semibold))
                 Spacer()
-                Text(path)
-                    .font(.system(size: 11, design: .monospaced))
-                    .foregroundColor(AppTheme.textSecondary(dark))
-                Image(systemName: "arrow.up.right")
-                    .font(.system(size: 10))
-                    .foregroundColor(AppTheme.textSecondary(dark))
+                AppButton(title: model.displayToken.isEmpty ? t("查看", "Reveal") : t("隐藏", "Hide"),
+                          systemImage: model.displayToken.isEmpty ? "eye" : "eye.slash", kind: .secondary,
+                          isLoading: model.materialLoading, enabled: !model.displayToken.isEmpty || model.canReveal) {
+                    if model.displayToken.isEmpty { model.reveal() } else { model.hideMaterial() }
+                }
             }
-            .padding(10)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(AppTheme.cardBg(dark).opacity(0.6))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(AppTheme.border(dark).opacity(0.6), lineWidth: 1)
-            )
+            if model.displayToken.isEmpty {
+                Text("•••• •••• •••• ••••").font(.system(size: 20, design: .monospaced))
+                    .foregroundColor(AppTheme.textMuted(dark)).padding(.vertical, 12)
+            } else {
+                HStack(spacing: 10) {
+                    Text(model.displayToken).font(.system(size: 14, design: .monospaced))
+                        .fixedSize(horizontal: false, vertical: true).frame(maxWidth: .infinity, alignment: .leading)
+                    AppButton(title: t("复制", "Copy"), systemImage: "doc.on.doc", kind: .secondary) { model.copyToken() }
+                }.padding(16).background(AppTheme.inputBg(dark)).cornerRadius(12)
+            }
         }
-        .buttonStyle(PlainButtonStyle())
+        .foregroundColor(AppTheme.textPrimary(dark))
+        .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 
-    private func infoRow(_ label: String, _ value: String, warn: Bool = false) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            Text(label)
-                .font(.system(size: 13))
-                .foregroundColor(AppTheme.textSecondary(dark))
-                .frame(width: 72, alignment: .leading)
-            Text(value)
-                .font(.system(size: 14, weight: warn ? .semibold : .regular))
-                .foregroundColor(
-                    warn
-                        ? Color(hex: "f0881a")
-                        : (AppTheme.textPrimary(dark))
-                )
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
+    private func detail(_ label: String, _ value: String?) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 20) {
+            Text(label).font(.system(size: 14, weight: .medium)).foregroundColor(AppTheme.textSecondary(dark))
+                .frame(width: 100, alignment: .leading)
+            Text(value?.isEmpty == false ? value! : "—").font(.system(size: 14))
+                .fixedSize(horizontal: false, vertical: true).frame(maxWidth: .infinity, alignment: .leading)
+        }.padding(.vertical, 15).frame(maxWidth: .infinity, alignment: .leading)
+            .overlay(Rectangle().fill(AppTheme.border(dark)).frame(height: 1), alignment: .bottom)
     }
 
-    private func errorBanner(_ text: String) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundColor(Color(hex: "f85149"))
-            Text(text).font(.system(size: 14))
+    private var editor: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            if model.staleEditor {
+                HStack {
+                    Text(t("配置版本已变化，请核对后使用最新版本。", "Configuration changed. Review before using the latest revision."))
+                    AppButton(title: t("使用最新版本", "Use latest"), kind: .secondary,
+                              enabled: !model.isLoading && model.errorText == nil && !model.busy) { model.useLatest() }
+                }
+            }
+            FormFieldRow(label: t("Token 名称", "Token name"), required: true) {
+                AppTextField(text: $model.form.tokenName, placeholder: t("例如：生产环境 API", "For example: production API"))
+            }
+            FormFieldRow(label: t("有效期", "Validity")) {
+                SelectMenu(options: model.expireOptions, selection: Binding(
+                    get: { "\(model.form.expirationDays)" },
+                    set: { model.form.expirationDays = Int($0 ?? "") ?? 30 }),
+                    placeholder: t("选择天数", "Select days"), width: 180, allowClear: false, searchable: false)
+            }
+            FormFieldRow(label: t("描述", "Description")) {
+                TextEditor(text: $model.form.description).font(.system(size: 14))
+                    .frame(height: 130).padding(10).background(AppTheme.inputBg(dark))
+                    .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(AppTheme.border(dark), lineWidth: 1))
+                Text("\(model.form.description.utf16.count) / 1000").font(.system(size: 12)).foregroundColor(AppTheme.textMuted(dark))
+            }
+        }
+        .disabled(model.busy || model.requiresReview)
+        .frame(maxWidth: 720, alignment: .leading).frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var review: some View {
+        HStack(spacing: 12) {
+            Toggle(t("已核对服务器结果", "I have reviewed the server result"), isOn: $model.reviewChecked)
+                .toggleStyle(CheckboxToggleStyle()).disabled(!model.reviewReady || model.busy)
             Spacer()
-            Button("重试") { Task { await model.reload() } }
-                .buttonStyle(PlainButtonStyle())
-        }
-        .foregroundColor(Color(hex: "f85149"))
-        .padding(12)
-        .background(Color(hex: "f85149").opacity(0.1))
-        .cornerRadius(8)
+            AppButton(title: t("完成核对", "Finish review"), kind: .secondary,
+                      enabled: model.reviewChecked && model.reviewReady && !model.busy) { model.acknowledgeReview() }
+        }.padding(16)
+    }
+
+    private var footer: some View {
+        HStack(spacing: 14) {
+            if model.editing {
+                Text(model.busy ? t("正在等待服务器回执…", "Waiting for the server…") : "")
+                    .font(.system(size: 13)).foregroundColor(AppTheme.textSecondary(dark))
+                Spacer()
+                AppButton(title: t("继续", "Continue"), systemImage: "arrow.right", kind: .primary,
+                          isLoading: model.busy, enabled: model.canMutate && model.form.valid && !model.staleEditor) { model.generate() }
+            } else {
+                Group {
+                    if let date = model.lastUpdated {
+                        Text(t("最近读取 ", "Last read ") + DateFormatter.localizedString(from: date, dateStyle: .none, timeStyle: .medium))
+                    } else { Text(t("尚未加载", "Not loaded")) }
+                }.font(.system(size: 12)).foregroundColor(AppTheme.textMuted(dark))
+                Spacer(minLength: 8)
+                Button("Swagger") { model.openURL("/swagger-ui/index.html") }
+                Button("OpenAPI JSON") { model.openURL("/v3/api-docs") }
+                Button(t("复制请求头格式", "Copy header format")) { model.copyAuthHeader() }
+            }
+        }.buttonStyle(PlainButtonStyle()).padding(.horizontal, 20).frame(height: 64)
+            .overlay(Rectangle().fill(AppTheme.border(dark)).frame(height: 1), alignment: .top)
     }
 }

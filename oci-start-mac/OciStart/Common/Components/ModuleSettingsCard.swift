@@ -91,7 +91,7 @@ struct ModuleSettingsCard<BodyContent: View, Footer: View>: View {
                     lineWidth: 1
                 )
         )
-        .shadow(color: Color.black.opacity(dark ? 0 : 0.04), radius: 10, y: 3)
+        .shadow(color: AppTheme.cardShadow(dark), radius: AppTheme.cardShadowRadius, y: AppTheme.cardShadowY)
         .animation(.easeInOut(duration: 0.18), value: isOn)
     }
 

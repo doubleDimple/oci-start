@@ -19,9 +19,6 @@ struct StorageView: View {
                 VStack(spacing: 0) {
                     filterBar
                         .padding(.horizontal, 8)
-                    if let err = model.errorText, !err.isEmpty {
-                        errorBanner(err)
-                    }
                     HStack(alignment: .top, spacing: 14) {
                         bucketPanel
                             .frame(minWidth: 260, idealWidth: 320, maxWidth: 380)
@@ -51,6 +48,9 @@ struct StorageView: View {
 
     private var toolbar: some View {
         HStack(spacing: 8) {
+            if let error = model.errorText, !error.isEmpty {
+                PageErrorIndicator(message: error, retry: { Task { await model.reloadAll() } })
+            }
             AppButton(title: "刷新", systemImage: "arrow.clockwise", kind: .secondary) {
                 Task { await model.reloadAll() }
             }
@@ -86,21 +86,6 @@ struct StorageView: View {
         )
     }
 
-    private func errorBanner(_ text: String) -> some View {
-        HStack {
-            Image(systemName: "exclamationmark.triangle.fill")
-            Text(text).font(.system(size: 14))
-            Spacer()
-            Button("重试") { Task { await model.reloadAll() } }
-                .buttonStyle(PlainButtonStyle())
-        }
-        .foregroundColor(Color(hex: "f85149"))
-        .padding(12)
-        .background(Color(hex: "f85149").opacity(0.1))
-        .cornerRadius(8)
-        .padding(.horizontal, 16)
-        .padding(.top, 8)
-    }
 
     // MARK: - Bucket panel
 
