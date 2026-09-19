@@ -467,6 +467,7 @@ rm -rf "$ARCHIVE_PATH"
 
 # 支持系统：macOS Big Sur 11.7.11+（deploymentTarget 11.0）
 # 注意：set -e 下必须保留 xcodebuild 的真实退出码，禁止 `|| true` 吞失败
+# 摘要只显示前 40 行，但持续读取输出，避免提前关闭管道中断编译和完整日志。
 set +e
 xcodebuild archive \
     -project  "$MAC_DIR/$APP_NAME.xcodeproj" \
@@ -477,7 +478,7 @@ xcodebuild archive \
     ONLY_ACTIVE_ARCH=NO \
     CODE_SIGN_IDENTITY="-" \
     CODE_SIGNING_REQUIRED=NO \
-    2>&1 | tee "$BUILD_DIR/xcodebuild-archive.log" | grep -E "error:|warning:|SUCCEEDED|FAILED" | head -40
+    2>&1 | tee "$BUILD_DIR/xcodebuild-archive.log" | grep -E "error:|warning:|SUCCEEDED|FAILED" | sed -n '1,40p'
 XCODE_STATUS=${PIPESTATUS[0]}
 set -e
 

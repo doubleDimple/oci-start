@@ -8,11 +8,17 @@ options:
   indentWidth: 4
   tabWidth: 4
 
+packages:
+  SwiftTerm:
+    path: Vendor/SwiftTerm
+
 targets:
   OciStart:
     type: application
     platform: macOS
     deploymentTarget: "11.0"
+    dependencies:
+      - package: SwiftTerm
     sources:
       - path: OciStart
         createIntermediateGroups: true
@@ -22,7 +28,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.doubledimple.ocistart
         MARKETING_VERSION: "5.7.92"
-        CURRENT_PROJECT_VERSION: "9"
+        CURRENT_PROJECT_VERSION: "11"
         SWIFT_VERSION: "5.5"
         MACOSX_DEPLOYMENT_TARGET: "11.0"
         ENABLE_HARDENED_RUNTIME: YES
@@ -43,7 +49,7 @@ targets:
         CFBundleName: OciStart
         CFBundleDisplayName: OCI Start
         CFBundleIdentifier: com.doubledimple.ocistart
-        CFBundleVersion: "9"
+        CFBundleVersion: "11"
         CFBundleShortVersionString: "5.7.92"
         NSPrincipalClass: NSApplication
         NSHighResolutionCapable: true
