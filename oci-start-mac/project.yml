@@ -28,7 +28,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.doubledimple.ocistart
         MARKETING_VERSION: "5.7.92"
-        CURRENT_PROJECT_VERSION: "11"
+        CURRENT_PROJECT_VERSION: "12"
         SWIFT_VERSION: "5.5"
         MACOSX_DEPLOYMENT_TARGET: "11.0"
         ENABLE_HARDENED_RUNTIME: YES
@@ -49,7 +49,7 @@ targets:
         CFBundleName: OciStart
         CFBundleDisplayName: OCI Start
         CFBundleIdentifier: com.doubledimple.ocistart
-        CFBundleVersion: "11"
+        CFBundleVersion: "12"
         CFBundleShortVersionString: "5.7.92"
         NSPrincipalClass: NSApplication
         NSHighResolutionCapable: true

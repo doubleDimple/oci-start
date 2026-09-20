@@ -90,7 +90,7 @@ struct TenantTrafficView: View {
             subtitle: tenant.map { $0.displayName },
             systemImage: "chart.bar.xaxis",
             layout: .workspace,
-            toolbar: { toolbar },
+            toolbar: { EmptyView() },
             content: { mainContent }
         )
     }
@@ -133,7 +133,7 @@ struct TenantTrafficView: View {
     // MARK: - Filter (Web .filter-controls)
 
     private var filterControls: some View {
-        HStack(alignment: .center, spacing: 14) {
+        SingleLineToolbar(spacing: 14) {
             // Region multi-select
             regionMultiSelect
                 .frame(width: 240)
@@ -178,22 +178,8 @@ struct TenantTrafficView: View {
 
             Spacer(minLength: 8)
 
-            Button(action: { model.closeTrafficPage() }) {
-                HStack(spacing: 6) {
-                    Image(systemName: "arrow.left")
-                        .font(.system(size: 11, weight: .semibold))
-                    Text("返回")
-                        .font(.system(size: 14, weight: .medium))
-                }
-                .foregroundColor(accentGreen)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .overlay(
-                    RoundedRectangle(cornerRadius: AppTheme.controlRadius)
-                        .stroke(accentGreen, lineWidth: 1)
-                )
-            }
-            .buttonStyle(PlainButtonStyle())
+            toolbar
+                .fixedSize(horizontal: true, vertical: false)
         }
         .padding(14)
         .background(surface)
@@ -250,7 +236,8 @@ struct TenantTrafficView: View {
             }
             .buttonStyle(PlainButtonStyle())
 
-            if regionMenuOpen {
+            .popover(isPresented: $regionMenuOpen, arrowEdge: .bottom) {
+                ScrollView(.vertical) {
                 VStack(alignment: .leading, spacing: 0) {
                     regionOptionRow(
                         title: model.tqSelectedRegionIds.count == model.tqRegions.count && !model.tqRegions.isEmpty
@@ -288,8 +275,10 @@ struct TenantTrafficView: View {
                         .stroke(cardBorder, lineWidth: 1)
                 )
                 .cornerRadius(AppTheme.controlRadius)
-                .shadow(color: Color.black.opacity(dark ? 0.35 : 0.08), radius: 6, y: 2)
-                .padding(.top, 4)
+                .padding(8)
+                }
+                .frame(width: 300, height: min(320, CGFloat(max(1, model.tqRegions.count) + 1) * 38 + 16))
+                .background(surface)
             }
         }
         .zIndex(regionMenuOpen ? 20 : 0)

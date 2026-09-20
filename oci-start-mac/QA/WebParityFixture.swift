@@ -34,6 +34,16 @@ final class PreviewProtocol: URLProtocol {
         switch path {
         case "/perform_login": status = 401; body = json(["success": false, "message": "fixture password rejected"])
         case "/tenants/list/json": body = #"{"content":[{"id":1,"tenancyName":"Preview Tokyo","defName":"界面验收数据","region":"ap-tokyo-1","accountTypeName":"免费账户","activeDays":"128","createdAtStr":"2026-09-17","apiSynced":true},{"id":2,"tenancyName":"Preview Singapore","defName":"长名称在表格中保持对齐","region":"ap-singapore-1","accountTypeName":"付费账户","activeDays":"256","createdAtStr":"2026-09-17","apiSynced":true}],"currentPage":0,"totalPages":7,"totalElements":70,"size":10}"#
+        case "/vpnProxy/pageList":
+            // List rendering only: no connection test, save, delete or binding
+            // endpoint is mocked, and all unknown requests fail locally.
+            precondition(request.httpMethod == "POST")
+            body = success(["content": [
+                ["id": 1, "customName": "Tokyo production egress proxy with a long name", "proxyType": "HTTP", "proxyHost": "tokyo-proxy.fixture.invalid", "proxyPort": 8080, "proxyUsername": "preview-long-account-name", "proxyPassword": "", "tenantId": 1, "tenantName": "Preview Tokyo tenancy", "forceProxy": 0, "availableStatus": 1],
+                ["id": 2, "customName": "Singapore global egress", "proxyType": "HTTPS", "proxyHost": "singapore-proxy.fixture.invalid", "proxyPort": 8443, "proxyUsername": "fixture", "proxyPassword": "", "tenantName": "", "forceProxy": 1, "availableStatus": 0]],
+                "number": 0, "size": 10, "totalElements": 2, "totalPages": 1])
+        case "/tenants/listParentTenants":
+            body = success([["id": 1, "tenancyName": "Preview Tokyo", "region": "ap-tokyo-1"]])
         case "/api/system/apiTokenConfigs": body = json(["success": true, "data": tokenMetadata])
         case "/api/system/apiTokenMaterial":
             precondition(request.url?.query == "revision=" + revision)
@@ -119,7 +129,8 @@ method_exchangeImplementations(originalFactory, previewFactory)
 UserDefaults.standard.setVolatileDomain([
     "appAppearance": "light", "deploymentMode": "remote", "deploymentModeChosen": false,
     "serverURL": "https://oci-mac-preview.invalid", "remoteServerURL": "https://oci-mac-preview.invalid",
-    "lastUsername": "Preview", "cloudProvider": 1, "sidebarCollapsed": false
+    "lastUsername": "Preview", "cloudProvider": 1, "sidebarCollapsed": false,
+    "appLocale": "zh_CN"
 ], forName: UserDefaults.argumentDomain)
 URLProtocol.registerClass(PreviewProtocol.self)
 Task { @MainActor in fputs("MainActor preview task reached\n", stderr) }
@@ -130,6 +141,8 @@ let session = AppSession.shared
 let navigation = NavigationState.shared
 let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1280, height: 800), styleMask: [.titled, .resizable], backing: .buffered, defer: false)
 window.isReleasedWhenClosed = false
+let fixtureOriginalWindowLevel = window.level
+window.level = .floating
 let shell = MainShellViewController(session: session, navigation: navigation, appearance: appearance)
 let container = NSView(frame: NSRect(x: 0, y: 0, width: 1280, height: 800))
 window.contentView = container
@@ -141,16 +154,18 @@ app.activate(ignoringOtherApps: true)
 
 let output = ProcessInfo.processInfo.environment["OCI_CAPTURE_DIR"] ?? "/private/tmp/oci-mac-web-qa/shots"
 try FileManager.default.createDirectory(atPath: output, withIntermediateDirectories: true)
-let scenarios: [(String, NavID, Bool, Bool, CGFloat)] = [
+let allScenarios: [(String, NavID, Bool, Bool, CGFloat)] = [
     ("tenants-light", .tenants, false, false, 1280),
     ("tenants-dark", .tenants, true, false, 1280),
     ("tenants-narrow", .tenants, false, false, 960),
+    ("proxy-narrow", .proxyConfig, false, false, 960),
     ("settings-light", .settings, false, false, 1280),
     ("dashboard-light", .dashboard, false, false, 1280),
     ("instances-compact", .instances, false, true, 960),
     ("regions-light", .regions, false, false, 1280),
     ("regions-dark", .regions, true, false, 1280),
     ("regions-narrow", .regions, false, true, 960),
+    ("regions-english-narrow", .regions, false, false, 960),
     ("memo-light", .memo, false, false, 1280),
     ("memo-dark", .memo, true, false, 1280),
     ("mfa-light", .mfa, false, false, 1280),
@@ -162,6 +177,11 @@ let scenarios: [(String, NavID, Bool, Bool, CGFloat)] = [
     ("migration-light", .migration, false, false, 1280),
     ("resources-unavailable", .vpsList, false, true, 960)
 ]
+// Optional bounded rerun after a layout-only edit; all HTTP remains intercepted.
+let layoutOnly = ProcessInfo.processInfo.environment["OCI_LAYOUT_QA_ONLY"] == "1"
+let scenarios = layoutOnly ? allScenarios.filter {
+    ["tenants-narrow", "proxy-narrow", "regions-english-narrow"].contains($0.0)
+} : allScenarios
 var index = 0
 var validationFailures: [String] = []
 func snapshot(_ name: String) {
@@ -175,25 +195,46 @@ func snapshot(_ name: String) {
 }
 func next() {
     guard index < scenarios.count else {
+        tableFixtureTrace("all list scenarios complete; removing shell before login")
         shell.view.removeFromSuperview()
+        tableFixtureTrace("shell removed; creating login hosting view")
         let login = NSHostingView(rootView: LoginView().environmentObject(session).environmentObject(BackendController.shared).environmentObject(appearance))
+        tableFixtureTrace("login hosting view created; resizing window")
         window.setContentSize(NSSize(width: 1280, height: 800))
         login.frame = container.bounds
         login.autoresizingMask = [.width, .height]
         container.addSubview(login)
+        tableFixtureTrace("login hosting view mounted")
         appearance.mode = .light
+        tableFixtureTrace("login light appearance applied; scheduling verification after 2 seconds")
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            snapshot("login-light")
-            appearance.mode = .dark
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                snapshot("login-dark")
-                login.removeFromSuperview()
-                captureForm(0)
+            tableFixtureTrace("login verification dispatch deadline reached; entering main callback verification")
+            verifyLoginGlobeAnimation(in: container, capture: snapshot) { result in
+                if case .failure(let error) = result {
+                    let failure = "login globe animation: \(error.localizedDescription)"
+                    validationFailures.append(failure)
+                    fputs("FAIL: \(failure)\n", stderr)
+                }
+                tableFixtureTrace("login globe completion callback; capturing light")
+                snapshot("login-light")
+                appearance.mode = .dark
+                tableFixtureTrace("login dark appearance applied; scheduling capture")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                    tableFixtureTrace("login dark capture deadline reached")
+                    snapshot("login-dark")
+                    login.removeFromSuperview()
+                    tableFixtureTrace("login host removed after captures")
+                    if layoutOnly { finishFixture() } else { captureForm(0) }
+                }
             }
         }
         return
     }
     let scenario = scenarios[index]
+    var preferences = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
+    preferences["appLocale"] = scenario.0.contains("english") ? "en_US" : "zh_CN"
+    UserDefaults.standard.setVolatileDomain(preferences, forName: UserDefaults.argumentDomain)
+    NotificationCenter.default.post(name: UserDefaults.didChangeNotification, object: UserDefaults.standard)
     appearance.mode = scenario.2 ? .dark : .light
     navigation.sidebarCollapsed = scenario.3
     window.setContentSize(NSSize(width: scenario.4, height: scenario.4 == 960 ? 640 : 800))
@@ -204,6 +245,20 @@ func next() {
                 do { try await verifyTenantFixedActions(in: container) }
                 catch {
                     let failure = "fixed table actions: \(error.localizedDescription)"
+                    validationFailures.append(failure)
+                    fputs("FAIL: \(failure)\n", stderr)
+                }
+            }
+            if scenario.0 == "proxy-narrow" || scenario.0 == "regions-english-narrow" {
+                let proxy = scenario.0 == "proxy-narrow"
+                do {
+                    try await verifyBusinessTable(in: container, name: scenario.0,
+                        firstHeader: proxy ? "名称" : "Region", lastHeader: proxy ? "操作" : "Last report",
+                        headers: proxy ? ["名称", "类型", "地址", "端口", "用户名", "密码", "租户", "强制", "连通状态", "操作"]
+                            : ["Region", "Status", "Architecture", "Launches", "This month", "First launch", "Last report"],
+                        capture: { snapshot(scenario.0 + "-last-column") })
+                } catch {
+                    let failure = "\(scenario.0) table layout: \(error.localizedDescription)"
                     validationFailures.append(failure)
                     fputs("FAIL: \(failure)\n", stderr)
                 }
@@ -235,11 +290,16 @@ struct PreviewLogin: View {
 }
 let formModel = LoginFormModel()
 var formHost: NSHostingView<PreviewLogin>?
+func finishFixture() {
+    window.level = fixtureOriginalWindowLevel
+    print("PASS: native fixture captures finished")
+    if !validationFailures.isEmpty { print("FAIL: \(validationFailures.count) validation check(s) failed") }
+    exit(validationFailures.isEmpty ? 0 : 1)
+}
 func captureForm(_ step: Int) {
     guard step < 6 else {
-        print("PASS: native fixture captures finished")
-        if !validationFailures.isEmpty { print("FAIL: \(validationFailures.count) validation check(s) failed") }
-        exit(validationFailures.isEmpty ? 0 : 1)
+        finishFixture()
+        return
     }
     if step == 0 {
         formModel.modeActivated = true
@@ -350,7 +410,18 @@ func verifyContracts() async throws {
     for check in try await TerminalFixture.run() { print("PASS: \(check)") }
 }
 Task { @MainActor in
-    do { try await verifyContracts() }
+    // The standalone table fixture owns the screen while it runs. Keep the
+    // shell's separate floating window from obscuring synthetic-event targets.
+    window.orderOut(nil)
+    do { try await verifySharedTableLayout(captureDirectory: output) }
+    catch {
+        let failure = "shared table layout: \(error.localizedDescription)"
+        validationFailures.append(failure)
+        fputs("FAIL: \(failure)\n", stderr)
+    }
+    window.makeKeyAndOrderFront(nil)
+    window.orderFrontRegardless()
+    do { if !layoutOnly { try await verifyContracts() } }
     catch {
         let failure = "fixture contract check: \(error)"
         validationFailures.append(failure)

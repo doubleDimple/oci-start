@@ -393,14 +393,15 @@ function rowActions(row: TenantRow): RowAction[] {
     Number(row.cloudType ?? shell.cloudType) === 1 &&
     Number(row.transferStatus || 0) !== 1
   ) {
-    if (Number(row.supportAI) === 1) {
-      items.push({
-        id: 'chat',
-        label: t('tenant.actions.chat'),
-        icon: 'i-mdi-brain',
-        path: '/ai/chat',
-      })
-    }
+    // 暂停租户 AI 对话入口，待服务恢复后再启用。
+    // if (Number(row.supportAI) === 1) {
+    //   items.push({
+    //     id: 'chat',
+    //     label: t('tenant.actions.chat'),
+    //     icon: 'i-mdi-brain',
+    //     path: '/ai/chat',
+    //   })
+    // }
     items.push(
       { id: 'update', label: t('tenant.actions.update'), icon: 'i-mdi-refresh' },
       {

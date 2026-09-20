@@ -1,7 +1,17 @@
 import Foundation
 
-/// URLSession WebSocket client (macOS 11+). Used by native SSH / Console.
-final class NativeWSClient: NSObject {
+/// Injectable transport contract shared by the native AI, SSH and console flows.
+protocol NativeWSConnection: AnyObject {
+    var onState: ((NativeWSClient.State) -> Void)? { get set }
+    var onText: ((String) -> Void)? { get set }
+    var onBinary: ((Data) -> Void)? { get set }
+    func connect(url: URL)
+    func sendJSON(_ object: [String: Any])
+    func disconnect(reason: String?)
+}
+
+/// URLSession WebSocket client (macOS 11+). Callbacks are delivered on main.
+final class NativeWSClient: NSObject, NativeWSConnection {
     enum State: Equatable {
         case idle
         case connecting
@@ -13,14 +23,18 @@ final class NativeWSClient: NSObject {
     private var session: URLSession?
     private let lock = NSLock()
     private var receiveLoopActive = false
+    private var generation: UInt64 = 0
 
     var onState: ((State) -> Void)?
     var onText: ((String) -> Void)?
     var onBinary: ((Data) -> Void)?
 
     func connect(url: URL) {
-        // 静默拆掉旧连接，不要回调 .closed，避免上层刚设 isConnecting 又被清掉
+        // Replacing a connection is silent. A queued old close must not change
+        // the state of a new connection, including before its task is assigned.
         lock.lock()
+        generation &+= 1
+        let currentGeneration = generation
         receiveLoopActive = false
         let oldTask = task
         let oldSession = session
@@ -30,8 +44,6 @@ final class NativeWSClient: NSObject {
         oldTask?.cancel(with: .goingAway, reason: nil)
         oldSession?.invalidateAndCancel()
 
-        onState?(.connecting)
-
         let config = URLSessionConfiguration.default
         config.httpCookieStorage = HTTPCookieStorage.shared
         config.httpShouldSetCookies = true
@@ -39,7 +51,10 @@ final class NativeWSClient: NSObject {
         config.timeoutIntervalForRequest = 60
         config.timeoutIntervalForResource = 3600
 
-        let session = URLSession(configuration: config, delegate: nil, delegateQueue: nil)
+        // URLSession retains its delegate until invalidation; the delegate must
+        // not retain this client, which owns the URLSession.
+        let delegate = NativeWSDelegate(owner: self)
+        let session = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
         var request = URLRequest(url: url)
         let httpURL = url.absoluteString.replacingOccurrences(of: "wss://", with: "https://").replacingOccurrences(of: "ws://", with: "http://")
         if let cookie = APIClient.shared.cookieHeader(for: httpURL), !cookie.isEmpty {
@@ -47,22 +62,28 @@ final class NativeWSClient: NSObject {
         }
         let task = session.webSocketTask(with: request)
         lock.lock()
+        guard generation == currentGeneration else {
+            lock.unlock()
+            task.cancel(with: .goingAway, reason: nil)
+            session.invalidateAndCancel()
+            return
+        }
         self.session = session
         self.task = task
         lock.unlock()
-        task.resume()
-        onState?(.open)
-        startReceiveLoop()
+        notifyState(.connecting, generation: currentGeneration)
+        // A synchronous main-thread state observer may already have cancelled.
+        if isCurrent(task) { task.resume() }
     }
 
     func sendText(_ text: String) {
         lock.lock()
-        let t = task
+        let candidate = task
         lock.unlock()
-        guard let t = t else { return }
-        t.send(.string(text)) { [weak self] error in
+        guard let candidate = candidate else { return }
+        candidate.send(.string(text)) { [weak self] error in
             if let error = error {
-                DispatchQueue.main.async { self?.fail(t, reason: error.localizedDescription) }
+                self?.finish(candidate, reason: self?.closureReason(candidate, error: error))
             }
         }
     }
@@ -75,44 +96,62 @@ final class NativeWSClient: NSObject {
 
     func disconnect(reason: String?) {
         lock.lock()
+        generation &+= 1
+        let currentGeneration = generation
         receiveLoopActive = false
-        let t = task
-        let s = session
+        let candidate = task
+        let activeSession = session
         task = nil
         session = nil
         lock.unlock()
-        t?.cancel(with: .goingAway, reason: nil)
-        s?.invalidateAndCancel()
-        onState?(.closed(reason))
+        candidate?.cancel(with: .goingAway, reason: nil)
+        activeSession?.invalidateAndCancel()
+        notifyState(.closed(reason), generation: currentGeneration)
     }
 
-    private func startReceiveLoop() {
-        lock.lock()
-        receiveLoopActive = true
-        lock.unlock()
-        receiveNext()
+    fileprivate func didOpen(_ candidate: URLSessionWebSocketTask) {
+        onMain { owner in
+            owner.lock.lock()
+            guard owner.task === candidate, !owner.receiveLoopActive else {
+                owner.lock.unlock()
+                return
+            }
+            owner.receiveLoopActive = true
+            let currentGeneration = owner.generation
+            owner.lock.unlock()
+            // This is the sole .open producer: URLSession confirmed the actual
+            // WebSocket handshake. resume() alone is only a connection attempt.
+            owner.notifyState(.open, generation: currentGeneration)
+            if owner.isCurrent(candidate) { owner.receiveNext(candidate) }
+        }
     }
 
-    private func receiveNext() {
-        lock.lock()
-        let t = task
-        let active = receiveLoopActive
-        lock.unlock()
-        guard active, let t = t else { return }
+    fileprivate func didClose(_ candidate: URLSessionWebSocketTask, reason: Data?) {
+        finish(candidate, reason: reason.flatMap { String(data: $0, encoding: .utf8) }.flatMap { $0.isEmpty ? nil : $0 })
+    }
 
-        t.receive { [weak self] result in
-            DispatchQueue.main.async {
-                guard let self = self, self.isCurrent(t) else { return }
+    fileprivate func didComplete(_ candidate: URLSessionWebSocketTask, error: Error?) {
+        finish(candidate, reason: closureReason(candidate, error: error))
+    }
+
+    private func receiveNext(_ candidate: URLSessionWebSocketTask) {
+        lock.lock()
+        let active = receiveLoopActive && task === candidate
+        lock.unlock()
+        guard active else { return }
+        candidate.receive { [weak self] result in
+            self?.onMain { owner in
+                guard owner.isCurrent(candidate) else { return }
                 switch result {
                 case .failure(let error):
-                    self.fail(t, reason: error.localizedDescription)
+                    owner.finish(candidate, reason: owner.closureReason(candidate, error: error))
                 case .success(let message):
                     switch message {
-                    case .string(let text): self.onText?(text)
-                    case .data(let data): self.onBinary?(data)
+                    case .string(let text): owner.onText?(text)
+                    case .data(let data): owner.onBinary?(data)
                     @unknown default: break
                     }
-                    if self.isCurrent(t) { self.receiveNext() }
+                    if owner.isCurrent(candidate) { owner.receiveNext(candidate) }
                 }
             }
         }
@@ -121,12 +160,78 @@ final class NativeWSClient: NSObject {
     private func isCurrent(_ candidate: URLSessionWebSocketTask) -> Bool {
         lock.lock()
         defer { lock.unlock() }
-        return receiveLoopActive && task === candidate
+        return task === candidate
     }
 
-    private func fail(_ candidate: URLSessionWebSocketTask, reason: String) {
-        guard isCurrent(candidate) else { return }
-        disconnect(reason: reason)
+    private func closureReason(_ candidate: URLSessionWebSocketTask, error: Error?) -> String? {
+        if let data = candidate.closeReason, let reason = String(data: data, encoding: .utf8), !reason.isEmpty {
+            return reason
+        }
+        // A receive completion may race the delegate's clean-close callback.
+        if candidate.closeCode == .normalClosure { return nil }
+        return error?.localizedDescription
+    }
+
+    private func finish(_ candidate: URLSessionWebSocketTask, reason: String?) {
+        onMain { owner in
+            owner.lock.lock()
+            guard owner.task === candidate else { owner.lock.unlock(); return }
+            let currentGeneration = owner.generation
+            let activeSession = owner.session
+            owner.receiveLoopActive = false
+            owner.task = nil
+            owner.session = nil
+            owner.lock.unlock()
+            candidate.cancel(with: .goingAway, reason: nil)
+            activeSession?.invalidateAndCancel()
+            // Detachment above makes receive/send/delegate close races notify
+            // once, and prevents stale failures from closing a replacement task.
+            owner.notifyState(.closed(reason), generation: currentGeneration)
+        }
+    }
+
+    private func notifyState(_ state: State, generation expected: UInt64) {
+        onMain { owner in
+            owner.lock.lock()
+            let current = owner.generation == expected
+            owner.lock.unlock()
+            if current { owner.onState?(state) }
+        }
+    }
+
+    private func onMain(_ operation: @escaping (NativeWSClient) -> Void) {
+        if Thread.isMainThread { operation(self) }
+        else {
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                operation(self)
+            }
+        }
+    }
+
+    deinit {
+        task?.cancel(with: .goingAway, reason: nil)
+        session?.invalidateAndCancel()
+    }
+}
+
+private final class NativeWSDelegate: NSObject, URLSessionWebSocketDelegate {
+    weak var owner: NativeWSClient?
+
+    init(owner: NativeWSClient) { self.owner = owner }
+
+    func urlSession(_ session: URLSession, webSocketTask: URLSessionWebSocketTask, didOpenWithProtocol protocol: String?) {
+        owner?.didOpen(webSocketTask)
+    }
+
+    func urlSession(_ session: URLSession, webSocketTask: URLSessionWebSocketTask,
+                    didCloseWith closeCode: URLSessionWebSocketTask.CloseCode, reason: Data?) {
+        owner?.didClose(webSocketTask, reason: reason)
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        guard let socket = task as? URLSessionWebSocketTask else { return }
+        owner?.didComplete(socket, error: error)
     }
 }
 

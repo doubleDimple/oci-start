@@ -13,12 +13,10 @@ struct CloudflareView: View {
             title: "Cloudflare",
             subtitle: "DNS 解析管理 · 代理状态 · 同步记录",
             systemImage: "cloud.fill",
-            toolbar: { toolbar },
+            toolbar: { EmptyView() },
             content: {
                 VStack(spacing: 0) {
                     filterBar
-                        .padding(.horizontal, 16)
-                        .padding(.top, 12)
                     listBody
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
@@ -81,7 +79,7 @@ struct CloudflareView: View {
     // MARK: - Filter
 
     private var filterBar: some View {
-        FilterBar {
+        FilterBar(leading: {
             HStack(spacing: 10) {
                 Text("域名")
                     .font(.system(size: 13))
@@ -116,7 +114,7 @@ struct CloudflareView: View {
                     }
                 }
             }
-        }
+        }, trailing: { toolbar })
     }
 
     // MARK: - List
@@ -144,7 +142,7 @@ struct CloudflareView: View {
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                DataList {
+                DataList(minimumWidth: 760) {
                     DataListColumnHeader(title: "类型", width: 72)
                     DataListColumnHeader(title: "记录名", width: nil)
                     DataListColumnHeader(title: "记录值", width: nil)

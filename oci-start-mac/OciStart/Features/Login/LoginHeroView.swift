@@ -139,9 +139,51 @@ private struct LoginRegionMap: NSViewRepresentable {
     func updateNSView(_ nsView: LoginRegionMapView, context: Context) {
         nsView.dark = dark
         nsView.english = english
+        nsView.refreshAnimationAfterLayout()
         nsView.needsDisplay = true
     }
+
+    static func dismantleNSView(_ nsView: LoginRegionMapView, coordinator: ()) { nsView.dispose() }
 }
+
+#if DEBUG
+/// Read actual rendered-view state from the isolated QA window, without starting
+/// a separate simulation clock or changing system accessibility preferences.
+struct LoginGlobeAnimationSnapshot {
+    let timerRunning: Bool
+    let frameCount: Int
+    let elapsed: TimeInterval
+    let rotationY: CGFloat
+    let rotationX: CGFloat
+    let velocityY: CGFloat
+    let velocityX: CGFloat
+    let dragging: Bool
+    let reducedMotion: Bool
+    let pauseReason: String?
+}
+
+@MainActor
+enum LoginGlobeDiagnostics {
+    static func snapshot(in container: NSView) -> LoginGlobeAnimationSnapshot? {
+        map(in: container)?.animationSnapshot
+    }
+
+    @discardableResult
+    static func setReducedMotionOverride(_ value: Bool?, in container: NSView) -> Bool {
+        guard let view = map(in: container) else { return false }
+        view.diagnosticReducedMotionOverride = value
+        return true
+    }
+
+    private static func map(in container: NSView) -> LoginRegionMapView? {
+        if let view = container as? LoginRegionMapView { return view }
+        for child in container.subviews {
+            if let view = map(in: child) { return view }
+        }
+        return nil
+    }
+}
+#endif
 
 private struct Point3D {
     var vx: CGFloat
@@ -169,6 +211,42 @@ private final class LoginRegionMapView: NSView {
     private var timer: Timer?
     private var observers: [NSObjectProtocol] = []
     private var workspaceObserver: NSObjectProtocol?
+    private weak var scrollClip: NSClipView?
+    private var scrollObservers: [NSObjectProtocol] = []
+    private var refreshQueued = false
+    private var disposed = false
+    private var lastTickTime: TimeInterval?
+    private var elapsed: TimeInterval = 0
+    private var lastTooltipTime: TimeInterval = 0
+
+    #if DEBUG
+    fileprivate var diagnosticReducedMotionOverride: Bool? { didSet { updateAnimation(); needsDisplay = true } }
+    fileprivate var animationSnapshot: LoginGlobeAnimationSnapshot {
+        LoginGlobeAnimationSnapshot(timerRunning: timer?.isValid == true, frameCount: animationFrames,
+                                    elapsed: elapsed, rotationY: rotY, rotationX: rotX,
+                                    velocityY: velY, velocityX: velX, dragging: isDragging,
+                                    reducedMotion: reducedMotion, pauseReason: animationPauseReason)
+    }
+    #endif
+
+    private var reducedMotion: Bool {
+        #if DEBUG
+        if let override = diagnosticReducedMotionOverride { return override }
+        #endif
+        return NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+    }
+
+    private var animationPauseReason: String? {
+        if disposed { return "disposed" }
+        guard let window = window else { return "detached" }
+        if isHiddenOrHasHiddenAncestor { return "view-hidden" }
+        if NSApp.isHidden { return "app-hidden" }
+        if !window.isVisible || window.isMiniaturized { return "window-hidden" }
+        if !window.occlusionState.contains(.visible) { return "window-occluded" }
+        if bounds.width <= 20 || bounds.height <= 20 || visibleRect.isEmpty { return "outside-viewport" }
+        if reducedMotion { return "reduced-motion" }
+        return nil
+    }
 
     // 3D rotation state (Polar spin & view pitch angle)
     private var rotY: CGFloat = -1.1
@@ -188,15 +266,26 @@ private final class LoginRegionMapView: NSView {
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         for name in [NSApplication.didBecomeActiveNotification, NSApplication.didResignActiveNotification,
+                     NSApplication.didHideNotification, NSApplication.didUnhideNotification,
                      NSWindow.didChangeOcclusionStateNotification, NSWindow.didMiniaturizeNotification,
-                     NSWindow.didDeminiaturizeNotification] {
-            observers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
-                self?.updateAnimation()
+                     NSWindow.didDeminiaturizeNotification, NSWindow.didBecomeKeyNotification,
+                     NSWindow.didBecomeMainNotification, NSWindow.didResignKeyNotification,
+                     NSWindow.didExposeNotification, NSWindow.didChangeScreenNotification,
+                     NSWindow.willCloseNotification] {
+            observers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] notification in
+                guard let self = self else { return }
+                if let changedWindow = notification.object as? NSWindow, changedWindow !== self.window { return }
+                if notification.name == NSWindow.willCloseNotification { self.stopAnimation(); return }
+                if notification.name == NSApplication.didResignActiveNotification || notification.name == NSWindow.didResignKeyNotification {
+                    self.cancelDrag()
+                }
+                self.updateAnimation()
+                self.refreshAnimationAfterLayout()
             })
         }
         workspaceObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification, object: nil, queue: .main
-        ) { [weak self] _ in self?.updateAnimation() }
+        ) { [weak self] _ in self?.updateAnimation(); self?.needsDisplay = true }
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -204,40 +293,138 @@ private final class LoginRegionMapView: NSView {
     deinit {
         timer?.invalidate()
         observers.forEach { NotificationCenter.default.removeObserver($0) }
+        scrollObservers.forEach { NotificationCenter.default.removeObserver($0) }
         if let observer = workspaceObserver { NSWorkspace.shared.notificationCenter.removeObserver(observer) }
     }
 
-    override func viewDidMoveToWindow() { super.viewDidMoveToWindow(); updateAnimation() }
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if window == nil { stopAnimation(); detachScrollObserver() }
+        else { refreshAnimationAfterLayout() }
+    }
+
+    override func viewDidMoveToSuperview() { super.viewDidMoveToSuperview(); refreshAnimationAfterLayout() }
+    override func viewDidHide() { super.viewDidHide(); stopAnimation() }
+    override func viewDidUnhide() { super.viewDidUnhide(); refreshAnimationAfterLayout() }
 
     override func layout() {
         super.layout()
         updateRegionTooltips()
+        refreshAnimationAfterLayout()
         needsDisplay = true
     }
 
-    private func updateAnimation() {
+    fileprivate func refreshAnimationAfterLayout() {
+        guard !disposed, !refreshQueued else { return }
+        refreshQueued = true
+        // The view is attached before its window is ordered onscreen. Re-evaluate
+        // after that layout/display pass instead of relying on an activation event.
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.refreshQueued = false
+            guard !self.disposed else { return }
+            self.attachScrollObserver()
+            self.updateAnimation()
+        }
+    }
+
+    private func attachScrollObserver() {
+        var ancestor = superview
+        var clip: NSClipView?
+        while let view = ancestor {
+            if let found = view as? NSClipView { clip = found; break }
+            ancestor = view.superview
+        }
+        guard clip !== scrollClip else { return }
+        detachScrollObserver()
+        guard let found = clip else { return }
+        scrollClip = found
+        found.postsBoundsChangedNotifications = true
+        found.postsFrameChangedNotifications = true
+        for name in [NSView.boundsDidChangeNotification, NSView.frameDidChangeNotification] {
+            scrollObservers.append(NotificationCenter.default.addObserver(forName: name, object: found, queue: .main) { [weak self] _ in
+                self?.refreshAnimationAfterLayout()
+            })
+        }
+    }
+
+    private func detachScrollObserver() {
+        scrollObservers.forEach { NotificationCenter.default.removeObserver($0) }
+        scrollObservers.removeAll()
+        scrollClip = nil
+    }
+
+    fileprivate func dispose() {
+        disposed = true
+        stopAnimation()
+        detachScrollObserver()
+        observers.forEach { NotificationCenter.default.removeObserver($0) }
+        observers.removeAll()
+        if let observer = workspaceObserver { NSWorkspace.shared.notificationCenter.removeObserver(observer) }
+        workspaceObserver = nil
+    }
+
+    private func stopAnimation(cancelInteraction: Bool = true) {
         timer?.invalidate()
         timer = nil
-        guard window?.isVisible == true, window?.occlusionState.contains(.visible) == true,
-              NSApp.isActive, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
-            needsDisplay = true
+        lastTickTime = nil
+        if cancelInteraction { cancelDrag() }
+    }
+
+    private func cancelDrag() {
+        isDragging = false
+        velY = 0
+        velX = 0
+    }
+
+    private func updateAnimation() {
+        if let reason = animationPauseReason {
+            let wasRunning = timer != nil
+            // Reduced motion disables automatic movement, but manual dragging
+            // remains available, including across draw/layout refreshes.
+            stopAnimation(cancelInteraction: reason != "reduced-motion")
+            if reason == "reduced-motion" { velY = 0; velX = 0 }
+            if wasRunning { needsDisplay = true }
             return
         }
-        let next = Timer(timeInterval: 1.0 / 24, repeats: true) { [weak self] _ in
+        // Visible background windows animate like a visible Web page. Repeated
+        // layout and theme refreshes keep the same timer and monotonic time base.
+        guard timer?.isValid != true else { return }
+        lastTickTime = ProcessInfo.processInfo.systemUptime
+        let next = Timer(timeInterval: 1.0 / 30, repeats: true) { [weak self] _ in
             guard let self = self else { return }
-            if !self.isDragging {
-                self.rotY += 0.0014 + self.velY
-                self.rotX += self.velX
-                self.velY *= 0.94
-                self.velX *= 0.94
-                self.rotX = max(-0.8, min(0.8, self.rotX))
-            }
-            self.needsDisplay = true
-            self.animationFrames += 1
-            if self.animationFrames % 24 == 0 { self.updateRegionTooltips() }
+            self.advanceAnimation()
         }
+        next.tolerance = 0.003
         RunLoop.main.add(next, forMode: .common)
         timer = next
+    }
+
+    private func advanceAnimation() {
+        guard animationPauseReason == nil else { updateAnimation(); return }
+        let now = ProcessInfo.processInfo.systemUptime
+        let delta = min(0.05, max(0, now - (lastTickTime ?? now)))
+        lastTickTime = now
+        elapsed += delta
+        // Recover when a drag was interrupted before AppKit delivered mouseUp.
+        if isDragging && (NSEvent.pressedMouseButtons & 1) == 0 { cancelDrag() }
+        if !isDragging {
+            // Web uses 0.0025 radians/frame and 0.94 inertia decay at 60Hz.
+            // Scale by elapsed time so native frame rate does not slow the globe.
+            let frames = CGFloat(delta * 60)
+            let decay = CGFloat(pow(0.94, Double(frames)))
+            let inertiaSteps = (1 - decay) / (1 - CGFloat(0.94))
+            rotY += 0.0025 * frames + velY * inertiaSteps
+            rotX = max(-0.8, min(0.8, rotX + velX * inertiaSteps))
+            velY *= decay
+            velX *= decay
+        }
+        animationFrames += 1
+        needsDisplay = true
+        if elapsed - lastTooltipTime >= 0.25 {
+            lastTooltipTime = elapsed
+            updateRegionTooltips()
+        }
     }
 
     // Pointer mouse drag interaction
@@ -256,14 +443,16 @@ private final class LoginRegionMapView: NSView {
         let dy = loc.y - lastMouseLocation.y
         rotY += dx * 0.006
         rotX = max(-0.8, min(0.8, rotX + dy * 0.006))
-        velY = dx * 0.002
-        velX = dy * 0.002
+        velY = reducedMotion ? 0 : dx * 0.002
+        velX = reducedMotion ? 0 : dy * 0.002
         lastMouseLocation = loc
+        updateRegionTooltips()
         needsDisplay = true
     }
 
     override func mouseUp(with event: NSEvent) {
         isDragging = false
+        if reducedMotion { velY = 0; velX = 0 }
         updateRegionTooltips()
     }
 
@@ -321,6 +510,7 @@ private final class LoginRegionMapView: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
+        if timer == nil { refreshAnimationAfterLayout() }
         guard let ctx = NSGraphicsContext.current?.cgContext else { return }
 
         // Container Background Fill
@@ -409,7 +599,7 @@ private final class LoginRegionMapView: NSView {
 
         // 5. 3D Great-Circle Network Arcs & Traveling Energy Particles
         lineColor.setStroke()
-        let now = Date.timeIntervalSinceReferenceDate
+        let now = elapsed
         for (rIdx, route) in Self.routes.enumerated() {
             let path = NSBezierPath()
             path.lineWidth = 0.8
@@ -425,7 +615,7 @@ private final class LoginRegionMapView: NSView {
             path.stroke()
 
             // Traveling Light Particle
-            if timer != nil, !route.samples.isEmpty {
+            if !reducedMotion, !route.samples.isEmpty {
                 let progress = CGFloat((now / 3.0 + Double(rIdx) * 0.22).truncatingRemainder(dividingBy: 1.0))
                 let sampleIdx = Int(progress * CGFloat(route.samples.count - 1))
                 let pt = route.samples[sampleIdx]
@@ -450,9 +640,9 @@ private final class LoginRegionMapView: NSView {
             let depthAlpha = min(1.0, p.z * 2.2)
 
             // Outer Pulsing Ring
-            if timer != nil && ["ap-tokyo-1", "ap-singapore-1", "eu-frankfurt-1", "us-ashburn-1"].contains(region.id) {
-                let phase = Double(region.id.hashValue & 0xffff)
-                let progress = CGFloat((now * 0.45 + phase * 0.001).truncatingRemainder(dividingBy: 1.0))
+            if !reducedMotion {
+                let phase = Self.regionPulsePhases[region.id] ?? 0
+                let progress = CGFloat((now + phase).truncatingRemainder(dividingBy: 2.4) / 2.4)
                 let ringR = 3.0 + progress * 8.0
                 nodeColor.withAlphaComponent((1.0 - progress) * 0.2 * depthAlpha).setStroke()
                 let ringPath = NSBezierPath(ovalIn: NSRect(x: p.sx - ringR, y: p.sy - ringR, width: ringR * 2, height: ringR * 2))
@@ -520,6 +710,9 @@ private final class LoginRegionMapView: NSView {
         ("me-jeddah-1", "ap-mumbai-1"), ("ap-mumbai-1", "ap-singapore-1"),
         ("ap-singapore-1", "ap-tokyo-1"), ("ap-tokyo-1", "ap-sydney-1")
     ]
+
+    private static let regionPulsePhases = Dictionary(uniqueKeysWithValues:
+        LoginPublicRegion.all.enumerated().map { ($0.element.id, Double($0.offset) * 0.173) })
 
     private static let routes: [RouteArc] = {
         var result: [RouteArc] = []

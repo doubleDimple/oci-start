@@ -50,7 +50,7 @@ struct TenantQuotaView: View {
             subtitle: tenant.map { $0.displayName },
             systemImage: "chart.bar.fill",
             layout: .workspace,
-            toolbar: { toolbar },
+            toolbar: { EmptyView() },
             content: {
                 VStack(spacing: 0) {
                     filterBar
@@ -127,6 +127,7 @@ struct TenantQuotaView: View {
                 }
             },
             trailing: {
+                toolbar
                 AppButton(
                     title: "查询",
                     systemImage: "magnifyingglass",
@@ -199,31 +200,33 @@ struct TenantQuotaView: View {
             GeometryReader { geo in
                 let typeW = hasTypeColumn ? wType : 0
                 let fixed = typeW + wNum * 3 + wBar + wPct + minName + hPad * 2
-                let totalW = max(geo.size.width - 32, fixed)
+                let totalW = max(geo.size.width, fixed)
                 let wName = minName + max(0, totalW - fixed)
 
-                VStack(spacing: 0) {
-                    headerRow(wName: wName, typeW: typeW, width: totalW)
-                    ScrollView {
-                        LazyVStack(spacing: 0) {
-                            ForEach(Array(model.quotaItems.enumerated()), id: \.element.id) { idx, row in
-                                dataRow(index: idx, row: row, wName: wName, typeW: typeW, width: totalW)
+                NativeHorizontalTable(contentWidth: totalW, viewportWidth: geo.size.width, height: geo.size.height) {
+                    VStack(spacing: 0) {
+                        headerRow(wName: wName, typeW: typeW, width: totalW)
+                        ScrollView {
+                            LazyVStack(spacing: 0) {
+                                ForEach(Array(model.quotaItems.enumerated()), id: \.element.id) { idx, row in
+                                    dataRow(index: idx, row: row, wName: wName, typeW: typeW, width: totalW)
+                                }
                             }
                         }
                     }
+                    .frame(width: totalW, alignment: .topLeading)
                 }
-                .frame(width: totalW, alignment: .topLeading)
                 .background(surface)
                 .overlay(
                     RoundedRectangle(cornerRadius: 10)
                         .stroke(cardBorder, lineWidth: 1)
                 )
                 .cornerRadius(10)
-                .padding(.horizontal, AppTheme.pagePadding)
-                .padding(.top, 12)
-                .padding(.bottom, showPagination ? 4 : 12)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
+            .padding(.horizontal, AppTheme.pagePadding)
+            .padding(.top, 12)
+            .padding(.bottom, showPagination ? 4 : 12)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
@@ -377,7 +380,8 @@ struct TenantQuotaView: View {
 
     private func colHeader(_ title: String, _ w: CGFloat, align: Alignment) -> some View {
         Text(title)
-            .font(.system(size: 13, weight: .bold))
+            .lineLimit(1)
+            .font(.system(size: AppTheme.bodySize, weight: .bold))
             .foregroundColor(secondaryText)
             .frame(width: w, alignment: align)
     }

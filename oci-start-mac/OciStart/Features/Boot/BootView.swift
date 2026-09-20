@@ -240,7 +240,7 @@ struct BootView: View {
                         }
                     }
                 }
-                .frame(width: totalW, height: geo.size.height, alignment: .topLeading)
+                .frame(width: totalW, alignment: .topLeading)
 
                 NativeFixedTrailingTable(contentWidth: totalW, viewportWidth: geo.size.width, height: geo.size.height) { table }
             }
@@ -368,7 +368,7 @@ struct BootView: View {
 
     private func colHeader(_ title: String, _ width: CGFloat, align: Alignment = .leading) -> some View {
         Text(title)
-            .font(.system(size: 13, weight: .semibold))
+            .font(.system(size: AppTheme.bodySize, weight: .semibold))
             .foregroundColor(AppTheme.textSecondary(dark))
             .lineLimit(1)
             .frame(width: width, alignment: align)
@@ -459,7 +459,7 @@ struct BootView: View {
     private func actionBar(_ item: BootTaskItem) -> some View {
         BootActionMoreButton(dark: dark, item: item, model: model)
             .environmentObject(appearance)
-            .frame(width: 28, height: 26)
+            .frame(width: 30, height: 30)
     }
 }
 
@@ -746,32 +746,10 @@ private struct BootActionMoreButton: NSViewRepresentable {
     }
 
     func makeNSView(context: Context) -> NSButton {
-        let b = NSButton(frame: NSRect(x: 0, y: 0, width: 30, height: 26))
-        b.bezelStyle = .shadowlessSquare
-        b.isBordered = false
-        b.title = ""
-        b.image = NSImage(systemSymbolName: "ellipsis", accessibilityDescription: "更多")
-        b.imagePosition = .imageOnly
-        b.imageScaling = .scaleProportionallyDown
-        b.contentTintColor = dark
-            ? NSColor.white.withAlphaComponent(0.9)
-            : NSColor.labelColor
-        b.wantsLayer = true
-        if let layer = b.layer {
-            layer.cornerRadius = 7
-            layer.backgroundColor = (dark
-                ? NSColor(calibratedRed: 0.17, green: 0.19, blue: 0.21, alpha: 1)
-                : NSColor(calibratedRed: 0.93, green: 0.95, blue: 0.96, alpha: 1)).cgColor
-            layer.borderWidth = 1
-            layer.borderColor = (dark
-                ? NSColor.white.withAlphaComponent(0.12)
-                : NSColor.black.withAlphaComponent(0.08)).cgColor
-        }
-        b.target = context.coordinator
-        b.action = #selector(Coordinator.toggle(_:))
-        b.setButtonType(.momentaryChange)
-        b.toolTip = "更多操作"
-        return b
+        let button = TableActionButton(dark: dark)
+        button.target = context.coordinator
+        button.action = #selector(Coordinator.toggle(_:))
+        return button
     }
 
     func updateNSView(_ nsView: NSButton, context: Context) {
@@ -779,17 +757,7 @@ private struct BootActionMoreButton: NSViewRepresentable {
         context.coordinator.model = model
         context.coordinator.appearance = appearance
         context.coordinator.dark = dark
-        nsView.contentTintColor = dark
-            ? NSColor.white.withAlphaComponent(0.9)
-            : NSColor.labelColor
-        if let layer = nsView.layer {
-            layer.backgroundColor = (dark
-                ? NSColor(calibratedRed: 0.17, green: 0.19, blue: 0.21, alpha: 1)
-                : NSColor(calibratedRed: 0.93, green: 0.95, blue: 0.96, alpha: 1)).cgColor
-            layer.borderColor = (dark
-                ? NSColor.white.withAlphaComponent(0.12)
-                : NSColor.black.withAlphaComponent(0.08)).cgColor
-        }
+        (nsView as? TableActionButton)?.updateAppearance(dark: dark)
     }
 
     final class Coordinator: NSObject {

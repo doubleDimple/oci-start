@@ -49,6 +49,7 @@ struct MemoView: View {
             .disabled(model.isSaving || model.requiresReview)
             if model.screen == .list {
                 SearchField(text: $model.searchText, placeholder: language.text("搜索标题 / 摘要 / 内容", "Search title, summary, or content"), maxWidth: 340)
+                    .frame(width: 280)
                     .disabled(model.isSaving)
             } else {
                 Text(language.text(model.screen == .read ? "查看笔记" : model.activeForm?.isNew == true ? "新建笔记" : "编辑笔记",
@@ -107,10 +108,8 @@ struct MemoView: View {
 
     private var list: some View {
         GeometryReader { proxy in
-            Group {
-                if proxy.size.width < 820 {
-                    ScrollView(.horizontal) { table.frame(width: 820, height: proxy.size.height) }
-                } else { table }
+            NativeHorizontalTable(contentWidth: max(820, proxy.size.width), viewportWidth: proxy.size.width, height: proxy.size.height) {
+                table
             }
         }
     }
@@ -124,6 +123,7 @@ struct MemoView: View {
                 Text(language.text("操作", "Actions")).frame(width: 170, alignment: .leading)
             }
             .font(.system(size: 14, weight: .semibold))
+            .lineLimit(1)
             .padding(.horizontal, 20).padding(.vertical, 12)
             .background(AppTheme.cardSubtle(dark))
             ScrollView {

@@ -21,7 +21,7 @@ struct PageScaffold<Toolbar: View, Content: View, Footer: View>: View {
     var body: some View {
         VStack(spacing: 0) {
             if Toolbar.self != EmptyView.self {
-                HStack(spacing: 10) {
+                SingleLineToolbar {
                     Spacer(minLength: 0)
                     toolbar()
                 }

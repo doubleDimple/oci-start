@@ -24,7 +24,7 @@ struct TenantAuditLogView: View {
             title: "审计日志",
             subtitle: tenant.map { "\($0.displayName) · \($0.region.isEmpty ? "—" : $0.region)" },
             systemImage: "doc.text",
-            toolbar: { toolbar },
+            toolbar: { EmptyView() },
             content: {
                 VStack(spacing: 0) {
                     filterBar
@@ -102,6 +102,7 @@ struct TenantAuditLogView: View {
                 }
             },
             trailing: {
+                toolbar
                 AppButton(title: "查询", systemImage: "magnifyingglass", kind: .primary) {
                     guard let t = tenant else { return }
                     model.searchAudit(t)
@@ -157,24 +158,26 @@ struct TenantAuditLogView: View {
                 let wEvent = minEvent + flex * 0.55
                 let wEnv = minEnv + flex * 0.45
 
-                VStack(spacing: 0) {
-                    headerRow(wEvent: wEvent, wEnv: wEnv, width: totalW)
-                    ScrollView {
-                        LazyVStack(spacing: 0) {
-                            ForEach(Array(model.auditPageItems.enumerated()), id: \.offset) { idx, log in
-                                dataRow(
-                                    index: model.auditRowStart + idx - 1,
-                                    displayIndex: model.auditRowStart + idx,
-                                    log: log,
-                                    wEvent: wEvent,
-                                    wEnv: wEnv,
-                                    width: totalW
-                                )
+                NativeHorizontalTable(contentWidth: totalW, viewportWidth: geo.size.width, height: geo.size.height) {
+                    VStack(spacing: 0) {
+                        headerRow(wEvent: wEvent, wEnv: wEnv, width: totalW)
+                        ScrollView {
+                            LazyVStack(spacing: 0) {
+                                ForEach(Array(model.auditPageItems.enumerated()), id: \.offset) { idx, log in
+                                    dataRow(
+                                        index: model.auditRowStart + idx - 1,
+                                        displayIndex: model.auditRowStart + idx,
+                                        log: log,
+                                        wEvent: wEvent,
+                                        wEnv: wEnv,
+                                        width: totalW
+                                    )
+                                }
                             }
                         }
                     }
+                    .frame(width: totalW, alignment: .topLeading)
                 }
-                .frame(width: totalW, height: geo.size.height, alignment: .topLeading)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -242,7 +245,8 @@ struct TenantAuditLogView: View {
 
     private func colHeader(_ title: String, _ w: CGFloat, align: Alignment = .leading) -> some View {
         Text(title)
-            .font(.system(size: 13, weight: .semibold))
+            .lineLimit(1)
+            .font(.system(size: AppTheme.bodySize, weight: .semibold))
             .foregroundColor(AppTheme.textSecondary(dark))
             .frame(width: w, alignment: align)
     }

@@ -180,7 +180,8 @@ function rowActions(row: TenantRow): RegionAction[] {
   ]
   if (cloudType(row) !== 1) return []
   const items: RegionAction[] = []
-  if (Number(row.supportAI) === 1) items.push({ id: 'chat', label: t('tenantRegions.actions.chat'), icon: 'i-mdi-brain', path: '/ai/chat' })
+  // 暂停租户 AI 对话入口，待服务恢复后再启用。
+  // if (Number(row.supportAI) === 1) items.push({ id: 'chat', label: t('tenantRegions.actions.chat'), icon: 'i-mdi-brain', path: '/ai/chat' })
   items.push(
     { id: 'sync', label: t('tenantRegions.actions.sync'), icon: 'i-mdi-sync' },
     { id: 'boot', label: t('tenantRegions.actions.boot'), icon: 'i-mdi-plus-circle-outline', path: '/tenants/bootPage' },

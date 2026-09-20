@@ -44,7 +44,7 @@ struct AiChatView: View {
         }
         .onDisappear { model.teardown() }
         .onReceive(NotificationCenter.default.publisher(for: .ociReloadCurrentPage)) { _ in
-            Task { await model.loadTenants() }
+            model.refreshTenants()
         }
         .onReceive(navigation.$aiChatOpenToken) { _ in
             model.consumePendingTenant()
@@ -401,6 +401,7 @@ struct AiChatView: View {
                         width: 220,
                         allowClear: false
                     )
+                    .disabled(model.isSending)
                 }
                 .padding(.leading, 8)
                 .padding(.trailing, 4)
@@ -425,12 +426,23 @@ struct AiChatView: View {
             // Context toggle chip
             contextChip
 
+            if model.canCancel {
+                iconToolButton(systemImage: "xmark", tip: model.isSending ? "停止等待回复" : "取消准备") {
+                    model.cancel()
+                }
+            } else if !model.isConnected {
+                iconToolButton(systemImage: "arrow.clockwise", tip: "重新连接") {
+                    model.reconnect()
+                }
+            }
+
             iconToolButton(systemImage: "doc.on.doc", tip: "复制最后回复") {
                 model.copyLastAssistant()
             }
             iconToolButton(systemImage: "trash", tip: "清空对话") {
                 model.clearChat(keepWelcome: true)
             }
+            .disabled(model.isSending)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
@@ -460,7 +472,7 @@ struct AiChatView: View {
 
     private var statusColor: Color {
         if model.isConnected { return Color(hex: "10b981") }
-        if model.isLoadingModels || model.statusText.contains("连接") || model.statusText.contains("加载") {
+        if model.isLoadingModels || model.isLoadingTenants || model.isConnecting {
             return Color(hex: "f59e0b")
         }
         return Color(hex: "94a3b8")

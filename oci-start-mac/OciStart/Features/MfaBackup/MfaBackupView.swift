@@ -21,6 +21,7 @@ struct MfaBackupView: View {
                     }
                 } else {
                     SearchField(text: $model.searchText, placeholder: language.text("搜索名称 / 发行者", "Search name / issuer"), maxWidth: 280)
+                        .frame(width: 240)
                     Spacer()
                     AppButton(title: language.text("导出 CSV", "Export CSV"), kind: .secondary) { model.exportCSV() }.disabled(model.busy || model.filtered.isEmpty)
                     AppButton(title: language.text("刷新", "Refresh"), systemImage: "arrow.clockwise", kind: .secondary) { Task { await model.reload() } }.disabled(model.busy)
@@ -89,37 +90,47 @@ struct MfaBackupView: View {
                 EmptyStateView(icon: "lock.shield", title: language.text("暂无匹配账户", "No matching accounts"))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                HStack {
-                    Text(language.text("账户 / 发行者", "Account / issuer")).frame(maxWidth: .infinity, alignment: .leading)
-                    Text(language.text("验证码", "Code")).frame(width: 130, alignment: .leading)
-                    Text(language.text("创建时间", "Created")).frame(width: 160, alignment: .leading)
-                    Text(language.text("操作", "Actions")).frame(width: 140, alignment: .trailing)
-                }.font(.system(size: 14, weight: .medium)).padding(.horizontal, 18).padding(.vertical, 10)
-                Divider()
-                ScrollView {
-                    LazyVStack(spacing: 0) {
-                        ForEach(model.pageItems) { item in
-                            HStack(spacing: 12) {
+                GeometryReader { geometry in
+                    NativeHorizontalTable(contentWidth: max(840, geometry.size.width), viewportWidth: geometry.size.width, height: geometry.size.height) {
+                        accountTable
+                    }
+                }
+            }
+        }
+    }
+
+    private var accountTable: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                Text(language.text("账户 / 发行者", "Account / issuer")).frame(maxWidth: .infinity, alignment: .leading)
+                Text(language.text("验证码", "Code")).frame(width: 130, alignment: .leading)
+                Text(language.text("创建时间", "Created")).frame(width: 160, alignment: .leading)
+                Text(language.text("操作", "Actions")).frame(width: 140, alignment: .trailing)
+            }.lineLimit(1).font(.system(size: 14, weight: .medium)).padding(.horizontal, 18).padding(.vertical, 10)
+            Divider()
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    ForEach(model.pageItems) { item in
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(item.keyName).font(.system(size: 14))
+                                Text(item.issuer.isEmpty ? "—" : item.issuer).font(.system(size: 13)).foregroundColor(AppTheme.textSecondary(dark))
+                            }.frame(maxWidth: .infinity, alignment: .leading)
+                            Button(action: { model.copyCode(item) }) {
                                 VStack(alignment: .leading, spacing: 4) {
-                                    Text(item.keyName).font(.system(size: 14))
-                                    Text(item.issuer.isEmpty ? "—" : item.issuer).font(.system(size: 13)).foregroundColor(AppTheme.textSecondary(dark))
-                                }.frame(maxWidth: .infinity, alignment: .leading)
-                                Button(action: { model.copyCode(item) }) {
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text(model.codes[item.id] ?? "—").font(.system(size: 16, weight: .medium, design: .monospaced))
-                                        Text(model.countdown > 0 ? "\(model.countdown)s" : "—").font(.system(size: 13))
-                                    }.frame(width: 130, alignment: .leading)
-                                }.buttonStyle(PlainButtonStyle()).disabled(model.codes[item.id] == nil)
-                                    .help(language.text("复制当前验证码", "Copy current code"))
-                                Text(item.createTime.isEmpty ? "—" : item.createTime).font(.system(size: 13)).frame(width: 160, alignment: .leading)
-                                HStack(spacing: 12) {
-                                    Button(language.text("密钥 / QR", "Key / QR")) { revealSecret = false; model.openMaterial(item) }
-                                    Button(language.text("删除", "Delete")) { model.delete(item) }.foregroundColor(AppTheme.danger).disabled(!model.canMutate)
-                                }.font(.system(size: 14)).buttonStyle(PlainButtonStyle()).frame(width: 140, alignment: .trailing).disabled(model.busy || model.requiresReview)
-                            }
-                            .padding(.horizontal, 18).padding(.vertical, 12)
-                            Divider().opacity(0.4)
+                                    Text(model.codes[item.id] ?? "—").font(.system(size: 16, weight: .medium, design: .monospaced))
+                                    Text(model.countdown > 0 ? "\(model.countdown)s" : "—").font(.system(size: 13))
+                                }.frame(width: 130, alignment: .leading)
+                            }.buttonStyle(PlainButtonStyle()).disabled(model.codes[item.id] == nil)
+                                .help(language.text("复制当前验证码", "Copy current code"))
+                            Text(item.createTime.isEmpty ? "—" : item.createTime).font(.system(size: 13)).frame(width: 160, alignment: .leading)
+                            HStack(spacing: 12) {
+                                Button(language.text("密钥 / QR", "Key / QR")) { revealSecret = false; model.openMaterial(item) }
+                                Button(language.text("删除", "Delete")) { model.delete(item) }.foregroundColor(AppTheme.danger).disabled(!model.canMutate)
+                            }.font(.system(size: 14)).buttonStyle(PlainButtonStyle()).frame(width: 140, alignment: .trailing).disabled(model.busy || model.requiresReview)
                         }
+                        .padding(.horizontal, 18).padding(.vertical, 12)
+                        Divider().opacity(0.4)
                     }
                 }
             }

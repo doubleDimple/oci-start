@@ -14,7 +14,7 @@ struct StorageView: View {
             subtitle: "OCI Object Storage · 存储桶与对象管理",
             systemImage: "externaldrive",
             layout: .workspace,
-            toolbar: { toolbar },
+            toolbar: { EmptyView() },
             content: {
                 VStack(spacing: 0) {
                     filterBar
@@ -79,6 +79,7 @@ struct StorageView: View {
                 }
             },
             trailing: {
+                toolbar
                 AppButton(title: "刷新桶", systemImage: "arrow.clockwise", kind: .secondary) {
                     model.refreshBuckets()
                 }

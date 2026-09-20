@@ -29,6 +29,7 @@ import com.oracle.bmc.generativeaiinference.model.TextContent;
 import com.oracle.bmc.generativeaiinference.model.UserMessage;
 import com.oracle.bmc.generativeaiinference.requests.ChatRequest;
 import com.oracle.bmc.generativeaiinference.responses.ChatResponse;
+import com.oracle.bmc.retrier.RetryConfiguration;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -430,172 +431,79 @@ public class OciAiChatUtils {
     }
 
     /**
-     * 流式对话 - 解析 OCI 事件流并回调
+     * Legacy callback contract: callers outside the WebSocket flow still receive
+     * service failures as a final text callback, without changing their fallback policy.
      */
     public void chatWithStream(Tenant tenant, String message, String modelId, java.util.function.Consumer<String> chunkConsumer) {
         try {
-            OciAiClientManager.ClientContext context = clientManager.getClientContext(tenant);
-            GenerativeAiInferenceClient aiClient = context.getClient();
-
-            GenericChatRequest genericChatRequest = GenericChatRequest.builder()
-                    .messages(Arrays.asList(UserMessage.builder()
-                            .content(Arrays.asList(TextContent.builder().text(message).build()))
-                            .build()))
-                    .maxTokens(4096)
-                    .isStream(true)
-                    .build();
-
-            ChatDetails chatDetails = ChatDetails.builder()
-                    .servingMode(OnDemandServingMode.builder().modelId(modelId).build())
-                    .chatRequest(genericChatRequest)
-                    .compartmentId(context.getCompartmentId())
-                    .build();
-
-            ChatRequest request = ChatRequest.builder().chatDetails(chatDetails).build();
-            ChatResponse response = aiClient.chat(request);
-
-            // 从源码返回的 entity 中获取 eventStream
-            try (java.io.InputStream is = response.getEventStream();
-                 java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(is, java.nio.charset.StandardCharsets.UTF_8))) {
-
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    if (line.startsWith("data:")) {
-                        String data = line.substring(5).trim();
-                        if ("[DONE]".equals(data)) break;
-
-                        // 使用 Fastjson 提取文本
-                        String textPart = parseWithFastjson(data);
-                        if (StringUtils.isNotEmpty(textPart)) {
-                            chunkConsumer.accept(textPart);
-                        }
-                    }
-                }
-            }
+            streamReply(tenant, message, modelId, chunkConsumer, null);
         } catch (Exception e) {
             log.error("OCI AI 流式处理异常", e);
             chunkConsumer.accept(" [AI服务异常: " + e.getMessage() + "]");
         }
+    }
+
+    /** WebSocket entry point: only a valid, nonempty, completed stream succeeds. */
+    public void chatWithStreamOrThrow(Tenant tenant, String message, String modelId, java.util.function.Consumer<String> chunkConsumer) {
+        // Interactive callers need the first service error, not minutes of
+        // invisible SDK retries. Leave retry decisions to the user.
+        streamReply(tenant, message, modelId, chunkConsumer, RetryConfiguration.NO_RETRY_CONFIGURATION);
+    }
+
+    private void streamReply(Tenant tenant, String message, String modelId,
+                             java.util.function.Consumer<String> chunkConsumer, RetryConfiguration retry) {
+        OciAiClientManager.ClientContext context = clientManager.getClientContext(tenant);
+        GenerativeAiInferenceClient aiClient = context.getClient();
+        GenericChatRequest genericChatRequest = GenericChatRequest.builder()
+                .messages(Arrays.asList(UserMessage.builder()
+                        .content(Arrays.asList(TextContent.builder().text(message).build()))
+                        .build()))
+                .maxTokens(4096)
+                .isStream(true)
+                .build();
+        ChatDetails chatDetails = ChatDetails.builder()
+                .servingMode(OnDemandServingMode.builder().modelId(modelId).build())
+                .chatRequest(genericChatRequest)
+                .compartmentId(context.getCompartmentId())
+                .build();
+        ChatResponse response = aiClient.chat(ChatRequest.builder().chatDetails(chatDetails)
+                .retryConfiguration(retry).build());
+        OciAiEventStreamReader.read(response == null ? null : response.getEventStream(), chunkConsumer);
     }
 
     public void chatWithStreamSse(Tenant tenant, String message, String modelId, java.util.function.Consumer<String> chunkConsumer) {
-        try {
-            OciAiClientManager.ClientContext context = clientManager.getClientContext(tenant);
-            GenerativeAiInferenceClient aiClient = context.getClient();
-
-            GenericChatRequest genericChatRequest = GenericChatRequest.builder()
-                    .messages(Arrays.asList(UserMessage.builder()
-                            .content(Arrays.asList(TextContent.builder().text(message).build()))
-                            .build()))
-                    .maxTokens(4096)
-                    .isStream(true)
-                    .build();
-
-            ChatDetails chatDetails = ChatDetails.builder()
-                    .servingMode(OnDemandServingMode.builder().modelId(modelId).build())
-                    .chatRequest(genericChatRequest)
-                    .compartmentId(context.getCompartmentId())
-                    .build();
-
-            ChatRequest request = ChatRequest.builder().chatDetails(chatDetails).build();
-            ChatResponse response = aiClient.chat(request);
-
-            try (java.io.InputStream is = response.getEventStream();
-                 java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(is, java.nio.charset.StandardCharsets.UTF_8))) {
-
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    if (StringUtils.isBlank(line) || line.startsWith(":")) {
-                        continue;
-                    }
-
-                    if (line.startsWith("data:")) {
-                        String data = line.substring(5);
-                        if (data.trim().equals("[DONE]")) {
-                            break;
-                        }
-                        String textPart = parseWithFastjson(data.trim());
-                        if (StringUtils.isNotEmpty(textPart)) {
-                            chunkConsumer.accept(textPart);
-                        }
-                    } else {
-                        String textPart = parseWithFastjson(line.trim());
-                        if (StringUtils.isNotEmpty(textPart)) {
-                            chunkConsumer.accept(textPart);
-                        }
-                    }
-                }
-            }
-        } catch (Exception e) {
-            log.error("OCI AI 流式处理异常", e);
-            chunkConsumer.accept(" [AI服务异常: " + e.getMessage() + "]");
-        }
+        chatWithStream(tenant, message, modelId, chunkConsumer);
     }
 
-    public void chatWithHistoryStream(Tenant tenant, List<Map<String, String>> history, String modelId, java.util.function.Consumer<String> chunkConsumer,String promptWord) {
+    public void chatWithHistoryStream(Tenant tenant, List<Map<String, String>> history, String modelId, java.util.function.Consumer<String> chunkConsumer, String promptWord) {
         try {
-            OciAiClientManager.ClientContext context = clientManager.getClientContext(tenant);
-            GenerativeAiInferenceClient aiClient = context.getClient();
-            String currentQuestion = "";
-            List<Map<String, String>> contextMessages = new ArrayList<>();
-            for (int i = history.size() - 1; i >= 0; i--) {
-                Map<String, String> msg = history.get(i);
-                if ("user".equals(msg.get("role"))) {
-                    currentQuestion = msg.get("content");
-                    if (i > 0) contextMessages = history.subList(0, i);
-                    break;
-                }
-            }
-
-            String finalPrompt = buildContextAwarePrompt(currentQuestion, contextMessages,promptWord);
-            GenericChatRequest genericChatRequest = GenericChatRequest.builder()
-                    .messages(Arrays.asList(UserMessage.builder()
-                            .content(Arrays.asList(TextContent.builder().text(finalPrompt).build()))
-                            .build()))
-                    .maxTokens(4096)
-                    .isStream(true)
-                    .build();
-
-            ChatDetails chatDetails = ChatDetails.builder()
-                    .servingMode(OnDemandServingMode.builder().modelId(modelId).build())
-                    .chatRequest(genericChatRequest)
-                    .compartmentId(context.getCompartmentId())
-                    .build();
-
-            ChatRequest request = ChatRequest.builder().chatDetails(chatDetails).build();
-            ChatResponse response = aiClient.chat(request);
-
-            // 4. 解析流
-            try (java.io.InputStream is = response.getEventStream();
-                 java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(is, java.nio.charset.StandardCharsets.UTF_8))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    if (line.startsWith("data:")) {
-                        String data = line.substring(5).trim();
-                        if ("[DONE]".equals(data)) break;
-                        String textPart = parseWithFastjson(data);
-                        if (StringUtils.isNotEmpty(textPart)) {
-                            chunkConsumer.accept(textPart);
-                        }
-                    }
-                }
-            }
+            streamHistoryReply(tenant, history, modelId, chunkConsumer, promptWord, null);
         } catch (Exception e) {
             log.error("OCI AI 流式历史对话异常", e);
             chunkConsumer.accept(" [AI服务异常: " + e.getMessage() + "]");
         }
     }
 
-    private String parseWithFastjson(String json) {
-        try {
-            JSONObject root = JSON.parseObject(json);
-            return root.getJSONObject("message")
-                    .getJSONArray("content")
-                    .getJSONObject(0)
-                    .getString("text");
-        } catch (Exception e) {
-            return "";
+    /** Strict counterpart preserving the existing history-to-prompt conversion. */
+    public void chatWithHistoryStreamOrThrow(Tenant tenant, List<Map<String, String>> history, String modelId, java.util.function.Consumer<String> chunkConsumer, String promptWord) {
+        streamHistoryReply(tenant, history, modelId, chunkConsumer, promptWord, RetryConfiguration.NO_RETRY_CONFIGURATION);
+    }
+
+    private void streamHistoryReply(Tenant tenant, List<Map<String, String>> history, String modelId,
+                                    java.util.function.Consumer<String> chunkConsumer, String promptWord,
+                                    RetryConfiguration retry) {
+        String currentQuestion = "";
+        List<Map<String, String>> contextMessages = new ArrayList<>();
+        for (int i = history.size() - 1; i >= 0; i--) {
+            Map<String, String> msg = history.get(i);
+            if ("user".equals(msg.get("role"))) {
+                currentQuestion = msg.get("content");
+                if (i > 0) contextMessages = history.subList(0, i);
+                break;
+            }
         }
+        String finalPrompt = buildContextAwarePrompt(currentQuestion, contextMessages, promptWord);
+        streamReply(tenant, finalPrompt, modelId, chunkConsumer, retry);
     }
 
     /**

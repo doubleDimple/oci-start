@@ -1,4 +1,37 @@
 import SwiftUI
+import AppKit
+
+/// Keep controls on one line without compressing their labels. Native/AppKit
+/// menus remain hosted outside the scroll view by their existing presenters.
+struct SingleLineToolbar<Content: View>: View {
+    var spacing: CGFloat = 10
+    var alignment: Alignment = .leading
+    @ViewBuilder var content: () -> Content
+    @State private var hasOverflow = false
+
+    var body: some View {
+        GeometryReader { viewport in
+            ScrollView(.horizontal, showsIndicators: true) {
+                HStack(alignment: .center, spacing: spacing) {
+                    content()
+                }
+                .lineLimit(1)
+                .frame(minWidth: max(0, viewport.size.width), minHeight: AppInputStyle.height, alignment: alignment)
+                .background(GeometryReader { row in
+                    Color.clear.preference(key: ToolbarOverflowPreference.self,
+                                           value: row.size.width > viewport.size.width + 1)
+                })
+            }
+        }
+        .frame(height: AppInputStyle.height + (hasOverflow ? NSScroller.scrollerWidth(for: .regular, scrollerStyle: .legacy) : 0))
+        .onPreferenceChange(ToolbarOverflowPreference.self) { hasOverflow = $0 }
+    }
+}
+
+private struct ToolbarOverflowPreference: PreferenceKey {
+    static var defaultValue = false
+    static func reduce(value: inout Bool, nextValue: () -> Bool) { value = value || nextValue() }
+}
 
 /// Horizontal filter row: leading filters + trailing actions.
 struct FilterBar<Leading: View, Trailing: View>: View {
@@ -10,10 +43,12 @@ struct FilterBar<Leading: View, Trailing: View>: View {
     private var dark: Bool { appearance.isDarkEffective || colorScheme == .dark }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
-            leading()
+        SingleLineToolbar {
+            HStack(spacing: 10) { leading() }
+                .fixedSize(horizontal: true, vertical: false)
             Spacer(minLength: 8)
-            trailing()
+            HStack(spacing: 8) { trailing() }
+                .fixedSize(horizontal: true, vertical: false)
         }
         .frame(minHeight: AppInputStyle.height)
         .padding(.horizontal, 16)
@@ -34,34 +69,21 @@ extension FilterBar where Trailing == EmptyView {
     }
 }
 
-/// One list toolbar at normal widths; two compact rows when the window narrows.
-/// Horizontal scrolling remains available for unusually long localized labels.
+/// Filters and actions share one row at every width, with horizontal overflow.
 struct AdaptiveListToolbar<Filters: View, Actions: View>: View {
+    // Retained for existing call sites; narrow windows now scroll instead of wrapping.
     var compactBelow: CGFloat = 900
     var availableWidth: CGFloat
     @ViewBuilder var filters: () -> Filters
     @ViewBuilder var actions: () -> Actions
 
     var body: some View {
-        VStack(spacing: 10) {
-            if availableWidth >= compactBelow {
-                HStack(spacing: 12) {
-                    filters()
-                    Spacer(minLength: 8)
-                    actions()
-                }
-            } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 10) { filters() }
-                        .frame(minWidth: max(0, availableWidth - 40), alignment: .leading)
-                }
-                .frame(height: AppInputStyle.height)
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 10) { actions() }
-                        .frame(minWidth: max(0, availableWidth - 40), alignment: .trailing)
-                }
-                .frame(height: AppInputStyle.height)
-            }
+        SingleLineToolbar(spacing: 12) {
+            HStack(spacing: 10) { filters() }
+                .fixedSize(horizontal: true, vertical: false)
+            Spacer(minLength: 8)
+            HStack(spacing: 8) { actions() }
+                .fixedSize(horizontal: true, vertical: false)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)

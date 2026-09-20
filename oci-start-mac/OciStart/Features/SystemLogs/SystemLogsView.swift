@@ -282,10 +282,8 @@ struct AuditLogsView: View {
                 .background(AppTheme.danger.opacity(0.08))
             }
             GeometryReader { geometry in
-                if geometry.size.width < tableWidth {
-                    ScrollView(.horizontal) { table(width: tableWidth) }
-                } else {
-                    table(width: geometry.size.width)
+                NativeHorizontalTable(contentWidth: max(tableWidth, geometry.size.width), viewportWidth: geometry.size.width, height: geometry.size.height) {
+                    table(width: max(tableWidth, geometry.size.width))
                 }
             }
             PaginationBar(state: $model.pageState) { Task { await model.load() } }
@@ -315,13 +313,14 @@ struct AuditLogsView: View {
     private func text(_ zh: String, _ en: String) -> String { language.text(zh, en) }
 
     private var filters: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        SingleLineToolbar(spacing: 12) {
             HStack(spacing: 10) {
                 AppButton(title: text("返回", "Back"), systemImage: "chevron.left", kind: .secondary,
                           enabled: !model.busy) { navigation.select(.dashboard) }
                 SearchField(text: $model.keyword,
                             placeholder: text("搜索标题、路径、操作人、IP…", "Search title, path, user or IP…"),
                             onSubmit: { if controlsEnabled { model.search() } }, maxWidth: 360)
+                    .frame(width: 260)
                     .disabled(!controlsEnabled)
                 AppButton(title: text("搜索", "Search"), systemImage: "magnifyingglass", kind: .secondary,
                           enabled: controlsEnabled) { model.search() }
@@ -341,7 +340,8 @@ struct AuditLogsView: View {
                 .help(text("更多操作", "More actions"))
                 .disabled(model.busy)
             }
-            ScrollView(.horizontal, showsIndicators: false) {
+            .fixedSize(horizontal: true, vertical: false)
+            Group {
                 HStack(spacing: 10) {
                     SelectMenu(options: ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"].map { SelectOption(id: $0, title: $0) },
                                selection: $model.method, placeholder: text("全部请求方式", "All methods"), width: 140, searchable: false)
@@ -364,6 +364,7 @@ struct AuditLogsView: View {
                 .font(.system(size: AppTheme.bodySize))
                 .foregroundColor(AppTheme.textPrimary(dark))
                 .disabled(!controlsEnabled)
+                .fixedSize(horizontal: true, vertical: false)
             }
             if !model.selectedIDs.isEmpty {
                 HStack(spacing: 12) {
@@ -373,6 +374,7 @@ struct AuditLogsView: View {
                 }
                 .font(.system(size: AppTheme.secondarySize))
                 .foregroundColor(AppTheme.textPrimary(dark))
+                .fixedSize(horizontal: true, vertical: false)
             }
         }
     }

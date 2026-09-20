@@ -13,15 +13,13 @@ struct EdgeOneView: View {
             title: "EdgeOne",
             subtitle: "腾讯云 DNS 记录 · 加速域名 · 同步管理",
             systemImage: "globe",
-            toolbar: { toolbar },
+            toolbar: { EmptyView() },
             content: {
                 VStack(spacing: 0) {
                     modePicker
                         .padding(.horizontal, 16)
                         .padding(.top, 12)
                     filterBar
-                        .padding(.horizontal, 16)
-                        .padding(.top, 10)
                     listBody
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
@@ -131,7 +129,7 @@ struct EdgeOneView: View {
     // MARK: - Filter
 
     private var filterBar: some View {
-        FilterBar {
+        FilterBar(leading: {
             HStack(spacing: 10) {
                 Text("域名")
                     .font(.system(size: 13))
@@ -172,7 +170,7 @@ struct EdgeOneView: View {
                     }
                 }
             }
-        }
+        }, trailing: { toolbar })
     }
 
     // MARK: - List
@@ -214,7 +212,7 @@ struct EdgeOneView: View {
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                DataList {
+                DataList(minimumWidth: 760) {
                     DataListColumnHeader(title: "类型", width: 72)
                     DataListColumnHeader(title: "记录名", width: nil)
                     DataListColumnHeader(title: "记录值", width: nil)
@@ -251,7 +249,7 @@ struct EdgeOneView: View {
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                DataList {
+                DataList(minimumWidth: 760) {
                     DataListColumnHeader(title: "域名", width: nil)
                     DataListColumnHeader(title: "状态", width: 90)
                     DataListColumnHeader(title: "CNAME", width: nil)

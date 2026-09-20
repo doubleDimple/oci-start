@@ -101,7 +101,7 @@ struct AiModelsEditor: View {
     }
 
     private var toolbar: some View {
-        HStack(spacing: 10) {
+        SingleLineToolbar {
             if let onBack = onBack {
                 PageToolbarIcon(title: language.text("返回", "Back"), systemImage: "chevron.left", disabled: model.isBusy) { onBack() }
             }

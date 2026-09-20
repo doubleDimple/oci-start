@@ -3,6 +3,10 @@ set -euo pipefail
 
 # Build the app first with Debug / CODE_SIGNING_ALLOWED=NO. This harness links
 # its production objects into a separate executable, with all HTTP intercepted.
+# OCI_LAYOUT_QA_ONLY=1 limits runtime checks to shared table stress fixtures,
+# populated narrow tenants/proxy/English-regions pages, and login globe motion.
+# It still sends native wheel events, captures final columns/timed globe frames,
+# and exits nonzero on failed geometry or lifecycle assertions.
 qa_root="$(cd "$(dirname "$0")/.." && pwd)"
 qa_derived="${1:-/private/tmp/oci-mac-web-20260919-build-unrestricted}"
 qa_output="${2:-/private/tmp/oci-mac-web-qa}"

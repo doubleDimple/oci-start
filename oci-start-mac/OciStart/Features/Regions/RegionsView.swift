@@ -33,7 +33,7 @@ struct RegionsView: View {
     private var toolbar: some View {
         HStack(spacing: 12) {
             AppTextField(text: $model.searchText, placeholder: regionText("搜索区域名称或标识", "Search region name or identifier"), leadingSystemImage: "magnifyingglass")
-                .frame(minWidth: 180, maxWidth: 320)
+                .frame(width: 240)
             SelectMenu(options: RegionContinent.allCases.map { SelectOption(id: $0.rawValue, title: $0.title) },
                        selection: Binding(get: { model.continent.rawValue }, set: { model.continent = RegionContinent(rawValue: $0 ?? "") ?? .all }),
                        width: 150, allowClear: false)
@@ -126,16 +126,16 @@ struct RegionsView: View {
     private var listCard: some View {
         VStack(spacing: 0) {
             GeometryReader { geometry in
-                ScrollView(.horizontal, showsIndicators: true) {
+                NativeHorizontalTable(contentWidth: max(1085, geometry.size.width), viewportWidth: geometry.size.width, height: geometry.size.height) {
                     VStack(spacing: 0) {
                         HStack(spacing: 0) {
-                            tableCell(regionText("区域", "Region"), 260)
-                            tableCell(regionText("状态", "Status"), 145)
-                            tableCell(regionText("架构", "Architecture"), 85)
-                            tableCell(regionText("开机次数", "Launches"), 85)
-                            tableCell(regionText("本月", "This month"), 85)
-                            tableCell(regionText("首次开机", "First launch"), 175)
-                            tableCell(regionText("最近上报", "Last report"), 175)
+                            tableCell(regionText("区域", "Region"), 260).nativeTableHeader(regionText("区域", "Region"))
+                            tableCell(regionText("状态", "Status"), 145).nativeTableHeader(regionText("状态", "Status"))
+                            tableCell(regionText("架构", "Architecture"), 120).nativeTableHeader(regionText("架构", "Architecture"))
+                            tableCell(regionText("开机次数", "Launches"), 100).nativeTableHeader(regionText("开机次数", "Launches"))
+                            tableCell(regionText("本月", "This month"), 110).nativeTableHeader(regionText("本月", "This month"))
+                            tableCell(regionText("首次开机", "First launch"), 175).nativeTableHeader(regionText("首次开机", "First launch"))
+                            tableCell(regionText("最近上报", "Last report"), 175).nativeTableHeader(regionText("最近上报", "Last report"))
                             Spacer(minLength: 0)
                         }
                         .font(.system(size: 14, weight: .medium))
@@ -155,7 +155,7 @@ struct RegionsView: View {
                             }
                         })
                     }
-                    .frame(width: max(1010, geometry.size.width), height: geometry.size.height)
+                    .frame(width: max(1085, geometry.size.width), alignment: .topLeading)
                 }
             }
             PaginationBar(state: $model.pageState, onChange: { model.goPage { _ in } })
@@ -175,9 +175,9 @@ struct RegionsView: View {
                 Text(!model.armLoaded ? "—" : row.isOpen ? regionText("有开机记录", "Has launch history") : regionText("无开机记录", "No launch history"))
                 if row.isMine { Text(regionText("我的区域", "My region")).foregroundColor(AppTheme.brand(dark)).font(.system(size: 12)) }
             }.padding(.horizontal, 12).frame(width: 145, alignment: .leading)
-            tableCell(row.architectureType, 85)
-            tableCell(model.armLoaded ? "\(row.openCount)" : "—", 85)
-            tableCell(model.armLoaded ? "\(row.monthlyOpenCount)" : "—", 85)
+            tableCell(row.architectureType, 120)
+            tableCell(model.armLoaded ? "\(row.openCount)" : "—", 100)
+            tableCell(model.armLoaded ? "\(row.monthlyOpenCount)" : "—", 110)
             tableCell(row.openTime ?? "—", 175)
             tableCell(row.lastNotifyTime ?? "—", 175)
             Spacer(minLength: 0)
@@ -198,7 +198,7 @@ struct RegionsView: View {
         }.font(.system(size: 13)).lineLimit(1)
     }
     private func tableCell(_ text: String, _ width: CGFloat) -> some View {
-        Text(text).lineLimit(2).padding(.horizontal, 12).frame(width: width, alignment: .leading).help(text)
+        Text(text).lineLimit(1).padding(.horizontal, 12).frame(width: width, alignment: .leading).help(text)
     }
     private func legend(_ color: Color, _ text: String, outlined: Bool = false) -> some View {
         HStack(spacing: 5) {

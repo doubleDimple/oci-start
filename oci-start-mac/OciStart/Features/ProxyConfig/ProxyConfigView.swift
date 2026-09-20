@@ -81,7 +81,7 @@ struct ProxyConfigView: View {
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                DataList {
+                DataList(minimumWidth: 1100) {
                     DataListColumnHeader(title: "名称", width: 100)
                     DataListColumnHeader(title: "类型", width: 64)
                     DataListColumnHeader(title: "地址", width: nil)

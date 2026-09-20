@@ -248,7 +248,7 @@ struct TenantsView: View {
                         }
                     }
                 }
-                .frame(width: totalW, height: geo.size.height, alignment: .topLeading)
+                .frame(width: totalW, alignment: .topLeading)
 
                 NativeFixedTrailingTable(contentWidth: totalW, viewportWidth: geo.size.width, height: geo.size.height) { table }
             }
@@ -444,12 +444,14 @@ struct TenantsView: View {
     private func actionCell(_ item: TenantItem, width: CGFloat) -> some View {
         TenantActionEllipsisButton(dark: dark, item: item, model: model)
             .environmentObject(appearance)
-            .frame(width: width, height: 28)
+            .frame(width: 30, height: 30)
+            .frame(width: width, height: 30)
     }
 
     private func colHeader(_ title: String, _ w: CGFloat, align: Alignment = .leading) -> some View {
         Text(title)
-            .font(.system(size: 13, weight: .semibold))
+            .lineLimit(1)
+            .font(.system(size: AppTheme.bodySize, weight: .semibold))
             .foregroundColor(AppTheme.textSecondary(dark))
             .frame(width: w, alignment: align)
     }
@@ -686,16 +688,11 @@ private struct TenantActionEllipsisButton: NSViewRepresentable {
     }
 
     func makeNSView(context: Context) -> NSButton {
-        let b = NSButton(frame: NSRect(x: 0, y: 0, width: 32, height: 26))
-        b.bezelStyle = .rounded
-        b.isBordered = true
-        b.title = "···"
-        b.font = NSFont.systemFont(ofSize: 14, weight: .bold)
-        b.target = context.coordinator
-        b.action = #selector(Coordinator.toggleMenu(_:))
-        b.setButtonType(.momentaryPushIn)
-        context.coordinator.button = b
-        return b
+        let button = TableActionButton(dark: dark)
+        button.target = context.coordinator
+        button.action = #selector(Coordinator.toggleMenu(_:))
+        context.coordinator.button = button
+        return button
     }
 
     func updateNSView(_ nsView: NSButton, context: Context) {
@@ -703,6 +700,7 @@ private struct TenantActionEllipsisButton: NSViewRepresentable {
         context.coordinator.model = model
         context.coordinator.appearance = appearance
         context.coordinator.dark = dark
+        (nsView as? TableActionButton)?.updateAppearance(dark: dark)
     }
 
     final class Coordinator: NSObject {
@@ -750,11 +748,12 @@ enum TenantActionPanel {
     static func actions(for item: TenantItem, model: TenantsViewModel) -> [TenantActionItem] {
         var list: [TenantActionItem] = []
         if item.cloudType == 1, !item.isTransferred {
-            if item.supportAI == 1 {
-                list.append(TenantActionItem(id: "ai", title: "AI", systemImage: "sparkles", isDanger: false) {
-                    model.openAI(item)
-                })
-            }
+            // 暂停租户 AI 对话入口，待服务恢复后再启用。
+            // if item.supportAI == 1 {
+            //     list.append(TenantActionItem(id: "ai", title: "AI", systemImage: "sparkles", isDanger: false) {
+            //         model.openAI(item)
+            //     })
+            // }
             list.append(contentsOf: [
                 TenantActionItem(id: "boot", title: "创建开机", systemImage: "plus.circle", isDanger: false) { model.openBoot(item) },
                 TenantActionItem(id: "upd", title: "更新信息", systemImage: "arrow.clockwise", isDanger: false) { model.updateTenantSSE(item) },
@@ -787,11 +786,12 @@ enum TenantActionPanel {
     static func detailActions(for item: TenantItem, model: TenantsViewModel) -> [TenantActionItem] {
         var list: [TenantActionItem] = []
         if item.cloudType == 1 {
-            if item.supportAI == 1 {
-                list.append(TenantActionItem(id: "ai", title: "AI", systemImage: "sparkles", isDanger: false) {
-                    model.openAI(item)
-                })
-            }
+            // 暂停租户 AI 对话入口，待服务恢复后再启用。
+            // if item.supportAI == 1 {
+            //     list.append(TenantActionItem(id: "ai", title: "AI", systemImage: "sparkles", isDanger: false) {
+            //         model.openAI(item)
+            //     })
+            // }
             list.append(contentsOf: [
                 TenantActionItem(id: "sync", title: "同步", systemImage: "arrow.2.circlepath", isDanger: false) {
                     model.syncDetailRow(item)
@@ -924,23 +924,15 @@ struct NativeFixedTrailingTable<Content: View>: View {
     private var trailingInset: CGFloat { overflow > 0.5 ? (measuredTrailingInset ?? overflow) : 0 }
 
     var body: some View {
-        Group {
-            if overflow > 0.5 {
-                ScrollView(.horizontal, showsIndicators: true) {
-                    content()
-                        .frame(width: contentWidth, height: height, alignment: .topLeading)
-                        .background(NativeTableScrollProbe { inset in
-                            // Hover transitions must not animate scroll compensation.
-                            var transaction = Transaction()
-                            transaction.animation = nil
-                            transaction.disablesAnimations = true
-                            withTransaction(transaction) { measuredTrailingInset = inset }
-                        })
-                }
-                .frame(width: viewportWidth, height: height)
-            } else {
-                content().frame(width: viewportWidth, height: height, alignment: .topLeading)
-            }
+        NativeHorizontalTable(contentWidth: contentWidth, viewportWidth: viewportWidth, height: height) {
+            content()
+                .background(NativeTableScrollProbe { inset in
+                    // Hover transitions must not animate scroll compensation.
+                    var transaction = Transaction()
+                    transaction.animation = nil
+                    transaction.disablesAnimations = true
+                    withTransaction(transaction) { measuredTrailingInset = inset }
+                })
         }
         .environment(\.nativeTableTrailingInset, trailingInset)
     }

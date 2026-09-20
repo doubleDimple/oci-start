@@ -172,17 +172,19 @@ struct TenantRegionSubView: View {
                     let totalW = max(geo.size.width, fixed + 160)
                     let wName = max(160, totalW - fixed)
 
-                    VStack(spacing: 0) {
-                        subscribedHeader(wName: wName, wKey: wKey, wHome: wHome, wStatus: wStatus, width: totalW, hPad: hPad)
-                        ScrollView {
-                            LazyVStack(spacing: 0) {
-                                ForEach(Array(model.subscribedRegions.enumerated()), id: \.element.id) { idx, r in
-                                    subscribedRow(index: idx, r: r, wName: wName, wKey: wKey, wHome: wHome, wStatus: wStatus, width: totalW, hPad: hPad)
+                    NativeHorizontalTable(contentWidth: totalW, viewportWidth: geo.size.width, height: geo.size.height) {
+                        VStack(spacing: 0) {
+                            subscribedHeader(wName: wName, wKey: wKey, wHome: wHome, wStatus: wStatus, width: totalW, hPad: hPad)
+                            ScrollView(.vertical) {
+                                LazyVStack(spacing: 0) {
+                                    ForEach(Array(model.subscribedRegions.enumerated()), id: \.element.id) { idx, r in
+                                        subscribedRow(index: idx, r: r, wName: wName, wKey: wKey, wHome: wHome, wStatus: wStatus, width: totalW, hPad: hPad)
+                                    }
                                 }
                             }
                         }
+                        .frame(width: totalW, alignment: .topLeading)
                     }
-                    .frame(width: totalW, height: geo.size.height, alignment: .topLeading)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -274,17 +276,19 @@ struct TenantRegionSubView: View {
             let hPad: CGFloat = 16
             let totalW = max(geo.size.width, 400)
 
-            VStack(spacing: 0) {
-                unsubscribedHeader(width: totalW, hPad: hPad)
-                ScrollView {
-                    LazyVStack(spacing: 0) {
-                        ForEach(Array(model.unsubscribedRegions.enumerated()), id: \.element.id) { idx, r in
-                            unsubscribedRow(index: idx, r: r, width: totalW, hPad: hPad)
+            NativeHorizontalTable(contentWidth: totalW, viewportWidth: geo.size.width, height: geo.size.height) {
+                VStack(spacing: 0) {
+                    unsubscribedHeader(width: totalW, hPad: hPad)
+                    ScrollView(.vertical) {
+                        LazyVStack(spacing: 0) {
+                            ForEach(Array(model.unsubscribedRegions.enumerated()), id: \.element.id) { idx, r in
+                                unsubscribedRow(index: idx, r: r, width: totalW, hPad: hPad)
+                            }
                         }
                     }
                 }
+                .frame(width: totalW, alignment: .topLeading)
             }
-            .frame(width: totalW, height: geo.size.height, alignment: .topLeading)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -350,8 +354,9 @@ struct TenantRegionSubView: View {
 
     private func colHeader(_ title: String, _ w: CGFloat?) -> some View {
         let view = Text(title)
-            .font(.system(size: 13, weight: .semibold))
+            .font(.system(size: AppTheme.bodySize, weight: .semibold))
             .foregroundColor(mutedText)
+            .lineLimit(1)
         if let w = w {
             return AnyView(view.frame(width: w, alignment: .leading))
         }

@@ -12,7 +12,6 @@ struct VpsListView: View {
     @State private var qualityOpen = false
     @State private var qualityInstance: String?
     @State private var details: VpsCardItem?
-    @State private var horizontalOffset: CGFloat = 0
     private var dark: Bool { appearance.isDarkEffective }
 
     var body: some View {
@@ -63,10 +62,10 @@ struct VpsListView: View {
     }
 
     private var controls: some View {
-        VStack(spacing: 10) {
+        SingleLineToolbar {
             HStack(spacing: 8) {
                 AppTextField(text: $model.searchText, placeholder: vpsText("搜索名称、IP、租户或区域", "Search name, IP, tenant or region"), leadingSystemImage: "magnifyingglass")
-                    .frame(minWidth: 180, maxWidth: 340)
+                    .frame(width: 240)
                 SelectMenu(options: [
                     SelectOption(id: "", title: vpsText("全部厂商", "All providers")),
                     SelectOption(id: "1", title: "Oracle Cloud"), SelectOption(id: "2", title: "Google Cloud"),
@@ -80,6 +79,8 @@ struct VpsListView: View {
                     Task { await model.reload(); await quality.refresh() }
                 }.help(vpsText("刷新", "Refresh"))
             }
+            .fixedSize(horizontal: true, vertical: false)
+            Spacer(minLength: 8)
             HStack(spacing: 8) {
                 Text(vpsText("共 \(model.totalCount) 台 · 在线 \(model.onlineCount) · 离线 \(model.offlineCount)",
                              "\(model.totalCount) resources · \(model.onlineCount) online · \(model.offlineCount) offline"))
@@ -104,21 +105,24 @@ struct VpsListView: View {
                 .disabled(model.isBusy || model.requiresReview)
                 .help(vpsText("更多操作", "More actions"))
             }
+            .fixedSize(horizontal: true, vertical: false)
         }
         .foregroundColor(AppTheme.textPrimary(dark))
         .padding(16)
     }
 
+    // IP, agent, three metrics, traffic, latency, three carriers and actions.
+    private let fixedResourceColumnsWidth: CGFloat = 1333
+
     private var table: some View {
         GeometryReader { viewport in
-            let width = max(CGFloat(1470), viewport.size.width)
-            let shift = min(CGFloat(0), viewport.size.width - width - horizontalOffset)
-            ScrollView(.horizontal, showsIndicators: true) {
+            let width = max(fixedResourceColumnsWidth + 280, viewport.size.width)
+            NativeFixedTrailingTable(contentWidth: width, viewportWidth: viewport.size.width, height: viewport.size.height) {
                 VStack(spacing: 0) {
-                    tableHeader(width: width, shift: shift)
+                    tableHeader(width: width)
                     ScrollView(.vertical, showsIndicators: true) {
                         LazyVStack(spacing: 0) {
-                            ForEach(model.visibleCards) { card in resourceRow(card, width: width, shift: shift) }
+                            ForEach(model.visibleCards) { card in resourceRow(card, width: width) }
                         }
                         .frame(maxWidth: .infinity, alignment: .topLeading)
                     }
@@ -130,61 +134,58 @@ struct VpsListView: View {
                         }
                     })
                 }
-                .frame(width: width, height: viewport.size.height)
-                .background(GeometryReader { geometry in
-                    Color.clear.preference(key: VpsHorizontalOffset.self, value: geometry.frame(in: .named("resourceHorizontal")).minX)
-                })
+                .frame(width: width, alignment: .topLeading)
             }
-            .coordinateSpace(name: "resourceHorizontal")
-            .onPreferenceChange(VpsHorizontalOffset.self) { horizontalOffset = $0 }
         }
         .font(.system(size: 14))
         .foregroundColor(AppTheme.textPrimary(dark))
     }
 
-    private func tableHeader(width: CGFloat, shift: CGFloat) -> some View {
+    private func tableHeader(width: CGFloat) -> some View {
         HStack(spacing: 0) {
             Group {
-            cell(vpsText("实例", "Instance"), width: width - 1190)
-            cell(vpsText("IP / 区域", "IP / Region"), width: 150)
-            cell(vpsText("监控", "Agent"), width: 95)
-            cell("CPU", width: 72)
-            cell(vpsText("内存", "Memory"), width: 72)
-            cell(vpsText("磁盘", "Disk"), width: 72)
+            headerCell(vpsText("实例", "Instance"), width: width - fixedResourceColumnsWidth)
+            headerCell(vpsText("IP / 区域", "IP / Region"), width: 150)
+            headerCell(vpsText("监控", "Agent"), width: 95)
+            headerCell("CPU", width: 96)
+            headerCell(vpsText("内存", "Memory"), width: 96)
+            headerCell(vpsText("磁盘", "Disk"), width: 96)
             }
             Group {
-            cell(vpsText("收 / 发 · 采样字节", "RX / TX · sample bytes"), width: 140)
-            cell(vpsText("HTTP 延迟", "HTTP latency"), width: 99)
-            cell(vpsText("电信", "Telecom"), width: 130)
-            cell(vpsText("联通", "Unicom"), width: 130)
-            cell(vpsText("移动", "Mobile"), width: 130)
+            headerCell(vpsText("收 / 发 · 采样字节", "RX / TX · sample bytes"), width: 190)
+            headerCell(vpsText("HTTP 延迟", "HTTP latency"), width: 120)
+            headerCell(vpsText("电信", "Telecom"), width: 130)
+            headerCell(vpsText("联通", "Unicom"), width: 130)
+            headerCell(vpsText("移动", "Mobile"), width: 130)
             Color.clear.frame(width: 100)
             }
         }
         .frame(height: 42)
         .background(AppTheme.hover(dark))
-        .overlay(cell(vpsText("操作", "Actions"), width: 100).frame(height: 42).background(AppTheme.hover(dark)).offset(x: shift), alignment: .trailing)
+        .modifier(NativeFixedTableActions(width: 100, trailingPadding: 0, background: AppTheme.hover(dark)) {
+            headerCell(vpsText("操作", "Actions"), width: 100).frame(height: 42)
+        })
     }
 
-    private func resourceRow(_ card: VpsCardItem, width: CGFloat, shift: CGFloat) -> some View {
+    private func resourceRow(_ card: VpsCardItem, width: CGFloat) -> some View {
         HStack(spacing: 0) {
             Group {
             VStack(alignment: .leading, spacing: 4) {
                 Text(card.item.displayName.isEmpty ? "—" : card.item.displayName).fontWeight(.medium)
                 Text(model.showTenant ? empty(card.item.tenancyName) : card.item.maskedTenancyName).font(.system(size: 13))
-            }.lineLimit(1).padding(.horizontal, 12).frame(width: width - 1190, alignment: .leading)
+            }.lineLimit(1).padding(.horizontal, 12).frame(width: width - fixedResourceColumnsWidth, alignment: .leading)
             VStack(alignment: .leading, spacing: 4) {
                 Text(model.showIP ? card.displayIP : card.maskedIP)
                 Text(empty(card.item.regionName)).font(.system(size: 13))
             }.lineLimit(1).padding(.horizontal, 12).frame(width: 150, alignment: .leading)
             cell(model.agentLabel(card), width: 95)
-            metricCell(card.metrics.cpuPercent, width: 72, stale: card.monitorWarning)
-            metricCell(card.metrics.memPercent, width: 72, stale: card.monitorWarning)
-            metricCell(card.metrics.diskPercent, width: 72, stale: card.monitorWarning)
+            metricCell(card.metrics.cpuPercent, width: 96, stale: card.monitorWarning)
+            metricCell(card.metrics.memPercent, width: 96, stale: card.monitorWarning)
+            metricCell(card.metrics.diskPercent, width: 96, stale: card.monitorWarning)
             }
             Group {
-            cell("\(card.metrics.netRx)\n\(card.metrics.netTx)", width: 140)
-            cell(VpsFormat.latencyLabel(card.latencyMs), width: 99)
+            cell("\(card.metrics.netRx)\n\(card.metrics.netTx)", width: 190)
+            cell(VpsFormat.latencyLabel(card.latencyMs), width: 120)
             carrierCell(card.id, operatorCode: "telecom")
             carrierCell(card.id, operatorCode: "unicom")
             carrierCell(card.id, operatorCode: "mobile")
@@ -193,7 +194,9 @@ struct VpsListView: View {
         }
         .frame(height: 68)
         .background(AppTheme.cardBg(dark))
-        .overlay(rowActions(card).frame(width: 100, height: 68).background(AppTheme.cardBg(dark)).offset(x: shift), alignment: .trailing)
+        .modifier(NativeFixedTableActions(width: 100, trailingPadding: 0, background: AppTheme.cardBg(dark)) {
+            rowActions(card).frame(width: 100, height: 68)
+        })
         .overlay(Rectangle().fill(AppTheme.border(dark)).frame(height: 1), alignment: .bottom)
     }
 
@@ -208,8 +211,11 @@ struct VpsListView: View {
                 Divider()
                 Button(vpsText("安装 / 升级探针", "Install / upgrade agent")) { model.installMonitor(card) }
                 Button(vpsText("卸载探针", "Uninstall agent")) { model.uninstallMonitor(card) }
-            } label: { Image(systemName: "ellipsis").frame(width: 24, height: 24) }
-            .menuStyle(BorderlessButtonMenuStyle()).fixedSize()
+            } label: { TableActionMenuLabel(title: vpsText("更多操作", "More actions")) }
+            .menuStyle(BorderlessButtonMenuStyle(showsMenuIndicator: false)).fixedSize()
+            .modifier(TableActionMenuChrome())
+            .accessibilityIdentifier("table.row.more")
+            .help(vpsText("更多操作", "More actions"))
             .disabled(model.isBusy || model.requiresReview)
         }
         .foregroundColor(AppTheme.brand(dark))
@@ -278,14 +284,12 @@ struct VpsListView: View {
     private func metricCell(_ value: Double?, width: CGFloat, stale: Bool) -> some View {
         cell(VpsFormat.metric(value), width: width).opacity(stale ? 0.6 : 1)
     }
+    private func headerCell(_ text: String, width: CGFloat) -> some View {
+        Text(text).lineLimit(1).padding(.horizontal, 12).frame(width: width, alignment: .leading).help(text)
+    }
     private func cell(_ text: String, width: CGFloat) -> some View {
         Text(text).lineLimit(2).padding(.horizontal, 12).frame(width: width, alignment: .leading).help(text)
     }
-}
-
-private struct VpsHorizontalOffset: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
 }
 
 private func stringSelection(_ value: Binding<String>) -> Binding<String?> {
@@ -369,6 +373,14 @@ struct NetworkQualityView: View {
                 else if showHistory { showHistory = false; model.selectedInstance = ""; model.updatePagination(reset: true) }
                 else if canLeavePage() { onBack() }
             }
+            if model.editor == nil && !showHistory {
+                AppTextField(text: $model.query, placeholder: vpsText("搜索任务、目标或运营商", "Search tasks, targets or carriers"),
+                             leadingSystemImage: "magnifyingglass")
+                    .frame(width: 260)
+                Text(vpsText("\(model.filteredTasks.count) 个任务", "\(model.filteredTasks.count) tasks"))
+                    .font(.system(size: 13))
+                    .fixedSize()
+            }
             Spacer()
             errorButton(model.errorText)
             AppButton(title: vpsText("刷新", "Refresh"), systemImage: "arrow.clockwise", kind: .secondary, isLoading: model.loading) {
@@ -384,19 +396,25 @@ struct NetworkQualityView: View {
 
     private var tasksPage: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                AppTextField(text: $model.query, placeholder: vpsText("搜索任务、目标或运营商", "Search tasks, targets or carriers"), leadingSystemImage: "magnifyingglass").frame(maxWidth: 360)
-                Spacer()
-                Text(vpsText("检测任务", "Network tasks")).font(.system(size: 16, weight: .semibold))
-                Text("\(model.filteredTasks.count)")
-            }.padding(16)
-            HStack {
+            GeometryReader { geometry in
+                NativeHorizontalTable(contentWidth: max(840, geometry.size.width), viewportWidth: geometry.size.width, height: geometry.size.height) {
+                    taskTable
+                }
+            }
+            PaginationBar(state: $model.pageState, onChange: { model.updatePagination() })
+        }
+        .background(AppTheme.cardBg(dark)).cornerRadius(AppTheme.cardRadius)
+    }
+
+    private var taskTable: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 8) {
                 Text(vpsText("任务 / 目标", "Task / Target")).frame(maxWidth: .infinity, alignment: .leading)
                 Text(vpsText("运营商", "Carrier")).frame(width: 90)
-                Text(vpsText("间隔 / 样本", "Interval / Samples")).frame(width: 110)
+                Text(vpsText("间隔 / 样本", "Interval / Samples")).frame(width: 150)
                 Text(vpsText("实例", "Instances")).frame(width: 80)
                 Text(vpsText("操作", "Actions")).frame(width: 170)
-            }.padding(12).background(AppTheme.hover(dark))
+            }.lineLimit(1).font(.system(size: AppTheme.bodySize, weight: .medium)).padding(12).background(AppTheme.hover(dark))
             ScrollView(.vertical) {
                 LazyVStack(spacing: 0) {
                     ForEach(model.visibleTasks) { task in taskRow(task) }
@@ -407,9 +425,7 @@ struct NetworkQualityView: View {
                     }
                 }
             }
-            PaginationBar(state: $model.pageState, onChange: { model.updatePagination() })
         }
-        .background(AppTheme.cardBg(dark)).cornerRadius(AppTheme.cardRadius)
     }
 
     private func taskRow(_ task: NetworkQualityTask) -> some View {
@@ -419,7 +435,7 @@ struct NetworkQualityView: View {
                 Text("\(task.type.uppercased()) · \(task.target)").font(.system(size: 13)).lineLimit(1).help(task.target)
             }.frame(maxWidth: .infinity, alignment: .leading)
             VStack(spacing: 5) { Text(task.operatorLabel); Text(task.region.isEmpty ? "—" : task.region).font(.system(size: 13)) }.frame(width: 90)
-            Text("\(task.intervalSeconds)s / \(task.sampleCount)\n" + (task.enabled ? vpsText("运行", "Active") : vpsText("暂停", "Paused"))).frame(width: 110)
+            Text("\(task.intervalSeconds)s / \(task.sampleCount)\n" + (task.enabled ? vpsText("运行", "Active") : vpsText("暂停", "Paused"))).frame(width: 150)
             Text("\(task.instanceIds.count)").frame(width: 80)
             HStack(spacing: 14) {
                 Button { if let id = task.instanceIds.first { showHistory = true; model.openHistory(instance: id, task: task) } } label: { Image(systemName: "chart.xyaxis.line") }
@@ -429,8 +445,11 @@ struct NetworkQualityView: View {
                 Menu {
                     Button(task.enabled ? vpsText("暂停", "Pause") : vpsText("恢复", "Resume")) { model.toggle(task) }
                     Button(vpsText("删除", "Delete")) { model.delete(task) }
-                } label: { Image(systemName: "ellipsis").frame(width: 20) }
-                .menuStyle(BorderlessButtonMenuStyle()).fixedSize()
+                } label: { TableActionMenuLabel(title: vpsText("更多操作", "More actions")) }
+                .menuStyle(BorderlessButtonMenuStyle(showsMenuIndicator: false)).fixedSize()
+                .modifier(TableActionMenuChrome())
+                .accessibilityIdentifier("table.row.more")
+                .help(vpsText("更多操作", "More actions"))
             }.buttonStyle(PlainButtonStyle()).foregroundColor(AppTheme.brand(dark))
                 .disabled(!model.canMutate).frame(width: 170)
         }
@@ -508,7 +527,7 @@ struct NetworkQualityView: View {
 
     private var historyPage: some View {
         VStack(spacing: 16) {
-            HStack(spacing: 12) {
+            SingleLineToolbar(spacing: 12) {
                 SelectMenu(options: (model.overview?.agents ?? []).map { SelectOption(id: $0.id, title: $0.title) },
                            selection: stringSelection($model.selectedInstance), placeholder: vpsText("选择实例", "Choose resource"), width: 220, allowClear: false)
                 SelectMenu(options: (model.overview?.tasks ?? []).filter { $0.instanceIds.contains(model.selectedInstance) }.map { SelectOption(id: $0.id, title: $0.name) },

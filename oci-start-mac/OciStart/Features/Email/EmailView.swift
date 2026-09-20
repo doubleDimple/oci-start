@@ -14,7 +14,7 @@ struct EmailView: View {
             title: "邮件管理",
             subtitle: "OCI Email Delivery · 租户服务 / 收件人 / 发送记录",
             systemImage: "envelope",
-            toolbar: { toolbar },
+            toolbar: { EmptyView() },
             content: {
                 VStack(spacing: 0) {
                     if let err = model.errorText, !err.isEmpty {
@@ -66,7 +66,7 @@ struct EmailView: View {
                 model.openCompose()
             }
             AppButton(
-                title: "刷新",
+                title: "刷新全部",
                 systemImage: "arrow.clockwise",
                 kind: .secondary,
                 isLoading: model.isLoading || sectionBusy
@@ -161,9 +161,9 @@ struct EmailView: View {
                                     set: { model.onTenantSearchChanged($0) }
                                 ),
                                 placeholder: "搜索租户 / 发件地址…",
-                                fillsWidth: true
+                                maxWidth: 260
                             )
-                            .frame(maxWidth: 280)
+                            .frame(width: 260)
                         }
                     case .contacts:
                         Text("管理常用收件人，发送邮件时可多选")
@@ -177,6 +177,7 @@ struct EmailView: View {
                 }
             },
             trailing: {
+                toolbar
                 Group {
                     switch model.mainSection {
                     case .tenants:
@@ -507,7 +508,7 @@ struct EmailView: View {
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                DataList {
+                DataList(minimumWidth: 900) {
                     DataListColumnHeader(title: "主题", width: nil)
                     DataListColumnHeader(title: "时间", width: 150)
                     DataListColumnHeader(title: "租户", width: 120)

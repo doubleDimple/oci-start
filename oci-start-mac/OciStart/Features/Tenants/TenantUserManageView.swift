@@ -308,22 +308,24 @@ struct TenantUserManageView: View {
                     let totalW = max(geo.size.width, fixed + 160)
                     let wEmail = max(120, totalW - fixed)
 
-                    VStack(spacing: 0) {
-                        usersHeader(wDomain: wDomain, wUser: wUser, wEmail: wEmail, wStatus: wStatus,
-                                    wCreated: wCreated, wLogin: wLogin, wAction: wAction,
-                                    width: totalW, hPad: hPad)
-                        ScrollView {
-                            LazyVStack(spacing: 0) {
-                                ForEach(Array(model.users.enumerated()), id: \.element.id) { idx, u in
-                                    userRow(index: idx, user: u,
-                                            wDomain: wDomain, wUser: wUser, wEmail: wEmail,
-                                            wStatus: wStatus, wCreated: wCreated, wLogin: wLogin,
-                                            wAction: wAction, width: totalW, hPad: hPad)
+                    NativeHorizontalTable(contentWidth: totalW, viewportWidth: geo.size.width, height: geo.size.height) {
+                        VStack(spacing: 0) {
+                            usersHeader(wDomain: wDomain, wUser: wUser, wEmail: wEmail, wStatus: wStatus,
+                                        wCreated: wCreated, wLogin: wLogin, wAction: wAction,
+                                        width: totalW, hPad: hPad)
+                            ScrollView(.vertical) {
+                                LazyVStack(spacing: 0) {
+                                    ForEach(Array(model.users.enumerated()), id: \.element.id) { idx, u in
+                                        userRow(index: idx, user: u,
+                                                wDomain: wDomain, wUser: wUser, wEmail: wEmail,
+                                                wStatus: wStatus, wCreated: wCreated, wLogin: wLogin,
+                                                wAction: wAction, width: totalW, hPad: hPad)
+                                    }
                                 }
                             }
                         }
+                        .frame(width: totalW, alignment: .topLeading)
                     }
-                    .frame(width: totalW, height: geo.size.height, alignment: .topLeading)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -437,17 +439,19 @@ struct TenantUserManageView: View {
                     let totalW = max(geo.size.width, fixed + 200)
                     let wEmail = max(200, totalW - fixed)
 
-                    VStack(spacing: 0) {
-                        notifyHeader(wNo: wNo, wEmail: wEmail, wStatus: wStatus, wAction: wAction, width: totalW, hPad: hPad)
-                        ScrollView {
-                            LazyVStack(spacing: 0) {
-                                ForEach(Array(model.notifyEmails.enumerated()), id: \.offset) { idx, email in
-                                    notifyRow(index: idx, email: email, wNo: wNo, wEmail: wEmail, wStatus: wStatus, wAction: wAction, width: totalW, hPad: hPad)
+                    NativeHorizontalTable(contentWidth: totalW, viewportWidth: geo.size.width, height: geo.size.height) {
+                        VStack(spacing: 0) {
+                            notifyHeader(wNo: wNo, wEmail: wEmail, wStatus: wStatus, wAction: wAction, width: totalW, hPad: hPad)
+                            ScrollView(.vertical) {
+                                LazyVStack(spacing: 0) {
+                                    ForEach(Array(model.notifyEmails.enumerated()), id: \.offset) { idx, email in
+                                        notifyRow(index: idx, email: email, wNo: wNo, wEmail: wEmail, wStatus: wStatus, wAction: wAction, width: totalW, hPad: hPad)
+                                    }
                                 }
                             }
                         }
+                        .frame(width: totalW, alignment: .topLeading)
                     }
-                    .frame(width: totalW, height: geo.size.height, alignment: .topLeading)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -575,8 +579,9 @@ struct TenantUserManageView: View {
 
     private func colHeader(_ title: String, _ w: CGFloat) -> some View {
         Text(title)
-            .font(.system(size: 13, weight: .semibold))
+            .font(.system(size: AppTheme.bodySize, weight: .semibold))
             .foregroundColor(mutedText)
+            .lineLimit(1)
             .frame(width: w, alignment: .leading)
     }
 

@@ -34,7 +34,7 @@ struct TenantCostView: View {
             subtitle: tenant.map { $0.displayName },
             systemImage: "creditcard",
             layout: .workspace,
-            toolbar: { toolbar },
+            toolbar: { EmptyView() },
             content: { mainContent }
         )
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
@@ -87,7 +87,7 @@ struct TenantCostView: View {
     // MARK: - Filter
 
     private var filterControls: some View {
-        HStack(alignment: .center, spacing: 14) {
+        SingleLineToolbar(spacing: 14) {
             HStack(spacing: 8) {
                 Text("时间范围：")
                     .font(.system(size: 14))
@@ -130,6 +130,8 @@ struct TenantCostView: View {
             .buttonStyle(PlainButtonStyle())
 
             Spacer(minLength: 8)
+            toolbar
+                .fixedSize(horizontal: true, vertical: false)
         }
         .padding(14)
         .background(surface)
@@ -383,18 +385,24 @@ struct TenantCostView: View {
                     let wSku = minSku + flex * 0.45
                     let wRes = minRes + flex * 0.55
 
-                    VStack(spacing: 0) {
-                        costHeader(wSku: wSku, wRes: wRes, width: totalW)
-                        ForEach(Array(model.costPageItems.enumerated()), id: \.offset) { idx, item in
-                            costRow(index: idx, item: item, wSku: wSku, wRes: wRes, width: totalW)
+                    NativeHorizontalTable(contentWidth: totalW, viewportWidth: geo.size.width, height: geo.size.height) {
+                        VStack(spacing: 0) {
+                            costHeader(wSku: wSku, wRes: wRes, width: totalW)
+                            ScrollView(.vertical) {
+                                LazyVStack(spacing: 0) {
+                                    ForEach(Array(model.costPageItems.enumerated()), id: \.offset) { idx, item in
+                                        costRow(index: idx, item: item, wSku: wSku, wRes: wRes, width: totalW)
+                                    }
+                                }
+                            }
                         }
-                        PaginationBar(state: $model.costPageState) {
-                            model.syncCostPagination()
-                        }
+                        .frame(width: totalW, alignment: .topLeading)
                     }
-                    .frame(width: totalW, alignment: .topLeading)
                 }
-                .frame(minHeight: CGFloat(44 + model.costPageItems.count * 36 + 52))
+                .frame(height: CGFloat(44 + model.costPageItems.count * 36))
+                PaginationBar(state: $model.costPageState) {
+                    model.syncCostPagination()
+                }
             }
         }
         .background(surface)
@@ -442,8 +450,9 @@ struct TenantCostView: View {
 
     private func colHeader(_ title: String, _ w: CGFloat, align: Alignment = .leading) -> some View {
         Text(title)
-            .font(.system(size: 11, weight: .semibold))
+            .font(.system(size: AppTheme.bodySize, weight: .semibold))
             .foregroundColor(AppTheme.textSecondary(dark))
+            .lineLimit(1)
             .frame(width: w, alignment: align)
     }
 
