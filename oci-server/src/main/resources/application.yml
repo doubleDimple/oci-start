@@ -36,11 +36,6 @@ spring:
       write-dates-as-timestamps: false
   application:
     name: oci-start
-  messages:
-    basename: i18n/messages
-    encoding: UTF-8
-    fallback-to-system-locale: false
-    use-code-as-default-message: true
 
   servlet:
     multipart:
