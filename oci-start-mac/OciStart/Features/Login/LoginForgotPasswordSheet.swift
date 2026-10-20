@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Web-parity forgot-password modal (3 steps).
+/// Archived forgot-password presentation. The login entry and API calls are disabled.
 struct LoginForgotPasswordSheet: View {
     @ObservedObject var model: LoginFormModel
     var dark: Bool

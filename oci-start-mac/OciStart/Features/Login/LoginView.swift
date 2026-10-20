@@ -9,7 +9,8 @@ struct LoginView: View {
 
     @StateObject private var model = LoginFormModel()
     @State private var countdownTask: Task<Void, Never>?
-    @State private var resetCountdownTask: Task<Void, Never>?
+    // 忘记密码已停用。
+    // @State private var resetCountdownTask: Task<Void, Never>?
     @State private var metaGeneration = 0
 
     private var dark: Bool { appearance.isShellDark }
@@ -36,7 +37,7 @@ struct LoginView: View {
                         onOAuth: { provider in Task { await doOAuth(provider) } },
                         onServerCommit: { applyServerAndLoadMeta() },
                         onDeploymentMode: { mode in Task { await switchDeploymentMode(mode) } },
-                        onForgotPassword: { model.openForgotPassword() },
+                        // onForgotPassword: { model.openForgotPassword() },
                         onLocale: { loc in
                             LanguageManager.shared.setLocale(loc)
                         }
@@ -46,10 +47,12 @@ struct LoginView: View {
                 }
                 .frame(width: geo.size.width, height: geo.size.height)
                 .background(LoginPalette.bg(dark))
-                .disabled(model.showForgotPassword)
-                .accessibilityHidden(model.showForgotPassword)
+                // .disabled(model.showForgotPassword)
+                // .accessibilityHidden(model.showForgotPassword)
             }
 
+            /*
+            // 服务端已停用忘记密码；弹层与请求入口一并停用。
             if model.showForgotPassword {
                 LoginForgotPasswordSheet(
                     model: model,
@@ -67,9 +70,10 @@ struct LoginView: View {
                 .transition(.opacity)
                 .zIndex(20)
             }
+            */
         }
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
-        .animation(.easeOut(duration: 0.18), value: model.showForgotPassword)
+        // .animation(.easeOut(duration: 0.18), value: model.showForgotPassword)
         .onAppear {
             model.deploymentMode = session.deploymentMode
             model.serverURL = session.serverURL
@@ -95,7 +99,7 @@ struct LoginView: View {
         .onDisappear {
             metaGeneration += 1
             countdownTask?.cancel()
-            resetCountdownTask?.cancel()
+            // resetCountdownTask?.cancel()
         }
     }
 
@@ -461,7 +465,8 @@ struct LoginView: View {
         }
     }
 
-    // MARK: - Forgot password
+    /*
+    // MARK: - Forgot password (disabled with the server endpoints)
 
     private func doResetSendCode() async {
         let user = await MainActor.run {
@@ -605,4 +610,5 @@ struct LoginView: View {
             }
         }
     }
+    */
 }

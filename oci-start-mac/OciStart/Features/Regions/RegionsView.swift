@@ -236,14 +236,17 @@ private struct NativeRegionWorldMap: NSViewRepresentable {
         view.configure(rows: rows, selected: selected, zoom: zoom, labels: labels, pulse: pulse, links: links,
                        dark: dark, onSelect: onSelect, onZoom: onZoom)
     }
-    static func dismantleNSView(_ view: RegionWorldCanvas, coordinator: ()) { view.stop() }
+    static func dismantleNSView(_ view: RegionWorldCanvas, coordinator: ()) { view.dispose() }
 }
 
 /// Draws the same supplied 5px dot artwork as Vue using AppKit, without web content.
 private final class RegionWorldCanvas: NSView {
     override var isFlipped: Bool { true }
     override var acceptsFirstResponder: Bool { true }
-    private var rows: [RegionRow] = []
+    private var mappedRows: [(row: RegionRow, coordinate: RegionCoordinate)] = []
+    private var linkCoordinates: [(RegionCoordinate, RegionCoordinate)] = []
+    private var pulsePhases: [String: TimeInterval] = [:]
+    private var haloGradients: [Int: CGGradient] = [:]
     private var selected: String?
     private var magnification = 1.0
     private var labels = true, pulse = true, links = true, dark = false
@@ -251,7 +254,14 @@ private final class RegionWorldCanvas: NSView {
     private var onSelect: ((RegionRow) -> Void)?
     private var onZoom: ((Double) -> Void)?
     private var timer: Timer?
-    private var phase = 0.0
+    private var observers: [NSObjectProtocol] = []
+    private var workspaceObserver: NSObjectProtocol?
+    private weak var scrollClip: NSClipView?
+    private var scrollObservers: [NSObjectProtocol] = []
+    private var refreshQueued = false
+    private var disposed = false
+    private var lastTickTime: TimeInterval?
+    private var elapsed: TimeInterval = 0
     private var cachedBase: NSBezierPath?
     private var cacheKey = ""
     private var dragOrigin: NSPoint?
@@ -260,6 +270,14 @@ private final class RegionWorldCanvas: NSView {
     private var tracking: NSTrackingArea?
     private var markerFrames: [(RegionRow, NSPoint)] = []
     private var hovered: String?
+    private var pointerLocation: NSPoint?
+
+    private static func phaseFor(_ code: String) -> TimeInterval {
+        var hash: Int32 = 0
+        for byte in code.utf8 { hash = (hash &* 31) &+ Int32(byte) }
+        return Double(abs(Int64(hash)) % 2200) / 1000.0
+    }
+
     private static let landShapes: [NSBezierPath] = KnownRegions.land.map { polygon in
         let path = NSBezierPath()
         for (index, coordinate) in polygon.enumerated() {
@@ -271,13 +289,48 @@ private final class RegionWorldCanvas: NSView {
     }
     private var scale: CGFloat { max(0.001, min(max(1, bounds.width - 24) / 360, max(1, bounds.height - 24) / 142)) * CGFloat(magnification) }
 
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        for name in [NSApplication.didBecomeActiveNotification, NSApplication.didResignActiveNotification,
+                     NSApplication.didHideNotification, NSApplication.didUnhideNotification,
+                     NSWindow.didChangeOcclusionStateNotification, NSWindow.didMiniaturizeNotification,
+                     NSWindow.didDeminiaturizeNotification, NSWindow.didBecomeKeyNotification,
+                     NSWindow.didResignKeyNotification, NSWindow.didExposeNotification,
+                     NSWindow.willCloseNotification] {
+            observers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] notification in
+                guard let self = self else { return }
+                if let changedWindow = notification.object as? NSWindow, changedWindow !== self.window { return }
+                if notification.name == NSWindow.willCloseNotification { self.stop(); return }
+                if notification.name == NSApplication.didResignActiveNotification || notification.name == NSWindow.didResignKeyNotification {
+                    self.cancelInteraction()
+                }
+                self.updateTimer()
+                self.refreshAfterLayout()
+            })
+        }
+        workspaceObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification, object: nil, queue: .main
+        ) { [weak self] _ in self?.updateTimer(); self?.needsDisplay = true }
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
     func configure(rows: [RegionRow], selected: String?, zoom: Double, labels: Bool, pulse: Bool, links: Bool,
                    dark: Bool, onSelect: @escaping (RegionRow) -> Void, onZoom: @escaping (Double) -> Void) {
         if selected != self.selected {
             if let row = rows.first(where: { $0.regionCode == selected }), let coordinate = row.coordinate, zoom > 1.01 { center = coordinate }
             else if selected == nil { center = RegionCoordinate(lat: 13, lng: 0) }
         }
-        self.rows = rows
+        // Data changes are infrequent; keep sorting and hashing out of every frame.
+        mappedRows = rows.compactMap { row in row.coordinate.map { (row: row, coordinate: $0) } }
+        pulsePhases = mappedRows.reduce(into: [:]) { result, entry in
+            result[entry.row.regionCode] = Self.phaseFor(entry.row.regionCode)
+        }
+        let ordered = mappedRows.sorted { $0.row.regionCode < $1.row.regionCode }
+        linkCoordinates = zip(ordered, ordered.dropFirst()).compactMap { start, end in
+            let a = start.coordinate, b = end.coordinate
+            return a.lat == b.lat && a.lng == b.lng ? nil : (a, b)
+        }
         self.selected = selected
         self.magnification = zoom
         self.labels = labels
@@ -286,21 +339,115 @@ private final class RegionWorldCanvas: NSView {
         self.dark = dark
         self.onSelect = onSelect
         self.onZoom = onZoom
-        toolTip = regionText("拖动平移，双指缩放；点击区域查看记录。", "Drag to pan, pinch to zoom, and select a region to view records.")
+        refreshHover()
         needsDisplay = true
         updateTimer()
+        refreshAfterLayout()
     }
-    override func viewDidMoveToWindow() { super.viewDidMoveToWindow(); updateTimer() }
-    func stop() { timer?.invalidate(); timer = nil }
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if window == nil { stop(); detachScrollObserver() }
+        else { refreshAfterLayout() }
+    }
+    override func viewDidMoveToSuperview() { super.viewDidMoveToSuperview(); refreshAfterLayout() }
+    override func viewDidHide() { super.viewDidHide(); stop() }
+    override func viewDidUnhide() { super.viewDidUnhide(); refreshAfterLayout() }
+    override func layout() {
+        super.layout()
+        refreshHover()
+        refreshAfterLayout()
+        needsDisplay = true
+    }
+    private func refreshAfterLayout() {
+        guard !disposed, !refreshQueued else { return }
+        refreshQueued = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.refreshQueued = false
+            guard !self.disposed else { return }
+            self.attachScrollObserver()
+            self.updateTimer()
+        }
+    }
+    private func attachScrollObserver() {
+        var ancestor = superview
+        var clip: NSClipView?
+        while let view = ancestor {
+            if let found = view as? NSClipView { clip = found; break }
+            ancestor = view.superview
+        }
+        guard clip !== scrollClip else { return }
+        detachScrollObserver()
+        guard let found = clip else { return }
+        scrollClip = found
+        found.postsBoundsChangedNotifications = true
+        found.postsFrameChangedNotifications = true
+        for name in [NSView.boundsDidChangeNotification, NSView.frameDidChangeNotification] {
+            scrollObservers.append(NotificationCenter.default.addObserver(forName: name, object: found, queue: .main) { [weak self] _ in
+                self?.refreshAfterLayout()
+            })
+        }
+    }
+    private func detachScrollObserver() {
+        scrollObservers.forEach { NotificationCenter.default.removeObserver($0) }
+        scrollObservers.removeAll()
+        scrollClip = nil
+    }
+    func dispose() {
+        disposed = true
+        stop()
+        detachScrollObserver()
+        observers.forEach { NotificationCenter.default.removeObserver($0) }
+        observers.removeAll()
+        if let observer = workspaceObserver { NSWorkspace.shared.notificationCenter.removeObserver(observer) }
+        workspaceObserver = nil
+        if let tracking = tracking { removeTrackingArea(tracking) }
+        tracking = nil
+        onSelect = nil
+        onZoom = nil
+    }
+    private func cancelInteraction() {
+        dragOrigin = nil
+        dragCenter = nil
+        pointerLocation = nil
+        refreshHover()
+    }
+    private func stop(cancelInteraction: Bool = true) {
+        timer?.invalidate()
+        timer = nil
+        lastTickTime = nil
+        if cancelInteraction { self.cancelInteraction() }
+    }
+    private var isVisibleForAnimation: Bool {
+        guard !disposed, let window = window, window.isVisible, !window.isMiniaturized,
+              window.occlusionState.contains(.visible), !NSApp.isHidden, !isHiddenOrHasHiddenAncestor,
+              bounds.width > 0, bounds.height > 0, !visibleRect.isEmpty else { return false }
+        return true
+    }
+    private var canAnimate: Bool {
+        isVisibleForAnimation && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion &&
+            ((pulse && !mappedRows.isEmpty) || (links && !linkCoordinates.isEmpty))
+    }
     private func updateTimer() {
-        guard window != nil, pulse, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { stop(); return }
+        guard canAnimate else {
+            // Disabling decoration must not cancel manual pan/zoom or hover.
+            stop(cancelInteraction: !isVisibleForAnimation)
+            return
+        }
         guard timer == nil else { return }
-        timer = Timer.scheduledTimer(withTimeInterval: 1.0 / 24.0, repeats: true) { [weak self] _ in
-            guard let self = self, self.window?.isVisible == true, !self.isHiddenOrHasHiddenAncestor, NSApp.isActive,
-                  !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
-            self.phase = Date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 2.4) / 2.4
+        lastTickTime = ProcessInfo.processInfo.systemUptime
+        let next = Timer(timeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            guard self.canAnimate else { self.updateTimer(); return }
+            let now = ProcessInfo.processInfo.systemUptime
+            let delta = min(0.05, max(0, now - (self.lastTickTime ?? now)))
+            self.lastTickTime = now
+            self.elapsed += delta
             self.needsDisplay = true
         }
+        next.tolerance = 0.003
+        RunLoop.main.add(next, forMode: .common)
+        timer = next
     }
     override func updateTrackingAreas() {
         if let tracking = tracking { removeTrackingArea(tracking) }
@@ -317,41 +464,78 @@ private final class RegionWorldCanvas: NSView {
         NSColor(srgbRed: CGFloat((hex >> 16) & 255) / 255, green: CGFloat((hex >> 8) & 255) / 255,
                 blue: CGFloat(hex & 255) / 255, alpha: 1)
     }
+    private func haloGradient(mine: Bool, active: Bool, color: NSColor) -> CGGradient? {
+        let key = (dark ? 4 : 0) + (mine ? 2 : 0) + (active ? 1 : 0)
+        if let cached = haloGradients[key] { return cached }
+        let colors = [color.withAlphaComponent(active ? 0.5 : 0.32).cgColor,
+                      color.withAlphaComponent(0).cgColor] as CFArray
+        let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: [0, 1])
+        haloGradients[key] = gradient
+        return gradient
+    }
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
+        if timer == nil { refreshAfterLayout() }
+        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
         (dark ? color(0x0a1420) : NSColor.white).setFill()
         bounds.fill()
         buildBaseIfNeeded()
         (dark ? color(0x22506b) : color(0xc3d2dc)).setFill()
         cachedBase?.fill()
-        markerFrames = rows.compactMap { row in
-            guard let coordinate = row.coordinate else { return nil }
-            return (row, project(coordinate))
-        }.filter { bounds.insetBy(dx: -16, dy: -16).contains($0.1) }
+        markerFrames = mappedRows.map { ($0.row, project($0.coordinate)) }
+            .filter { bounds.insetBy(dx: -16, dy: -16).contains($0.1) }
         if links { drawLinks() }
         var labelRects: [NSRect] = []
-        let ordered = markerFrames.sorted { ($0.0.regionCode == selected ? 1 : 0) < ($1.0.regionCode == selected ? 1 : 0) }
+        let ordered = markerFrames.filter { $0.0.regionCode != selected } + markerFrames.filter { $0.0.regionCode == selected }
+        let moving = pulse && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        let mine = dark ? color(0x4fe3c1) : color(0x1b8a6a)
+        let arm = dark ? color(0xf4b760) : color(0xb7791f)
+
         for (row, point) in ordered {
-            let mine = dark ? color(0x4fe3c1) : color(0x1b8a6a)
-            let arm = dark ? color(0xf4b760) : color(0xb7791f)
+            let active = (row.regionCode == selected || row.regionCode == hovered)
+            let both = (row.isOpen && row.isMine)
             let markerColor = row.isMine ? mine : arm
-            let active = row.regionCode == selected || row.regionCode == hovered
-            if pulse && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
-                let radius = CGFloat(5 + phase * 10)
-                markerColor.withAlphaComponent(CGFloat((1 - phase) * 0.5)).setStroke()
-                let ring = NSBezierPath(ovalIn: NSRect(x: point.x - radius, y: point.y - radius, width: radius * 2, height: radius * 2))
-                ring.lineWidth = 1
+
+            // Outer Pulsing Ring
+            if moving {
+                let phase = pulsePhases[row.regionCode] ?? 0
+                let ringProgress = CGFloat(((elapsed + phase) / 2.2).truncatingRemainder(dividingBy: 1.0))
+                let ringRadius = 3.0 + ringProgress * (active ? 16.0 : 11.0)
+                let ringColor = both ? arm : markerColor
+                ringColor.withAlphaComponent((1.0 - ringProgress) * (active ? 0.75 : 0.45)).setStroke()
+                let ring = NSBezierPath(ovalIn: NSRect(x: point.x - ringRadius, y: point.y - ringRadius, width: ringRadius * 2, height: ringRadius * 2))
+                ring.lineWidth = 1.2
                 ring.stroke()
             }
-            let radius: CGFloat = active ? 5 : 3.5
+
+            // Glowing Radial Gradient Halo
+            let glowRadius: CGFloat = active ? 13.0 : 9.0
+            if let haloGrad = haloGradient(mine: row.isMine, active: active, color: markerColor) {
+                ctx.drawRadialGradient(haloGrad,
+                                       startCenter: CGPoint(x: point.x, y: point.y), startRadius: 0,
+                                       endCenter: CGPoint(x: point.x, y: point.y), endRadius: glowRadius,
+                                       options: [])
+            }
+
+            // Distinct Concentric Accent Ring for `both` (ARM + Mine)
+            if both {
+                arm.withAlphaComponent(0.95).setStroke()
+                let ringR: CGFloat = active ? 6.8 : 5.5
+                let ring = NSBezierPath(ovalIn: NSRect(x: point.x - ringR, y: point.y - ringR, width: ringR * 2, height: ringR * 2))
+                ring.lineWidth = 1.5
+                ring.stroke()
+            } else if active {
+                markerColor.withAlphaComponent(0.8).setStroke()
+                let ring = NSBezierPath(ovalIn: NSRect(x: point.x - 6.6, y: point.y - 6.6, width: 13.2, height: 13.2))
+                ring.lineWidth = 1.0
+                ring.stroke()
+            }
+
+            // Core Dot
+            let coreR: CGFloat = active ? 3.4 : 2.6
             markerColor.setFill()
-            NSBezierPath(ovalIn: NSRect(x: point.x - radius, y: point.y - radius, width: radius * 2, height: radius * 2)).fill()
-            if row.isMine && row.isOpen || active {
-                (row.isOpen ? arm : mine).setStroke()
-                let ring = NSBezierPath(ovalIn: NSRect(x: point.x - radius - 2, y: point.y - radius - 2, width: radius * 2 + 4, height: radius * 2 + 4))
-                ring.lineWidth = active ? 2 : 1
-                ring.stroke()
-            }
+            NSBezierPath(ovalIn: NSRect(x: point.x - coreR, y: point.y - coreR, width: coreR * 2, height: coreR * 2)).fill()
+
             if labels || active {
                 let name = KnownRegions.cityName(row.regionCode) as NSString
                 let attributes: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 11, weight: active ? .semibold : .regular),
@@ -392,18 +576,36 @@ private final class RegionWorldCanvas: NSView {
         cachedBase = path
     }
     private func drawLinks() {
-        guard markerFrames.count > 1 else { return }
-        let origin = markerFrames.first(where: { $0.0.regionCode == selected }) ?? markerFrames[0]
-        (dark ? color(0x4fe3c1) : color(0x1b8a6a)).withAlphaComponent(0.22).setStroke()
-        for destination in markerFrames where destination.0.regionCode != origin.0.regionCode {
-            let a = origin.1, b = destination.1
-            let curve = NSBezierPath()
-            curve.move(to: a)
-            let lift = min(CGFloat(70), abs(a.x - b.x) * 0.18)
-            curve.curve(to: b, controlPoint1: NSPoint(x: a.x + (b.x - a.x) / 3, y: a.y - lift),
-                        controlPoint2: NSPoint(x: a.x + (b.x - a.x) * 2 / 3, y: b.y - lift))
-            curve.lineWidth = 0.7
-            curve.stroke()
+        guard !linkCoordinates.isEmpty, let ctx = NSGraphicsContext.current?.cgContext else { return }
+        let mineColor = dark ? color(0x4fe3c1) : color(0x1b8a6a)
+        let moving = !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        let progress = CGFloat((elapsed / 2.6).truncatingRemainder(dividingBy: 1.0))
+        let remaining = 1.0 - progress
+        for (a, b) in linkCoordinates {
+            let start = project(a)
+            let end = project(b)
+            let dx = end.x - start.x
+            let dy = end.y - start.y
+            let controlX = (start.x + end.x) / 2.0 - dy * 0.22
+            let controlY = (start.y + end.y) / 2.0 + dx * 0.22
+
+            ctx.saveGState()
+            ctx.beginPath()
+            ctx.move(to: CGPoint(x: start.x, y: start.y))
+            ctx.addQuadCurve(to: CGPoint(x: end.x, y: end.y), control: CGPoint(x: controlX, y: controlY))
+            mineColor.withAlphaComponent(0.35).setStroke()
+            ctx.setLineWidth(1.0)
+            ctx.strokePath()
+
+            // Traveling Light Particle along Link
+            if moving {
+                let px = remaining * remaining * start.x + 2.0 * remaining * progress * controlX + progress * progress * end.x
+                let py = remaining * remaining * start.y + 2.0 * remaining * progress * controlY + progress * progress * end.y
+                let alpha = sin(.pi * progress)
+                mineColor.withAlphaComponent(alpha).setFill()
+                NSBezierPath(ovalIn: NSRect(x: px - 1.8, y: py - 1.8, width: 3.6, height: 3.6)).fill()
+            }
+            ctx.restoreGState()
         }
     }
     override func mouseDown(with event: NSEvent) {
@@ -411,40 +613,80 @@ private final class RegionWorldCanvas: NSView {
         dragOrigin = convert(event.locationInWindow, from: nil)
         dragCenter = center
         dragged = false
+        refreshHover()
+        NSCursor.closedHand.set()
     }
     override func mouseDragged(with event: NSEvent) {
         guard let origin = dragOrigin, let original = dragCenter else { return }
         let point = convert(event.locationInWindow, from: nil)
         let delta = NSPoint(x: point.x - origin.x, y: point.y - origin.y)
-        if abs(delta.x) + abs(delta.y) > 4 { dragged = true }
+        if !dragged {
+            guard hypot(delta.x, delta.y) > 4 else { return }
+            dragged = true
+        }
         center = RegionCoordinate(lat: max(-58, min(84, original.lat + Double(delta.y / scale))),
                                   lng: max(-180, min(180, original.lng - Double(delta.x / scale))))
         needsDisplay = true
     }
     override func mouseUp(with event: NSEvent) {
-        defer { dragOrigin = nil; dragCenter = nil }
-        guard !dragged else { return }
+        guard dragOrigin != nil else { return }
         let point = convert(event.locationInWindow, from: nil)
-        if let nearest = closest(to: point) { onSelect?(nearest.0) }
+        let wasDragged = dragged
+        dragOrigin = nil
+        dragCenter = nil
+        if !wasDragged, let nearest = closest(to: point) { onSelect?(nearest.0) }
+        pointerLocation = point
+        refreshHover()
     }
     override func magnify(with event: NSEvent) { onZoom?(max(1, min(5, magnification * (1 + Double(event.magnification))))) }
     override func mouseMoved(with event: NSEvent) {
-        let point = convert(event.locationInWindow, from: nil)
-        let nearest = closest(to: point)
-        hovered = nearest?.0.regionCode
-        toolTip = nearest.map { "\($0.0.displayName) · \($0.0.regionCode)" }
-        if nearest == nil { NSCursor.arrow.set() } else { NSCursor.pointingHand.set() }
-        needsDisplay = true
+        pointerLocation = convert(event.locationInWindow, from: nil)
+        refreshHover()
     }
-    override func mouseExited(with event: NSEvent) { hovered = nil; NSCursor.arrow.set(); needsDisplay = true }
+    override func mouseEntered(with event: NSEvent) { mouseMoved(with: event) }
+    private func refreshHover() {
+        let nearest = dragOrigin == nil ? pointerLocation.flatMap { closest(to: $0) } : nil
+        if hovered != nearest?.0.regionCode {
+            hovered = nearest?.0.regionCode
+            needsDisplay = true
+        }
+        let text = nearest.map { "\($0.0.displayName) · \($0.0.regionCode)" } ??
+            regionText("拖动平移，双指缩放；点击区域查看记录。", "Drag to pan, pinch to zoom, and select a region to view records.")
+        if toolTip != text { toolTip = text }
+        if pointerLocation != nil, window?.isKeyWindow == true, dragOrigin == nil {
+            if nearest == nil { NSCursor.arrow.set() } else { NSCursor.pointingHand.set() }
+        }
+    }
+    override func mouseExited(with event: NSEvent) {
+        pointerLocation = nil
+        refreshHover()
+        NSCursor.arrow.set()
+    }
     override func keyDown(with event: NSEvent) {
         if event.charactersIgnoringModifiers == "+" { onZoom?(min(5, magnification * 1.25)); return }
         if event.charactersIgnoringModifiers == "-" { onZoom?(max(1, magnification / 1.25)); return }
         super.keyDown(with: event)
     }
     private func closest(to point: NSPoint) -> (RegionRow, NSPoint)? {
-        markerFrames.filter { hypot($0.1.x - point.x, $0.1.y - point.y) <= 14 }
-            .min { hypot($0.1.x - point.x, $0.1.y - point.y) < hypot($1.1.x - point.x, $1.1.y - point.y) }
+        guard bounds.contains(point) else { return nil }
+        var nearest: (RegionRow, NSPoint)?
+        var distance: CGFloat = 14 * 14
+        // Project the current viewport, even if a resize/zoom has not drawn yet.
+        for entry in mappedRows {
+            let marker = project(entry.coordinate)
+            let dx = marker.x - point.x, dy = marker.y - point.y
+            let candidate = dx * dx + dy * dy
+            if candidate < distance {
+                nearest = (entry.row, marker)
+                distance = candidate
+            }
+        }
+        return nearest
     }
-    deinit { timer?.invalidate() }
+    deinit {
+        timer?.invalidate()
+        observers.forEach { NotificationCenter.default.removeObserver($0) }
+        scrollObservers.forEach { NotificationCenter.default.removeObserver($0) }
+        if let observer = workspaceObserver { NSWorkspace.shared.notificationCenter.removeObserver(observer) }
+    }
 }

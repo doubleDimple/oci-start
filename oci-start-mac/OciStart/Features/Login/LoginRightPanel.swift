@@ -13,7 +13,8 @@ struct LoginRightPanel: View {
     var onOAuth: (String) -> Void
     var onServerCommit: () -> Void = {}
     var onDeploymentMode: (DeploymentMode) -> Void = { _ in }
-    var onForgotPassword: () -> Void = {}
+    // 忘记密码已随服务端停用，保留旧入口代码供后续参考。
+    // var onForgotPassword: () -> Void = {}
     var onLocale: (AppLocale) -> Void = { _ in }
 
     private var formReady: Bool {
@@ -604,12 +605,14 @@ struct LoginRightPanel: View {
             }
             .buttonStyle(PlainButtonStyle())
             Spacer()
+            /*
             Button(action: onForgotPassword) {
                 Text(model.locale == .enUS ? "Forgot password?" : "忘记密码？")
                     .font(.system(size: 14))
                     .foregroundColor(LoginPalette.muted(dark))
             }
             .buttonStyle(PlainButtonStyle())
+            */
         }
     }
 

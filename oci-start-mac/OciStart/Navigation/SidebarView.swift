@@ -12,6 +12,11 @@ struct SidebarView: View {
 
     private var dark: Bool { appearance.isShellDark }
     private var collapsed: Bool { navigation.sidebarCollapsed }
+    private var searching: Bool { !navigation.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+
+    private func showsItems(in section: NavSection) -> Bool {
+        collapsed || searching || navigation.isSectionExpanded(section)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -36,8 +41,10 @@ struct SidebarView: View {
                             } else {
                                 Color.clear.frame(height: 8)
                             }
-                            ForEach(items) { item in
-                                row(item)
+                            if showsItems(in: section) {
+                                ForEach(items) { item in
+                                    row(item)
+                                }
                             }
                         }
                     }
@@ -88,13 +95,31 @@ struct SidebarView: View {
     }
 
     private func sectionHeader(_ section: NavSection) -> some View {
-        Text(section.title)
-            .font(.system(size: AppTheme.captionSize, weight: .medium))
-            .foregroundColor(AppTheme.sidebarText(dark))
+        let expanded = showsItems(in: section)
+        let current = NavigationCatalog.section(for: navigation.selected) == section
+        return Button(action: { navigation.toggleSection(section) }) {
+            HStack(spacing: 8) {
+                Text(section.title)
+                    .font(.system(size: AppTheme.sectionSize, weight: .semibold))
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+                Image(systemName: expanded ? "chevron.down" : "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .frame(width: 14)
+                    .accessibilityHidden(true)
+            }
+            .foregroundColor(current ? AppTheme.sidebarPrimary(dark) : AppTheme.sidebarText(dark))
             .padding(.horizontal, 12)
-            .padding(.top, 16)
-            .padding(.bottom, 8)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(minHeight: 36)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PlainButtonStyle())
+        .disabled(searching)
+        .padding(.top, 10)
+        .padding(.bottom, 4)
+        .help(section.title)
+        .accessibilityLabel(section.title)
+        .accessibilityValue(expanded ? language.text("已展开", "Expanded") : language.text("已收起", "Collapsed"))
     }
 
     private func row(_ item: NavigationItem) -> some View {

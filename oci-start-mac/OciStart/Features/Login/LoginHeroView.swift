@@ -6,6 +6,7 @@ struct LoginHeroView: View {
     var dark: Bool
     var locale: AppLocale = .zhCN
     @State private var showDirectory = false
+    @State private var selectedRegion: LoginPublicRegion? = nil
 
     private var english: Bool { locale == .enUS }
     private var heroText: Color { Color(hex: dark ? "e4eee9" : "1a332b") }
@@ -44,7 +45,7 @@ struct LoginHeroView: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     .padding(.bottom, 4)
-                    LoginRegionMap(dark: dark, english: english)
+                    LoginRegionMap(dark: dark, english: english, selectedRegion: selectedRegion, onSelectRegion: { selectedRegion = $0 })
                         .frame(height: max(250, min(360, geo.size.height * 0.44)))
                         .padding(.horizontal, -18)
                         .padding(.vertical, 4)
@@ -100,20 +101,38 @@ struct LoginHeroView: View {
                 .font(.system(size: 13))
                 .foregroundColor(LoginPalette.muted(dark))
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 12) {
+                LazyVStack(alignment: .leading, spacing: 8) {
                     ForEach(LoginPublicRegion.all) { region in
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(english ? region.en : region.zh)
-                                .font(.system(size: 14, weight: .medium))
-                            Text(region.id)
-                                .font(.system(size: 12, design: .monospaced))
-                            Text(region.coordinates)
-                                .font(.system(size: 12, design: .monospaced))
-                                .foregroundColor(LoginPalette.muted(dark))
+                        Button(action: {
+                            selectedRegion = region
+                            showDirectory = false
+                        }) {
+                            VStack(alignment: .leading, spacing: 3) {
+                                HStack {
+                                    Text(english ? region.en : region.zh)
+                                        .font(.system(size: 14, weight: .medium))
+                                    Spacer()
+                                    if selectedRegion?.id == region.id {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundColor(LoginPalette.primary(dark))
+                                            .font(.system(size: 13))
+                                    }
+                                }
+                                Text(region.id)
+                                    .font(.system(size: 12, design: .monospaced))
+                                Text(region.coordinates)
+                                    .font(.system(size: 12, design: .monospaced))
+                                    .foregroundColor(LoginPalette.muted(dark))
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, 4)
+                            .padding(.horizontal, 6)
+                            .background(selectedRegion?.id == region.id ? LoginPalette.line(dark) : Color.clear)
+                            .cornerRadius(6)
+                            .padding(.bottom, 4)
+                            .overlay(LoginPalette.line(dark).frame(height: 1), alignment: .bottom)
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.bottom, 8)
-                        .overlay(LoginPalette.line(dark).frame(height: 1), alignment: .bottom)
+                        .buttonStyle(PlainButtonStyle())
                     }
                 }
             }
@@ -134,11 +153,25 @@ struct LoginHeroView: View {
 private struct LoginRegionMap: NSViewRepresentable {
     var dark: Bool
     var english: Bool
+    var selectedRegion: LoginPublicRegion? = nil
+    var onSelectRegion: ((LoginPublicRegion?) -> Void)? = nil
 
-    func makeNSView(context: Context) -> LoginRegionMapView { LoginRegionMapView() }
+    func makeNSView(context: Context) -> LoginRegionMapView {
+        let view = LoginRegionMapView()
+        view.dark = dark
+        view.english = english
+        view.selectRegion(selectedRegion)
+        view.onSelectRegion = onSelectRegion
+        return view
+    }
+
     func updateNSView(_ nsView: LoginRegionMapView, context: Context) {
         nsView.dark = dark
         nsView.english = english
+        if nsView.selectedRegion?.id != selectedRegion?.id {
+            nsView.selectRegion(selectedRegion)
+        }
+        nsView.onSelectRegion = onSelectRegion
         nsView.refreshAnimationAfterLayout()
         nsView.needsDisplay = true
     }
@@ -207,7 +240,10 @@ private struct RouteArc {
 private final class LoginRegionMapView: NSView {
     var dark = true
     var english = false { didSet { if oldValue != english { updateRegionTooltips() } } }
-    private var tooltipStrings: [NSString] = []
+    var selectedRegion: LoginPublicRegion?
+    var hoveredRegion: LoginPublicRegion?
+    var onSelectRegion: ((LoginPublicRegion?) -> Void)?
+
     private var timer: Timer?
     private var observers: [NSObjectProtocol] = []
     private var workspaceObserver: NSObjectProtocol?
@@ -217,7 +253,9 @@ private final class LoginRegionMapView: NSView {
     private var disposed = false
     private var lastTickTime: TimeInterval?
     private var elapsed: TimeInterval = 0
-    private var lastTooltipTime: TimeInterval = 0
+    private var trackingArea: NSTrackingArea?
+    private var pointerLocation: NSPoint?
+    private var dragOrigin = NSPoint.zero
 
     #if DEBUG
     fileprivate var diagnosticReducedMotionOverride: Bool? { didSet { updateAnimation(); needsDisplay = true } }
@@ -248,13 +286,16 @@ private final class LoginRegionMapView: NSView {
         return nil
     }
 
-    // 3D rotation state (Polar spin & view pitch angle)
-    private var rotY: CGFloat = -1.1
-    private var rotX: CGFloat = 0.14
+    // 3D rotation state (Earth spin & camera pitch angle, matching Web loginMap.js)
+    private var rotY: CGFloat = 0.3
+    private var rotX: CGFloat = 0.28
     private var animationFrames = 0
     private var velY: CGFloat = 0
     private var velX: CGFloat = 0
+    private var targetRotY: CGFloat? = nil
+    private var targetRotX: CGFloat? = nil
     private var isDragging = false
+    private var dragMoved = false
     private var lastMouseLocation = NSPoint.zero
 
     private static let RAD = CGFloat.pi / 180.0
@@ -278,6 +319,8 @@ private final class LoginRegionMapView: NSView {
                 if notification.name == NSWindow.willCloseNotification { self.stopAnimation(); return }
                 if notification.name == NSApplication.didResignActiveNotification || notification.name == NSWindow.didResignKeyNotification {
                     self.cancelDrag()
+                    self.pointerLocation = nil
+                    self.refreshHover()
                 }
                 self.updateAnimation()
                 self.refreshAnimationAfterLayout()
@@ -317,8 +360,7 @@ private final class LoginRegionMapView: NSView {
     fileprivate func refreshAnimationAfterLayout() {
         guard !disposed, !refreshQueued else { return }
         refreshQueued = true
-        // The view is attached before its window is ordered onscreen. Re-evaluate
-        // after that layout/display pass instead of relying on an activation event.
+        // Window visibility and the scroll viewport settle after attachment/layout.
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             self.refreshQueued = false
@@ -362,13 +404,23 @@ private final class LoginRegionMapView: NSView {
         observers.removeAll()
         if let observer = workspaceObserver { NSWorkspace.shared.notificationCenter.removeObserver(observer) }
         workspaceObserver = nil
+        if let trackingArea = trackingArea { removeTrackingArea(trackingArea) }
+        trackingArea = nil
+        pointerLocation = nil
+        hoveredRegion = nil
+        toolTip = nil
+        onSelectRegion = nil
     }
 
     private func stopAnimation(cancelInteraction: Bool = true) {
         timer?.invalidate()
         timer = nil
         lastTickTime = nil
-        if cancelInteraction { cancelDrag() }
+        if cancelInteraction {
+            cancelDrag()
+            pointerLocation = nil
+            refreshHover()
+        }
     }
 
     private func cancelDrag() {
@@ -377,21 +429,46 @@ private final class LoginRegionMapView: NSView {
         velX = 0
     }
 
+    func selectRegion(_ region: LoginPublicRegion?) {
+        selectedRegion = region
+        cancelDrag()
+        targetRotY = nil
+        targetRotX = nil
+        if let r = region {
+            targetRotY = -r.longitude * Self.RAD
+            targetRotX = r.latitude * Self.RAD * 0.5
+        }
+        if reducedMotion { finishTargetRotation() }
+        refreshHover()
+        updateAnimation()
+        needsDisplay = true
+    }
+
+    private func finishTargetRotation() {
+        if let targetY = targetRotY, let targetX = targetRotX {
+            rotY = targetY
+            rotX = targetX
+        }
+        targetRotY = nil
+        targetRotX = nil
+    }
+
     private func updateAnimation() {
+        if reducedMotion, targetRotY != nil {
+            finishTargetRotation()
+            refreshHover()
+            needsDisplay = true
+        }
         if let reason = animationPauseReason {
             let wasRunning = timer != nil
-            // Reduced motion disables automatic movement, but manual dragging
-            // remains available, including across draw/layout refreshes.
             stopAnimation(cancelInteraction: reason != "reduced-motion")
             if reason == "reduced-motion" { velY = 0; velX = 0 }
             if wasRunning { needsDisplay = true }
             return
         }
-        // Visible background windows animate like a visible Web page. Repeated
-        // layout and theme refreshes keep the same timer and monotonic time base.
         guard timer?.isValid != true else { return }
         lastTickTime = ProcessInfo.processInfo.systemUptime
-        let next = Timer(timeInterval: 1.0 / 30, repeats: true) { [weak self] _ in
+        let next = Timer(timeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
             guard let self = self else { return }
             self.advanceAnimation()
         }
@@ -406,11 +483,22 @@ private final class LoginRegionMapView: NSView {
         let delta = min(0.05, max(0, now - (lastTickTime ?? now)))
         lastTickTime = now
         elapsed += delta
-        // Recover when a drag was interrupted before AppKit delivered mouseUp.
         if isDragging && (NSEvent.pressedMouseButtons & 1) == 0 { cancelDrag() }
-        if !isDragging {
-            // Web uses 0.0025 radians/frame and 0.94 inertia decay at 60Hz.
-            // Scale by elapsed time so native frame rate does not slow the globe.
+
+        // Keep selection timing independent of timer cadence or a busy main thread.
+        if !isDragging, let targetY = targetRotY, let targetX = targetRotX {
+            let diffY = atan2(sin(targetY - rotY), cos(targetY - rotY))
+            let diffX = targetX - rotX
+            let progress = CGFloat(1 - pow(0.92, delta * 60))
+            rotY += diffY * progress
+            rotX += diffX * progress
+            if abs(diffY) < 0.001 && abs(diffX) < 0.001 {
+                rotY = targetY
+                rotX = targetX
+                targetRotY = nil
+                targetRotX = nil
+            }
+        } else if !isDragging && !reducedMotion {
             let frames = CGFloat(delta * 60)
             let decay = CGFloat(pow(0.94, Double(frames)))
             let inertiaSteps = (1 - decay) / (1 - CGFloat(0.94))
@@ -420,25 +508,90 @@ private final class LoginRegionMapView: NSView {
             velX *= decay
         }
         animationFrames += 1
+        refreshHover()
         needsDisplay = true
-        if elapsed - lastTooltipTime >= 0.25 {
-            lastTooltipTime = elapsed
-            updateRegionTooltips()
+    }
+
+    override func updateTrackingAreas() {
+        if let trackingArea = trackingArea { removeTrackingArea(trackingArea) }
+        let area = NSTrackingArea(rect: bounds, options: [.activeInKeyWindow, .mouseMoved, .mouseEnteredAndExited, .inVisibleRect], owner: self, userInfo: nil)
+        addTrackingArea(area)
+        self.trackingArea = area
+        super.updateTrackingAreas()
+    }
+
+    private func nearestRegion(at point: NSPoint) -> LoginPublicRegion? {
+        guard bounds.contains(point) else { return nil }
+        let cx = bounds.width / 2
+        let cy = bounds.height / 2
+        let radius = min(bounds.width, bounds.height) * 0.40
+        var closest: LoginPublicRegion?
+        var minDistance: CGFloat = 16.0 * 16.0
+        for region in LoginPublicRegion.locations {
+            let phi = region.latitude * Self.RAD
+            let lam = region.longitude * Self.RAD
+            let cosPhi = cos(phi)
+            let p = project3D(cosPhi * sin(lam), sin(phi), cosPhi * cos(lam),
+                              spinY: rotY, pitchX: rotX, cx: cx, cy: cy, radius: radius)
+            guard p.z > 0.05 else { continue }
+            let d = (p.sx - point.x) * (p.sx - point.x) + (p.sy - point.y) * (p.sy - point.y)
+            if d < minDistance {
+                minDistance = d
+                closest = region
+            }
         }
+        return closest
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        pointerLocation = convert(event.locationInWindow, from: nil)
+        refreshHover()
+    }
+
+    override func mouseEntered(with event: NSEvent) { mouseMoved(with: event) }
+
+    private func refreshHover() {
+        let hit = isDragging ? nil : pointerLocation.flatMap { nearestRegion(at: $0) }
+        if hit?.id != hoveredRegion?.id {
+            hoveredRegion = hit
+            updateRegionTooltips()
+            needsDisplay = true
+        }
+        if pointerLocation != nil, window?.isKeyWindow == true, !isDragging {
+            if hit != nil { NSCursor.pointingHand.set() }
+            else { NSCursor.arrow.set() }
+        }
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        pointerLocation = nil
+        refreshHover()
+        NSCursor.arrow.set()
     }
 
     // Pointer mouse drag interaction
     override func mouseDown(with event: NSEvent) {
         let loc = convert(event.locationInWindow, from: nil)
         isDragging = true
+        dragMoved = false
+        dragOrigin = loc
         lastMouseLocation = loc
         velY = 0
         velX = 0
+        targetRotY = nil
+        targetRotX = nil
+        refreshHover()
+        NSCursor.closedHand.set()
     }
 
     override func mouseDragged(with event: NSEvent) {
         guard isDragging else { return }
         let loc = convert(event.locationInWindow, from: nil)
+        // Accumulate from mouse-down so many small movements are still a drag.
+        if !dragMoved {
+            guard hypot(loc.x - dragOrigin.x, loc.y - dragOrigin.y) > 3 else { return }
+            dragMoved = true
+        }
         let dx = loc.x - lastMouseLocation.x
         let dy = loc.y - lastMouseLocation.y
         rotY += dx * 0.006
@@ -446,14 +599,22 @@ private final class LoginRegionMapView: NSView {
         velY = reducedMotion ? 0 : dx * 0.002
         velX = reducedMotion ? 0 : dy * 0.002
         lastMouseLocation = loc
-        updateRegionTooltips()
         needsDisplay = true
     }
 
     override func mouseUp(with event: NSEvent) {
+        guard isDragging else { return }
         isDragging = false
         if reducedMotion { velY = 0; velX = 0 }
-        updateRegionTooltips()
+        if !dragMoved {
+            let loc = convert(event.locationInWindow, from: nil)
+            if let hit = nearestRegion(at: loc) {
+                selectRegion(hit)
+                onSelectRegion?(hit)
+            }
+        }
+        pointerLocation = convert(event.locationInWindow, from: nil)
+        refreshHover()
     }
 
     private func project3D(_ vx: CGFloat, _ vy: CGFloat, _ vz: CGFloat,
@@ -486,26 +647,12 @@ private final class LoginRegionMapView: NSView {
     }
 
     private func updateRegionTooltips() {
-        removeAllToolTips()
-        tooltipStrings.removeAll()
-        let cx = bounds.width / 2
-        let cy = bounds.height / 2
-        let radius = min(bounds.width, bounds.height) * 0.43
-
-        for region in LoginPublicRegion.locations {
-            let phi = region.latitude * Self.RAD
-            let lam = region.longitude * Self.RAD
-            let cosPhi = cos(phi)
-            let p = project3D(cosPhi * sin(lam), sin(phi), cosPhi * cos(lam),
-                              spinY: rotY, pitchX: rotX, cx: cx, cy: cy, radius: radius)
-            guard p.z > 0.05 else { continue }
-            let names = LoginPublicRegion.all.filter { $0.latitude == region.latitude && $0.longitude == region.longitude }
+        let text = hoveredRegion.map { region in
+            LoginPublicRegion.all.filter { $0.latitude == region.latitude && $0.longitude == region.longitude }
                 .map { (english ? $0.en : $0.zh) + " · " + $0.id + "\n" + $0.coordinates }
                 .joined(separator: "\n")
-            let tooltip = names as NSString
-            tooltipStrings.append(tooltip)
-            addToolTip(NSRect(x: p.sx - 8, y: p.sy - 8, width: 16, height: 16), owner: tooltip, userData: nil)
         }
+        if toolTip != text { toolTip = text }
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -523,51 +670,64 @@ private final class LoginRegionMapView: NSView {
 
         let cx = width / 2
         let cy = height / 2
-        let radius = min(width, height) * 0.43
+        let radius = min(width, height) * 0.40
 
-        let nodeColor = NSColor(Color(hex: dark ? "53c7a3" : "16836a"))
-        let lineColor = nodeColor.withAlphaComponent(dark ? 0.3 : 0.25)
-        let oceanColor = NSColor(Color(hex: dark ? "12251f" : "f7faf8"))
-        let oceanEdgeColor = NSColor(Color(hex: dark ? "10221c" : "e0ebe5"))
-        let graticuleColor = nodeColor.withAlphaComponent(dark ? 0.11 : 0.1)
+        let nodeColor = NSColor(Color(hex: dark ? "ff6600" : "ff4500"))
+        let lineColor = NSColor(Color(hex: dark ? "ff6600" : "ff4500")).withAlphaComponent(0.55)
+        let oceanColor = NSColor(Color(hex: dark ? "0b1219" : "edf3f8"))
+        let oceanEdgeColor = NSColor(Color(hex: dark ? "162330" : "cbdbe6"))
+        let graticuleColor = dark ? NSColor(red: 120/255, green: 165/255, blue: 200/255, alpha: 0.22)
+                                  : NSColor(red: 20/255, green: 40/255, blue: 65/255, alpha: 0.35)
 
         let colorSpace = CGColorSpaceCreateDeviceRGB()
 
         // 1. Atmosphere Outer Glow
-        let glowColors = [nodeColor.withAlphaComponent(dark ? 0.08 : 0.06).cgColor, nodeColor.withAlphaComponent(0).cgColor] as CFArray
-        if let glowGrad = CGGradient(colorsSpace: colorSpace, colors: glowColors, locations: [0.0, 1.0]) {
+        let glowColors = [nodeColor.withAlphaComponent(0.14).cgColor,
+                          nodeColor.withAlphaComponent(0.04).cgColor,
+                          nodeColor.withAlphaComponent(0).cgColor] as CFArray
+        if let glowGrad = CGGradient(colorsSpace: colorSpace, colors: glowColors, locations: [0.0, 0.7, 1.0]) {
             ctx.drawRadialGradient(glowGrad,
                                    startCenter: CGPoint(x: cx, y: cy), startRadius: radius * 0.85,
-                                   endCenter: CGPoint(x: cx, y: cy), endRadius: radius * 1.15,
+                                   endCenter: CGPoint(x: cx, y: cy), endRadius: radius * 1.22,
                                    options: [.drawsAfterEndLocation])
         }
 
         // 2. 3D Globe Surface Fill
-        // Clip the ocean gradient to the sphere. Extending its last color to the
-        // canvas edge was the blue rectangle that separated the globe from the page.
         ctx.saveGState()
         ctx.addEllipse(in: CGRect(x: cx - radius, y: cy - radius, width: radius * 2, height: radius * 2))
         ctx.clip()
         let bodyColors = [oceanColor.cgColor, oceanColor.cgColor, oceanEdgeColor.cgColor] as CFArray
         if let bodyGrad = CGGradient(colorsSpace: colorSpace, colors: bodyColors, locations: [0.0, 0.65, 1.0]) {
             ctx.drawRadialGradient(bodyGrad,
-                                   startCenter: CGPoint(x: cx - radius * 0.3, y: cy - radius * 0.3), startRadius: 0,
+                                   startCenter: CGPoint(x: cx - radius * 0.3, y: cy - radius * 0.3), startRadius: radius * 0.1,
                                    endCenter: CGPoint(x: cx, y: cy), endRadius: radius,
                                    options: [.drawsAfterEndLocation])
         }
         ctx.restoreGState()
 
         // Atmosphere Rim Border
-        nodeColor.withAlphaComponent(dark ? 0.17 : 0.13).setStroke()
+        nodeColor.withAlphaComponent(0.35).setStroke()
         let rimPath = NSBezierPath(ovalIn: NSRect(x: cx - radius, y: cy - radius, width: radius * 2, height: radius * 2))
-        rimPath.lineWidth = 0.7
+        rimPath.lineWidth = 1.2
         rimPath.stroke()
+
+        // Tilted Polar Axis Line (North - South Pole Axis)
+        let poleNorth = project3D(0, 1.13, 0, spinY: rotY, pitchX: rotX, cx: cx, cy: cy, radius: radius)
+        let poleSouth = project3D(0, -1.13, 0, spinY: rotY, pitchX: rotX, cx: cx, cy: cy, radius: radius)
+        nodeColor.withAlphaComponent(0.3).setStroke()
+        let axisPath = NSBezierPath()
+        axisPath.lineWidth = 1.0
+        let pattern: [CGFloat] = [4, 4]
+        axisPath.setLineDash(pattern, count: 2, phase: 0)
+        axisPath.move(to: NSPoint(x: poleNorth.sx, y: poleNorth.sy))
+        axisPath.line(to: NSPoint(x: poleSouth.sx, y: poleSouth.sy))
+        axisPath.stroke()
 
         // 3. Graticule Lines (Parallels & Meridians)
         graticuleColor.setStroke()
         for line in Self.graticules {
             let path = NSBezierPath()
-            path.lineWidth = 0.55
+            path.lineWidth = 0.95
             var drawing = false
             for pt in line {
                 let p = project3D(pt.vx, pt.vy, pt.vz, spinY: rotY, pitchX: rotX, cx: cx, cy: cy, radius: radius)
@@ -580,16 +740,16 @@ private final class LoginRegionMapView: NSView {
             path.stroke()
         }
 
-        // The same quiet green family as the brand; depth defines the continents.
-        let baseDotR = max(0.8, radius * 0.0067)
-        let landColor = NSColor(Color(hex: dark ? "65a58d" : "578775"))
-        for band in 0..<8 {
-            let depth = CGFloat(band + 1) / 8
-            landColor.withAlphaComponent(0.2 + depth * 0.64).setFill()
+        // 4. Land Dots (Multi-Color Continents matching Web)
+        let baseDotR = max(0.9, radius * 0.009)
+        for c in 0..<12 {
+            let cColor = Self.continentColor(c, dark: dark)
+            cColor.setFill()
             let path = NSBezierPath()
             for dot in Self.landDots {
+                if dot.continent != c { continue }
                 let p = project3D(dot.vx, dot.vy, dot.vz, spinY: rotY, pitchX: rotX, cx: cx, cy: cy, radius: radius)
-                if p.z > 0.02 && min(7, Int(p.z * 8)) == band {
+                if p.z > 0.02 {
                     let r = baseDotR * (0.65 + p.z * 0.45)
                     path.appendOval(in: NSRect(x: p.sx - r, y: p.sy - r, width: r * 2, height: r * 2))
                 }
@@ -602,7 +762,7 @@ private final class LoginRegionMapView: NSView {
         let now = elapsed
         for (rIdx, route) in Self.routes.enumerated() {
             let path = NSBezierPath()
-            path.lineWidth = 0.8
+            path.lineWidth = 1.0
             var drawing = false
             for pt in route.samples {
                 let p = project3D(pt.vx, pt.vy, pt.vz, spinY: rotY, pitchX: rotX, cx: cx, cy: cy, radius: radius)
@@ -614,7 +774,7 @@ private final class LoginRegionMapView: NSView {
             }
             path.stroke()
 
-            // Traveling Light Particle
+            // Traveling Light Particle along Arc
             if !reducedMotion, !route.samples.isEmpty {
                 let progress = CGFloat((now / 3.0 + Double(rIdx) * 0.22).truncatingRemainder(dividingBy: 1.0))
                 let sampleIdx = Int(progress * CGFloat(route.samples.count - 1))
@@ -622,13 +782,17 @@ private final class LoginRegionMapView: NSView {
                 let p = project3D(pt.vx, pt.vy, pt.vz, spinY: rotY, pitchX: rotX, cx: cx, cy: cy, radius: radius)
                 if p.z > 0.05 {
                     let alpha = sin(.pi * progress) * min(1.0, p.z * 2.0)
+                    ctx.saveGState()
                     nodeColor.withAlphaComponent(alpha).setFill()
-                    NSBezierPath(ovalIn: NSRect(x: p.sx - 1.5, y: p.sy - 1.5, width: 3, height: 3)).fill()
+                    ctx.setShadow(offset: .zero, blur: 8, color: nodeColor.withAlphaComponent(alpha).cgColor)
+                    NSBezierPath(ovalIn: NSRect(x: p.sx - 2.5, y: p.sy - 2.5, width: 5.0, height: 5.0)).fill()
+                    ctx.restoreGState()
                 }
             }
         }
 
-        // Region beacons remain readable without overpowering the map.
+        // 6. Project & Render OCI Region Nodes
+        let active = selectedRegion ?? hoveredRegion
         for region in LoginPublicRegion.locations {
             let phi = region.latitude * Self.RAD
             let lam = region.longitude * Self.RAD
@@ -637,22 +801,24 @@ private final class LoginRegionMapView: NSView {
                               spinY: rotY, pitchX: rotX, cx: cx, cy: cy, radius: radius)
             guard p.z > 0.05 else { continue }
 
+            let on = (active != nil && region.latitude == active!.latitude && region.longitude == active!.longitude)
             let depthAlpha = min(1.0, p.z * 2.2)
 
             // Outer Pulsing Ring
             if !reducedMotion {
                 let phase = Self.regionPulsePhases[region.id] ?? 0
                 let progress = CGFloat((now + phase).truncatingRemainder(dividingBy: 2.4) / 2.4)
-                let ringR = 3.0 + progress * 8.0
-                nodeColor.withAlphaComponent((1.0 - progress) * 0.2 * depthAlpha).setStroke()
+                let ringR = 4.0 + progress * (on ? 18.0 : 12.0)
+                nodeColor.withAlphaComponent((1.0 - progress) * (on ? 0.85 : 0.4) * depthAlpha).setStroke()
                 let ringPath = NSBezierPath(ovalIn: NSRect(x: p.sx - ringR, y: p.sy - ringR, width: ringR * 2, height: ringR * 2))
-                ringPath.lineWidth = 0.7
+                ringPath.lineWidth = 1.3
                 ringPath.stroke()
             }
 
             // Glowing Halo
-            let glowR: CGFloat = 7.0
-            let haloColors = [nodeColor.withAlphaComponent(0.15 * depthAlpha).cgColor, nodeColor.withAlphaComponent(0).cgColor] as CFArray
+            let glowR: CGFloat = on ? 18.0 : 12.0
+            let haloColors = [nodeColor.withAlphaComponent((on ? 0.6 : 0.32) * depthAlpha).cgColor,
+                              nodeColor.withAlphaComponent(0).cgColor] as CFArray
             if let haloGrad = CGGradient(colorsSpace: colorSpace, colors: haloColors, locations: [0.0, 1.0]) {
                 ctx.drawRadialGradient(haloGrad,
                                        startCenter: CGPoint(x: p.sx, y: p.sy), startRadius: 0,
@@ -660,13 +826,15 @@ private final class LoginRegionMapView: NSView {
                                        options: [.drawsAfterEndLocation])
             }
 
-            // Outer Orange Core (Enlarged)
+            // Core Dot (Enlarged)
+            let coreR: CGFloat = on ? 5.2 : 3.8
             nodeColor.withAlphaComponent(depthAlpha).setFill()
-            NSBezierPath(ovalIn: NSRect(x: p.sx - 2.7, y: p.sy - 2.7, width: 5.4, height: 5.4)).fill()
+            NSBezierPath(ovalIn: NSRect(x: p.sx - coreR, y: p.sy - coreR, width: coreR * 2, height: coreR * 2)).fill()
 
-            // Bright White Inner Beacon Center
+            // Bright White Beacon Center
+            let centerR: CGFloat = on ? 2.5 : 1.8
             NSColor.white.withAlphaComponent(depthAlpha).setFill()
-            NSBezierPath(ovalIn: NSRect(x: p.sx - 1.1, y: p.sy - 1.1, width: 2.2, height: 2.2)).fill()
+            NSBezierPath(ovalIn: NSRect(x: p.sx - centerR, y: p.sy - centerR, width: centerR * 2, height: centerR * 2)).fill()
         }
     }
 

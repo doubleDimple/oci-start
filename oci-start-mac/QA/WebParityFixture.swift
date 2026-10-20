@@ -139,10 +139,11 @@ app.setActivationPolicy(.accessory)
 let appearance = AppearanceController.shared
 let session = AppSession.shared
 let navigation = NavigationState.shared
-let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1280, height: 800), styleMask: [.titled, .resizable], backing: .buffered, defer: false)
+let window = NSWindow(contentRect: NSRect(x: 40, y: 40, width: 1280, height: 800), styleMask: [.titled, .resizable], backing: .buffered, defer: false)
 window.isReleasedWhenClosed = false
+window.isExcludedFromWindowsMenu = true
 let fixtureOriginalWindowLevel = window.level
-window.level = .floating
+window.level = .normal
 let shell = MainShellViewController(session: session, navigation: navigation, appearance: appearance)
 let container = NSView(frame: NSRect(x: 0, y: 0, width: 1280, height: 800))
 window.contentView = container
@@ -150,7 +151,6 @@ shell.view.frame = container.bounds
 shell.view.autoresizingMask = [.width, .height]
 container.addSubview(shell.view)
 window.orderFront(nil)
-app.activate(ignoringOtherApps: true)
 
 let output = ProcessInfo.processInfo.environment["OCI_CAPTURE_DIR"] ?? "/private/tmp/oci-mac-web-qa/shots"
 try FileManager.default.createDirectory(atPath: output, withIntermediateDirectories: true)
@@ -179,9 +179,11 @@ let allScenarios: [(String, NavID, Bool, Bool, CGFloat)] = [
 ]
 // Optional bounded rerun after a layout-only edit; all HTTP remains intercepted.
 let layoutOnly = ProcessInfo.processInfo.environment["OCI_LAYOUT_QA_ONLY"] == "1"
-let scenarios = layoutOnly ? allScenarios.filter {
-    ["tenants-narrow", "proxy-narrow", "regions-english-narrow"].contains($0.0)
-} : allScenarios
+let customScenarios = ProcessInfo.processInfo.environment["OCI_SCENARIOS"]?.components(separatedBy: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+let scenarios = allScenarios.filter { scenario in
+    if let requested = customScenarios { return requested.contains(scenario.0) }
+    return !layoutOnly || ["tenants-narrow", "proxy-narrow", "regions-english-narrow"].contains(scenario.0)
+}
 var index = 0
 var validationFailures: [String] = []
 func snapshot(_ name: String) {
@@ -282,9 +284,6 @@ struct PreviewLogin: View {
                     onLogin: {}, onRegister: {}, onSendCode: {}, onOAuth: { _ in })
                     .frame(width: 486)
             }
-            if model.showForgotPassword {
-                LoginForgotPasswordSheet(model: model, dark: dark, onClose: {}, onSendCode: {}, onNext: {}, onBack: {})
-            }
         }.environmentObject(appearance)
     }
 }
@@ -297,7 +296,7 @@ func finishFixture() {
     exit(validationFailures.isEmpty ? 0 : 1)
 }
 func captureForm(_ step: Int) {
-    guard step < 6 else {
+    guard step < 4 else {
         finishFixture()
         return
     }
@@ -319,15 +318,13 @@ func captureForm(_ step: Int) {
         container.addSubview(host)
         formHost = host
     }
-    let names = ["login-form-light", "login-form-dark-mfa", "register-english", "reset-light", "reset-dark", "login-local-waiting"]
-    appearance.mode = step == 1 || step == 4 ? .dark : .light
+    let names = ["login-form-light", "login-form-dark-mfa", "register-english", "login-local-waiting"]
+    appearance.mode = step == 1 ? .dark : .light
     formModel.locale = step == 2 ? .enUS : .zhCN
     formModel.tab = step == 2 ? .register : .login
     formModel.verifyMethod = step == 1 ? .mfa : .message
-    formModel.showForgotPassword = step == 3 || step == 4
-    formModel.deploymentMode = step == 5 ? .local : .remote
-    formModel.serverURL = step == 5 ? AppSession.localDefaultURL : "https://oci-mac-preview.invalid"
-    formModel.resetStep = step == 4 ? 2 : 1
+    formModel.deploymentMode = step == 3 ? .local : .remote
+    formModel.serverURL = step == 3 ? AppSession.localDefaultURL : "https://oci-mac-preview.invalid"
     if step == 2 { window.setContentSize(NSSize(width: 960, height: 640)) }
     else { window.setContentSize(NSSize(width: 1280, height: 800)) }
     func resetFormScroll(_ view: NSView) {
@@ -410,17 +407,15 @@ func verifyContracts() async throws {
     for check in try await TerminalFixture.run() { print("PASS: \(check)") }
 }
 Task { @MainActor in
-    // The standalone table fixture owns the screen while it runs. Keep the
-    // shell's separate floating window from obscuring synthetic-event targets.
+    // The standalone table fixture owns the screen while it runs.
     window.orderOut(nil)
-    do { try await verifySharedTableLayout(captureDirectory: output) }
+    do { if !layoutOnly { try await verifySharedTableLayout(captureDirectory: output) } }
     catch {
         let failure = "shared table layout: \(error.localizedDescription)"
         validationFailures.append(failure)
         fputs("FAIL: \(failure)\n", stderr)
     }
-    window.makeKeyAndOrderFront(nil)
-    window.orderFrontRegardless()
+    window.orderFront(nil)
     do { if !layoutOnly { try await verifyContracts() } }
     catch {
         let failure = "fixture contract check: \(error)"

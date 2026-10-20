@@ -89,6 +89,9 @@ enum NavigationCatalog {
     }
 
     static func section(for nav: NavID) -> NavSection? {
+        // Secondary destinations still belong to a sidebar group.
+        if nav == .auditLogs { return .system }
+        if nav == .aiChat { return .tools }
         for (section, items) in sections {
             if items.contains(where: { $0.nav == nav }) {
                 return section

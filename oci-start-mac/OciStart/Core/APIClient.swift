@@ -49,6 +49,7 @@ final class APIClient {
             }
             let body = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
             let redirectedToLogin = http.url?.path == "/login" || http.url?.path == "/m/login"
+            // A 403 may report an IP ban or a denied operation; it does not expire the session.
             let expired = http.statusCode == 401 || (body?["code"] as? NSNumber)?.intValue == 401
                 || (redirectedToLogin && request.url?.path != http.url?.path)
             if expired {
@@ -337,7 +338,7 @@ final class APIClient {
                 throw APIError.serverMessage(partial?.message ?? "用户名或密码错误")
             }
             guard (200..<300).contains(http.statusCode) else {
-                throw APIError.serverMessage("登录失败 HTTP \(http.statusCode)")
+                throw APIError.serverMessage(Self.friendlyServerMessage(data: data, status: http.statusCode))
             }
             if data.isEmpty {
                 return LoginResult(success: true, redirectUrl: nil, message: nil)
@@ -429,8 +430,7 @@ final class APIClient {
         req.httpBody = try JSONSerialization.data(withJSONObject: body)
         let (data, http) = try await data(for: req)
         guard (200..<300).contains(http.statusCode) else {
-            let msg = String(data: data, encoding: .utf8) ?? "发送失败"
-            throw APIError.serverMessage(msg)
+            throw APIError.serverMessage(Self.friendlyServerMessage(data: data, status: http.statusCode))
         }
     }
 
@@ -554,7 +554,8 @@ final class APIClient {
         return await LoginFactorConfig(messageEnabled: msg, mfaEnabled: mfa)
     }
 
-    // MARK: - Forgot password (web login_user_v1.js)
+    /*
+    // MARK: - Forgot password (disabled with the server endpoints)
 
     func sendResetCode(baseURL: String, username: String) async throws {
         let url = try makeURL(baseURL, path: "/api/send-reset-code")
@@ -603,6 +604,7 @@ final class APIClient {
         guard success else { throw APIError.serverMessage(message) }
         return message
     }
+    */
 
     // MARK: - Helpers
 
