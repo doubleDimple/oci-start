@@ -1,8 +1,7 @@
 package com.doubledimple.ociserver.config.annotations;
 
-import com.doubledimple.dao.entity.BanRecord;
-import com.doubledimple.dao.repository.BanRecordRepository;
 import com.doubledimple.ociserver.config.exception.IpBannedException;
+import com.doubledimple.ociserver.service.LoginAttemptService;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -26,7 +25,7 @@ public class IpBanAspect {
 
 
     @Resource
-    private BanRecordRepository banRecordRepository;
+    private LoginAttemptService loginAttemptService;
 
     @Around("@within(com.doubledimple.ociserver.config.annotations.CheckIpBan) || @annotation(com.doubledimple.ociserver.config.annotations.CheckIpBan)")
     public Object checkIpBan(ProceedingJoinPoint joinPoint) throws Throwable {
@@ -37,8 +36,9 @@ public class IpBanAspect {
             throw new IpBannedException("无法识别IP来源，拒绝访问。");
         }
 
-        BanRecord record = banRecordRepository.findTopByIpAddress(clientIp);
-        if (record != null && record.getStatus() == 1) {
+        try {
+            loginAttemptService.assertAllowed(clientIp);
+        } catch (IpBannedException e) {
             MethodSignature signature = (MethodSignature) joinPoint.getSignature();
             Method method = signature.getMethod();
             CheckIpBan annotation = method.getAnnotation(CheckIpBan.class);

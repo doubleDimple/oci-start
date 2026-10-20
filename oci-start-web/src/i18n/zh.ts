@@ -18,6 +18,7 @@ import vpsDetails from './vps/resourceDetails'
 import networkQuality from './settings/networkQuality'
 import systemLogs from './settings/systemLogs'
 import securitySettings from './settings/securitySettings'
+import ipBans from './settings/ipBans'
 import vpnProxy from './settings/vpnProxy'
 import notificationSettings from './settings/notificationSettings'
 import memos from './settings/memos'
@@ -84,6 +85,7 @@ export default {
   networkQuality: networkQuality.zh,
   systemLogs: systemLogs.zh,
   securitySettings: securitySettings.zh,
+  ipBans: ipBans.zh,
   vpnProxy: vpnProxy.zh,
   notificationSettings: notificationSettings.zh,
   memo: memos.zh,
@@ -278,6 +280,7 @@ export default {
     system: '系统管理',
     quality: '网络质量',
     logs: '系统日志',
+    ipBans: '封禁管理',
     security: '安全管理',
     proxyConfig: '代理配置',
     tools: '我的工具',

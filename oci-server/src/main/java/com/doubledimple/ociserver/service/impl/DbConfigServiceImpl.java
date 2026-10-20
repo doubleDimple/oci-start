@@ -306,7 +306,10 @@ public class DbConfigServiceImpl implements DbConfigService {
             DbConfig dbConfig = dbConfigRepository.findById(id).orElse(null);
             if (dbConfig == null) return ApiResponse.error("记录不存在");
 
-            Tenant tenant = tenantRepository.findById(tenantId).orElse(null);
+            if (!java.util.Objects.equals(dbConfig.getTenantId(), tenantId)) {
+                return ApiResponse.error("数据库与租户不匹配");
+            }
+            Tenant tenant = tenantRepository.findById(dbConfig.getTenantId()).orElse(null);
             if (tenant == null) return ApiResponse.error("租户不存在");
 
             String newAdminUser = dbConfig.getDbName();

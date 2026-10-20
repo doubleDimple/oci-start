@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { hasTenantPermission } from '@/utils/tenantPermissions'
 import { ElTableColumn as BaseTableColumn } from 'element-plus'
 import PageErrorNotice from '@/components/PageErrorNotice.vue'
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
@@ -39,6 +40,8 @@ function requestError(cause: unknown) {
 const props = defineProps<{ tenant: TenantRow }>()
 const emit = defineEmits<{ close: []; changed: [] }>()
 const tenantId = computed(() => String(props.tenant.id))
+const canManage = computed(() => hasTenantPermission(props.tenant, 'VOLUME_MANAGE'))
+const canDelete = computed(() => hasTenantPermission(props.tenant, 'BOOT_VOLUME_DELETE'))
 const tenantName = computed(() => props.tenant.defName || t('tenantRegions.common.currentTenant'))
 const heading = ref<HTMLElement>()
 const table = ref<TableInstance>()
@@ -86,6 +89,7 @@ function clampPage() {
 }
 
 async function loadVolumes() {
+  if (!hasTenantPermission(props.tenant, 'BASIC_READ')) return
   if (loading.value || busy.value) return
   const current = generation
   const id = tenantId.value
@@ -105,6 +109,7 @@ async function loadVolumes() {
 }
 
 function startEditing(volume: BootVolume) {
+  if (!canManage.value) return
   if (busy.value || loading.value) return
   editing.value = volume
   editName.value = volume.displayName || ''
@@ -120,6 +125,7 @@ function cancelEditing() {
 }
 
 async function saveVolume() {
+  if (!canManage.value) return
   const volume = editing.value
   if (!volume || busy.value) return
   editError.value = ''
@@ -155,6 +161,7 @@ async function saveVolume() {
 }
 
 async function deleteVolume(volume: BootVolume) {
+  if (!canDelete.value) return
   if (volume.instanceName || busy.value || loading.value) return
   const current = generation
   const id = tenantId.value
@@ -233,8 +240,8 @@ const ElTableColumn = BaseTableColumn<BootVolume>
               <div><dt>{{ t('tenantRegions.volumes.performanceUnit') }}</dt><dd class="volume-number">{{ number(volume.vpusPerGB) }}</dd></div>
             </dl>
             <template #footer>
-              <GhostBtn :disabled="loading || !!busy" @click="startEditing(volume)">{{ t('tenantRegions.common.edit') }}</GhostBtn>
-              <GhostBtn v-if="!volume.instanceName" danger :loading="busy === 'delete' && deletingId === volume.id" :disabled="loading || !!busy" @click="deleteVolume(volume)">{{ t('tenantRegions.common.delete') }}</GhostBtn>
+              <GhostBtn v-if="canManage" :disabled="loading || !!busy" @click="startEditing(volume)">{{ t('tenantRegions.common.edit') }}</GhostBtn>
+              <GhostBtn v-if="canDelete && !volume.instanceName" danger :loading="busy === 'delete' && deletingId === volume.id" :disabled="loading || !!busy" @click="deleteVolume(volume)">{{ t('tenantRegions.common.delete') }}</GhostBtn>
             </template>
           </MobileRecordCard>
           <p v-if="loading || !pageVolumes.length" class="volume-mobile-empty" role="status">{{ t(loading ? 'tenantRegions.volumes.loading' : error ? 'tenantRegions.volumes.failed' : keyword ? 'tenantRegions.volumes.noMatch' : 'tenantRegions.volumes.empty') }}</p>
@@ -245,7 +252,7 @@ const ElTableColumn = BaseTableColumn<BootVolume>
             <el-table-column prop="displayName" :label="t('tenantRegions.volumes.name')" min-width="225" show-overflow-tooltip />
             <el-table-column :label="t('tenantRegions.volumes.capacity')" width="116" align="right"><template #default="{ row }"><span class="volume-number">{{ number(row.sizeInGBs) }}</span></template></el-table-column>
             <el-table-column :label="t('tenantRegions.volumes.performanceUnit')" width="110" align="right"><template #default="{ row }"><span class="volume-number">{{ number(row.vpusPerGB) }}</span></template></el-table-column>
-            <el-table-column :label="t('tenantRegions.common.actions')" width="144" fixed="right"><template #default="{ row }"><div class="volume-row-actions"><el-button link :disabled="loading || !!busy" @click="startEditing(row)">{{ t('tenantRegions.common.edit') }}</el-button><el-button v-if="!row.instanceName" link type="danger" :loading="busy === 'delete' && deletingId === row.id" :disabled="loading || !!busy" @click="deleteVolume(row)">{{ t('tenantRegions.common.delete') }}</el-button></div></template></el-table-column>
+            <el-table-column :label="t('tenantRegions.common.actions')" width="144" fixed="right"><template #default="{ row }"><div class="volume-row-actions"><el-button v-if="canManage" link :disabled="loading || !!busy" @click="startEditing(row)">{{ t('tenantRegions.common.edit') }}</el-button><el-button v-if="canDelete && !row.instanceName" link type="danger" :loading="busy === 'delete' && deletingId === row.id" :disabled="loading || !!busy" @click="deleteVolume(row)">{{ t('tenantRegions.common.delete') }}</el-button></div></template></el-table-column>
           </el-table>
         </div>
         <PagePagination embedded class="volume-pagination" v-model:current-page="page" v-model:page-size="pageSize" :page-sizes="[10, 20, 50]" :total="filteredVolumes.length" :disabled="loading || !!busy"><span class="volume-count">{{ t('tenantRegions.volumes.total', { count: number(filteredVolumes.length) }) }}</span></PagePagination>

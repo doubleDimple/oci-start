@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { hasTenantPermission, isManagedTenant, type TenantPermission } from '@/utils/tenantPermissions'
 import PageErrorNotice from '@/components/PageErrorNotice.vue'
 import PageBackButton from '@/components/PageBackButton.vue'
 import MobileRecordList from '@/components/MobileRecordList.vue'
@@ -453,9 +454,25 @@ function rowActions(row: TenantRow): RowAction[] {
     danger: true,
     divided: true,
   })
-  return items
+  if (isManagedTenant(row)) items.unshift({
+    id: 'permissions', label: t('tenant.actions.permissions'), icon: 'i-mdi-shield-key-outline',
+  })
+  const permissions: Record<string, TenantPermission> = {
+    update: 'BASIC_READ', regions: 'BASIC_READ', subscribe: 'REGION_SUBSCRIBE',
+    users: 'USER_READ', traffic: 'TRAFFIC_READ', monitor: 'TRAFFIC_READ',
+    audit: 'AUDIT_READ', costs: 'COST_READ', social: 'DOMAIN_SECURITY_MANAGE',
+  }
+  return items.filter(item => {
+    if (isManagedTenant(row) && ['email', 'quota', 'chat'].includes(item.id)) return false
+    return !permissions[item.id] || hasTenantPermission(row, permissions[item.id]!)
+  })
 }
 function runAction(item: RowAction, row: TenantRow) {
+  if (!rowActions(row).some(allowed => allowed.id === item.id)) return
+  if (item.id === 'permissions') {
+    void router.push({ path: '/tenants/addSpeed', query: { cloudType: '1', managedTenantId: row.id } })
+    return
+  }
   if (item.path) navigate(item.path, row)
   else if (item.id === 'delete') handleOpenDeleteTenant(row)
   else openAction(item.id, row)

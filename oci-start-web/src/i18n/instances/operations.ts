@@ -19,6 +19,7 @@ const zh = {
     start: '确认启动此实例？提交后请刷新确认云端状态。',
     stop: '停止后，实例上运行的服务将中断。请确认已保存需要的数据。',
     terminate: '此操作不可撤销：将终止实例，同时删除引导卷和本地记录。引导卷内的数据将无法恢复。',
+    terminatePreserveVolume: '此操作不可撤销：将终止实例并删除本地实例记录。当前未授权删除启动卷，系统会保留启动卷及其数据。',
     delete: '仅删除此实例在系统中的本地记录，云端实例会继续保留。后续同步可能重新导入该记录。',
     name: '实例名称和关联引导卷的名称会一并更新。',
     config: 'CPU 与内存的可用配置取决于实例规格和云端限制。更新可能需要一些时间。',
@@ -32,7 +33,7 @@ const zh = {
   },
   success: {
     start: '启动请求已提交，请刷新确认云端状态。', stop: '停止请求已提交，请刷新确认云端状态。',
-    terminate: '终止请求已提交，实例和引导卷将被删除。', remark: '备注已保存。', name: '名称已更新。',
+    terminate: '终止请求已提交，实例和引导卷将被删除。', terminatePreserveVolume: '终止请求已提交，启动卷会保留。', remark: '备注已保存。', name: '名称已更新。',
     config: 'CPU 与内存配置已更新。', volume: '引导卷扩容请求已提交，请刷新确认容量。',
     vpu: '引导卷性能更新请求已提交。', delete: '本地记录已删除。',
   },
@@ -78,6 +79,7 @@ const en = {
     start: 'Start this instance? Refresh after submitting to confirm its cloud status.',
     stop: 'Stopping this instance interrupts its running services. Save any necessary data before continuing.',
     terminate: 'This cannot be undone. The instance, its boot volume, and its local record will be deleted. Data on the boot volume cannot be recovered.',
+    terminatePreserveVolume: 'This cannot be undone. The instance and its local record will be deleted. Boot volume deletion is not authorized, so its volume and data will be preserved.',
     delete: 'Only the local record will be deleted. The cloud instance remains available. A later sync may import its record again.',
     name: 'The instance and its associated boot volume will both be renamed.',
     config: 'Available CPU and memory configurations depend on the instance shape and cloud limits. Updating may take some time.',
@@ -91,7 +93,7 @@ const en = {
   },
   success: {
     start: 'Start request submitted. Refresh to confirm its cloud status.', stop: 'Stop request submitted. Refresh to confirm its cloud status.',
-    terminate: 'Termination requested. The instance and its boot volume will be deleted.', remark: 'Remark saved.', name: 'Name updated.',
+    terminate: 'Termination requested. The instance and its boot volume will be deleted.', terminatePreserveVolume: 'Termination requested. The boot volume will be preserved.', remark: 'Remark saved.', name: 'Name updated.',
     config: 'CPU and memory configuration updated.', volume: 'Boot volume expansion requested. Refresh to confirm its capacity.',
     vpu: 'Boot volume performance update requested.', delete: 'Local record deleted.',
   },

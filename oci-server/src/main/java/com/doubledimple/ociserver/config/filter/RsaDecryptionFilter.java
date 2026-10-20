@@ -73,8 +73,8 @@ public class RsaDecryptionFilter extends OncePerRequestFilter {
                         return;
                     }
                 } catch (Exception e) {
-                    log.warn("【降级登录告警】解密失败，回退至明文验证,请尽快升级到最新版本。IP: {}, User-Agent: {}, 错误: {}",
-                            request.getRemoteAddr(), request.getHeader("User-Agent"), e.getMessage());
+                    log.warn("【降级登录告警】解密失败，回退至明文验证,请尽快升级到最新版本。IP: {}, User-Agent: {}, 异常类型: {}",
+                            request.getRemoteAddr(), request.getHeader("User-Agent"), e.getClass().getSimpleName());
                 }
             } else {
                 if (encryptedPassword != null) {
@@ -111,7 +111,7 @@ public class RsaDecryptionFilter extends OncePerRequestFilter {
                 return rejectChallenge(request, response, HttpServletResponse.SC_FORBIDDEN);
             }
         } catch (Exception e) {
-            log.error("Turnstile 验证异常: {}", e.getMessage());
+            log.error("Turnstile 验证异常，异常类型: {}", e.getClass().getSimpleName());
             return rejectChallenge(request, response, HttpServletResponse.SC_SERVICE_UNAVAILABLE);
         }
         return true;

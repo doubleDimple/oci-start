@@ -62,6 +62,7 @@ export const MENU: NavGroup[] = [
     children: [
       { id: 'api-logs', href: '/system/logs', labelKey: 'nav.logs', icon: 'i-mdi-file-document-outline' },
       { id: 'api-settings', href: '/system/settings', labelKey: 'nav.security', icon: 'i-mdi-tune' },
+      { id: 'system-ip-bans', href: '/system/ip-bans', labelKey: 'nav.ipBans', icon: 'i-mdi-shield-lock-outline' },
       { id: 'vpnProxy-management', href: '/vpnProxy/page', labelKey: 'nav.proxyConfig', icon: 'i-mdi-swap-horizontal' },
     ],
   },

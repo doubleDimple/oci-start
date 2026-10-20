@@ -121,6 +121,7 @@ public class InstanceDetailsServiceImpl implements InstanceDetailsService {
     */
     @Override
     public void doBootVolumeBackUp(InstanceDetails instanceDetails, User user, String bootVolumeId) {
+        if (backupManagedVolume(instanceDetails, user, bootVolumeId)) return;
         try {
             String tenantId = user.getUserId();
             String architecture = user.getArchitecture();
@@ -177,6 +178,7 @@ public class InstanceDetailsServiceImpl implements InstanceDetailsService {
     */
     @Override
     public void doBootVolumeBackUpNoAuth(InstanceDetails instanceDetails, User user, String bootVolumeId) {
+        if (backupManagedVolume(instanceDetails, user, bootVolumeId)) return;
         try {
             String tenantId = user.getUserId();
             String architecture = user.getArchitecture();
@@ -213,6 +215,11 @@ public class InstanceDetailsServiceImpl implements InstanceDetailsService {
 
     @Override
     public void doBootVolumeBackUpNoAuthReplace(InstanceDetails instanceDetails, User user, String bootVolumeId) {
+        Tenant currentTenant = tenantRepository.findById(instanceDetails.getTenantId()).orElse(null);
+        if (com.doubledimple.ociserver.service.permissions.OciPermissions.isManaged(currentTenant)) {
+            throw new com.doubledimple.ociserver.service.permissions.OciPermissionDeniedException(
+                    "专用 API 未开放删除已有备份；请创建独立备份，或在 OCI 控制台处理已有备份");
+        }
         try {
             String tenantId = user.getUserId();
             String architecture = user.getArchitecture();
@@ -245,5 +252,17 @@ public class InstanceDetailsServiceImpl implements InstanceDetailsService {
         } catch (Exception e) {
             log.warn("doBootVolumeBackUp 出现异常,原因为:{}",e.getMessage());
         }
+    }
+
+    private boolean backupManagedVolume(InstanceDetails instance, User user, String volumeId) {
+        Tenant tenant = tenantRepository.findById(instance.getTenantId()).orElse(null);
+        if (!com.doubledimple.ociserver.service.permissions.OciPermissions.isManaged(tenant)) return false;
+        com.doubledimple.ociserver.service.permissions.OciPermissions.require(tenant, "VOLUME_MANAGE");
+        // 存储卷授权不捎带对象存储写权限，不把实例配置（含 SSH 凭证）上传到存储桶。
+        if (hasBootVolumeBackup(tenant, user.getArchitecture()) == null) {
+            String backupId = createBootVolumeBackup(tenant, volumeId, user.getArchitecture());
+            if (backupId == null) throw new IllegalStateException("启动卷备份未完成");
+        }
+        return true;
     }
 }

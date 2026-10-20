@@ -107,6 +107,7 @@ function post(path: string, body: object, signal?: AbortSignal, allowEmpty = fal
 
 export const registerAccount = (username: string, password: string, signal?: AbortSignal) => post('/api/register-first-user', { username, password }, signal, true)
 export const sendLoginCode = (username: string, signal?: AbortSignal) => post('/api/send-verification-code', { username }, signal, true)
+/* 忘记密码 API 已停用，与后台路由同步保留为注释。
 async function resetRequest(path: string, body: object, signal?: AbortSignal) {
   const result = await post(path, body, signal)
   if (result.success !== true) throw new AuthError('invalidResponse')
@@ -119,6 +120,8 @@ export async function verifyResetCode(username: string, verificationCode: string
   return body.data.resetToken
 }
 export const resetPassword = (username: string, resetToken: string, signal?: AbortSignal) => resetRequest('/api/reset-password', { username, resetToken }, signal)
+
+*/
 
 export async function oauthLoginUrl(provider: 'github' | 'google', remember: boolean, signal?: AbortSignal): Promise<string> {
   const { response, text } = await requestText(`/api/${provider}/login/url${remember ? '?remember-me=on' : ''}`, { signal, headers: { Accept: 'text/plain' } })

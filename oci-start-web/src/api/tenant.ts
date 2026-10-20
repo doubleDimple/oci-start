@@ -9,6 +9,10 @@ export interface TenantRow extends Record<string, any> {
   cloudType?: number
   active?: boolean
   isActive?: boolean
+  permissionMode?: string
+  permissionsJson?: string
+  managedUserName?: string
+  accountScopeJson?: string
 }
 
 export function tenantCsrfToken(): string {

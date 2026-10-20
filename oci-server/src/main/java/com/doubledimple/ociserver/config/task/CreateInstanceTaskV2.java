@@ -12,6 +12,8 @@ import com.doubledimple.ociserver.pojo.domain.dto.User;
 import com.doubledimple.ociserver.pojo.enums.MessageEnum;
 import com.doubledimple.ociserver.service.message.factory.MessageFactory;
 import com.doubledimple.ociserver.service.oracle.OracleCloudService;
+import com.doubledimple.ociserver.service.permissions.OciPermissionDeniedException;
+import com.doubledimple.ociserver.service.permissions.OciPermissions;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.context.ApplicationEventPublisher;
@@ -201,7 +203,8 @@ public class CreateInstanceTaskV2 {
 
         for (BootInstance task : tasks) {
             Tenant tenant = tenantMap.get(task.getTenantId());
-            if (tenant == null) {
+            if (!OciPermissions.allows(tenant, "INSTANCE_CREATE")) {
+                pauseUnauthorizedTask(task);
                 continue;
             }
 
@@ -245,6 +248,11 @@ public class CreateInstanceTaskV2 {
             }
             if (latestTask.getStatus() != 1) {
                 removeTaskKey(latestTask);
+                return;
+            }
+            Tenant latestTenant = tenantRepository.findById(latestTask.getTenantId()).orElse(null);
+            if (!OciPermissions.allows(latestTenant, "INSTANCE_CREATE")) {
+                pauseUnauthorizedTask(latestTask);
                 return;
             }
             if (latestTask.getNextExecutionTime() != null &&
@@ -301,6 +309,10 @@ public class CreateInstanceTaskV2 {
                 log.debug("调用云服务API - TaskId: {}", taskId);
                 return oracleCloudService.createInstanceData(user);
             } catch (Exception e) {
+                if (hasPermissionFailure(e)) {
+                    pauseUnauthorizedTask(task);
+                    return null;
+                }
                 if (isNetworkTemporaryError(e)) {
                     ociLogBuilder.buildOpenNoThrow("[TaskId={}] 网络连接暂时不可达(DNS/UnknownHost)，跳过本次失败计次: {}", taskId, e.getMessage());
                     return null;
@@ -361,7 +373,9 @@ public class CreateInstanceTaskV2 {
         }
 
         try {
-            if (real instanceof TimeoutException) {
+            if (hasPermissionFailure(real)) {
+                pauseUnauthorizedTask(task);
+            } else if (real instanceof TimeoutException) {
                 ociLogBuilder.buildOpenNoThrow("抢机API超时({}秒) - TaskId: {}", API_TIMEOUT_SECONDS, taskId);
                 // todo 暂时不告警了
                 // messageFactory.getType(MessageEnum.TELEGRAM).sendMessageTemplate(
@@ -384,6 +398,37 @@ public class CreateInstanceTaskV2 {
         String msg = e.getMessage();
         return e instanceof java.net.UnknownHostException ||
                 (msg != null && (msg.contains("UnknownHostException") || msg.contains("ConnectException")));
+    }
+
+    private boolean hasPermissionFailure(Throwable error) {
+        Throwable current = error;
+        while (current != null) {
+            if (current instanceof OciPermissionDeniedException) {
+                return true;
+            }
+            if (current.getCause() == current) {
+                break;
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    /** Revocation pauses the task instead of generating one failed retry per interval. */
+    private void pauseUnauthorizedTask(BootInstance task) {
+        try {
+            BootInstance latest = instanceRepository.findById(task.getId()).orElse(null);
+            if (latest != null && latest.getStatus() == 1) {
+                latest.setStatus(0);
+                instanceRepository.save(latest);
+                ociLogBuilder.buildOpenNoThrow(
+                        "抢机任务已暂停，租户未授权创建实例 - TaskId: {}", latest.getBootId());
+            }
+        } catch (Exception e) {
+            log.warn("暂停未授权抢机任务失败 - TaskId: {}", task.getBootId(), e);
+        } finally {
+            removeTaskKey(task);
+        }
     }
 
     // ==================== 失败/完成处理 ====================
@@ -437,6 +482,8 @@ public class CreateInstanceTaskV2 {
     // ==================== 外部接口（与 V2 兼容） ====================
 
     public void addTask(BootInstance bootInstance) {
+        Tenant tenant = tenantRepository.findById(bootInstance.getTenantId()).orElse(null);
+        OciPermissions.require(tenant, "INSTANCE_CREATE");
         try {
             long nextTime = System.currentTimeMillis() + bootInstance.getLoopTime() * 1000L;
             bootInstance.setNextExecutionTime(new Timestamp(nextTime));
@@ -461,6 +508,8 @@ public class CreateInstanceTaskV2 {
                 log.warn("任务未找到: {}", taskId);
                 return false;
             }
+            Tenant tenant = tenantRepository.findById(task.getTenantId()).orElse(null);
+            OciPermissions.require(tenant, "INSTANCE_CREATE");
             task.setLoopTime(newInterval);
             long newExecuteAt = System.currentTimeMillis() + newInterval * 1000L;
             task.setNextExecutionTime(new Timestamp(newExecuteAt));

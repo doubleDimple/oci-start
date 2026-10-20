@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { allowsInstanceAction } from '@/utils/tenantPermissions'
 import PageErrorNotice from '@/components/PageErrorNotice.vue'
 import MobileRecordList from '@/components/MobileRecordList.vue'
 import MobileRecordCard from '@/components/MobileRecordCard.vue'
@@ -88,7 +89,7 @@ function stateTone(row: InstanceRow) {
     : ['TERMINATING', 'TERMINATED'].includes(code) ? 'terminated' : 'neutral'
 }
 function rowActions(row: InstanceRow): MenuItem[] {
-  return [
+  const items: MenuItem[] = [
     { id: 'inspect', label: t('instances.details'), icon: 'information-outline' },
     { id: 'config', label: t('instances.config'), icon: 'chip' },
     { id: 'ip', label: t('instances.changeIp'), icon: 'ip-network-outline' },
@@ -97,6 +98,7 @@ function rowActions(row: InstanceRow): MenuItem[] {
     { id: 'volume', label: t('instances.resize'), icon: 'harddisk', disabled: !hasVolume(row) },
     { id: 'terminate', label: t('instances.terminate'), icon: 'power', danger: true },
   ]
+  return items.filter(item => allowsInstanceAction(row.permissionContext, item.id))
 }
 function rememberFocus() { restoreFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null }
 function inspect(row: InstanceRow, volume = false) {
@@ -105,6 +107,7 @@ function inspect(row: InstanceRow, volume = false) {
   inspectVolume.value = volume
 }
 function runAction(item: MenuItem, row: InstanceRow) {
+  if (!allowsInstanceAction(row.permissionContext, item.id)) return
   if (loading.value || operationOpen.value || item.disabled) return
   if (item.id === 'inspect') { inspect(row); return }
   rememberFocus()
@@ -175,7 +178,7 @@ onBeforeRouteUpdate(() => !operationOpen.value)
           </dl>
           <template #footer>
             <button type="button" class="mobile-record-button" :disabled="loading || operationOpen" @click="inspect(row, tab === 'volumes')">{{ t('tenantInstances.details') }}</button>
-            <button v-if="tab === 'volumes'" type="button" class="mobile-record-button" :disabled="loading || operationOpen" @click="resizeVolume(row)">{{ t('tenantInstances.expand') }}</button>
+            <button v-if="tab === 'volumes' && allowsInstanceAction(row.permissionContext, 'volume')" type="button" class="mobile-record-button" :disabled="loading || operationOpen" @click="resizeVolume(row)">{{ t('tenantInstances.expand') }}</button>
           </template>
         </MobileRecordCard>
         <p v-if="!(tab === 'instances' ? rows : volumeRows).length" class="tenant-instances-mobile-empty" role="status">{{ emptyText }}</p>

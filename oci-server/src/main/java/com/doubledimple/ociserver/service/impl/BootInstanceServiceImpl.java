@@ -25,6 +25,7 @@ import com.doubledimple.ociserver.pojo.request.UpdateBootInstanceRequest;
 import com.doubledimple.ocicommon.param.ApiResponse;
 import com.doubledimple.ociserver.pojo.response.BootInstanceRes;
 import com.doubledimple.ociserver.service.BootInstanceService;
+import com.doubledimple.ociserver.service.permissions.OciPermissions;
 import com.doubledimple.ociserver.utils.oracle.OciComputerUtils;
 import com.doubledimple.ociserver.utils.oracle.OciImageUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -103,6 +104,7 @@ public class BootInstanceServiceImpl implements BootInstanceService {
             return;
         }
         Tenant tenant = byId.get();
+        OciPermissions.require(tenant, "INSTANCE_CREATE");
         //查询是否存在computerDto,不存在,再重新构建
         User user = bootPojo(tenant, bootInstance);
         Optional<OciComputerInfo> byBootId = ociComputerInfoRepository.findFirstByTenantIdAndArchitectureAndCloudTypeAndRegionOrderByIdDesc(bootInstance.getTenantId(), bootInstance.getArchitecture(), bootInstance.getCloudType(),user.getRegion());
@@ -165,11 +167,14 @@ public class BootInstanceServiceImpl implements BootInstanceService {
     @Transactional
     @Override
     public void startInstance(BootInstance bootInstance) {
-        User user = bootPojo(
-                tenantRepository.findById(bootInstance.getTenantId()).get(),
-                bootInstance);
+        BootInstance stored = bootInstanceRepository.findById(bootInstance.getId())
+                .orElseThrow(() -> new IllegalArgumentException("抢机任务不存在"));
+        Tenant tenant = tenantRepository.findById(stored.getTenantId())
+                .orElseThrow(() -> new IllegalArgumentException("租户不存在"));
+        OciPermissions.require(tenant, "INSTANCE_CREATE");
+        User user = bootPojo(tenant, stored);
 
-        bootInstanceRepository.updateBootInstanceStatusById(bootInstance.getId(),1);
+        bootInstanceRepository.updateBootInstanceStatusById(stored.getId(),1);
         bootInstanceRepository.flush();
 
         //推送信息
@@ -294,6 +299,9 @@ public class BootInstanceServiceImpl implements BootInstanceService {
         // 2. 查询实例
         BootInstance instance = bootInstanceRepository.findById(Long.valueOf(request.getId()))
                 .orElseThrow(() -> new RuntimeException("实例不存在"));
+        Tenant tenant = tenantRepository.findById(instance.getTenantId())
+                .orElseThrow(() -> new IllegalArgumentException("租户不存在"));
+        OciPermissions.require(tenant, "INSTANCE_CREATE");
 
         // 3. 计算下次执行时间
         Timestamp currentTime = new Timestamp(System.currentTimeMillis());

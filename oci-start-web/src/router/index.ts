@@ -4,6 +4,8 @@ import { doneProgress, startProgress } from '@/utils/progress'
 import { createRoutePreloader } from './preload'
 import { mobileAliases } from './mobile'
 import { beginRouteNavigation, endRouteNavigation, isSameNavigation, navigationPending } from '@/utils/navigation'
+import { hasTenantPermission, loadTenantPermissionContext, loadInstancePermissionContext, type TenantPermission } from '@/utils/tenantPermissions'
+import { sessionExpired } from '@/utils/session'
 
 const layout = () => import('@/layouts/DefaultLayout.vue')
 
@@ -51,6 +53,7 @@ const children: RouteRecordRaw[] = [
   { path: 'system/logs', meta: { title: '系统日志', id: 'api-logs' }, component: () => import('@/views/logs/SysLogView.vue') },
   { path: 'system/auditLogs', meta: { title: '审计日志', id: 'system-auditLogs' }, component: () => import('@/views/logs/AuditLogsView.vue') },
   { path: 'system/settings', meta: { title: '安全管理', id: 'api-settings' }, component: () => import('@/views/settings/SecuritySettingsView.vue') },
+  { path: 'system/ip-bans', meta: { title: '封禁管理', titleKey: 'ipBans.title', id: 'system-ip-bans' }, component: () => import('@/views/settings/IpBansView.vue') },
   { path: 'vpnProxy/page', meta: { title: '代理配置', id: 'vpnProxy-management' }, component: () => import('@/views/vpn/VpnProxyView.vue') },
   { path: 'system/notifySettings', meta: { title: '通知管理', id: 'api-notifySettings' }, component: () => import('@/views/settings/NotifySettingsView.vue') },
   { path: 'system/memPage', meta: { title: '笔记管理', id: 'api-memPage' }, component: () => import('@/views/tools/MemoView.vue') },
@@ -105,8 +108,10 @@ const router = createRouter({
 export const routePreloader = createRoutePreloader(router)
 watch(navigationPending, value => routePreloader.navigationPending(value), { immediate: true, flush: 'sync' })
 let progressOwner: RouteLocationNormalized | null = null
+let permissionGuardController: AbortController | undefined
 
 router.beforeEach(to => {
+  permissionGuardController?.abort()
   if (to.matched.some(record => record.path === '/oci/sysHelp') && window.matchMedia('(max-width: 760px)').matches) {
     return { path: '/m/instances', replace: true }
   }
@@ -116,6 +121,49 @@ router.beforeEach(to => {
   progressOwner = to
   startProgress()
   return true
+})
+// Resolve local authorization before a deep-linked page starts its cloud requests.
+const tenantRoutePermissions: Record<string, TenantPermission> = {
+  '/tenants/auditPage': 'AUDIT_READ',
+  '/tenants/regionSubList': 'REGION_SUBSCRIBE',
+  '/tenants/bootPage': 'INSTANCE_CREATE',
+  '/tenants/bootList': 'INSTANCE_CREATE',
+  '/boot/fullBootList': 'INSTANCE_CREATE',
+  '/cost/costPage': 'COST_READ',
+  '/monitor/homePage': 'TRAFFIC_READ',
+}
+const instanceRoutePermissions: Record<string, TenantPermission> = {
+  '/oci/terminal': 'INSTANCE_REINSTALL',
+  '/ssh/terminal': 'INSTANCE_REINSTALL',
+  '/oci/sysHelp': 'INSTANCE_REINSTALL',
+  '/oci/console/terminal/:instanceId?': 'INSTANCE_REINSTALL',
+  '/oci/vnic/manage': 'NETWORK_MANAGE',
+}
+router.beforeResolve(async to => {
+  const path = String(to.meta.canonicalPath || to.path)
+  const tenantPermission = tenantRoutePermissions[path]
+  const instancePermission = instanceRoutePermissions[path]
+  const permission = tenantPermission || instancePermission
+  const id = tenantPermission ? to.query.tenantId : to.params.instanceId || to.query.instanceId
+  if (!permission || typeof id !== 'string' || !id) return true
+  const active = new AbortController()
+  permissionGuardController = active
+  try {
+    const tenant = tenantPermission
+      ? await loadTenantPermissionContext(id, active.signal)
+      : await loadInstancePermissionContext(id, active.signal)
+    if (active.signal.aborted || sessionExpired.value) return false
+    if (tenant.nonOci === true) {
+      return ['/oci/terminal', '/ssh/terminal'].includes(path)
+        ? true : { path: '/forbidden', query: { reason: 'tenantPermission' }, replace: true }
+    }
+    if (hasTenantPermission(tenant, permission)) return true
+  } catch {
+    if (active.signal.aborted || sessionExpired.value) return false
+    // Unknown permissions must not mount a page which automatically reads cloud resources.
+    return { path: '/forbidden', query: { reason: 'permissionsUnavailable' }, replace: true }
+  }
+  return { path: '/forbidden', query: { reason: 'tenantPermission' }, replace: true }
 })
 function finishRouteProgress(to: RouteLocationNormalized) {
   if (!progressOwner || !isSameNavigation(progressOwner, to)) return

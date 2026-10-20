@@ -1,7 +1,7 @@
 export default {
   zh: {
-    titles: { proxy: '为连接，多一份从容。', traffic: '让每一份流量，都心中有数。', import: '把你的租户，带到这里。', export: '一份备份，一份安心。', batchCheck: '所有账号，一目了然。', transfer: '记录这一次转让。' },
-    labels: { proxy: '快速配置代理', traffic: '流量预警', import: '导入租户数据', export: '安全导出', batchCheck: '批量检测账号', transfer: '租户转让' },
+    titles: { proxy: '为连接，多一份从容。', traffic: '让每一份流量，都心中有数。', import: '恢复租户备份', export: '一份备份，一份安心。', batchCheck: '所有账号，一目了然。', transfer: '记录这一次转让。' },
+    labels: { proxy: '快速配置代理', traffic: '流量预警', import: '恢复 JSON 备份', export: '安全导出', batchCheck: '批量检测账号', transfer: '租户转让' },
     actions: { reload: '重新加载', createAndBind: '新建并绑定', saveBinding: '保存绑定', import: '确认导入', verifyDownload: '验证并下载', sendCode: '发送验证码', confirmTransfer: '确认转让', save: '保存设置', confirm: '确认', cancel: '取消', close: '关闭', resend: '重新发送', startCheck: '开始检测' },
     proxy: {
       mode: '代理配置方式', selectExisting: '选择已有代理', globalPool: '使用全局代理池', globalPoolHint: '解除专属代理绑定，恢复全局共享',
@@ -11,9 +11,9 @@ export default {
     },
     traffic: {
       statistics: '流量统计与预警', statisticsHint: '按月统计租户流量，达到阈值时提醒你。', enableStatistics: '启用流量统计与预警', threshold: '每月预警阈值（GB）', thresholdPlaceholder: '输入大于 0 的数值', thresholdHint: '保存配置时必须填写有效阈值。',
-      autoShutdown: '达到阈值后自动关机', autoShutdownHint: '启用后，达到阈值将关闭租户实例。', confirmTitle: '启用自动关机', confirmMessage: '月流量达到 {threshold} GB 后，将自动关闭该租户的实例。确认保存？',
+      autoShutdown: '达到阈值后自动关机', autoShutdownHint: '启用后，达到阈值将关闭租户实例。', powerRequired: '需先授权实例开关机，才能启用自动关机。', confirmTitle: '启用自动关机', confirmMessage: '月流量达到 {threshold} GB 后，将自动关闭该租户的实例。确认保存？',
     },
-    import: { fileLabel: '选择租户数据 JSON 文件', reading: '正在读取文件…', selectFile: '选择或拖入 JSON 文件', ready: '{count} 条租户记录，已准备好导入', fileHint: '使用从 oci-start 导出的租户数据文件', replaceFile: '重新选择文件', browse: '浏览文件', hint: '导入会恢复文件中的租户与区域数据，已有的租户记录会跳过。', success: '租户数据已导入' },
+    import: { fileLabel: '选择租户数据 JSON 文件', reading: '正在读取文件…', selectFile: '选择或拖入 JSON 文件', ready: '{count} 条租户记录，已准备好导入', fileHint: '使用从 oci-start 导出的租户数据文件', replaceFile: '重新选择文件', browse: '浏览文件', hint: '此入口仅用于恢复 oci-start 的 JSON 备份，不创建或修改 OCI 云端权限。已有记录会跳过。新增凭证请使用“API 导入”，需要限制权限时选择“创建受限 API”；恢复文件中的权限信息不代表已校验云端策略。', success: '租户数据已导入' },
     export: { singleScope: '导出当前租户及其区域数据', allScope: '导出全部 OCI 租户数据', scopeHint: '通过通知终端验证码验证后，下载 JSON 备份。', codeLabel: '通知终端验证码', codePlaceholder: '输入 6 位验证码', codeHint: '验证码已发送，请在有效期内完成导出。', hint: '点击下方按钮，将验证码发送到你已配置的通知终端。', codeSent: '验证码已发送至你的通知终端', success: '导出文件已准备好' },
     check: {
       idle: '逐个检查 OCI 账号，实时查看检测结果。', connecting: '正在连接检测服务…', checking: '正在检测账号…', progress: '已检测 {processed} 个账号', progressWithTotal: '已检测 {processed} / {total} 个账号', complete: '检测完成，共 {total} 个账号', interrupted: '检测中断',
@@ -24,8 +24,8 @@ export default {
     errors: { default: '操作未完成，请稍后重试', loadConfiguration: '未能读取配置，请重试后保存', missingTenant: '未找到租户，请关闭后重新打开', invalidImport: '请选择导出的租户 JSON 文件，内容应为非空数据数组', invalidJson: '文件不是有效的 JSON，请检查后重新选择', readFile: '文件读取失败', sendCode: '验证码发送失败', proxyHost: '请填写代理地址', proxyPort: '代理端口应为 1–65535 之间的整数', threshold: '请设置大于 0 的流量预警阈值', exportFormat: '导出响应格式有误，请重新获取验证码后重试', checkFormat: '检测结果格式有误', checkResult: '无法读取检测结果', stream: '检测连接已中断，已保留收到的日志' },
   },
   en: {
-    titles: { proxy: 'Connect with confidence.', traffic: 'Keep track of your traffic.', import: 'Bring your tenants here.', export: 'Keep a backup handy.', batchCheck: 'All accounts at a glance.', transfer: 'Record this transfer.' },
-    labels: { proxy: 'Configure proxy', traffic: 'Traffic alerts', import: 'Import tenant data', export: 'Secure export', batchCheck: 'Check accounts', transfer: 'Transfer tenant' },
+    titles: { proxy: 'Connect with confidence.', traffic: 'Keep track of your traffic.', import: 'Restore a tenant backup', export: 'Keep a backup handy.', batchCheck: 'All accounts at a glance.', transfer: 'Record this transfer.' },
+    labels: { proxy: 'Configure proxy', traffic: 'Traffic alerts', import: 'Restore JSON backup', export: 'Secure export', batchCheck: 'Check accounts', transfer: 'Transfer tenant' },
     actions: { reload: 'Reload', createAndBind: 'Create and bind', saveBinding: 'Save binding', import: 'Import data', verifyDownload: 'Verify and download', sendCode: 'Send code', confirmTransfer: 'Confirm transfer', save: 'Save settings', confirm: 'Confirm', cancel: 'Cancel', close: 'Close', resend: 'Resend', startCheck: 'Start check' },
     proxy: {
       mode: 'Proxy configuration mode', selectExisting: 'Use existing proxy', globalPool: 'Use the global proxy pool', globalPoolHint: 'Remove the dedicated binding and use the shared pool',
@@ -35,9 +35,9 @@ export default {
     },
     traffic: {
       statistics: 'Traffic monitoring and alerts', statisticsHint: 'Track monthly traffic and get notified at the threshold.', enableStatistics: 'Enable traffic monitoring and alerts', threshold: 'Monthly alert threshold (GB)', thresholdPlaceholder: 'Enter a value above 0', thresholdHint: 'A valid threshold is required to save these settings.',
-      autoShutdown: 'Shut down at the threshold', autoShutdownHint: 'Turn off this tenant’s instances when traffic reaches the threshold.', confirmTitle: 'Enable automatic shutdown', confirmMessage: 'This tenant’s instances will shut down when monthly traffic reaches {threshold} GB. Save these settings?',
+      autoShutdown: 'Shut down at the threshold', autoShutdownHint: 'Turn off this tenant’s instances when traffic reaches the threshold.', powerRequired: 'Authorize instance power actions to enable automatic shutdown.', confirmTitle: 'Enable automatic shutdown', confirmMessage: 'This tenant’s instances will shut down when monthly traffic reaches {threshold} GB. Save these settings?',
     },
-    import: { fileLabel: 'Choose a tenant data JSON file', reading: 'Reading file…', selectFile: 'Choose or drop a JSON file', ready: '{count} tenant records ready to import', fileHint: 'Use a tenant data file exported from oci-start', replaceFile: 'Choose another file', browse: 'Browse files', hint: 'Import restores the tenant and region data in the file. Existing tenant records are skipped.', success: 'Tenant data imported' },
+    import: { fileLabel: 'Choose a tenant data JSON file', reading: 'Reading file…', selectFile: 'Choose or drop a JSON file', ready: '{count} tenant records ready to import', fileHint: 'Use a tenant data file exported from oci-start', replaceFile: 'Choose another file', browse: 'Browse files', hint: 'This restores an oci-start JSON backup only; it does not create or change OCI policies. Existing records are skipped. Use API import for new credentials and choose Create restricted API when limits are needed. Restored permission metadata does not mean cloud policies have been verified.', success: 'Tenant data imported' },
     export: { singleScope: 'Export this tenant and its regions', allScope: 'Export all OCI tenant data', scopeHint: 'Verify with a code from your notification channel to download a JSON backup.', codeLabel: 'Verification code', codePlaceholder: 'Enter the 6-digit code', codeHint: 'Code sent. Complete the export before it expires.', hint: 'Send a verification code to your configured notification channel to continue.', codeSent: 'Code sent to your notification channel', success: 'Your export is ready' },
     check: {
       idle: 'Check OCI accounts one by one and follow the results live.', connecting: 'Connecting to the check service…', checking: 'Checking accounts…', progress: '{processed} accounts checked', progressWithTotal: '{processed} / {total} accounts checked', complete: 'Check complete: {total} accounts', interrupted: 'Check interrupted',

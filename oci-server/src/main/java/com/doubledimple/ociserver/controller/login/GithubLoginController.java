@@ -7,6 +7,8 @@ import com.doubledimple.ociserver.pojo.request.GithubConfig;
 import com.doubledimple.ociserver.pojo.request.GithubUser;
 import com.doubledimple.ociserver.service.impl.system.SystemConfigService;
 import com.doubledimple.ociserver.service.login.LoginUserService;
+import com.doubledimple.ociserver.service.login.LoginFailureGuard;
+import com.doubledimple.ociserver.config.exception.IpBannedException;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import cn.dev33.satoken.stp.StpUtil;
@@ -46,6 +48,9 @@ public class GithubLoginController extends BaseController {
 
     @Resource
     private LoginUserService loginUserService;
+
+    @Resource
+    private LoginFailureGuard loginFailureGuard;
     private static final Map<String, StateInfo> STATE_CACHE = new ConcurrentHashMap<>();
 
     private static class StateInfo {
@@ -105,6 +110,7 @@ public class GithubLoginController extends BaseController {
                                HttpServletRequest request,
                                HttpServletResponse response) throws IOException {
         try {
+            String clientIp = loginFailureGuard.assertAllowed(request);
             log.info("Receiving GitHub callback. Code len: {}, State: {}", code.length(), state);
             StateInfo stateInfo = STATE_CACHE.remove(state);
             if (stateInfo == null) {
@@ -132,11 +138,19 @@ public class GithubLoginController extends BaseController {
             );
 
             StpUtil.login(localUser.getUsername(), stateInfo.rememberMe);
+            try {
+                loginFailureGuard.loginSucceeded(clientIp);
+            } catch (RuntimeException e) {
+                StpUtil.logout();
+                throw e;
+            }
             log.info("GitHub login success, user={}, rememberMe={}", localUser.getUsername(), stateInfo.rememberMe);
 
             String redirectUrl = isMobileRequest(request) ? "/m/tenants" : "/index";
             response.sendRedirect(redirectUrl);
 
+        } catch (IpBannedException e) {
+            throw e;
         } catch (Exception e) {
             log.error("GitHub Login fail", e);
             String loginUrl = isMobileRequest(request) ? "/m/login" : "/login";

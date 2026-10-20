@@ -47,11 +47,11 @@ public class LoginUserService {
      */
     public LoginUser validateCredentials(String username, String password) {
         LoginUser user = loginUserRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("用户名或密码错误"));
+                .orElseThrow(() -> new CredentialValidationException(true));
 
         if (!passwordEncoder.matches(password, user.getPassword())) {
             log.warn("用户 [{}] 密码验证失败", username);
-            throw new RuntimeException("用户名或密码错误");
+            throw new CredentialValidationException(false);
         }
 
         return user;
@@ -161,6 +161,20 @@ public class LoginUserService {
             loginUserRepository.save(user);
         }
         return changed;
+    }
+
+    /** The failure kind is internal; the response never reveals whether an account exists. */
+    public static final class CredentialValidationException extends RuntimeException {
+        private final boolean unknownUsername;
+
+        private CredentialValidationException(boolean unknownUsername) {
+            super("用户名或密码错误");
+            this.unknownUsername = unknownUsername;
+        }
+
+        public boolean isUnknownUsername() {
+            return unknownUsername;
+        }
     }
 
     /** Only these explicit checks run before any account entity mutation. */

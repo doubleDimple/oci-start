@@ -695,7 +695,7 @@ public class OciNetBootServiceImpl implements OciNetBootService {
 
         //todo 时间太长了,注释掉 Alpine 就绪后继续 DD 成 Debian 12
         /*if (!executeDd(consoleBuf, out)) {
-            log.error("[重装-3] DD 重装 Debian 失败（当前可能仍是 Alpine，密码 {}）", ROOT_PASSWORD);
+            log.error("[重装-3] DD 重装 Debian 失败（当前可能仍是 Alpine）");
             try {
                 telegramMessageService.sendMessageTemplate(String.format(
                         "————系统重装通知————\n实例【%s】\nDD Debian 失败\n当前可能仍为 Alpine\nRoot密码：%s",
@@ -706,7 +706,6 @@ public class OciNetBootServiceImpl implements OciNetBootService {
 
         log.info("================================================");
         log.info("系统重装完成！实例: {}", instanceDetails.getInstanceId());
-        log.info("Root 密码: {}", ROOT_PASSWORD);
         log.info("================================================");
 
         try {
@@ -1422,7 +1421,10 @@ public class OciNetBootServiceImpl implements OciNetBootService {
         log.info("[EFI] > {}", cmd); out.write((cmd + "\r\n").getBytes()); out.flush();
     }
     private void sendLine(OutputStream out, String line) throws Exception {
-        log.info("[Shell] > {}", line.isEmpty() ? "(回车)" : line); out.write((line + "\n").getBytes()); out.flush();
+        // Shell input may contain login passwords or commands with embedded credentials.
+        log.debug("[Shell] 发送输入");
+        out.write((line + "\n").getBytes());
+        out.flush();
     }
     private boolean waitSignal(StringBuffer cb, String[] sigs, long t) throws Exception {
         long s = System.currentTimeMillis();
@@ -1452,7 +1454,7 @@ public class OciNetBootServiceImpl implements OciNetBootService {
 
     private void startOutputReaderThread(InputStream in, StringBuffer buffer, AtomicBoolean keepReading) {
         new Thread(() -> {
-            try { byte[] buf = new byte[4096]; while (keepReading.get()) { int a = in.available(); if (a > 0) { int l = in.read(buf, 0, Math.min(buf.length, a)); if (l > 0) { String ch = new String(buf, 0, l); synchronized (buffer) { buffer.append(ch); if (buffer.length() > 100_000) buffer.delete(0, 50_000); } log.debug("[串口原始] {}", ch.replace("\n", "\\n").replace("\r", "\\r")); } } else { Thread.sleep(50); } } }
+            try { byte[] buf = new byte[4096]; while (keepReading.get()) { int a = in.available(); if (a > 0) { int l = in.read(buf, 0, Math.min(buf.length, a)); if (l > 0) { String ch = new String(buf, 0, l); synchronized (buffer) { buffer.append(ch); if (buffer.length() > 100_000) buffer.delete(0, 50_000); } } } else { Thread.sleep(50); } } }
             catch (Exception e) { if (keepReading.get()) log.error("串口中断", e); }
         }, "console-reader").start();
     }

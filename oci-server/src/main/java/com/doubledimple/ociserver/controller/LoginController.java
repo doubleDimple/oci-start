@@ -8,6 +8,9 @@ import com.doubledimple.ociserver.pojo.request.TurnstileConfig;
 import com.doubledimple.ociserver.service.VerifyService;
 import com.doubledimple.ociserver.service.impl.system.SystemConfigService;
 import com.doubledimple.ociserver.service.login.LoginUserService;
+import com.doubledimple.ociserver.service.login.LoginFailureGuard;
+import com.doubledimple.ociserver.config.annotations.CheckIpBan;
+import com.doubledimple.ociserver.config.exception.IpBannedException;
 import com.doubledimple.ociserver.service.mfa.OTPService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -43,10 +46,14 @@ import static com.doubledimple.ociserver.utils.DesktopUtils.isMobileRequest;
 @CrossOrigin
 @Slf4j
 @AuditLog(title = "登录认证")
+@CheckIpBan
 public class LoginController {
 
     @Resource
     private LoginUserService loginUserService;
+
+    @Resource
+    private LoginFailureGuard loginFailureGuard;
 
     @Resource
     private SystemConfigService systemConfigService;
@@ -111,13 +118,20 @@ public class LoginController {
         boolean mobile = isMobileRequest(request);
 
         try {
+            String clientIp = loginFailureGuard.assertAllowed(request);
             if (!StringUtils.hasText(username) || !StringUtils.hasText(password)) {
                 redirectError(response, request, isAjax, mobile, "用户名或密码不能为空");
                 return;
             }
 
             // 验证用户名密码
-            com.doubledimple.dao.entity.LoginUser user = loginUserService.validateCredentials(username, password);
+            com.doubledimple.dao.entity.LoginUser user;
+            try {
+                user = loginUserService.validateCredentials(username, password);
+            } catch (LoginUserService.CredentialValidationException e) {
+                loginFailureGuard.failed(clientIp, username, e.isUnknownUsername());
+                throw e;
+            }
 
             // 验证额外因子（MFA / 消息验证码）
             String factorError = validateAdditionalFactors(request, username);
@@ -128,6 +142,13 @@ public class LoginController {
 
             // 登录成功，写入 Sa-Token session
             StpUtil.login(user.getUsername(), rememberMe);
+            try {
+                // Only a complete login clears failures; a concurrent ban still wins.
+                loginFailureGuard.loginSucceeded(clientIp);
+            } catch (RuntimeException e) {
+                StpUtil.logout();
+                throw e;
+            }
             log.info("用户 [{}] 登录成功，rememberMe={}", username, rememberMe);
 
             // 登录成功后清除 RSA 密钥，防止重复使用
@@ -144,8 +165,10 @@ public class LoginController {
             } else {
                 response.sendRedirect(targetUrl);
             }
+        } catch (IpBannedException e) {
+            throw e;
         } catch (Exception e) {
-            log.warn("用户 [{}] 登录失败：{}", username, e.getMessage());
+            log.warn("用户 [{}] 登录失败，异常类型：{}", username, e.getClass().getSimpleName());
             redirectError(response, request, isAjax, mobile, e.getMessage());
         }
     }
@@ -167,7 +190,7 @@ public class LoginController {
                 verifyService.checkCodeForLogin(username, verificationCode);
                 return null;
             } catch (Exception e) {
-                log.warn("消息验证码验证失败：{}", e.getMessage());
+                log.warn("消息验证码验证失败，异常类型：{}", e.getClass().getSimpleName());
             }
         }
 
@@ -177,7 +200,7 @@ public class LoginController {
                     return null;
                 }
             } catch (Exception e) {
-                log.warn("MFA验证码验证失败：{}", e.getMessage());
+                log.warn("MFA验证码验证失败，异常类型：{}", e.getClass().getSimpleName());
             }
         }
 

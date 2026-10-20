@@ -9,6 +9,7 @@ import com.doubledimple.dao.repository.CloudTenancyRepository;
 import com.doubledimple.dao.repository.CloudSshConnRepository;
 import com.doubledimple.dao.repository.OracleInstanceDetailRepository;
 import com.doubledimple.dao.repository.TenantRepository;
+import com.doubledimple.ociserver.service.permissions.OciPermissions;
 import com.doubledimple.ocicommon.enums.CloudTypeEnum;
 import com.doubledimple.ocicommon.enums.RegionEnum;
 import com.doubledimple.ocicommon.param.ScriptResult;
@@ -579,10 +580,11 @@ public class OracleInstanceServiceImpl implements OracleInstanceService {
         try(ComputeClient computeClient = ComputeClient.builder().build(provider)) {
 
             // 创建终止实例的请求
-            // preserveBootVolume设置为false表示同时删除引导卷
+            // 受限用户未勾选独立删盘时，本应用终止实例默认保留启动盘。
             TerminateInstanceRequest terminateInstanceRequest = TerminateInstanceRequest.builder()
                     .instanceId(instanceId)
-                    .preserveBootVolume(false)
+                    .preserveBootVolume(OciPermissions.isManaged(tenant)
+                            && !OciPermissions.allows(tenant, "BOOT_VOLUME_DELETE"))
                     .build();
 
             // 发送终止请求
@@ -730,6 +732,14 @@ public class OracleInstanceServiceImpl implements OracleInstanceService {
     */
     @Override
     public String createOciAdminUser(Long tenantId, String username, String email,String groupId) {
+        Tenant sourceTenant = tenantRepository.findById(tenantId).get();
+        if (OciPermissions.isManaged(sourceTenant)) {
+            OciPermissions.require(sourceTenant, "USER_CREATE");
+            if (groupId != null && !groupId.trim().isEmpty()) {
+                throw new IllegalArgumentException("专用 API 只允许创建普通用户，不能添加管理员组或其他用户组");
+            }
+            return createBaseOciUser(tenantId, username, email, "oci-start-create-user");
+        }
         String password = createBaseOciUser(tenantId, username, email, "oci-admin-user");
 
         // 添加到管理员组
@@ -819,6 +829,10 @@ public class OracleInstanceServiceImpl implements OracleInstanceService {
             CreateUserResponse response = identityClient.createUser(request);
             userId = response.getUser().getId();
 
+            if (OciPermissions.isManaged(tenant)) {
+                // 创建用户不捎带重置密码和用户组管理权限。
+                return "";
+            }
             // 设置初始密码
             CreateOrResetUIPasswordResponse orResetUIPassword = identityClient.createOrResetUIPassword(
                     CreateOrResetUIPasswordRequest
@@ -826,7 +840,7 @@ public class OracleInstanceServiceImpl implements OracleInstanceService {
                             .userId(userId)
                             .build());
             password = orResetUIPassword.getUIPassword().getPassword();
-            log.info("创建用户:{} 的初始密码是:{}", username, password);
+            log.info("用户:{} 创建成功，初始密码已设置", username);
 
             return password;
         } catch (Exception e) {
@@ -920,7 +934,20 @@ public class OracleInstanceServiceImpl implements OracleInstanceService {
     public void stopInstance(String instanceId, String tenancy) {
         List<Tenant> byTenancy = tenantRepository.findByTenancy(tenancy);
         if (byTenancy.size() > 0){
-            Tenant tenant = byTenancy.get(0);
+            InstanceDetails stored = oracleInstanceDetailRepository.findByInstanceId(instanceId);
+            Tenant tenant;
+            if (stored != null) {
+                tenant = tenantRepository.findById(stored.getTenantId()).orElse(null);
+                if (tenant == null || !tenancy.equals(tenant.getTenancy())) {
+                    throw new IllegalArgumentException("实例与租户不匹配");
+                }
+            } else {
+                if (byTenancy.stream().anyMatch(OciPermissions::isManaged)) {
+                    throw new IllegalArgumentException("无法确认实例所属专用用户，已停止操作");
+                }
+                tenant = byTenancy.get(0);
+            }
+            OciPermissions.require(tenant, "INSTANCE_POWER");
             SimpleAuthenticationDetailsProvider provider = OciUtils.getProvider(tenant);
             try(ComputeClient computeClient = ComputeClient.builder().build(provider)) {
                  InstanceDetails byInstanceId = oracleInstanceDetailRepository.findByInstanceId(instanceId);

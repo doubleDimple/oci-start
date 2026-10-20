@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { hasTenantPermission, type TenantPermission } from '@/utils/tenantPermissions'
 import PageErrorNotice from '@/components/PageErrorNotice.vue'
 import MobileRecordList from '@/components/MobileRecordList.vue'
 import MobileRecordCard from '@/components/MobileRecordCard.vue'
@@ -191,9 +192,14 @@ function rowActions(row: TenantRow): RegionAction[] {
     { id: 'instances', label: t('tenantRegions.actions.instances'), icon: 'i-mdi-server', path: '/oci/list' },
     { id: 'mysql', label: t('tenantRegions.actions.mysql'), icon: 'i-mdi-database-outline' },
   )
-  return items
+  const permissions: Record<string, TenantPermission> = {
+    sync: 'BASIC_READ', boot: 'INSTANCE_CREATE', tasks: 'INSTANCE_CREATE',
+    volumes: 'BASIC_READ', security: 'NETWORK_MANAGE', instances: 'BASIC_READ', mysql: 'MYSQL_READ',
+  }
+  return items.filter(item => !permissions[item.id] || hasTenantPermission(row, permissions[item.id]!))
 }
 function runAction(item: RegionAction, row: TenantRow) {
+  if (!rowActions(row).some(allowed => allowed.id === item.id)) return
   if (item.path) navigate(item.path, row)
   else if (item.id === 'sync') void startSync(row)
   else {

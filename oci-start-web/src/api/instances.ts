@@ -1,8 +1,11 @@
 import { isAxiosError } from 'axios'
 import { i18n } from '@/i18n'
 import { tenantGet } from './tenant'
+import { loadTenantPermissionContext } from '@/utils/tenantPermissions'
+import type { TenantRow } from './tenant'
 
 export interface InstanceRow {
+  permissionContext?: TenantRow
   /** Local record ID. Most /oci mutations call this field tenantId. */
   id: string
   tenantId: string
@@ -101,6 +104,12 @@ export async function getInstances(page: number, size: number, tenantId: string,
     || body.currentPage !== page || body.size !== size) throw new InstanceResponseError()
   const rows = body.content.map(row)
   if (new Set(rows.map(value => value.id)).size !== rows.length) throw new InstanceResponseError()
+  const contexts = new Map<string, TenantRow>()
+  // Refresh permissions with every list read, so reauthorization does not leave stale actions visible.
+  await Promise.all([...new Set(rows.map(value => value.tenantId))].map(async id => {
+    contexts.set(id, await loadTenantPermissionContext(id, signal))
+  }))
+  for (const value of rows) value.permissionContext = contexts.get(value.tenantId)
   return { rows, total: body.totalElements as number, totalPages: body.totalPages as number }
 }
 

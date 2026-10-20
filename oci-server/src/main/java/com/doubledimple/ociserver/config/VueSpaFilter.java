@@ -69,6 +69,7 @@ public class VueSpaFilter extends OncePerRequestFilter {
             "/system/ipSettings",
             "/system/logs",
             "/system/settings",
+            "/system/ip-bans",
             "/vpnProxy/page",
             "/system/notifySettings",
             "/system/memPage",

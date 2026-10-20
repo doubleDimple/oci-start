@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { applyDocumentLocale, LOCALE_STORAGE_KEY } from '@/i18n'
 import { setTheme, theme, type ThemePreference } from '@/composables/useTheme'
-import { AuthError, fetchAuthBootstrap, loginPayload, oauthLoginUrl, registerAccount, resetPassword, sendLoginCode, sendResetCode, signIn, verifyResetCode, type AuthBootstrap } from '@/api/auth'
+import { AuthError, fetchAuthBootstrap, loginPayload, oauthLoginUrl, registerAccount, sendLoginCode, signIn, type AuthBootstrap } from '@/api/auth'
+// 忘记密码已停用；恢复时须同步评审后台路由和登录白名单。
+// import { resetPassword, sendResetCode, verifyResetCode } from '@/api/auth'
 import JSEncrypt from './vendor/jsencrypt'
 import { authMessages } from './messages'
 import { authCopy } from './copy'
@@ -33,25 +35,26 @@ const sending = ref(false)
 const sendUntil = ref(0)
 const now = ref(Date.now())
 const countdown = computed(() => Math.max(0, Math.ceil((sendUntil.value - now.value) / 1000)))
+/* 忘记密码状态已停用。
 const resetOpen = ref(false)
 const resetDialog = ref<HTMLElement>()
 const reset = reactive({ username: '', code: '', token: '', step: 1, busy: false, sending: false, sendUntil: 0 })
 const resetNotice = ref<{ type: 'success' | 'error'; key?: string; detail?: string }>()
 const resetCountdown = computed(() => Math.max(0, Math.ceil((reset.sendUntil - now.value) / 1000)))
 const resetBodyController = ref<AbortController>()
+*/
 const lifetime = new AbortController()
 let bootstrapController: AbortController | undefined
 let disposeMap: (() => void) | undefined
 let clock: ReturnType<typeof setInterval> | undefined
-let returnFocus: HTMLElement | null = null
-let originalOverflow = ''
+// let returnFocus: HTMLElement | null = null
+// let originalOverflow = ''
 let disposed = false
 
 function errorText(error: unknown) { return error instanceof AuthError ? error.detail || copy.value[error.key] : copy.value.network }
-function showError(error: unknown, inReset = false) {
+function showError(error: unknown) {
   if (disposed) return
-  const target = inReset ? resetNotice : notice
-  target.value = { type: 'error', detail: errorText(error) }
+  notice.value = { type: 'error', detail: errorText(error) }
 }
 function noticeText(value: { key?: string; detail?: string }) { return value.detail || (value.key ? t(value.key) : '') }
 async function loadConfig(blocking = true) {
@@ -151,6 +154,7 @@ async function oauth(provider: 'github' | 'google') {
   } catch (error) { showError(error) }
   finally { if (!disposed) oauthBusy.value = '' }
 }
+/* 忘记密码交互及请求调用已停用，保留实现供后续评审。
 async function openReset() {
   returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
   originalOverflow = document.body.style.overflow
@@ -226,6 +230,7 @@ function resetKeydown(event: KeyboardEvent) {
   if (event.shiftKey && (document.activeElement === first || document.activeElement === resetDialog.value)) { event.preventDefault(); last?.focus() }
   else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
 }
+*/
 watch(language, () => { document.title = t('login.page.title') })
 onMounted(() => {
   let preference: ThemePreference = window.matchMedia('(max-width: 760px)').matches ? 'system' : 'dark'
@@ -246,16 +251,16 @@ onBeforeUnmount(() => {
   disposed = true
   lifetime.abort()
   bootstrapController?.abort()
-  resetBodyController.value?.abort()
+  // resetBodyController.value?.abort()
   disposeMap?.()
   if (clock) clearInterval(clock)
-  if (resetOpen.value) document.body.style.overflow = originalOverflow
+  // if (resetOpen.value) document.body.style.overflow = originalOverflow
 })
 </script>
 
 <template>
   <main ref="root" class="auth-page" :data-theme="theme">
-    <section class="stage" aria-labelledby="heroBrandName" :inert="resetOpen || undefined">
+    <section class="stage" aria-labelledby="heroBrandName">
       <div class="brand">
         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2.5c0 0 6.8 7.4 6.8 12.1A6.8 6.8 0 0 1 12 21.4a6.8 6.8 0 0 1-6.8-6.8C5.2 9.9 12 2.5 12 2.5z" stroke="var(--brand-hi)" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 17.6a3 3 0 0 1-3-3c0-1.6 3-5 3-5s3 3.4 3 5a3 3 0 0 1-3 3z" fill="var(--brand-hi)"/></svg>
         <span id="heroBrandName" class="nm">{{ config?.siteLogoName || 'OCI-START' }} <em>/ {{ copy.workspace }}</em></span>
@@ -270,7 +275,7 @@ onBeforeUnmount(() => {
       </details>
       <div class="foot">© 2026 doubleDimple · <a href="https://github.com/doubleDimple/oci-start" target="_blank" rel="noopener">GitHub</a> · <a href="https://github.com/doubleDimple/oci-start#readme" target="_blank" rel="noopener">{{ copy.docs }}</a></div>
     </section>
-    <section class="auth" :inert="resetOpen || undefined">
+    <section class="auth">
       <div class="topbar"><div class="lang"><button type="button" :class="{ active: language === 'zh' }" :aria-current="language === 'zh'" @click="changeLocale('zh')">中文</button><i aria-hidden="true">/</i><button type="button" :class="{ active: language === 'en' }" :aria-current="language === 'en'" @click="changeLocale('en')">EN</button></div><button id="themeToggle" class="icon-btn" type="button" :title="theme === 'dark' ? copy.light : copy.dark" :aria-label="theme === 'dark' ? copy.light : copy.dark" @click="toggleAppearance"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button></div>
       <div class="login-card">
         <div class="mobile-auth-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2.5c0 0 6.8 7.4 6.8 12.1A6.8 6.8 0 0 1 12 21.4a6.8 6.8 0 0 1-6.8-6.8C5.2 9.9 12 2.5 12 2.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M12 17.6a3 3 0 0 1-3-3c0-1.6 3-5 3-5s3 3.4 3 5a3 3 0 0 1-3 3z" fill="currentColor"/></svg></div>
@@ -322,7 +327,7 @@ onBeforeUnmount(() => {
                 </div>
               </div>
               <div v-if="config.messageEnabled && config.mfaEnabled" id="verificationChoice" class="field form-group"><label>{{ t('login.verify.method') }}</label><div class="tab-group"><button id="messageTab" type="button" class="tab" :class="{ active: form.method === 'message' }" :aria-pressed="form.method === 'message'" @click="changeMethod('message')"><i class="i-mdi-email-outline" aria-hidden="true"/>{{ t('login.verify.method.msg') }}</button><button id="mfaTab" type="button" class="tab" :class="{ active: form.method === 'mfa' }" :aria-pressed="form.method === 'mfa'" @click="changeMethod('mfa')"><i class="i-mdi-shield-check-outline" aria-hidden="true"/>{{ t('login.verify.method.mfa') }}</button></div></div>
-              <div class="aux form-meta"><label class="check remember-me"><input v-model="form.remember" type="checkbox" name="remember-me" value="true"/><span>{{ t('login.remember.me') }}</span></label><a href="#" class="link forgot-password-link" @click.prevent="openReset">{{ t('login.forgot.password') }}</a></div>
+              <div class="aux form-meta"><label class="check remember-me"><input v-model="form.remember" type="checkbox" name="remember-me" value="true"/><span>{{ t('login.remember.me') }}</span></label><!-- 忘记密码入口已停用：<a href="#" class="link forgot-password-link" @click.prevent="openReset">{{ t('login.forgot.password') }}</a> --></div>
               <button id="loginButton" type="submit" class="submit btn btn-primary" :class="{ busy }" :disabled="busy || !allowed"><span class="spin" aria-hidden="true"/><span class="txt">{{ busy ? t('login.input.login.loading') : t('login.btn.login') }}</span></button><p class="msg" aria-hidden="true"/>
               <div v-if="config.githubEnabled || config.googleEnabled" class="auth-divider"><span>{{ copy.orThirdParty }}</span></div>
               <div v-if="config.githubEnabled || config.googleEnabled" class="oauth-row"><button v-if="config.githubEnabled" id="githubLoginBtn" type="button" class="btn btn-github btn-oauth" :disabled="!!oauthBusy || busy" @click="oauth('github')"><i class="i-mdi-github" aria-hidden="true"/><span>{{ oauthBusy === 'github' ? t('login.input.step.next') : t('login.btn.github') }}</span></button><button v-if="config.googleEnabled" id="googleLoginBtn" type="button" class="btn btn-google btn-oauth" :disabled="!!oauthBusy || busy" @click="oauth('google')"><i class="i-mdi-google" aria-hidden="true"/><span>{{ oauthBusy === 'google' ? t('login.input.step.next') : t('login.btn.google') }}</span></button></div>
@@ -365,6 +370,7 @@ onBeforeUnmount(() => {
         <span class="authfoot-date">{{ copy.projectStartTime }}: 2025-10-01</span>
       </div>
     </section>
+    <!-- 忘记密码弹窗已停用。
     <div v-if="resetOpen" id="forgotPasswordModal" class="modal-overlay show" @click.self="!reset.busy && closeReset()" @keydown="resetKeydown">
       <div ref="resetDialog" class="modal" role="dialog" aria-modal="true" aria-labelledby="loginResetTitle" tabindex="-1">
         <div class="modal-header"><div id="loginResetTitle" class="modal-title"><i class="i-mdi-key-outline" aria-hidden="true"/> {{ t('login.reset.title') }}</div><button type="button" class="modal-close" :aria-label="copy.close" :disabled="reset.busy" @click="closeReset"><i class="i-mdi-close" aria-hidden="true"/></button></div>
@@ -397,6 +403,7 @@ onBeforeUnmount(() => {
         <div class="modal-actions"><button id="resetCancelBtn" type="button" class="btn btn-secondary btn-modal" :disabled="reset.busy" @click="cancelReset">{{ reset.step === 3 ? copy.finish : reset.step === 2 ? copy.back : t('login.btn.cancel') }}</button><button v-if="reset.step < 3" id="resetNextBtn" type="button" class="btn btn-primary btn-modal" :disabled="reset.busy" @click="nextResetStep">{{ reset.busy ? t('login.input.resetting') : t(`login.reset.step${reset.step}`) }}</button></div>
       </div>
     </div>
+    -->
   </main>
 </template>
 

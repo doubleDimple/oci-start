@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { allowsInstanceAction } from '@/utils/tenantPermissions'
 import PageErrorNotice from '@/components/PageErrorNotice.vue'
 import MobileRecordList from '@/components/MobileRecordList.vue'
 import MobileRecordCard from '@/components/MobileRecordCard.vue'
@@ -134,13 +135,14 @@ function rowActions(row: InstanceRow): MenuItem[] {
     item('reinstall', 'reinstall', 'i-mdi-restore', { divided: true }),
     item('terminate', 'terminate', 'i-mdi-power', { danger: true }),
     item('delete', 'delete', 'i-mdi-trash-can-outline', { danger: true }),
-  ]
+  ].filter(action => allowsInstanceAction(row.permissionContext, action.id))
 }
 async function copyAddress(value: string) {
   try { await navigator.clipboard.writeText(value); if (!disposed) ElMessage.success(t('instances.copied')) }
   catch { if (!disposed) ElMessage.error(t('instances.copyFailed')) }
 }
 function runAction(item: MenuItem, row: InstanceRow) {
+  if (!allowsInstanceAction(row.permissionContext, item.id)) return
   if (item.disabled || loading.value) return
   const id = item.id
   if (id === 'copy4' || id === 'copy6') { void copyAddress(id === 'copy4' ? row.publicIps : row.ipv6Addresses); return }
@@ -190,6 +192,7 @@ async function loadRows() {
   listController = new AbortController()
   const key = queryKey.value
   if (displayedQuery !== key) { rows.value = []; total.value = 0; loaded.value = false; updatedAt.value = null }
+  else rows.value = rows.value.map(row => ({ ...row, permissionContext: undefined }))
   listError.value = null
   if (invalidFilter.value) { loading.value = false; return }
   loading.value = true

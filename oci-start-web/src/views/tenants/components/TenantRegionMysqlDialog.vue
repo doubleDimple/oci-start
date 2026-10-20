@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { hasTenantPermission } from '@/utils/tenantPermissions'
 import { ElTableColumn as BaseTableColumn } from 'element-plus'
 import PageErrorNotice from '@/components/PageErrorNotice.vue'
 import GhostBtn from '@/components/GhostBtn.vue'
@@ -42,6 +43,7 @@ function requestError(cause: unknown) {
 const props = defineProps<{ tenant: TenantRow }>()
 const emit = defineEmits<{ close: []; changed: [] }>()
 const tenantId = computed(() => String(props.tenant.id))
+const canManage = computed(() => hasTenantPermission(props.tenant, 'MYSQL_MANAGE'))
 const tenantLabel = computed(() =>
   [props.tenant.defName || t('tenantRegions.common.currentTenant'), props.tenant.region].filter(Boolean).join(' · '),
 )
@@ -81,6 +83,7 @@ function statusClass(row: MysqlInstance) {
 }
 
 async function loadMysql() {
+  if (!hasTenantPermission(props.tenant, 'MYSQL_READ')) return
   const current = generation
   const version = ++readVersion
   readController?.abort()
@@ -156,6 +159,7 @@ function confirmationFor(action: MysqlAction, row?: MysqlInstance) {
 }
 
 async function execute(action: MysqlAction, row?: MysqlInstance) {
+  if (!hasTenantPermission(props.tenant, ['syncOne', 'syncAll'].includes(action) ? 'MYSQL_READ' : 'MYSQL_MANAGE')) return
   if (busy.value || (['syncOne', 'reset', 'bind', 'delete'].includes(action) && !row)) return
   const current = generation
   const selectedTenantId = tenantId.value
@@ -287,7 +291,7 @@ const ElTableColumn = BaseTableColumn<MysqlInstance>
         <div class="toolbar-actions">
           <el-button :disabled="!!busy || loading" @click="refresh">{{ t('tenantRegions.common.refresh') }}</el-button>
           <el-button :loading="busy === 'syncAll'" :disabled="!!busy && busy !== 'syncAll'" @click="syncAll">{{ t('tenantRegions.mysql.syncAll') }}</el-button>
-          <el-button type="primary" :loading="busy === 'create'" :disabled="!!busy && busy !== 'create'" @click="createMysql">{{ t('tenantRegions.mysql.create') }}</el-button>
+          <el-button v-if="canManage" type="primary" :loading="busy === 'create'" :disabled="!!busy && busy !== 'create'" @click="createMysql">{{ t('tenantRegions.mysql.create') }}</el-button>
         </div>
       </div>
 
@@ -323,9 +327,9 @@ const ElTableColumn = BaseTableColumn<MysqlInstance>
           </section>
           <template #footer>
             <GhostBtn :disabled="!!busy || loading" :loading="busy === 'syncOne' && busyRowId === row.id" @click="execute('syncOne', row)">{{ t('tenantRegions.mysql.syncOne') }}</GhostBtn>
-            <GhostBtn :disabled="!!busy || loading" :loading="busy === 'reset' && busyRowId === row.id" @click="execute('reset', row)">{{ t('tenantRegions.mysql.reset') }}</GhostBtn>
-            <GhostBtn :disabled="!!busy || loading" :loading="busy === 'bind' && busyRowId === row.id" @click="execute('bind', row)">{{ t('tenantRegions.mysql.bind') }}</GhostBtn>
-            <GhostBtn danger :disabled="!!busy || loading" :loading="busy === 'delete' && busyRowId === row.id" @click="execute('delete', row)">{{ t('tenantRegions.mysql.delete') }}</GhostBtn>
+            <GhostBtn v-if="canManage" :disabled="!!busy || loading" :loading="busy === 'reset' && busyRowId === row.id" @click="execute('reset', row)">{{ t('tenantRegions.mysql.reset') }}</GhostBtn>
+            <GhostBtn v-if="canManage" :disabled="!!busy || loading" :loading="busy === 'bind' && busyRowId === row.id" @click="execute('bind', row)">{{ t('tenantRegions.mysql.bind') }}</GhostBtn>
+            <GhostBtn v-if="canManage" danger :disabled="!!busy || loading" :loading="busy === 'delete' && busyRowId === row.id" @click="execute('delete', row)">{{ t('tenantRegions.mysql.delete') }}</GhostBtn>
           </template>
         </MobileRecordCard>
         <p v-if="loading || (!rows.length && !readError)" class="mysql-mobile-empty" role="status">{{ t(loading ? 'pageLoading.loading' : 'tenantRegions.mysql.empty') }}</p>
@@ -394,9 +398,9 @@ const ElTableColumn = BaseTableColumn<MysqlInstance>
               <template #dropdown>
                 <el-dropdown-menu>
                   <el-dropdown-item command="syncOne">{{ t('tenantRegions.mysql.syncOne') }}</el-dropdown-item>
-                  <el-dropdown-item command="reset">{{ t('tenantRegions.mysql.reset') }}</el-dropdown-item>
-                  <el-dropdown-item command="bind">{{ t('tenantRegions.mysql.bind') }}</el-dropdown-item>
-                  <el-dropdown-item command="delete" divided class="mysql-delete-action">{{ t('tenantRegions.mysql.delete') }}</el-dropdown-item>
+                  <el-dropdown-item v-if="canManage" command="reset">{{ t('tenantRegions.mysql.reset') }}</el-dropdown-item>
+                  <el-dropdown-item v-if="canManage" command="bind">{{ t('tenantRegions.mysql.bind') }}</el-dropdown-item>
+                  <el-dropdown-item v-if="canManage" command="delete" divided class="mysql-delete-action">{{ t('tenantRegions.mysql.delete') }}</el-dropdown-item>
                 </el-dropdown-menu>
               </template>
             </el-dropdown>

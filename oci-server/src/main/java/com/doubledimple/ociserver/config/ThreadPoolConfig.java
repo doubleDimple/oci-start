@@ -365,6 +365,20 @@ public class ThreadPoolConfig {
         return executor;
     }
 
+    /** Login alerts must never hold up credential rejection when delivery is slow. */
+    @Bean(name = "loginNotificationExecutor")
+    public ThreadPoolTaskExecutor loginNotificationExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(1);
+        executor.setMaxPoolSize(2);
+        executor.setQueueCapacity(100);
+        executor.setThreadNamePrefix("login-notification-");
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
+        executor.setWaitForTasksToCompleteOnShutdown(false);
+        executor.initialize();
+        return executor;
+    }
+
     /**
      * 流量统计专用线程池：单线程、几乎不排队、忙时直接丢弃。
      * 保证长耗时的流量任务既不和其它事件抢线程，也不会因触发堆积而多轮并行。

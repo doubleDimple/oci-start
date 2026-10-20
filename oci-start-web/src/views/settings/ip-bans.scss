@@ -1,0 +1,70 @@
+.ip-bans-page {
+  display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; height: 100%; overflow: hidden;
+  border: 1px solid var(--border); border-radius: var(--r-card); background: var(--bg-card); color: var(--text-primary);
+  font: var(--font-size-body)/1.5 var(--sans);
+  .btn { min-height: 36px; padding: 7px 13px; }
+  i { flex: none; display: inline-block; width: 18px; height: 18px; }
+}
+.ip-bans-toolbar { display: flex; flex: none; flex-wrap: wrap; align-items: center; gap: 12px; min-height: 64px; padding: 13px 20px; border-bottom: 1px solid var(--border); }
+.ip-bans-toolbar h1 { flex: none; min-width: 0; margin: 0; font: 600 var(--font-size-section)/1.5 var(--sans); }
+.ip-bans-toolbar-actions { display: flex; flex: none; align-items: center; gap: 8px; }
+.ip-bans-filters {
+  display: flex; flex: 1 1 360px; align-items: center; justify-content: flex-end; gap: 10px; min-width: 0; margin-left: auto;
+  .ip-bans-search { flex: 1 1 160px; max-width: 260px; }
+  .ip-bans-status-filter { flex: 0 0 120px; width: 120px; }
+  .btn { flex: none; }
+  input { width: 100%; min-width: 0; min-height: 36px; box-sizing: border-box; padding: 7px 12px; border: 1px solid var(--border-strong); border-radius: var(--r-pill); background: var(--bg-card); color: var(--text-primary); font: var(--font-size-body)/1.5 var(--sans); }
+  input:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+  input:disabled { opacity: .6; }
+  .el-select__wrapper { min-height: 36px; }
+}
+.ip-bans-content { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+.ip-bans-empty { margin: 0; padding: 48px 20px; text-align: center; color: var(--text-secondary); }
+.ip-bans-notice { flex: none; margin: 0; padding: 12px 20px; border-bottom: 1px solid var(--border); background: var(--bg-search); overflow-wrap: anywhere; }
+.ip-bans-notice.is-warning { color: var(--status-warn); }
+.ip-bans-table {
+  width: 100%; min-width: 1000px; border-collapse: collapse; text-align: left;
+  th, td { padding: 14px 18px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { position: sticky; top: 0; z-index: 1; background: var(--bg-card); color: var(--text-secondary); font-weight: 500; white-space: nowrap; }
+  tbody tr:hover { background: var(--bg-hover); }
+  td { overflow-wrap: anywhere; }
+  .ip-ban-address { min-width: 160px; font-variant-numeric: tabular-nums; }
+  .ip-ban-reason { min-width: 220px; max-width: 360px; white-space: pre-wrap; }
+  .ip-ban-release { min-width: 190px; max-width: 300px; }
+  small { display: block; margin-top: 5px; color: var(--text-secondary); font-size: var(--font-size-secondary); }
+  time { display: block; min-width: 150px; font-variant-numeric: tabular-nums; }
+}
+.ip-ban-status { display: inline-flex; padding: 3px 8px; border-radius: var(--r-pill); background: var(--status-ok-bg); color: var(--status-ok); white-space: nowrap; font-size: var(--font-size-secondary); }
+.ip-ban-status.active { background: var(--status-danger-bg); color: var(--status-danger); }
+.ip-ban-dialog {
+  max-width: calc(100vw - 28px); border-radius: var(--r-card); background: var(--bg-card); color: var(--text-primary); font-family: var(--sans);
+  .el-dialog__title { color: var(--text-primary); font: 600 var(--font-size-dialog-title)/1.5 var(--sans); }
+  .el-dialog__body { color: var(--text-primary); font: var(--font-size-body)/1.7 var(--sans); }
+  .el-dialog__footer { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; }
+}
+.ip-ban-confirm-details { margin: 0; > div { display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 14px; padding: 10px 0; border-bottom: 1px solid var(--border); } dt { font-weight: 500; } dd { min-width: 0; margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; } }
+.ip-bans-mobile-list { display: grid; gap: 12px; padding: 12px; }
+.ip-ban-card {
+  min-width: 0; padding: 14px; border: 1px solid var(--border); border-radius: 12px;
+  header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+  strong { min-width: 0; overflow-wrap: anywhere; font-weight: 600; }
+  dl { display: grid; gap: 9px; margin: 16px 0; }
+  dl > div { display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 10px; }
+  dt { color: var(--text-secondary); }
+  dd { min-width: 0; margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+}
+@media (max-width: 760px) {
+  .ip-bans-toolbar { flex-wrap: wrap; gap: 10px; padding: 12px; }
+  .ip-bans-toolbar h1 { flex: 1; }
+  .ip-bans-filters { order: 1; flex-basis: 100%; gap: 10px; }
+  .ip-bans-filters .ip-bans-search { max-width: none; }
+  .ip-bans-filters input, .ip-bans-filters .el-select__wrapper, .ip-bans-page .btn { min-height: 44px; }
+  .ip-bans-notice { padding: 12px; }
+}
+@media (max-width: 400px) {
+  .ip-bans-filters { flex-wrap: wrap; }
+  .ip-bans-filters .ip-bans-search { flex-basis: 100%; }
+  .ip-bans-filters .ip-bans-status-filter { flex: 1; }
+  .ip-ban-confirm-details > div { grid-template-columns: 1fr; gap: 4px; }
+  .ip-ban-card dl > div { grid-template-columns: 1fr; gap: 3px; }
+}

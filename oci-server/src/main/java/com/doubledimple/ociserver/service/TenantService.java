@@ -8,6 +8,7 @@ import com.doubledimple.ociserver.pojo.request.AuditLogRequest;
 import com.doubledimple.ociserver.pojo.request.BootVolumeUpdateRequest;
 import com.doubledimple.ociserver.pojo.request.DeleteOciUserRequest;
 import com.doubledimple.ociserver.pojo.request.ResetOciPassRequest;
+import com.doubledimple.ociserver.pojo.request.UpdateOciUserStateRequest;
 import com.doubledimple.ociserver.pojo.request.TenantDTO;
 import com.doubledimple.ociserver.pojo.response.AccountCheckRes;
 import com.doubledimple.ociserver.pojo.response.PasswordPolicyDetail;
@@ -130,6 +131,7 @@ public interface TenantService {
      * @Date: 9/7/25 9:11 AM
      */
     ApiResponse resetPassword(ResetOciPassRequest request);
+    ApiResponse updateUserState(UpdateOciUserStateRequest request);
 
     ApiResponse enableEmailService(Map<String, Object> request);
 

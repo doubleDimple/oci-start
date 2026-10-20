@@ -9,10 +9,11 @@ import PrimaryBtn from '@/components/PrimaryBtn.vue'
 import GhostBtn from '@/components/GhostBtn.vue'
 import { useShellStore } from '@/stores/shell'
 import { usePageMotion } from '@/composables/usePageMotion'
+import { isManagedTenant, loadTenantPermissionContext } from '@/utils/tenantPermissions'
 import { REGION_COORDINATES, regionCityName } from '@/views/regions/regionCoords'
 import {
-  parseOciConfig, parseGcpConfig, saveTenantCredentials, tenantImportError,
-  type ImportProvider, type TenantImportFields, type OciProfile,
+  parseOciConfig, parseGcpConfig, saveTenantCredentials, tenantImportError, getTenantPermissionCatalog,
+  type ImportProvider, type TenantImportFields, type OciProfile, type TenantPermissionOption,
 } from '@/api/tenantImport'
 
 type Field = keyof TenantImportFields
@@ -36,6 +37,134 @@ const provider = computed<ImportProvider | null>(() => {
 })
 const emptyFields = (): TenantImportFields => ({ userName: '', tenantId: '', fingerprint: '', tenancy: '', region: '' })
 const form = reactive<TenantImportFields>(emptyFields())
+const defaultManagedUserName = 'oci-start-operator'
+const managedUserName = ref(defaultManagedUserName)
+const managedNameInvalid = ref(false)
+const updatingManagedTenant = computed(() => typeof route.query.managedTenantId === 'string' && Boolean(route.query.managedTenantId))
+const restrictedMode = ref(false)
+const passwordResetUsers = ref('')
+const userManagementGroups = ref('')
+const invalidScopeFields = ref(new Set<string>())
+const parseScopeIds = (value: string) => [...new Set(value.split(/[\s,;，；]+/).filter(Boolean))]
+const configHintKey = computed(() => provider.value === 2 ? 'configHintGcp' : restrictedMode.value ? 'configHintOci' : 'directConfigHint')
+const keyHintKey = computed(() => provider.value === 2 ? 'keyFileHintGcp' : restrictedMode.value ? 'keyFileHintOci' : 'directKeyHint')
+const saveHintKey = computed(() => provider.value === 2 ? 'gcpSaveHint' : restrictedMode.value ? 'ociSaveHint' : 'directSaveHint')
+const permissionCatalog = ref<TenantPermissionOption[]>([])
+const selectedPermissions = ref<string[]>([])
+const catalogLoading = ref(false)
+const catalogError = shallowRef<unknown>(null)
+const permissionGroups = computed(() => [...new Set(permissionCatalog.value.map(item => item.group))].map(group => ({
+  name: group,
+  items: permissionCatalog.value.filter(item => item.group === group && item.supported),
+  unavailable: permissionCatalog.value.filter(item => item.group === group && !item.supported),
+})))
+const selectedPermissionCount = computed(() => permissionCatalog.value.filter(item => item.supported && selectedPermissions.value.includes(item.code)).length)
+const permissionGroupIcons: Record<string, string> = {
+  basic: 'i-mdi-magnify', compute: 'i-mdi-server', storage: 'i-mdi-harddisk',
+  network: 'i-mdi-lan', observability: 'i-mdi-chart-line', database: 'i-mdi-database-outline',
+  account: 'i-mdi-account-cog-outline',
+}
+const destructivePermissions = new Set(['INSTANCE_DELETE', 'BOOT_VOLUME_DELETE', 'BLOCK_VOLUME_DELETE', 'USER_DELETE', 'MYSQL_MANAGE', 'NETWORK_MANAGE', 'DOMAIN_SECURITY_MANAGE', 'DOMAIN_USER_MANAGE'])
+function permissionLabel(item: TenantPermissionOption) {
+  return locale.value.startsWith('en') ? item.labelEn || item.label : item.label
+}
+function permissionDependencies(item: TenantPermissionOption) {
+  return permissionCatalog.value.filter(option => item.dependencies?.includes(option.code)).map(permissionLabel).join(locale.value.startsWith('en') ? ', ' : '、')
+}
+function permissionGroupLabel(group: string) {
+  const labels: Record<string, [string, string]> = {
+    basic: ['基础查询', 'Basic access'], compute: ['实例操作', 'Instances'], storage: ['存储卷', 'Storage volumes'],
+    network: ['网络与区域', 'Networking and regions'], observability: ['账单、流量与审计', 'Cost, traffic and audit'],
+    database: ['数据库', 'Databases'], account: ['账号管理', 'Account management'],
+  }
+  return labels[group]?.[locale.value.startsWith('en') ? 1 : 0] || group
+}
+let catalogController: AbortController | undefined
+async function loadPermissionCatalog() {
+  catalogController?.abort()
+  const controller = new AbortController()
+  catalogController = controller
+  catalogLoading.value = true
+  catalogError.value = null
+  try {
+    const catalog = await getTenantPermissionCatalog(controller.signal)
+    if (controller.signal.aborted) return
+    permissionCatalog.value = catalog
+    selectedPermissions.value = catalog.filter(item => item.supported && (item.required || item.defaultEnabled)).map(item => item.code)
+    const existingId = route.query.managedTenantId
+    if (updatingManagedTenant.value && (typeof existingId !== 'string' || !/^[1-9]\d*$/.test(existingId))) {
+      throw new Error(t('tenantImport.invalidManagedTenant'))
+    }
+    if (typeof existingId === 'string' && /^[1-9]\d*$/.test(existingId)) {
+      const existing = await loadTenantPermissionContext(existingId, controller.signal)
+      if (controller.signal.aborted) return
+      if (!isManagedTenant(existing)) throw new Error(t('tenantImport.invalidManagedTenant'))
+      managedUserName.value = existing.managedUserName || ''
+      form.userName = existing.userName || existing.defName || ''
+      form.tenancy = existing.tenancy || ''
+      form.region = existing.regionEn || existing.region || ''
+      const savedGrants: unknown = JSON.parse(existing.permissionsJson || '[]')
+      if (!Array.isArray(savedGrants)) throw new Error(t('tenantImport.invalidManagedTenant'))
+      selectedPermissions.value = catalog.filter(item => item.supported && (item.required || savedGrants.includes(item.code))).map(item => item.code)
+      const scope = JSON.parse(existing.accountScopeJson || '{}')
+      passwordResetUsers.value = Array.isArray(scope.passwordResetUserIds) ? scope.passwordResetUserIds.filter((id: unknown) => typeof id === 'string').join('\n') : ''
+      userManagementGroups.value = Array.isArray(scope.userManagementGroupIds) ? scope.userManagementGroupIds.filter((id: unknown) => typeof id === 'string').join('\n') : ''
+    }
+  } catch (error) {
+    if (!controller.signal.aborted) catalogError.value = error
+  } finally {
+    if (!controller.signal.aborted) catalogLoading.value = false
+  }
+}
+function chooseImportMode(restricted: boolean) {
+  if (saving.value || saved.value || updatingManagedTenant.value || restrictedMode.value === restricted) return
+  restrictedMode.value = restricted
+  saveError.value = null
+  managedNameInvalid.value = false
+  invalidScopeFields.value = new Set()
+  if (restricted) void loadPermissionCatalog()
+  else {
+    catalogController?.abort()
+    catalogLoading.value = false
+    catalogError.value = null
+  }
+}
+function togglePermission(item: TenantPermissionOption, enabled: boolean) {
+  if (item.required || !item.supported || locked.value) return
+  const next = new Set(selectedPermissions.value)
+  if (enabled) next.add(item.code)
+  else next.delete(item.code)
+  // Follow the server catalog so visible selections match the resulting cloud policy.
+  let changed = true
+  while (changed) {
+    changed = false
+    for (const capability of permissionCatalog.value) {
+      if (!next.has(capability.code)) continue
+      for (const dependency of capability.dependencies || []) {
+        if (next.has(dependency)) continue
+        if (enabled) next.add(dependency)
+        else next.delete(capability.code)
+        changed = true
+      }
+    }
+  }
+  selectedPermissions.value = [...next]
+}
+function selectAllPermissions() {
+  if (locked.value || catalogError.value) return
+  selectedPermissions.value = permissionCatalog.value.filter(item => item.supported).map(item => item.code)
+}
+function restoreDefaultPermissions() {
+  if (locked.value || catalogError.value) return
+  const defaults = new Set(permissionCatalog.value.filter(item => item.supported && (item.required || item.defaultEnabled)).map(item => item.code))
+  // Keep dependency selections in sync if the server's defaults change.
+  for (const code of defaults) {
+    for (const dependency of permissionCatalog.value.find(item => item.code === code)?.dependencies || []) {
+      if (permissionCatalog.value.some(item => item.code === dependency && item.supported)) defaults.add(dependency)
+    }
+  }
+  selectedPermissions.value = [...defaults]
+}
 const fieldDefinitions = computed<FieldDefinition[]>(() => [
   { id: 'userName', label: 'userName', placeholder: 'userNamePlaceholder' },
   { id: 'tenantId', label: provider.value === 2 ? 'clientEmail' : 'ociUser', placeholder: provider.value === 2 ? 'clientEmailPlaceholder' : 'ociUserPlaceholder' },
@@ -62,7 +191,7 @@ const parseNote = ref('')
 const fileErrorKey = ref('')
 const invalidFields = ref(new Set<Field>())
 const saveError = shallowRef<unknown>(null)
-const locked = computed(() => saving.value || saved.value)
+const locked = computed(() => saving.value || saved.value || (provider.value === 1 && restrictedMode.value && catalogLoading.value))
 const configDirty = computed(() => Boolean(configText.value.trim()) && configText.value !== parsedText.value)
 const fileSize = computed(() => {
   if (!keyFile.value) return ''
@@ -89,6 +218,12 @@ function stopInputWork() {
 function resetInputs() {
   stopInputWork()
   Object.assign(form, emptyFields())
+  managedUserName.value = defaultManagedUserName
+  managedNameInvalid.value = false
+  passwordResetUsers.value = ''
+  userManagementGroups.value = ''
+  invalidScopeFields.value = new Set()
+  selectedPermissions.value = permissionCatalog.value.filter(item => item.supported && (item.required || item.defaultEnabled)).map(item => item.code)
   configText.value = ''
   parsedText.value = ''
   profiles.value = []
@@ -106,9 +241,10 @@ function resetInputs() {
   if (configPicker.value) configPicker.value.value = ''
   if (keyPicker.value) keyPicker.value.value = ''
 }
-function clearForm() {
-  if (saving.value) return
+async function clearForm() {
+  if (saving.value || catalogLoading.value) return
   resetInputs()
+  if (provider.value === 1 && typeof route.query.managedTenantId === 'string') await loadPermissionCatalog()
   void nextTick(() => configInput.value?.focus())
 }
 function changeProvider(next: ImportProvider) {
@@ -138,7 +274,10 @@ function applyProfile(profile: OciProfile) {
   const changedAccount = (['tenantId', 'fingerprint', 'tenancy'] as const)
     .some(field => form[field] && form[field] !== profile.fields[field])
   if (changedAccount) keyFile.value = null
+  const displayName = typeof route.query.managedTenantId === 'string' ? form.userName : ''
   Object.assign(form, profile.fields)
+  // The pasted profile is the bootstrap administrator, not the dedicated target account.
+  if (displayName) form.userName = displayName
   profileId.value = profile.id
   invalidFields.value = new Set()
   parseNote.value = keyFile.value ? 'parsedOci' : 'waitingForKey'
@@ -292,6 +431,29 @@ async function focusInvalid() {
 }
 async function submit() {
   if (!provider.value || locked.value || reading.value) return
+  if (provider.value === 1 && restrictedMode.value) {
+    managedNameInvalid.value = !managedUserName.value.trim()
+    if (managedNameInvalid.value) {
+      root.value?.querySelector<HTMLInputElement>('#import-managed-user')?.focus()
+      return
+    }
+    if (catalogLoading.value || catalogError.value || !permissionCatalog.value.length) return
+    const errors = new Set<string>()
+    if (selectedPermissions.value.includes('USER_PASSWORD_RESET')) {
+      const ids = parseScopeIds(passwordResetUsers.value)
+      if (!ids.length || ids.some(id => !/^ocid1\.user\.[A-Za-z0-9._-]+$/.test(id))) errors.add('passwordResetUserIds')
+    }
+    if (selectedPermissions.value.includes('DOMAIN_USER_MANAGE')) {
+      const ids = parseScopeIds(userManagementGroups.value)
+      if (!ids.length || ids.some(id => !/^ocid1\.group\.[A-Za-z0-9._-]+$/.test(id))) errors.add('userManagementGroupIds')
+    }
+    invalidScopeFields.value = errors
+    if (errors.size) {
+      await nextTick()
+      root.value?.querySelector<HTMLTextAreaElement>('.permission-scope-field textarea[aria-invalid="true"]')?.focus()
+      return
+    }
+  }
   if (configDirty.value && !parseConfig()) { await focusInvalid(); return }
   const missing = new Set<Field>()
   for (const field of fieldDefinitions.value) if (!form[field.id].trim()) missing.add(field.id)
@@ -312,9 +474,22 @@ async function submit() {
   saving.value = true
   saveError.value = null
   try {
-    await saveTenantCredentials(cloud, fields, file, controller.signal)
+    await saveTenantCredentials(cloud, fields, file, controller.signal, cloud === 1 && restrictedMode.value
+      ? { managedUserName: managedUserName.value, permissions: selectedPermissions.value, accountScope: {
+        allUsers: false,
+        passwordResetUserIds: selectedPermissions.value.includes('USER_PASSWORD_RESET') ? parseScopeIds(passwordResetUsers.value) : [],
+        userManagementGroupIds: selectedPermissions.value.includes('DOMAIN_USER_MANAGE') ? parseScopeIds(userManagementGroups.value) : [],
+      } }
+      : undefined)
     if (version !== pageVersion || controller.signal.aborted) return
     saved.value = true
+    // Drop the bootstrap identity immediately after success, even if navigation fails.
+    keyFile.value = null
+    configText.value = ''
+    parsedText.value = ''
+    profiles.value = []
+    form.tenantId = ''
+    form.fingerprint = ''
     ElMessage.success(t('tenantImport.saveSuccess'))
   } catch (error) {
     if (version === pageVersion && !controller.signal.aborted) saveError.value = error
@@ -327,18 +502,32 @@ async function submit() {
     void router.push({ path: '/tenants/list', query: { cloudType: String(cloud) } }).catch(() => {})
   }
 }
-watch(provider, cloud => {
+watch([provider, () => route.query.managedTenantId], ([cloud]) => {
   pageVersion += 1
   saveController?.abort()
   saveController = undefined
   saving.value = false
   resetInputs()
+  restrictedMode.value = cloud === 1 && updatingManagedTenant.value
+  if (restrictedMode.value) void loadPermissionCatalog()
+  else {
+    catalogController?.abort()
+    catalogLoading.value = false
+    catalogError.value = null
+  }
   if (cloud && shell.cloudType !== cloud) shell.setCloud(cloud)
 }, { immediate: true })
+watch(selectedPermissions, permissions => {
+  const errors = new Set(invalidScopeFields.value)
+  if (!permissions.includes('USER_PASSWORD_RESET')) errors.delete('passwordResetUserIds')
+  if (!permissions.includes('DOMAIN_USER_MANAGE')) errors.delete('userManagementGroupIds')
+  invalidScopeFields.value = errors
+})
 onBeforeUnmount(() => {
   pageVersion += 1
   saveController?.abort()
   saveController = undefined
+  catalogController?.abort()
   resetInputs()
 })
 </script>
@@ -354,8 +543,8 @@ onBeforeUnmount(() => {
           </button>
         </div>
         <div class="import-toolbar-actions" data-page-error-anchor>
-          <GhostBtn :disabled="saving || !provider" @click="clearForm">{{ t('tenantImport.clear') }}</GhostBtn>
-          <PrimaryBtn type="submit" :loading="saving" :disabled="!provider || reading || saved"><i v-if="!saving" class="i-mdi-check" aria-hidden="true" />{{ t(`tenantImport.${saving ? 'saving' : 'save'}`) }}</PrimaryBtn>
+          <GhostBtn :disabled="saving || catalogLoading || !provider" @click="clearForm">{{ t('tenantImport.clear') }}</GhostBtn>
+          <PrimaryBtn type="submit" :loading="saving" :disabled="!provider || reading || saved || (provider === 1 && restrictedMode && (catalogLoading || !!catalogError || !permissionCatalog.length))"><i v-if="!saving" class="i-mdi-check" aria-hidden="true" />{{ t(`tenantImport.${saving ? 'saving' : 'save'}`) }}</PrimaryBtn>
         </div>
       </div>
 
@@ -367,10 +556,23 @@ onBeforeUnmount(() => {
         <div v-if="saved" class="save-notice" role="status"><i class="i-mdi-check-circle-outline" aria-hidden="true" /><span>{{ t('tenantImport.saveSuccess') }}</span><button type="button" @click="goBack">{{ t('tenantImport.checkList') }}</button></div>
 
         <div class="import-scroll">
+          <section v-if="provider === 1" class="import-mode-section" :aria-label="t('tenantImport.importMode')">
+            <h2>{{ t('tenantImport.importMode') }}</h2>
+            <div class="import-mode-options">
+              <label class="import-mode-option" :class="{ 'is-selected': !restrictedMode }">
+                <input type="radio" name="tenant-import-mode" :checked="!restrictedMode" :disabled="saving || saved || updatingManagedTenant" @change="chooseImportMode(false)" />
+                <span><strong>{{ t('tenantImport.directMode') }}</strong><small>{{ t('tenantImport.directModeHint') }}</small></span>
+              </label>
+              <label class="import-mode-option" :class="{ 'is-selected': restrictedMode }">
+                <input type="radio" name="tenant-import-mode" :checked="restrictedMode" :disabled="saving || saved || updatingManagedTenant" @change="chooseImportMode(true)" />
+                <span><strong>{{ t('tenantImport.restrictedMode') }}</strong><small>{{ t(updatingManagedTenant ? 'tenantImport.managedModeLocked' : 'tenantImport.restrictedModeHint') }}</small></span>
+              </label>
+            </div>
+          </section>
           <div class="import-columns">
             <section class="config-section" aria-labelledby="import-config-label">
               <div class="section-label-row"><label id="import-config-label" for="import-config">{{ t('tenantImport.configLabel') }}</label><button type="button" class="text-button" :disabled="locked || reading" @click="chooseConfigFile"><i class="i-mdi-file-upload-outline" aria-hidden="true" />{{ t('tenantImport.chooseFile') }}</button></div>
-              <p id="import-config-hint" class="section-hint">{{ t(`tenantImport.${provider === 1 ? 'configHintOci' : 'configHintGcp'}`) }}</p>
+              <p id="import-config-hint" class="section-hint">{{ t(`tenantImport.${configHintKey}`) }}</p>
               <input ref="configPicker" type="file" class="sr-only" tabindex="-1" :disabled="locked" :accept="provider === 2 ? '.json,application/json' : undefined" :aria-label="t('tenantImport.chooseFile')" @change="fileSelected($event, false)" />
               <div class="config-editor" :class="{ 'is-dragging': dragging, 'has-error': parseError }" @dragenter="dragEnter" @dragover.prevent @dragleave.prevent="dragLeave" @drop.prevent="dropFile">
                 <textarea id="import-config" ref="configInput" :value="configText" :disabled="locked" :placeholder="t(`tenantImport.${provider === 1 ? 'configPlaceholderOci' : 'configPlaceholderGcp'}`)" autocomplete="off" autocapitalize="off" spellcheck="false" :aria-invalid="Boolean(parseError)" :aria-describedby="parseError ? 'import-config-hint import-parse-error' : 'import-config-hint'" @input="configChanged" @paste="pasteFile" />
@@ -414,19 +616,125 @@ onBeforeUnmount(() => {
                 <div class="key-file" :class="{ 'has-file': keyFile, 'has-error': fileErrorKey }">
                   <button ref="keyButton" type="button" class="file-picker-button" :disabled="locked || reading" :aria-describedby="fileErrorKey ? 'import-file-error' : 'import-file-hint'" @click="chooseKeyFile">
                     <span class="file-icon"><i :class="keyFile ? 'i-mdi-file-check-outline' : 'i-mdi-key-outline'" aria-hidden="true" /></span>
-                    <span class="file-description"><strong>{{ keyFile?.name || t('tenantImport.chooseFile') }}</strong><small>{{ keyFile ? fileSize : t(`tenantImport.${provider === 1 ? 'keyFileHintOci' : 'keyFileHintGcp'}`) }}</small></span>
+                    <span class="file-description"><strong>{{ keyFile?.name || t('tenantImport.chooseFile') }}</strong><small>{{ keyFile ? fileSize : t(`tenantImport.${keyHintKey}`) }}</small></span>
                     <span class="file-action">{{ t(`tenantImport.${keyFile ? 'replaceFile' : 'chooseFile'}`) }}</span>
                   </button>
                   <button v-if="keyFile" type="button" class="icon-button" :disabled="locked || reading" :aria-label="t('tenantImport.removeFile')" :title="t('tenantImport.removeFile')" @click="removeFile"><i class="i-mdi-close" aria-hidden="true" /></button>
                 </div>
                 <p v-if="fileErrorKey" id="import-file-error" class="field-error" role="alert">{{ t(`tenantImport.${fileErrorKey}`) }}</p>
                 <p v-if="provider === 1 && activeProfile?.keyFileHint" id="import-file-hint" class="field-hint file-path-hint">{{ t('tenantImport.keyFilePathHint', { path: activeProfile.keyFileHint }) }}</p>
-                <p v-else id="import-file-hint" class="field-hint">{{ t(`tenantImport.${provider === 1 ? 'keyFileHintOci' : 'keyFileHintGcp'}`) }}</p>
+                <p v-else id="import-file-hint" class="field-hint">{{ t(`tenantImport.${keyHintKey}`) }}</p>
               </div>
             </section>
           </div>
+          <section v-if="provider === 1 && restrictedMode" class="import-permissions" aria-labelledby="import-permissions-title">
+            <h2 id="import-permissions-title" class="permission-section-heading"><i class="i-mdi-shield-key-outline" aria-hidden="true" />{{ t('tenantImport.permissionsTitle') }}</h2>
+            <div class="form-field managed-user-field">
+              <div class="permission-field-label">
+                <label for="import-managed-user">{{ t('tenantImport.managedUserName') }}<span class="required-mark" aria-hidden="true">*</span></label>
+                <el-popover trigger="click" :width="340" placement="top" popper-class="permission-info-popover">
+                  <template #reference><button type="button" class="permission-info-button" :aria-label="t('tenantImport.permissionDetailsFor', { name: t('tenantImport.managedUserName') })" @click.stop.prevent><i class="i-mdi-alert-circle-outline" aria-hidden="true" /></button></template>
+                  <div class="permission-info-content"><p>{{ t('tenantImport.managedUserHint') }}</p></div>
+                </el-popover>
+              </div>
+              <input id="import-managed-user" v-model="managedUserName" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" required :disabled="locked" :aria-invalid="managedNameInvalid" :aria-describedby="managedNameInvalid ? 'import-managed-user-error' : undefined" :placeholder="t('tenantImport.managedUserPlaceholder')" @input="managedNameInvalid = false" />
+              <p v-if="managedNameInvalid" id="import-managed-user-error" class="field-error">{{ t('tenantImport.requiredField', { field: t('tenantImport.managedUserName') }) }}</p>
+            </div>
+            <p v-if="catalogLoading" class="permission-loading" role="status"><i class="i-mdi-loading import-spin" aria-hidden="true" />{{ t('tenantImport.permissionsLoading') }}</p>
+            <PageErrorNotice v-else-if="catalogError">{{ tenantImportError(catalogError) }} <button type="button" class="text-button" @click="loadPermissionCatalog">{{ t('tenantImport.retryPermissions') }}</button></PageErrorNotice>
+            <template v-else>
+              <div class="permission-toolbar">
+                <div class="permission-toolbar-title">
+                  <h3>{{ t('tenantImport.permissionSelectionTitle') }}</h3>
+                  <el-popover trigger="click" :width="340" placement="top" popper-class="permission-info-popover">
+                    <template #reference><button type="button" class="permission-info-button" :aria-label="t('tenantImport.permissionNotesTitle')" @click.stop.prevent><i class="i-mdi-alert-circle-outline" aria-hidden="true" /></button></template>
+                    <div class="permission-info-content">
+                      <p>{{ t('tenantImport.provisionHint') }}</p>
+                      <p>{{ t('tenantImport.permissionDefaultsHint') }}</p>
+                      <p>{{ t('tenantImport.permissionAccountHint') }}</p>
+                      <p v-if="selectedPermissions.includes('INSTANCE_DELETE')">{{ t('tenantImport.permissionDeleteHint') }}</p>
+                      <p>{{ t('tenantImport.permissionBoundaryHint') }}</p>
+                    </div>
+                  </el-popover>
+                  <span class="permission-count" role="status">{{ t('tenantImport.permissionSelectedCount', { count: selectedPermissionCount }) }}</span>
+                </div>
+                <div class="permission-toolbar-actions">
+                  <button type="button" class="permission-action" :disabled="locked || !permissionCatalog.length" @click="selectAllPermissions"><i class="i-mdi-checkbox-multiple-marked-outline" aria-hidden="true" />{{ t('tenantImport.permissionSelectAll') }}</button>
+                  <button type="button" class="permission-action" :disabled="locked || !permissionCatalog.length" @click="restoreDefaultPermissions"><i class="i-mdi-restore" aria-hidden="true" />{{ t('tenantImport.permissionRestoreDefaults') }}</button>
+                </div>
+              </div>
+              <div class="permission-groups">
+                <fieldset v-for="group in permissionGroups" :key="group.name" class="permission-group" :disabled="locked">
+                  <legend>
+                    <i :class="permissionGroupIcons[group.name]" aria-hidden="true" />
+                    <span>{{ permissionGroupLabel(group.name) }}</span>
+                    <span class="permission-group-count">{{ group.items.filter(item => selectedPermissions.includes(item.code)).length }} / {{ group.items.length }}</span>
+                  </legend>
+                  <div class="permission-options">
+                    <label v-for="item in group.items" :key="item.code" class="permission-option" :class="{ 'is-selected': selectedPermissions.includes(item.code), 'is-required': item.required, 'is-locked': locked }">
+                      <input type="checkbox" :checked="selectedPermissions.includes(item.code)" :disabled="locked || item.required" @change="togglePermission(item, ($event.target as HTMLInputElement).checked)" />
+                      <span class="permission-option-content">
+                        <span class="permission-option-title">
+                          <span>{{ permissionLabel(item) }}</span>
+                          <span v-if="item.required" class="permission-badge is-required">{{ t('tenantImport.permissionRequired') }}</span>
+                          <span v-else-if="item.defaultEnabled" class="permission-badge">{{ t('tenantImport.permissionDefault') }}</span>
+                          <span v-else-if="item.code.startsWith('DOMAIN_')" class="permission-badge is-destructive">{{ t('tenantImport.permissionCombined') }}</span>
+                          <span v-else-if="destructivePermissions.has(item.code)" class="permission-badge is-destructive">{{ t('tenantImport.permissionDestructive') }}</span>
+                        </span>
+                      </span>
+                      <el-popover trigger="click" :width="340" placement="top" popper-class="permission-info-popover">
+                        <template #reference><button type="button" class="permission-info-button" :aria-label="t('tenantImport.permissionDetailsFor', { name: permissionLabel(item) })" @click.stop.prevent><i class="i-mdi-alert-circle-outline" aria-hidden="true" /></button></template>
+                        <div class="permission-info-content">
+                          <strong>{{ permissionLabel(item) }}</strong>
+                          <p v-if="item.reason">{{ item.reason }}</p>
+                          <p v-if="item.code === 'DOMAIN_SECURITY_MANAGE'">{{ t('tenantImport.domainSecurityScope') }}</p>
+                          <p v-if="item.code === 'DOMAIN_USER_MANAGE'">{{ t('tenantImport.domainUserScope') }}</p>
+                          <p v-if="item.dependencies?.length">{{ t('tenantImport.permissionDependencies', { permissions: permissionDependencies(item) }) }}</p>
+                          <p v-if="!item.reason && !item.dependencies?.length">{{ t('tenantImport.permissionBasicInfo') }}</p>
+                        </div>
+                      </el-popover>
+                    </label>
+                  </div>
+                  <div v-if="group.name === 'account' && (selectedPermissions.includes('USER_PASSWORD_RESET') || selectedPermissions.includes('DOMAIN_USER_MANAGE'))" class="permission-account-scope">
+                    <div v-if="selectedPermissions.includes('USER_PASSWORD_RESET')" class="permission-scope-field">
+                      <div class="permission-field-label">
+                        <label for="password-reset-users">{{ t('tenantImport.passwordResetUsers') }}<span aria-hidden="true">*</span></label>
+                        <el-popover trigger="click" :width="340" placement="top" popper-class="permission-info-popover">
+                          <template #reference><button type="button" class="permission-info-button" :aria-label="t('tenantImport.permissionDetailsFor', { name: t('tenantImport.passwordResetUsers') })" @click.stop.prevent><i class="i-mdi-alert-circle-outline" aria-hidden="true" /></button></template>
+                          <div class="permission-info-content"><p>{{ t('tenantImport.passwordResetUsersHint') }}</p></div>
+                        </el-popover>
+                      </div>
+                      <textarea id="password-reset-users" v-model="passwordResetUsers" rows="3" :disabled="locked" :placeholder="t('tenantImport.passwordResetUsersPlaceholder')" :aria-invalid="invalidScopeFields.has('passwordResetUserIds')" @input="invalidScopeFields.delete('passwordResetUserIds')" />
+                      <p v-if="invalidScopeFields.has('passwordResetUserIds')" class="field-error">{{ t('tenantImport.passwordResetUsersInvalid') }}</p>
+                    </div>
+                    <div v-if="selectedPermissions.includes('DOMAIN_USER_MANAGE')" class="permission-scope-field">
+                      <div class="permission-field-label">
+                        <label for="user-management-groups">{{ t('tenantImport.userManagementGroups') }}<span aria-hidden="true">*</span></label>
+                        <el-popover trigger="click" :width="340" placement="top" popper-class="permission-info-popover">
+                          <template #reference><button type="button" class="permission-info-button" :aria-label="t('tenantImport.permissionDetailsFor', { name: t('tenantImport.userManagementGroups') })" @click.stop.prevent><i class="i-mdi-alert-circle-outline" aria-hidden="true" /></button></template>
+                          <div class="permission-info-content"><p>{{ t('tenantImport.userManagementGroupsHint') }}</p></div>
+                        </el-popover>
+                      </div>
+                      <textarea id="user-management-groups" v-model="userManagementGroups" rows="3" :disabled="locked" :placeholder="t('tenantImport.userManagementGroupsPlaceholder')" :aria-invalid="invalidScopeFields.has('userManagementGroupIds')" @input="invalidScopeFields.delete('userManagementGroupIds')" />
+                      <p v-if="invalidScopeFields.has('userManagementGroupIds')" class="field-error">{{ t('tenantImport.userManagementGroupsInvalid') }}</p>
+                    </div>
+                  </div>
+                  <details v-if="group.unavailable.length" class="permission-unavailable">
+                    <summary><i class="i-mdi-information-outline" aria-hidden="true" /><span>{{ t('tenantImport.permissionUnavailableTitle', { count: group.unavailable.length }) }}</span><i class="i-mdi-chevron-down permission-disclosure" aria-hidden="true" /></summary>
+                    <p class="permission-unavailable-intro">{{ t('tenantImport.permissionUnavailableHint') }}</p>
+                    <ul>
+                      <li v-for="item in group.unavailable" :key="item.code">
+                        <span class="permission-unavailable-name">{{ permissionLabel(item) }}</span>
+                        <span>{{ item.reason || t('tenantImport.permissionUnsupported') }}</span>
+                      </li>
+                    </ul>
+                  </details>
+                </fieldset>
+              </div>
+            </template>
+          </section>
         </div>
-        <footer class="import-footer"><span v-if="invalidFields.size || fileErrorKey" role="status" class="is-error">{{ t('tenantImport.validationSummary') }}</span><span v-else>{{ t(`tenantImport.${provider === 1 ? 'ociSaveHint' : 'gcpSaveHint'}`) }}</span><button type="button" class="text-button" :disabled="saving" @click="goBack">{{ t('tenantImport.cancel') }}</button></footer>
+        <footer class="import-footer"><span v-if="invalidFields.size || fileErrorKey || invalidScopeFields.size" role="status" class="is-error">{{ t('tenantImport.validationSummary') }}</span><span v-else>{{ t(`tenantImport.${saveHintKey}`) }}</span><button type="button" class="text-button" :disabled="saving" @click="goBack">{{ t('tenantImport.cancel') }}</button></footer>
       </template>
     </form>
   </div>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { hasTenantPermission, isManagedTenant, type TenantPermission } from '@/utils/tenantPermissions'
 import PageErrorNotice from '@/components/PageErrorNotice.vue'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -18,8 +19,13 @@ const { t, locale } = useI18n()
 const compact = useCompactViewport()
 const route = useRoute()
 const tenantId = computed(() => String(props.tenant?.id ?? ''))
+const managed = computed(() => isManagedTenant(props.tenant))
+const allowed = (permission: TenantPermission) => hasTenantPermission(props.tenant, permission)
+const canManageSecurity = computed(() => allowed('DOMAIN_SECURITY_MANAGE'))
+const canManageDomainUsers = computed(() => allowed('DOMAIN_USER_MANAGE'))
 const tenantName = computed(() => props.tenant?.defName || props.tenant?.tenancyName || t('tenantIdentity.currentTenant'))
-const visible = computed(() => !!props.tenant && ['users', 'email', 'social'].includes(props.action))
+const visible = computed(() => !!props.tenant && ['users', 'email', 'social'].includes(props.action)
+  && (props.action === 'users' ? allowed('USER_READ') : props.action === 'social' ? canManageSecurity.value : !managed.value))
 const title = computed(() => ['users', 'email', 'social'].includes(props.action) ? t(`tenantIdentity.titles.${props.action}`) : '')
 const tab = ref('users')
 const editor = ref('')
@@ -43,6 +49,7 @@ const policies = ref<Row[]>([])
 const policyReady = ref(false)
 const policyForm = reactive({ enablePasswordExpiry: false, expiryDays: 120 })
 const credentials = ref<Row | null>(null)
+const passwordResetNotice = ref('')
 const emailDomain = ref('')
 const emailReadOnly = ref(false)
 const socialRows = ref<Row[]>([])
@@ -96,7 +103,7 @@ async function mutate(request: () => Promise<any>, success: (data: any) => void 
   try {
     const result = await request()
     if (current !== generation) return
-    ElMessage.success(t(messageKey))
+    if (messageKey) ElMessage.success(t(messageKey))
     emit('changed')
     await success(result)
   } catch (error) {
@@ -111,6 +118,7 @@ function close() {
 }
 
 function loadUsers() {
+  if (!allowed('USER_READ')) return
   return read('users', signal => tenantGet<Row[]>('/tenants/oracle-users', { tenantId: tenantId.value }, { signal }), data => {
     users.value = Array.isArray(data) ? data : []
     page.value = Math.max(1, Math.min(page.value, Math.ceil(users.value.length / pageSize)))
@@ -118,6 +126,7 @@ function loadUsers() {
 }
 
 function loadGroups() {
+  if (managed.value || !allowed('USER_CREATE')) return
   groupsReady.value = false
   return read('groups', signal => tenantPost<Row[]>('/tenants/groups', { tenantId: tenantId.value }, { signal }), data => {
     groups.value = Array.isArray(data) ? data : []
@@ -126,38 +135,72 @@ function loadGroups() {
 }
 
 function addUser() {
+  if (!allowed('USER_CREATE')) return
   Object.assign(userForm, { username: '', email: '', groupId: '', useEmail: false })
   editor.value = 'user'
-  void loadGroups()
+  if (!managed.value) void loadGroups()
 }
 
 async function createUser() {
+  if (!allowed('USER_CREATE')) return
   const email = userForm.email.trim()
   const username = userForm.useEmail ? email : userForm.username.trim()
-  if (!username || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !userForm.groupId) {
+  if (!username || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || (!managed.value && !userForm.groupId)) {
     ElMessage.warning(t('tenantIdentity.validation.user'))
     return
   }
   const groupName = groups.value.find(group => group.groupId === userForm.groupId)?.groupName || ''
-  await mutate(() => tenantPost('/tenants/oracle-users', { tenantId: tenantId.value, username, email, groupId: userForm.groupId }), async result => {
+  await mutate(() => tenantPost('/tenants/oracle-users', { tenantId: tenantId.value, username, email, ...(managed.value ? {} : { groupId: userForm.groupId }) }), async result => {
     editor.value = ''
-    credentials.value = { username: result.username, email: result.email, group: groupName, password: result.password }
+    if (!managed.value) credentials.value = { username: result.username, email: result.email, group: groupName, password: result.password }
     page.value = 1
     await loadUsers()
   }, 'tenantIdentity.messages.userCreated')
 }
 
 async function resetPassword(user: Row) {
-  if (!await confirm(t('tenantIdentity.confirmations.resetPassword', { username: displayUsername(user.username) }), t('tenantIdentity.actions.resetPassword'))) return
+  if (!canResetUserPassword(user)) return
+  if (!await confirm(t(managed.value ? 'tenantIdentity.confirmations.resetPasswordManaged' : 'tenantIdentity.confirmations.resetPassword', { username: displayUsername(user.username) }), t('tenantIdentity.actions.resetPassword'))) return
+  passwordResetNotice.value = ''
   await mutate(() => tenantPost('/tenants/oracle-users/resetPassword', { tenantId: tenantId.value, userId: user.id, userName: user.username }, { timeout: 30000 }), result => {
     const data = result.data || {}
-    credentials.value = { username: data.loginUser || displayUsername(user.username), password: data.temporaryPassword || '', resetTime: data.resetTime }
-  }, 'tenantIdentity.messages.passwordReset')
+    if (data.success === false) throw new Error(data.message || t('tenantIdentity.messages.error'))
+    if (typeof data.temporaryPassword === 'string' && data.temporaryPassword) {
+      credentials.value = { username: data.loginUser || displayUsername(user.username), password: data.temporaryPassword, resetTime: data.resetTime }
+      ElMessage.success(t('tenantIdentity.messages.passwordReset'))
+    } else {
+      credentials.value = null
+      passwordResetNotice.value = data.message || t(data.emailSent === true ? 'tenantIdentity.messages.passwordResetEmail' : 'tenantIdentity.messages.passwordResetAccepted')
+      ElMessage.success(passwordResetNotice.value)
+    }
+  }, '')
 }
 
 async function deleteUser(user: Row) {
+  if (!canDeleteUser(user)) return
   if (!await confirm(t('tenantIdentity.confirmations.deleteUser', { username: displayUsername(user.username) }), t('tenantIdentity.actions.deleteUser'))) return
   await mutate(() => tenantPost('/tenants/oracle-users/deleteUser', { tenantId: tenantId.value, userId: user.id }), loadUsers, 'tenantIdentity.messages.userDeleted')
+}
+
+function canResetUserPassword(user: Row) {
+  return managed.value ? user.canResetPassword === true : allowed('USER_PASSWORD_RESET')
+}
+function canDeleteUser(user: Row) {
+  return managed.value ? user.canDelete === true : allowed('USER_DELETE')
+}
+function canChangeUserState(user: Row) {
+  return typeof user.active === 'boolean' && user.canManage === true && (!managed.value || canManageDomainUsers.value)
+}
+async function changeUserState(user: Row) {
+  if (!canChangeUserState(user)) return
+  const active = !user.active
+  if (!await confirm(t(active ? 'tenantIdentity.confirmations.enableUser' : 'tenantIdentity.confirmations.disableUser', { username: displayUsername(user.username) }), t(active ? 'tenantIdentity.actions.enableUser' : 'tenantIdentity.actions.disableUser'))) return
+  await mutate(() => tenantPost('/tenants/oracle-users/state', { tenantId: tenantId.value, userId: user.id, active }), loadUsers,
+    active ? 'tenantIdentity.messages.userEnabled' : 'tenantIdentity.messages.userDisabled')
+}
+function userStatusLabel(user: Row) {
+  if (typeof user.active === 'boolean') return t(user.active ? 'tenantIdentity.status.enabled' : 'tenantIdentity.status.disabled')
+  return userStatus(user.lifecycleState)
 }
 
 function displayUsername(value: string = '') { return value.split('/').pop() || '—' }
@@ -176,6 +219,7 @@ function closeEditor() {
 }
 
 function loadPolicy() {
+  if (!canManageSecurity.value) return
   policyReady.value = false
   return read('policy', signal => tenantPost('/tenants/oracle-users/getPasspolicy', { tenantId: tenantId.value }, { signal }), result => {
     policies.value = Array.isArray(result.data) ? result.data : []
@@ -187,11 +231,13 @@ function loadPolicy() {
 }
 
 function openPolicy() {
+  if (!canManageSecurity.value) return
   editor.value = 'policy'
   void loadPolicy()
 }
 
 async function savePolicy() {
+  if (!canManageSecurity.value) return
   const days = Number(policyForm.expiryDays)
   if (policyForm.enablePasswordExpiry && (!Number.isInteger(days) || days < 0 || days > 365)) {
     ElMessage.warning(t('tenantIdentity.validation.expiryDays'))
@@ -205,12 +251,14 @@ async function savePolicy() {
 }
 
 function loadRecipients() {
+  if (!canManageSecurity.value) return
   return read('notifications', signal => tenantPost('/tenants/notification/recipients', { tenantId: tenantId.value }, { signal }), result => {
     recipients.value = result.recipients || []
   })
 }
 
 async function updateRecipient(removeEmail?: string) {
+  if (!canManageSecurity.value) return
   const email = notificationEmail.value.trim().toLowerCase()
   if (!removeEmail && !/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email)) {
     ElMessage.warning(t('tenantIdentity.validation.email'))
@@ -233,27 +281,32 @@ async function updateRecipient(removeEmail?: string) {
 }
 
 function loadMfa() {
+  if (!canManageSecurity.value) return
   return read('mfa', signal => tenantGet('/tenants/mfa/status', { tenantId: tenantId.value }, { signal }), result => { mfa.value = result.data || {} })
 }
 
 async function updateEmailMfa(enableEmail: boolean) {
+  if (!canManageSecurity.value) return
   const action = enableEmail ? 'enableEmailMfa' : 'disableEmailMfa'
   if (!await confirm(t(`tenantIdentity.confirmations.${action}`), t(`tenantIdentity.actions.${action}`))) return
   await mutate(() => tenantPost('/tenants/mfa/email', { tenantId: tenantId.value, enableEmail }), loadMfa, 'tenantIdentity.messages.emailMfaSaved')
 }
 
 async function resetMfa() {
+  if (!canManageSecurity.value) return
   if (!await confirm(t('tenantIdentity.confirmations.resetMfa'), t('tenantIdentity.actions.resetMfa'))) return
   await mutate(() => tenantPost('/tenants/resetAccountFactor', new URLSearchParams({ tenantId: tenantId.value }), { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }), loadMfa, 'tenantIdentity.messages.mfaReset')
 }
 
 function loadEmail() {
+  if (managed.value) return
   return read('email', signal => tenantPost('/email/tenant/get', { tenantId: tenantId.value }, { signal }), result => {
     emailDomain.value = result.data?.[0]?.domainName || ''
   })
 }
 
 async function saveEmail() {
+  if (managed.value) return
   const domain = emailDomain.value.trim()
   if (!domain || domain.length > 100 || !/^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/.test(domain)) {
     ElMessage.warning(t('tenantIdentity.validation.domain'))
@@ -264,6 +317,7 @@ async function saveEmail() {
 }
 
 function loadSocial() {
+  if (!canManageSecurity.value) return
   return read('social', async signal => {
     const results = await Promise.allSettled([
       tenantPost('/social/list', { tenantId: tenantId.value, cloudType: Number(props.tenant?.cloudType || 1) }, { signal }),
@@ -285,6 +339,7 @@ function loadSocial() {
 }
 
 function editSocial(row?: Row) {
+  if (!canManageSecurity.value) return
   Object.assign(socialForm, {
     id: row?.id || '', socialTypeStr: row?.socialTypeStr || row?.serviceProviderName || socialTypes.value[0] || '',
     clientId: row?.clientId || '', clientSecret: row?.clientSecret || '', redirectUrl: row?.redirectUrl || '',
@@ -293,6 +348,7 @@ function editSocial(row?: Row) {
 }
 
 async function saveSocial() {
+  if (!canManageSecurity.value) return
   if (!socialForm.socialTypeStr || !socialForm.clientId.trim() || !socialForm.clientSecret.trim()) {
     ElMessage.warning(t('tenantIdentity.validation.social'))
     return
@@ -312,6 +368,7 @@ async function saveSocial() {
 }
 
 async function toggleSocial(row: Row) {
+  if (!canManageSecurity.value) return
   const enable = row.socialStatus === 'disabled'
   const provider = row.socialTypeStr || row.serviceProviderName
   if (!await confirm(t(enable ? 'tenantIdentity.confirmations.enableSocial' : 'tenantIdentity.confirmations.disableSocial', { provider }), t('tenantIdentity.actions.changeLoginStatus'))) return
@@ -360,6 +417,7 @@ watch(() => [props.action, tenantId.value], () => {
   recipients.value = []
   mfa.value = null
   credentials.value = null
+  passwordResetNotice.value = ''
   notificationEmail.value = ''
   emailDomain.value = ''
   socialRows.value = []
@@ -384,7 +442,7 @@ watch(() => [route.query.mobileRecord, tenantId.value, props.action], () => {
   if (!compact.value || !visible.value || props.action !== 'users' || busy.value) return
   const selected = route.query.mobileRecord
   if (typeof selected !== 'string') return
-  if (selected.startsWith(`${recipientsListId.value}:`)) tab.value = 'notifications'
+  if (canManageSecurity.value && selected.startsWith(`${recipientsListId.value}:`)) tab.value = 'notifications'
   else if (selected.startsWith(`${usersListId.value}:`)) tab.value = 'users'
 }, { immediate: true })
 
@@ -399,25 +457,26 @@ onBeforeUnmount(() => { generation += 1; readController.abort() })
       <template v-if="action === 'users'">
         <el-tabs v-model="tab" class="identity-tabs">
           <el-tab-pane :label="t('tenantIdentity.tabs.users')" name="users" :disabled="busy" />
-          <el-tab-pane :label="t('tenantIdentity.tabs.notifications')" name="notifications" :disabled="busy" />
-          <el-tab-pane :label="t('tenantIdentity.tabs.mfa')" name="mfa" :disabled="busy" />
+          <el-tab-pane v-if="canManageSecurity" :label="t('tenantIdentity.tabs.notifications')" name="notifications" :disabled="busy" />
+          <el-tab-pane v-if="canManageSecurity" :label="t('tenantIdentity.tabs.mfa')" name="mfa" :disabled="busy" />
         </el-tabs>
         <Transition name="identity-panel" mode="out-in">
           <section v-if="tab === 'users'" :key="'users-' + editor" class="identity-panel">
             <template v-if="!editor">
-              <div class="toolbar"><p class="secondary">{{ t('tenantIdentity.descriptions.users') }}</p><div class="actions"><el-button :disabled="busy || loading.users" @click="loadUsers">{{ t('tenantIdentity.actions.refresh') }}</el-button><el-button :disabled="busy" @click="openPolicy">{{ t('tenantIdentity.actions.passwordPolicy') }}</el-button><el-button type="primary" :disabled="busy" @click="addUser">{{ t('tenantIdentity.actions.addUser') }}</el-button></div></div>
+              <div class="toolbar"><p class="secondary">{{ t('tenantIdentity.descriptions.users') }}</p><div class="actions"><el-button :disabled="busy || loading.users" @click="loadUsers">{{ t('tenantIdentity.actions.refresh') }}</el-button><el-button v-if="canManageSecurity" :disabled="busy" @click="openPolicy">{{ t('tenantIdentity.actions.passwordPolicy') }}</el-button><el-button v-if="allowed('USER_CREATE')" type="primary" :disabled="busy" @click="addUser">{{ t('tenantIdentity.actions.addUser') }}</el-button></div></div>
+              <el-alert v-if="passwordResetNotice" :title="passwordResetNotice" type="success" :closable="true" show-icon @close="passwordResetNotice = ''" />
               <PageErrorNotice v-if="errors.users">{{ errorMessage(errors.users) }}</PageErrorNotice>
               <MobileRecordList v-if="compact" drilldown :list-id="usersListId" :record-keys="users.map(row => String(row.id))" :loading="loading.users" class="identity-mobile-list">
-                <MobileRecordCard v-for="row in mobileUsers" :key="row.id" :record-key="String(row.id)" :summary-title="displayUsername(row.username)" :summary-meta="row.email || row.domain || '—'" :summary-status="userStatus(row.lifecycleState)" :summary-tone="row.lifecycleState === 'Active' ? 'success' : 'neutral'">
+                <MobileRecordCard v-for="row in mobileUsers" :key="row.id" :record-key="String(row.id)" :summary-title="displayUsername(row.username)" :summary-meta="row.email || row.domain || '—'" :summary-status="userStatusLabel(row)" :summary-tone="(row.active === true || (row.active == null && row.lifecycleState === 'Active')) ? 'success' : 'neutral'">
                   <template #identity><h3 class="mobile-record-title">{{ displayUsername(row.username) }}</h3></template>
                   <dl class="mobile-record-fields">
                     <div class="mobile-record-wide"><dt>{{ t('tenantIdentity.labels.domain') }}</dt><dd>{{ row.domain || '—' }}</dd></div>
                     <div class="mobile-record-wide"><dt>{{ t('tenantIdentity.labels.email') }}</dt><dd>{{ row.email || '—' }}</dd></div>
-                    <div><dt>{{ t('tenantIdentity.labels.status') }}</dt><dd><span class="status-pill" :class="row.lifecycleState === 'Active' ? 'is-active' : 'is-inactive'">{{ userStatus(row.lifecycleState) }}</span></dd></div>
+                    <div><dt>{{ t('tenantIdentity.labels.status') }}</dt><dd><span class="status-pill" :class="(row.active === true || (row.active == null && row.lifecycleState === 'Active')) ? 'is-active' : 'is-inactive'">{{ userStatusLabel(row) }}</span></dd></div>
                     <div class="mobile-record-wide"><dt>{{ t('tenantIdentity.labels.createdAt') }}</dt><dd>{{ row.timeCreated || '—' }}</dd></div>
                     <div class="mobile-record-wide"><dt>{{ t('tenantIdentity.labels.lastLogin') }}</dt><dd>{{ row.lastSuccessfulLoginTime || '—' }}</dd></div>
                   </dl>
-                  <template #footer><el-button :disabled="busy || loading.users" @click="resetPassword(row)">{{ t('tenantIdentity.actions.resetPassword') }}</el-button><el-button type="danger" plain :disabled="busy || loading.users" @click="deleteUser(row)">{{ t('tenantIdentity.actions.delete') }}</el-button></template>
+                  <template #footer><el-button v-if="canChangeUserState(row)" :type="row.active ? 'warning' : 'primary'" plain :disabled="busy || loading.users" @click="changeUserState(row)">{{ t(row.active ? 'tenantIdentity.actions.disableUser' : 'tenantIdentity.actions.enableUser') }}</el-button><el-button v-if="canResetUserPassword(row)" :disabled="busy || loading.users" @click="resetPassword(row)">{{ t('tenantIdentity.actions.resetPassword') }}</el-button><el-button v-if="canDeleteUser(row)" type="danger" plain :disabled="busy || loading.users" @click="deleteUser(row)">{{ t('tenantIdentity.actions.delete') }}</el-button></template>
                 </MobileRecordCard>
                 <p v-if="loading.users || !users.length" class="identity-mobile-empty" role="status">{{ t(loading.users ? 'pageLoading.loading' : 'tenantIdentity.empty.users') }}</p>
               </MobileRecordList>
@@ -425,21 +484,21 @@ onBeforeUnmount(() => { generation += 1; readController.abort() })
                 <el-table-column prop="domain" :label="t('tenantIdentity.labels.domain')" min-width="105" show-overflow-tooltip />
                 <el-table-column :label="t('tenantIdentity.labels.username')" min-width="135" show-overflow-tooltip><template #default="{ row }"><span class="user-name">{{ displayUsername(row.username) }}</span></template></el-table-column>
                 <el-table-column prop="email" :label="t('tenantIdentity.labels.email')" min-width="185" show-overflow-tooltip />
-                <el-table-column :label="t('tenantIdentity.labels.status')" width="88"><template #default="{ row }"><span class="status-pill" :class="row.lifecycleState === 'Active' ? 'is-active' : 'is-inactive'">{{ userStatus(row.lifecycleState) }}</span></template></el-table-column>
+                <el-table-column :label="t('tenantIdentity.labels.status')" width="88"><template #default="{ row }"><span class="status-pill" :class="(row.active === true || (row.active == null && row.lifecycleState === 'Active')) ? 'is-active' : 'is-inactive'">{{ userStatusLabel(row) }}</span></template></el-table-column>
                 <el-table-column prop="timeCreated" :label="t('tenantIdentity.labels.createdAt')" min-width="165" show-overflow-tooltip />
                 <el-table-column :label="t('tenantIdentity.labels.lastLogin')" min-width="165" show-overflow-tooltip><template #default="{ row }">{{ row.lastSuccessfulLoginTime || '—' }}</template></el-table-column>
-                <el-table-column :label="t('tenantIdentity.labels.actions')" :width="locale.startsWith('en') ? 188 : 146" fixed="right"><template #default="{ row }"><el-button link :disabled="busy" @click="resetPassword(row)">{{ t('tenantIdentity.actions.resetPassword') }}</el-button><el-button link type="danger" :disabled="busy" @click="deleteUser(row)">{{ t('tenantIdentity.actions.delete') }}</el-button></template></el-table-column>
+                <el-table-column :label="t('tenantIdentity.labels.actions')" :width="locale.startsWith('en') ? 278 : 230" fixed="right"><template #default="{ row }"><el-button v-if="canChangeUserState(row)" link :type="row.active ? 'warning' : 'primary'" :disabled="busy" @click="changeUserState(row)">{{ t(row.active ? 'tenantIdentity.actions.disableUser' : 'tenantIdentity.actions.enableUser') }}</el-button><el-button v-if="canResetUserPassword(row)" link :disabled="busy" @click="resetPassword(row)">{{ t('tenantIdentity.actions.resetPassword') }}</el-button><el-button v-if="canDeleteUser(row)" link type="danger" :disabled="busy" @click="deleteUser(row)">{{ t('tenantIdentity.actions.delete') }}</el-button></template></el-table-column>
               </el-table>
               <PagePagination embedded class="identity-pagination" v-model:current-page="page" :page-size="pageSize" :total="users.length" :disabled="busy"><span class="secondary">{{ t('tenantIdentity.counts.users', { count: users.length }) }}</span></PagePagination>
             </template>
             <div v-else-if="editor === 'user'" class="form-panel" v-loading="loading.groups">
-              <div class="section-title"><el-button text :disabled="busy" @click="closeEditor">← {{ t('tenantIdentity.actions.backToUsers') }}</el-button><h3>{{ t('tenantIdentity.actions.addUser') }}</h3><p class="secondary">{{ t('tenantIdentity.descriptions.newUser') }}</p></div>
+              <div class="section-title"><el-button text :disabled="busy" @click="closeEditor">← {{ t('tenantIdentity.actions.backToUsers') }}</el-button><h3>{{ t('tenantIdentity.actions.addUser') }}</h3><p class="secondary">{{ managed ? t('tenantIdentity.descriptions.restrictedNewUser') : t('tenantIdentity.descriptions.newUser') }}</p></div>
               <PageErrorNotice v-if="errors.groups"><p>{{ errorMessage(errors.groups) }}</p><el-button text @click="loadGroups">{{ t('tenantIdentity.actions.reloadGroups') }}</el-button></PageErrorNotice>
               <el-form label-position="top" :disabled="busy" @submit.prevent="createUser">
                 <div class="form-grid"><el-form-item :label="t('tenantIdentity.labels.username')" required><el-input :model-value="userForm.useEmail ? userForm.email : userForm.username" @update:model-value="userForm.username = $event" :disabled="userForm.useEmail" :placeholder="t('tenantIdentity.placeholders.username')" autocomplete="off" /></el-form-item><el-form-item :label="t('tenantIdentity.labels.email')" required><el-input v-model="userForm.email" type="email" :placeholder="t('tenantIdentity.placeholders.email')" /></el-form-item></div>
                 <el-checkbox v-model="userForm.useEmail">{{ t('tenantIdentity.labels.useEmail') }}</el-checkbox>
-                <el-form-item :label="t('tenantIdentity.labels.userGroup')" required><el-select v-model="userForm.groupId" popper-class="tenant-identity-select" :placeholder="t('tenantIdentity.placeholders.group')" :disabled="!groupsReady"><el-option v-for="group in groups" :key="group.groupId" :label="group.groupName" :value="group.groupId" /></el-select></el-form-item>
-                <div class="form-actions"><el-button :disabled="busy" @click="closeEditor">{{ t('tenantIdentity.actions.cancel') }}</el-button><el-button type="primary" native-type="submit" :loading="busy" :disabled="!groupsReady || !groups.length">{{ t('tenantIdentity.actions.createUser') }}</el-button></div>
+                <el-form-item v-if="!managed" :label="t('tenantIdentity.labels.userGroup')" required><el-select v-model="userForm.groupId" popper-class="tenant-identity-select" :placeholder="t('tenantIdentity.placeholders.group')" :disabled="!groupsReady"><el-option v-for="group in groups" :key="group.groupId" :label="group.groupName" :value="group.groupId" /></el-select></el-form-item>
+                <div class="form-actions"><el-button :disabled="busy" @click="closeEditor">{{ t('tenantIdentity.actions.cancel') }}</el-button><el-button type="primary" native-type="submit" :loading="busy" :disabled="!managed && (!groupsReady || !groups.length)">{{ t('tenantIdentity.actions.createUser') }}</el-button></div>
               </el-form>
             </div>
             <div v-else-if="editor === 'policy'" class="form-panel" v-loading="loading.policy">
@@ -450,7 +509,7 @@ onBeforeUnmount(() => { generation += 1; readController.abort() })
             </div>
           </section>
 
-          <section v-else-if="tab === 'notifications'" key="notifications" class="identity-panel">
+          <section v-else-if="tab === 'notifications' && canManageSecurity" key="notifications" class="identity-panel">
             <div class="toolbar"><p class="secondary">{{ t('tenantIdentity.descriptions.notifications') }}</p><div class="actions"><el-button :disabled="busy || loading.notifications" @click="loadRecipients">{{ t('tenantIdentity.actions.refresh') }}</el-button><el-button v-if="editor !== 'notification'" type="primary" :disabled="busy" @click="editor = 'notification'">{{ t('tenantIdentity.actions.addRecipient') }}</el-button></div></div>
             <PageErrorNotice v-if="errors.notifications">{{ errorMessage(errors.notifications) }}</PageErrorNotice>
             <el-form v-if="editor === 'notification'" class="notification-form" label-position="top" @submit.prevent="updateRecipient()"><el-form-item :label="t('tenantIdentity.labels.notificationEmail')" required><el-input v-model="notificationEmail" type="email" :placeholder="t('tenantIdentity.placeholders.email')" :disabled="busy" /></el-form-item><div class="actions"><el-button :disabled="busy" @click="closeEditor">{{ t('tenantIdentity.actions.cancel') }}</el-button><el-button type="primary" native-type="submit" :loading="busy">{{ t('tenantIdentity.actions.add') }}</el-button></div></el-form>
@@ -466,7 +525,7 @@ onBeforeUnmount(() => { generation += 1; readController.abort() })
             <div class="table-footer secondary">{{ t('tenantIdentity.counts.recipients', { count: recipients.length }) }}</div>
           </section>
 
-          <section v-else key="mfa" class="identity-panel" v-loading="loading.mfa">
+          <section v-else-if="canManageSecurity" key="mfa" class="identity-panel" v-loading="loading.mfa">
             <div class="toolbar"><p class="secondary">{{ t('tenantIdentity.descriptions.mfa') }}</p><el-button :disabled="busy || loading.mfa" @click="loadMfa">{{ t('tenantIdentity.actions.refreshStatus') }}</el-button></div>
             <PageErrorNotice v-if="errors.mfa">{{ errorMessage(errors.mfa) }}</PageErrorNotice>
             <div class="factor-list"><div v-for="factor in mfaFactors" :key="factor.key" class="factor-row"><div class="factor-icon" :class="factor.icon" /><div class="factor-label"><strong>{{ factor.name }}</strong><p class="secondary">{{ factor.description }}</p></div><span class="status-pill" :class="mfa?.[factor.key] ? 'is-active' : 'is-inactive'">{{ t(mfa ? (mfa[factor.key] ? 'tenantIdentity.status.enabled' : 'tenantIdentity.status.notEnabled') : 'tenantIdentity.status.pending') }}</span></div></div>

@@ -68,6 +68,7 @@ export function useTenantInstances() {
     const requestedPage = page.value
     const requestedSize = size.value
     if (dataKey !== key || invalidScope.value) clearData(key)
+    else rows.value = rows.value.map(row => ({ ...row, permissionContext: undefined }))
     problem.value = null
     if (invalidScope.value) {
       loading.value = false

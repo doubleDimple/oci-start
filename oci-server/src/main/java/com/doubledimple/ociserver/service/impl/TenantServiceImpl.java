@@ -40,6 +40,10 @@ import com.doubledimple.ociserver.pojo.enums.MessageEnum;
 import com.doubledimple.ociserver.pojo.request.AuditLogRequest;
 import com.doubledimple.ociserver.pojo.request.DeleteOciUserRequest;
 import com.doubledimple.ociserver.pojo.request.ResetOciPassRequest;
+import com.doubledimple.ociserver.pojo.request.UpdateOciUserStateRequest;
+import com.doubledimple.ociserver.service.permissions.ManagedAccountAccessService;
+import com.doubledimple.ociserver.service.permissions.OciPermissionDeniedException;
+import com.doubledimple.ociserver.service.permissions.OciPermissions;
 import com.doubledimple.ociserver.pojo.response.PasswordPolicyDetail;
 import com.doubledimple.ociserver.pojo.response.ResetOciPassResponse;
 import com.doubledimple.ociserver.service.DbConfigService;
@@ -114,6 +118,8 @@ import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -127,7 +133,6 @@ import java.util.stream.Collectors;
 
 import static com.doubledimple.ocicommon.template.MessageTemplate.MESSAGE_CONFIG_DEAD_ACCOUNT_TEMPLATE;
 import static com.doubledimple.ocicommon.template.MessageTemplate.MESSAGE_CONFIG_SUCCESS_ACCOUNT_TEMPLATE;
-import static com.doubledimple.ocicommon.template.MessageTemplate.MESSAGE_CONSOLE_PASSWORD_RESET_WITH_PASSWORD_TEMPLATE;
 import static com.doubledimple.ocicommon.utils.DateTimeUtils.calculateDaysFromNow;
 import static com.doubledimple.ocicommon.utils.FileUtils.deleteFile;
 import static com.doubledimple.ociserver.utils.oracle.OciCliUtils.createVcnAndFlowLogs;
@@ -146,6 +151,9 @@ public class TenantServiceImpl implements TenantService {
 
     @Resource
     private TenantRepository tenantRepository;
+
+    @Resource
+    private com.doubledimple.ociserver.service.permissions.ManagedTenantImportService managedTenantImportService;
 
     @Resource
     private VpnProxyRecordRepository vpnProxyRecordRepository;
@@ -490,6 +498,23 @@ public class TenantServiceImpl implements TenantService {
     @Override
     public void saveTenant(Tenant tenant, MultipartFile keyFile) throws IOException {
         int cloudType = tenant.getCloudType();
+        if (CloudTypeEnum.ORACLE_CLOUD.getType() == cloudType) {
+            if (tenantRepository.findByTenantId(tenant.getTenantId()).stream()
+                    .anyMatch(com.doubledimple.ociserver.service.permissions.OciPermissions::isManaged)) {
+                throw new IllegalArgumentException("该用户已作为受限 API 导入，请通过租户列表更新其授权");
+            }
+            // Direct import retains the supplied identity; it never provisions or changes OCI users.
+            // Do not accept client-supplied managed metadata through this legacy model-binding endpoint.
+            tenant.setPermissionMode(null);
+            tenant.setPermissionsJson(null);
+            tenant.setManagedUserName(null);
+            tenant.setManagedGroupId(null);
+            tenant.setManagedPolicyId(null);
+            tenant.setAccountScopeJson(null);
+            tenant.setManagedDomainId(null);
+            tenant.setManagedDomainUrl(null);
+            tenant.setManagedDomainGrantsJson(null);
+        }
         if (keyFile != null && !keyFile.isEmpty()) {
             String fileName = LocalDateTime.now() + "_" + keyFile.getOriginalFilename();
             FileUtils.checkFile(baseFile);
@@ -696,6 +721,9 @@ public class TenantServiceImpl implements TenantService {
         List<Tenant> tenants = new ArrayList<>();
         Tenant tenant = getById(Long.valueOf(tenantId));
         if (tenant != null){
+            if (com.doubledimple.ociserver.service.permissions.OciPermissions.isManaged(tenant)) {
+                return managedTenantImportService.refreshRegions(tenant);
+            }
             try {
                 self.deleteApi(Long.valueOf(tenantId),Boolean.FALSE);
                 Path path = Paths.get(tenant.getKeyFile()).toAbsolutePath().normalize();
@@ -850,33 +878,79 @@ public class TenantServiceImpl implements TenantService {
     @Override
     public ApiResponse resetPassword(ResetOciPassRequest request) {
         String userId = request.getUserId();
+        Tenant tenant = tenantRepository.findById(Long.valueOf(request.getTenantId()))
+                .orElseThrow(() -> new IllegalArgumentException("租户不存在"));
+        ManagedAccountAccessService.requireUserAction(tenant, "USER_PASSWORD_RESET", userId);
         try {
-            Tenant tenant = tenantRepository.findById(Long.valueOf(request.getTenantId())).get();
-            ResetOciPassResponse resetOciPassResponse = SignOnPolicyUtils.resetPass(tenant,userId);
+            ResetOciPassResponse resetOciPassResponse;
+            if (ManagedAccountAccessService.useDomainUserManager(tenant, "USER_PASSWORD_RESET", userId)) {
+                try (com.oracle.bmc.identitydomains.IdentityDomainsClient domains =
+                             ManagedAccountAccessService.openDomainClient(tenant)) {
+                    com.oracle.bmc.identitydomains.model.User user =
+                            ManagedAccountAccessService.resolveDomainUser(domains, tenant, userId);
+                    domains.putUserPasswordResetter(
+                            com.oracle.bmc.identitydomains.requests.PutUserPasswordResetterRequest.builder()
+                                    .userPasswordResetterId(user.getId())
+                                    .userPasswordResetter(com.oracle.bmc.identitydomains.model.UserPasswordResetter.builder()
+                                            .schemas(Collections.singletonList("urn:ietf:params:scim:schemas:oracle:idcs:UserPasswordResetter"))
+                                            .bypassNotification(false).build()).build());
+                    resetOciPassResponse = new ResetOciPassResponse();
+                    resetOciPassResponse.setSuccess(true);
+                    resetOciPassResponse.setEmailSent(true);
+                    resetOciPassResponse.setResetTime(com.doubledimple.ocicommon.utils.DateTimeUtils.formatDate(new Date()));
+                    resetOciPassResponse.setMessage("密码重置请求已完成，请用户查收身份域发送的重置邮件");
+                }
+            } else {
+                resetOciPassResponse = SignOnPolicyUtils.resetPass(tenant, userId);
+            }
             resetOciPassResponse.setLoginUser(request.getUserName());
             if (StringUtils.isNotBlank(resetOciPassResponse.getTemporaryPassword())) {
                 // 重置成功，发送通知
-                messageFactory.getType(MessageEnum.TELEGRAM).sendMessageTemplate(String.
-                        format(MESSAGE_CONSOLE_PASSWORD_RESET_WITH_PASSWORD_TEMPLATE,
-                                tenant.getUserName(),
-                                request.getUserName(),
-                                resetOciPassResponse.getTemporaryPassword(),
-                                resetOciPassResponse.getResetTime()
-                        ));
-                return ApiResponse.success(resetOciPassResponse);
-
-            } else if ("IDENTITY_DOMAIN_USER".equals(resetOciPassResponse.getResetTime())) {
-                return ApiResponse.error("该用户属于身份域，请在OCI控制台的身份域中手动重置密码");
-
-            } else if ("PERMISSION_DENIED".equals(resetOciPassResponse.getResetTime())) {
-                return ApiResponse.error("权限不足，无法重置该用户的密码");
-
-            } else {
-                return ApiResponse.error("密码重置失败，请检查用户状态");
+                try {
+                    messageFactory.getType(MessageEnum.TELEGRAM).sendMessageTemplate(
+                            "控制台密码重置成功，用户：" + request.getUserName()
+                                    + "。请在本次操作结果中查看临时密码。");
+                } catch (Exception notificationError) {
+                    log.warn("密码重置已完成，但发送结果通知失败");
+                }
             }
+            return ApiResponse.success(resetOciPassResponse);
+        } catch (OciPermissionDeniedException e) {
+            throw e;
+        } catch (com.oracle.bmc.model.BmcException e) {
+            log.warn("OCI 密码重置失败，HTTP状态：{}", e.getStatusCode());
+            return ApiResponse.error("密码重置未完成：OCI 拒绝请求或目标用户不可用（HTTP " + e.getStatusCode() + "）");
         } catch (Exception e) {
-            log.error("重置密码失败: {}", e.getMessage(), e);
-            return ApiResponse.error("密码重置失败：" + e.getMessage());
+            log.warn("密码重置未完成");
+            return ApiResponse.error("密码重置未完成，请检查用户状态及身份域配置");
+        }
+    }
+
+    @Override
+    public ApiResponse updateUserState(UpdateOciUserStateRequest request) {
+        if (request.getActive() == null) throw new IllegalArgumentException("必须明确指定启用或禁用");
+        Tenant tenant = tenantRepository.findById(Long.valueOf(request.getTenantId()))
+                .orElseThrow(() -> new IllegalArgumentException("租户不存在"));
+        ManagedAccountAccessService.requireUserAction(tenant, "DOMAIN_USER_MANAGE", request.getUserId());
+        try (com.oracle.bmc.identitydomains.IdentityDomainsClient domains =
+                     ManagedAccountAccessService.openDomainClient(tenant)) {
+            com.oracle.bmc.identitydomains.model.User user =
+                    ManagedAccountAccessService.resolveDomainUser(domains, tenant, request.getUserId());
+            domains.putUserStatusChanger(com.oracle.bmc.identitydomains.requests.PutUserStatusChangerRequest.builder()
+                    .userStatusChangerId(user.getId())
+                    .userStatusChanger(com.oracle.bmc.identitydomains.model.UserStatusChanger.builder()
+                            .schemas(Collections.singletonList("urn:ietf:params:scim:schemas:oracle:idcs:UserStatusChanger"))
+                            .active(request.getActive()).build()).build());
+            Map<String, Object> result = new HashMap<>();
+            result.put("userId", request.getUserId());
+            result.put("active", request.getActive());
+            result.put("message", request.getActive() ? "用户已启用" : "用户已禁用");
+            return ApiResponse.success(result);
+        } catch (OciPermissionDeniedException e) {
+            throw e;
+        } catch (com.oracle.bmc.model.BmcException e) {
+            log.warn("OCI 用户状态修改失败，HTTP状态：{}", e.getStatusCode());
+            return ApiResponse.error("用户状态未修改：OCI 拒绝请求或目标用户不可用（HTTP " + e.getStatusCode() + "）");
         }
     }
 
@@ -960,13 +1034,33 @@ public class TenantServiceImpl implements TenantService {
     @Override
     public ApiResponse deleteUser(DeleteOciUserRequest request) {
         String userId = request.getUserId();
+        Tenant tenant = tenantRepository.findById(Long.valueOf(request.getTenantId()))
+                .orElseThrow(() -> new IllegalArgumentException("租户不存在"));
+        ManagedAccountAccessService.requireUserAction(tenant, "USER_DELETE", userId);
         try {
-            Tenant tenant = tenantRepository.findById(Long.valueOf(request.getTenantId())).get();
+            if (ManagedAccountAccessService.useDomainUserManager(tenant, "USER_DELETE", userId)) {
+                try (com.oracle.bmc.identitydomains.IdentityDomainsClient domains =
+                             ManagedAccountAccessService.openDomainClient(tenant)) {
+                    com.oracle.bmc.identitydomains.model.User user =
+                            ManagedAccountAccessService.resolveDomainUser(domains, tenant, userId);
+                    domains.deleteUser(com.oracle.bmc.identitydomains.requests.DeleteUserRequest.builder()
+                            .userId(user.getId()).build());
+                }
+                return ApiResponse.success("删除用户成功");
+            }
+            if (OciPermissions.isManaged(tenant)) {
+                try (IdentityClient identity = IdentityClient.builder()
+                        .clientConfigurator(ProxyContext.get()).build(getProvider(tenant))) {
+                    identity.deleteUser(com.oracle.bmc.identity.requests.DeleteUserRequest.builder()
+                            .userId(userId).build());
+                }
+                return ApiResponse.success("删除用户成功");
+            }
             SignOnPolicyUtils.deleteUser(tenant,userId);
             return ApiResponse.success("删除用户成功");
         } catch (Exception e) {
-            log.error("重置密码失败: {}", e.getMessage(), e);
-            return ApiResponse.error("密码重置失败：" + e.getMessage());
+            log.warn("删除用户失败");
+            return ApiResponse.error("删除用户失败，请检查目标用户、用户组和 OCI 权限");
         }
     }
 
@@ -1131,6 +1225,7 @@ public class TenantServiceImpl implements TenantService {
                 tenantData.put("id", tenant.getId());
                 tenantData.put("tenant_id", tenant.getTenantId());
                 tenantData.put("user_name", tenant.getUserName());
+                putManagedPermissions(tenantData, tenant);
                 tenantData.put("fingerprint", tenant.getFingerprint());
                 tenantData.put("tenancy", tenant.getTenancy());
                 tenantData.put("region", RegionEnum.getRegionCode(tenant.getRegion()));
@@ -1172,6 +1267,7 @@ public class TenantServiceImpl implements TenantService {
                         childData.put("id", child.getId());
                         childData.put("tenant_id", child.getTenantId());
                         childData.put("user_name", child.getUserName());
+                        putManagedPermissions(childData, child);
                         childData.put("fingerprint", child.getFingerprint());
                         childData.put("tenancy", child.getTenancy());
                         childData.put("region", RegionEnum.getRegionCode(child.getRegion()));
@@ -1473,6 +1569,15 @@ public class TenantServiceImpl implements TenantService {
         tenant.setRegionEn(getStringValue(record, "region_en"));
         tenant.setIdStr(getStringValue(record, "id_str"));
         tenant.setEmailAddress(getStringValue(record, "email_address"));
+        tenant.setPermissionMode(getStringValue(record, "permission_mode"));
+        tenant.setPermissionsJson(getStringValue(record, "permissions_json"));
+        tenant.setManagedUserName(getStringValue(record, "managed_user_name"));
+        tenant.setManagedGroupId(getStringValue(record, "managed_group_id"));
+        tenant.setManagedPolicyId(getStringValue(record, "managed_policy_id"));
+        tenant.setAccountScopeJson(getStringValue(record, "account_scope_json"));
+        tenant.setManagedDomainId(getStringValue(record, "managed_domain_id"));
+        tenant.setManagedDomainUrl(getStringValue(record, "managed_domain_url"));
+        tenant.setManagedDomainGrantsJson(getStringValue(record, "managed_domain_grants_json"));
 
         // 处理创建时间
         String createdAtStr = getStringValue(record, "created_at");
@@ -1510,6 +1615,18 @@ public class TenantServiceImpl implements TenantService {
     private String getStringValue(Map<String, Object> record, String key) {
         Object value = record.get(key);
         return value != null ? value.toString().trim() : null;
+    }
+
+    private void putManagedPermissions(Map<String, Object> record, Tenant tenant) {
+        record.put("permission_mode", tenant.getPermissionMode());
+        record.put("permissions_json", tenant.getPermissionsJson());
+        record.put("managed_user_name", tenant.getManagedUserName());
+        record.put("managed_group_id", tenant.getManagedGroupId());
+        record.put("managed_policy_id", tenant.getManagedPolicyId());
+        record.put("account_scope_json", tenant.getAccountScopeJson());
+        record.put("managed_domain_id", tenant.getManagedDomainId());
+        record.put("managed_domain_url", tenant.getManagedDomainUrl());
+        record.put("managed_domain_grants_json", tenant.getManagedDomainGrantsJson());
     }
 
     /**
@@ -2213,8 +2330,10 @@ public class TenantServiceImpl implements TenantService {
                     sendSseEvent(emitter, "progress", "开始更新租户[" + tenant.getUserName() + "]区域:["+tenant.getRegion()+"]实例资源...");
                     self.syncOci(tenant.getId());
                     //更新数据库信息
-                    sendSseEvent(emitter, "progress", "开始更新租户[" + tenant.getUserName() + "]区域:["+tenant.getRegion()+"]数据库资源...");
-                    dbConfigService.syncMysqlFromCloud(tenant.getId());
+                    if (com.doubledimple.ociserver.service.permissions.OciPermissions.allows(tenant, "MYSQL_READ")) {
+                        sendSseEvent(emitter, "progress", "开始更新租户[" + tenant.getUserName() + "]区域:["+tenant.getRegion()+"]数据库资源...");
+                        dbConfigService.syncMysqlFromCloud(tenant.getId());
+                    }
                 }
                 sendSseEvent(emitter, "success", "更新完成");
                 emitter.complete();

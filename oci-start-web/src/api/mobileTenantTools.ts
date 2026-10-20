@@ -55,5 +55,9 @@ export async function getMobileTenantToolContext(tenantId: string, signal: Abort
     tenancyName: text(row.tenancyName),
     userName: text(row.userName),
     region: text(row.region) || text(row.regionEn),
+    permissionMode: text(row.permissionMode),
+    permissionsJson: text(row.permissionsJson),
+    managedUserName: text(row.managedUserName),
+    accountScopeJson: text(row.accountScopeJson),
   }
 }

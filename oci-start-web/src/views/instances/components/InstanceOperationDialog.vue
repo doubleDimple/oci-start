@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { allowsInstanceAction, hasTenantPermission, isManagedTenant } from '@/utils/tenantPermissions'
 import PageErrorNotice from '@/components/PageErrorNotice.vue'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -34,6 +35,9 @@ let disposed = false
 const working = computed(() => busy.value || sendingCode.value)
 const locked = computed(() => working.value || state.value === 'success' || state.value === 'uncertain')
 const danger = computed(() => ['stop', 'terminate', 'delete'].includes(props.action))
+const preserveBootVolume = computed(() => isManagedTenant(props.row.permissionContext)
+  && !hasTenantPermission(props.row.permissionContext, 'BOOT_VOLUME_DELETE'))
+const actionHintKey = computed(() => props.action === 'terminate' && preserveBootVolume.value ? 'terminatePreserveVolume' : props.action)
 const instanceName = computed(() => props.row.displayName || props.row.instanceId || props.row.id)
 const currentVolume = computed(() => props.row.bootVolumeSizeInGBs)
 const knownVolume = computed(() => typeof currentVolume.value === 'number' && Number.isFinite(currentVolume.value) && currentVolume.value > 0)
@@ -127,6 +131,7 @@ function startCooldown() {
 }
 
 async function sendCode() {
+  if (!allowsInstanceAction(props.row.permissionContext, 'terminate')) return
   if (locked.value || resendSeconds.value) return
   errorKey.value = ''
   errorText.value = ''
@@ -151,6 +156,7 @@ async function sendCode() {
 }
 
 async function submit() {
+  if (!allowsInstanceAction(props.row.permissionContext, props.action)) return
   if (locked.value) return
   if (props.action === 'terminate' && !codeSent.value) { await sendCode(); return }
   errorKey.value = ''
@@ -218,7 +224,7 @@ onBeforeUnmount(() => { disposed = true; generation++; clearInterval(resendTimer
     </div>
     <el-alert
       v-if="['start', 'stop', 'terminate', 'delete'].includes(action)"
-      :title="t(`instanceOperations.hints.${action}`)" :type="danger ? 'warning' : 'info'" :closable="false" show-icon
+      :title="t(`instanceOperations.hints.${actionHintKey}`)" :type="danger ? 'warning' : 'info'" :closable="false" show-icon
     />
     <el-form label-position="top" :disabled="locked" class="operation-form" @submit.prevent="submit">
       <template v-if="action === 'name'">
@@ -267,7 +273,7 @@ onBeforeUnmount(() => { disposed = true; generation++; clearInterval(resendTimer
         </div>
       </template>
     </el-form>
-    <el-alert v-if="state === 'success'" :title="t(`instanceOperations.success.${action}`)" type="success" :closable="false" show-icon role="status" />
+    <el-alert v-if="state === 'success'" :title="t(`instanceOperations.success.${actionHintKey}`)" type="success" :closable="false" show-icon role="status" />
     <el-alert v-else-if="state === 'uncertain'" :title="t('instanceOperations.hints.uncertain')" type="warning" :closable="false" show-icon role="alert" />
     <template v-else-if="error">
       <PageErrorNotice v-if="state === 'failed' || errorText || errorKey === 'codeFailed'">{{ error }}</PageErrorNotice>

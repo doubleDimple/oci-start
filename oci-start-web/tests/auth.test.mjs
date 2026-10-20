@@ -77,16 +77,6 @@ test('registration preserves plain-text backend error messages', async t => {
   await assert.rejects(auth.registerAccount('account', 'password'), { key: 'failed', detail: 'Registration is disabled' })
 })
 
-test('recovery rejects HTTP 200 business errors before countdown or step advancement', async t => {
-  response(t, json({ success: false, code: 500, message: 'Code expired' }))
-  await assert.rejects(auth.sendResetCode('account'), { key: 'failed', detail: 'Code expired' })
-})
-
-test('recovery requires an actual reset token before the reset operation', async t => {
-  response(t, json({ success: true, data: {} }))
-  await assert.rejects(auth.verifyResetCode('account', '123456'), { key: 'invalidResponse' })
-})
-
 test('OAuth preserves remember-me and accepts the provider HTTPS redirect', async t => {
   const fetch = t.mock.method(globalThis, 'fetch', async () => new Response('https://github.com/login/oauth/authorize?state=example'))
   assert.equal(await auth.oauthLoginUrl('github', true), 'https://github.com/login/oauth/authorize?state=example')
@@ -127,7 +117,6 @@ test('unmount cancellation reaches fetch and retains AbortError instead of repor
   assert.equal(requestSignal.aborted, true)
 })
 
-test('recovery rejects unknown successful JSON without advancing the wizard', async t => {
-  response(t, json({}))
-  await assert.rejects(auth.resetPassword('account', 'token'), { key: 'invalidResponse' })
+test('disabled password recovery has no callable API client exports', () => {
+  for (const name of ['sendResetCode', 'verifyResetCode', 'resetPassword']) assert.equal(name in auth, false)
 })

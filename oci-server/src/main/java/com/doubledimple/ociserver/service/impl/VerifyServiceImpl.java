@@ -1,6 +1,5 @@
 package com.doubledimple.ociserver.service.impl;
 
-import cn.hutool.json.JSONUtil;
 import com.doubledimple.dao.entity.InstanceDetails;
 import com.doubledimple.dao.entity.LoginUser;
 import com.doubledimple.dao.entity.Tenant;
@@ -13,6 +12,7 @@ import com.doubledimple.ociserver.pojo.request.FeishuConfig;
 import com.doubledimple.ociserver.pojo.request.MfaConfig;
 import com.doubledimple.ociserver.pojo.request.MfaConfigRequest;
 import com.doubledimple.ociserver.service.login.LoginUserService;
+import com.doubledimple.ociserver.service.login.LoginFailureGuard;
 import com.doubledimple.ociserver.service.message.factory.MessageFactory;
 import com.doubledimple.ociserver.pojo.request.DingTalkConfig;
 import com.doubledimple.ociserver.pojo.request.TelegramConfig;
@@ -87,6 +87,9 @@ public class VerifyServiceImpl implements VerifyService {
     @Resource
     private LoginUserService loginUserService;
 
+    @Resource
+    private LoginFailureGuard loginFailureGuard;
+
     @PostConstruct
     public void init() {
         // 初始化Guava Cache，设置5分钟过期时间
@@ -127,7 +130,7 @@ public class VerifyServiceImpl implements VerifyService {
         try {
             messageFactory.getType(MessageEnum.TELEGRAM).sendMessageTemplate(String.format(MESSAGE_CONFIG_STOP_INSTANCE_TEMPLATE,tenant.getUserName(),instanceDetails.getDisplayName(),verificationCode));
         } catch (Exception e) {
-            log.error("消息发送失败,{}", e.getMessage(),e);
+            log.error("消息发送失败，异常类型:{}", e.getClass().getSimpleName());
         }
     }
 
@@ -182,18 +185,15 @@ public class VerifyServiceImpl implements VerifyService {
 
     @Override
     public void sendVerificationCodeForLogin(String username,HttpServletRequest  request) {
+        String clientIp = loginFailureGuard.assertAllowed(request);
         Optional<LoginUser> loginUserOptional = loginUserRepository.findByUsername(username);
         if (!loginUserOptional.isPresent()){
-            final String clientIpAddress = getClientIpAddress(request).replace('.', '_');
-            messageFactory.getType(MessageEnum.TELEGRAM).sendMessageTemplateText(String.format(MESSAGE_MALICIOUS_LOGIN_TEMPLATE_V_2,
-                    getCurrentPublicIpAndAddress(request), username,clientIpAddress,clientIpAddress));
+            loginFailureGuard.failed(clientIp, username, true);
             throw new IllegalStateException("用户名或密码错误");
         }
-        LoginUser loginUser = loginUserOptional.get();
-        log.debug("当前的用户信息是:{}", JSONUtil.toJsonStr(loginUser));
         // 生成6位随机验证码
         String verificationCode = generateVerificationCode();
-        log.info("当前用户:{} 登录的验证码是:{}",username,verificationCode);
+        log.info("用户:{} 已生成登录验证码", username);
         // 将验证码存入Guava Cache
         String cacheKey = VERIFICATION_CODE_LOGIN_PREFIX + username;
         verificationCodeCache.put(cacheKey, verificationCode);
@@ -201,7 +201,7 @@ public class VerifyServiceImpl implements VerifyService {
         try {
             messageFactory.getType(MessageEnum.TELEGRAM).sendVerificationCodeMessage(username,verificationCode);
         } catch (Exception e) {
-            log.error("消息发送失败,{}", e.getMessage(),e);
+            log.error("消息发送失败，异常类型:{}", e.getClass().getSimpleName());
         }
     }
 
@@ -236,7 +236,6 @@ public class VerifyServiceImpl implements VerifyService {
             throw new IllegalStateException("用户名或密码错误");
         }
 
-        LoginUser loginUser = loginUserOptional.get();
         log.info("用户:{} 请求密码重置验证码", username);
 
         // 2. 检查发送频率限制（可选，防止频繁发送）
@@ -248,7 +247,6 @@ public class VerifyServiceImpl implements VerifyService {
 
         // 3. 生成6位随机验证码
         String verificationCode = generateVerificationCode();
-        log.info("用户:{} 的密码重置验证码是:{}", username, verificationCode);
 
         // 4. 将验证码存入缓存
         String cacheKey = VERIFICATION_CODE_RESET_PREFIX + username;
@@ -261,7 +259,7 @@ public class VerifyServiceImpl implements VerifyService {
         try {
             messageFactory.getType(MessageEnum.TELEGRAM).sendMessageTemplate(String.format(MESSAGE_PASSWORD_RESET_CODE_TEMPLATE,username, verificationCode));
         } catch (Exception e) {
-            log.error("密码重置验证码发送失败，用户:{}, 错误:{}", username, e.getMessage(), e);
+            log.error("密码重置验证码发送失败，用户:{}, 异常类型:{}", username, e.getClass().getSimpleName());
             // 发送失败，清除验证码
             verificationCodeCache.invalidate(cacheKey);
             throw new IllegalStateException("验证码发送失败，请稍后重试");
@@ -335,9 +333,9 @@ public class VerifyServiceImpl implements VerifyService {
         // 6. 发送新密码到通知终端
         try {
             messageFactory.getType(MessageEnum.TELEGRAM).sendMessageTemplate(String.format(MESSAGE_NEW_PASSWORD_TEMPLATE,username, newPassword));
-            log.info("用户:{} 密码:{}重置成功", username, newPassword);
+            log.info("用户:{} 密码重置成功", username);
         } catch (Exception e) {
-            log.error("新密码通知发送失败，用户:{}, 错误:{}", username, e.getMessage(), e);
+            log.error("新密码通知发送失败，用户:{}, 异常类型:{}", username, e.getClass().getSimpleName());
         }
 
         return "";
@@ -374,9 +372,9 @@ public class VerifyServiceImpl implements VerifyService {
             String message = String.format(MESSAGE_DATA_EXPORT_CODE_TEMPLATE, username, verificationCode);
             messageFactory.getType(MessageEnum.TELEGRAM).sendMessageTemplateText(message,Boolean.FALSE);
 
-            log.info("用户:{} 导出验证码已发送: {}", username, verificationCode);
+            log.info("用户:{} 导出验证码已发送", username);
         } catch (Exception e) {
-            log.error("导出验证码发送失败: {}", e.getMessage(), e);
+            log.error("导出验证码发送失败，异常类型:{}", e.getClass().getSimpleName());
             throw new IllegalStateException("验证码发送失败，请稍后重试");
         }
     }

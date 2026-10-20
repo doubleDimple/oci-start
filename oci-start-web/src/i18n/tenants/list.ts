@@ -10,7 +10,7 @@ export default {
       label: '租户列表', searchLabel: '搜索租户名称', searchPlaceholder: '搜索租户名称…',
       clearSearch: '清除搜索', hideNames: '隐藏全部租户名称', showNames: '显示全部租户名称',
       refreshLabel: '刷新租户列表', refreshedAt: '刷新，上次更新 {time}',
-      moreLabel: '更多租户操作', more: '更多操作', import: '导入数据', exportAll: '导出全部',
+      moreLabel: '更多租户操作', more: '更多操作', import: '恢复备份', exportAll: '导出全部',
       batchCheck: '批量检测', apiImport: 'API 导入', searchResults: '“{keyword}” 的搜索结果',
       clearFilter: '清除筛选', refreshFailed: '暂时无法刷新',
       loadFailed: '未能读取租户列表，请重新登录或重试',
@@ -21,7 +21,7 @@ export default {
       bootRunning: '开机中', noTask: '暂无任务', active: '有效', inactive: '失效', actions: '租户操作',
       noMatches: '没有找到匹配的租户', noTenants: '从你的第一个账号开始',
       noMatchesHint: '试试其他名称，或清除搜索查看全部租户。',
-      noTenantsHint: '通过右上角 API 导入，连接并管理你的云账号。',
+      noTenantsHint: '通过右上角 API 导入连接云账号，可按需选择创建受限凭证。',
       viewAll: '查看全部租户', loading: '正在读取租户…', range: '显示 {start}–{end}，共 {total} 个租户',
     },
     mobile: {
@@ -31,6 +31,7 @@ export default {
     },
     proxy: { forced: '强制代理', bound: '已绑定代理', configure: '配置代理' },
     actions: {
+      permissions: '更新云端权限',
       chat: 'AI 对话', boot: '添加开机', update: '更新账号', regions: '租户详情', subscribe: '区域订阅',
       users: '用户管理', traffic: '流量预警', monitor: '流量查询', audit: '审计日志', costs: '费用查询',
       export: '导出租户', email: '邮件服务', social: '社媒配置', quota: '查看配额',
@@ -68,7 +69,7 @@ export default {
       label: 'Tenant list', searchLabel: 'Search tenant names', searchPlaceholder: 'Search tenant names…',
       clearSearch: 'Clear search', hideNames: 'Hide all tenant names', showNames: 'Show all tenant names',
       refreshLabel: 'Refresh tenant list', refreshedAt: 'Refresh, last updated at {time}',
-      moreLabel: 'More tenant actions', more: 'More actions', import: 'Import data', exportAll: 'Export all',
+      moreLabel: 'More tenant actions', more: 'More actions', import: 'Restore backup', exportAll: 'Export all',
       batchCheck: 'Batch check', apiImport: 'API import', searchResults: 'Results for “{keyword}”',
       clearFilter: 'Clear filter', refreshFailed: 'Unable to refresh',
       loadFailed: 'Unable to load tenants. Please sign in again or retry.',
@@ -90,6 +91,7 @@ export default {
     },
     proxy: { forced: 'Proxy required', bound: 'Proxy assigned', configure: 'Configure proxy' },
     actions: {
+      permissions: 'Update cloud permissions',
       chat: 'AI chat', boot: 'Add launch task', update: 'Update account', regions: 'Tenant details', subscribe: 'Region subscriptions',
       users: 'User management', traffic: 'Traffic alerts', monitor: 'Traffic usage', audit: 'Audit logs', costs: 'Cost explorer',
       export: 'Export tenant', email: 'Email service', social: 'Social settings', quota: 'View quotas',

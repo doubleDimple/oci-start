@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { hasTenantPermission } from '@/utils/tenantPermissions'
 import PageErrorNotice from '@/components/PageErrorNotice.vue'
 import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -22,6 +23,7 @@ const title = computed(() => supportedActions.includes(props.action) ? t(`tenant
 const label = computed(() => supportedActions.includes(props.action) ? t(`tenantOperations.labels.${props.action}`) : '')
 const visible = computed(() => supportedActions.includes(props.action))
 const tenantName = computed(() => props.tenant?.defName || props.tenant?.tenancyName || props.tenant?.userName || '')
+const canAutoShutdown = computed(() => hasTenantPermission(props.tenant, 'INSTANCE_POWER'))
 const loading = ref(false)
 const saving = ref(false)
 const error = ref('')
@@ -138,7 +140,7 @@ async function loadConfiguration() {
       if (current !== generation) return
       traffic.statisticsEnabled = result?.statisticsEnabled === true
       traffic.threshold = result?.threshold ?? undefined
-      traffic.autoShutdown = result?.autoShutdown === true
+      traffic.autoShutdown = canAutoShutdown.value && result?.autoShutdown === true
     }
   } catch (reason) {
     if (current !== generation) return
@@ -272,7 +274,7 @@ async function submit() {
     } else if (props.action === 'traffic') {
       await tenantPost('/tenants/traffic-alert', {
         tenantId: props.tenant!.id, statisticsEnabled: traffic.statisticsEnabled,
-        threshold: traffic.threshold, autoShutdown: traffic.statisticsEnabled ? traffic.autoShutdown : false,
+        threshold: traffic.threshold, autoShutdown: traffic.statisticsEnabled && canAutoShutdown.value ? traffic.autoShutdown : false,
       }, config)
     } else if (props.action === 'transfer') {
       await tenantPost('/tenants/transfer', { tenantId: props.tenant!.id, transferAmount: String(Math.max(0, transferAmount.value || 0)) }, config)
@@ -415,7 +417,7 @@ onBeforeUnmount(cleanup)
       <el-form v-else-if="action === 'traffic'" label-position="top" :disabled="saving || loadFailed" class="operation-form" @submit.prevent="submit">
         <div class="setting-row"><div><strong>{{ t('tenantOperations.traffic.statistics') }}</strong><p>{{ t('tenantOperations.traffic.statisticsHint') }}</p></div><el-switch v-model="traffic.statisticsEnabled" :aria-label="t('tenantOperations.traffic.enableStatistics')" /></div>
         <el-form-item :label="t('tenantOperations.traffic.threshold')" required class="threshold-field"><el-input-number v-model="traffic.threshold" :min="0" :controls="false" :placeholder="t('tenantOperations.traffic.thresholdPlaceholder')" /><span class="field-hint">{{ t('tenantOperations.traffic.thresholdHint') }}</span></el-form-item>
-        <div class="setting-row"><div><strong>{{ t('tenantOperations.traffic.autoShutdown') }}</strong><p>{{ t('tenantOperations.traffic.autoShutdownHint') }}</p></div><el-switch v-model="traffic.autoShutdown" :disabled="!traffic.statisticsEnabled" :aria-label="t('tenantOperations.traffic.autoShutdown')" /></div>
+        <div class="setting-row"><div><strong>{{ t('tenantOperations.traffic.autoShutdown') }}</strong><p>{{ t(canAutoShutdown ? 'tenantOperations.traffic.autoShutdownHint' : 'tenantOperations.traffic.powerRequired') }}</p></div><el-switch v-model="traffic.autoShutdown" :disabled="!traffic.statisticsEnabled || !canAutoShutdown" :aria-label="t('tenantOperations.traffic.autoShutdown')" /></div>
       </el-form>
 
       <div v-else-if="action === 'import'">

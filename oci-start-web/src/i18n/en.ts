@@ -18,6 +18,7 @@ import vpsDetails from './vps/resourceDetails'
 import networkQuality from './settings/networkQuality'
 import systemLogs from './settings/systemLogs'
 import securitySettings from './settings/securitySettings'
+import ipBans from './settings/ipBans'
 import vpnProxy from './settings/vpnProxy'
 import notificationSettings from './settings/notificationSettings'
 import memos from './settings/memos'
@@ -84,6 +85,7 @@ export default {
   networkQuality: networkQuality.en,
   systemLogs: systemLogs.en,
   securitySettings: securitySettings.en,
+  ipBans: ipBans.en,
   vpnProxy: vpnProxy.en,
   notificationSettings: notificationSettings.en,
   memo: memos.en,
@@ -278,6 +280,7 @@ export default {
     system: 'System',
     quality: 'Network quality',
     logs: 'System logs',
+    ipBans: 'Ban management',
     security: 'Security',
     proxyConfig: 'Proxy config',
     tools: 'Tools',

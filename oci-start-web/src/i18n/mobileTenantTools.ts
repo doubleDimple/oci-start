@@ -8,6 +8,7 @@ export const mobileTenantToolsMessages = {
     currentTenant: '当前租户',
     tenantId: '租户 ID',
     errors: {
+      permissionDenied: '此租户未授权使用该功能。',
       invalidTenant: '缺少有效的租户 ID，请从租户列表重新进入。',
       invalidResponse: '租户信息格式不正确，请重试。',
       notFound: '无法找到此租户，请重试或重新选择租户。',
@@ -25,6 +26,7 @@ export const mobileTenantToolsMessages = {
     currentTenant: 'Current account',
     tenantId: 'Account ID',
     errors: {
+      permissionDenied: 'This account is not authorized to use this feature.',
       invalidTenant: 'A valid account ID is required. Open this tool from the account list.',
       invalidResponse: 'The account details could not be read. Please retry.',
       notFound: 'This account could not be found. Retry or select another account.',

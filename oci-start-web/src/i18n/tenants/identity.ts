@@ -15,6 +15,7 @@ export default {
       editSocial: '编辑登录服务', backToSocial: '返回登录服务', saveConfig: '保存配置',
       saveCredentials: '保存登录凭据', savedClose: '已保存，关闭', copyAllCredentials: '复制全部凭据',
       changeLoginStatus: '更改登录状态',
+      enableUser: '启用用户', disableUser: '禁用用户',
     },
     labels: {
       domain: '身份域', username: '用户名', email: '邮箱', status: '状态', createdAt: '创建时间',
@@ -31,6 +32,7 @@ export default {
     },
     descriptions: {
       users: '管理访问权限，让每一次登录井然有序。',
+      restrictedNewUser: '创建普通 OCI 用户，不设置登录密码，也不会加入任何用户组。',
       newUser: '新用户将在 DEFAULT 身份域创建。',
       policy: '统一设置当前租户的密码有效期。',
       passwordExpiry: '到期后，用户需要设置新密码。',
@@ -67,6 +69,9 @@ export default {
     messages: {
       error: '操作未完成，请稍后重试', saved: '已保存', userCreated: '用户已创建',
       passwordReset: '密码已重置', userDeleted: '用户已删除', policySaved: '密码策略已更新',
+      passwordResetEmail: '密码重置邮件已发送，请让该用户检查邮箱。',
+      passwordResetAccepted: '密码重置请求已提交。',
+      userEnabled: '用户已启用', userDisabled: '用户已禁用',
       recipientRemoved: '收件人已移除', recipientAdded: '收件人已添加',
       emailMfaSaved: '邮箱验证设置已更新', mfaReset: 'MFA 已重置', emailConfigured: '邮件服务已配置',
       socialTypesFailed: '登录服务类型加载失败：{reason}', socialSaved: '登录配置已保存',
@@ -75,6 +80,9 @@ export default {
     },
     confirmations: {
       resetPassword: '重置“{username}”的登录密码？将生成新的临时密码。',
+      resetPasswordManaged: '重置“{username}”的登录密码？身份域可能通过邮件发送重置流程，系统不保证返回明文临时密码。',
+      enableUser: '启用“{username}”？此用户将可以按已有权限登录。',
+      disableUser: '禁用“{username}”？此用户将无法继续登录。',
       deleteUser: '删除“{username}”？此用户将无法继续访问云控制台。',
       removeRecipient: '移除通知邮箱 {email}？',
       enableEmailMfa: '启用当前租户的邮箱多因子认证？设置将应用于租户内所有用户。',
@@ -101,6 +109,7 @@ export default {
       editSocial: 'Edit login service', backToSocial: 'Back to login services', saveConfig: 'Save settings',
       saveCredentials: 'Save login credentials', savedClose: 'Saved, close', copyAllCredentials: 'Copy all credentials',
       changeLoginStatus: 'Change login status',
+      enableUser: 'Enable user', disableUser: 'Disable user',
     },
     labels: {
       domain: 'Identity domain', username: 'Username', email: 'Email', status: 'Status', createdAt: 'Created',
@@ -117,6 +126,7 @@ export default {
     },
     descriptions: {
       users: 'Manage users and their access to the cloud console.',
+      restrictedNewUser: 'Create an OCI user without a console password or group membership.',
       newUser: 'New users are created in the DEFAULT identity domain.',
       policy: 'Set the password lifetime for this tenant.',
       passwordExpiry: 'Users must set a new password when it expires.',
@@ -153,6 +163,9 @@ export default {
     messages: {
       error: 'The operation could not be completed. Please try again.', saved: 'Saved', userCreated: 'User created',
       passwordReset: 'Password reset', userDeleted: 'User deleted', policySaved: 'Password policy updated',
+      passwordResetEmail: 'Password reset email sent. Ask the user to check their inbox.',
+      passwordResetAccepted: 'Password reset request submitted.',
+      userEnabled: 'User enabled', userDisabled: 'User disabled',
       recipientRemoved: 'Recipient removed', recipientAdded: 'Recipient added',
       emailMfaSaved: 'Email verification updated', mfaReset: 'MFA reset', emailConfigured: 'Email service configured',
       socialTypesFailed: 'Could not load login service types: {reason}', socialSaved: 'Login settings saved',
@@ -161,6 +174,9 @@ export default {
     },
     confirmations: {
       resetPassword: 'Reset the password for “{username}”? A new temporary password will be generated.',
+      resetPasswordManaged: 'Reset the sign-in password for “{username}”? The identity domain may email a reset flow instead of returning a temporary password.',
+      enableUser: 'Enable “{username}”? The user will be able to sign in with their existing permissions.',
+      disableUser: 'Disable “{username}”? The user will no longer be able to sign in.',
       deleteUser: 'Delete “{username}”? This user will lose access to the cloud console.',
       removeRecipient: 'Remove {email} from notification recipients?',
       enableEmailMfa: 'Enable email multi-factor authentication for every user in this tenant?',

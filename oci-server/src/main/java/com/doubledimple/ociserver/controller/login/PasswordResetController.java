@@ -15,8 +15,9 @@ import javax.servlet.http.HttpServletRequest;
 import java.util.HashMap;
 import java.util.Map;
 
-@RestController
-@RequestMapping("/api")
+// 忘记密码功能已停用：不注册 Spring Controller 或 HTTP 路由。
+// @RestController
+// @RequestMapping("/api")
 @Slf4j
 public class PasswordResetController  extends BaseController {
 
@@ -26,7 +27,7 @@ public class PasswordResetController  extends BaseController {
     /**
      * 发送重置验证码
      */
-    @PostMapping("/send-reset-code")
+    // @PostMapping("/send-reset-code")
     public ApiResponse sendResetCode(@RequestBody Map<String, String> request, HttpServletRequest  httpServletRequest) {
         try {
             String username = request.get("username");
@@ -40,7 +41,7 @@ public class PasswordResetController  extends BaseController {
         } catch (IllegalStateException e) {
             return ApiResponse.error(e.getMessage());
         } catch (Exception e) {
-            log.error("发送重置验证码失败", e);
+            log.error("发送重置验证码失败，异常类型:{}", e.getClass().getSimpleName());
             return ApiResponse.error("系统错误，请稍后重试");
         }
     }
@@ -48,7 +49,7 @@ public class PasswordResetController  extends BaseController {
     /**
      * 验证重置验证码
      */
-    @PostMapping("/verify-reset-code")
+    // @PostMapping("/verify-reset-code")
     public ApiResponse verifyResetCode(@RequestBody Map<String, String> request,HttpServletRequest httpServletRequest) {
         try {
             String username = request.get("username");
@@ -77,7 +78,7 @@ public class PasswordResetController  extends BaseController {
         } catch (IllegalStateException e) {
             return ApiResponse.error(e.getMessage());
         } catch (Exception e) {
-            log.error("验证重置验证码失败", e);
+            log.error("验证重置验证码失败，异常类型:{}", e.getClass().getSimpleName());
             return ApiResponse.error("系统错误，请稍后重试");
         }
     }
@@ -85,7 +86,7 @@ public class PasswordResetController  extends BaseController {
     /**
      * 执行密码重置
      */
-    @PostMapping("/reset-password")
+    // @PostMapping("/reset-password")
     public ApiResponse resetPassword(
             @RequestBody Map<String, String> request,
             @RequestHeader(value = "Reset-Token", required = false) String resetToken) {
@@ -112,7 +113,7 @@ public class PasswordResetController  extends BaseController {
         } catch (IllegalStateException e) {
             return ApiResponse.error(e.getMessage());
         } catch (Exception e) {
-            log.error("密码重置失败", e);
+            log.error("密码重置失败，异常类型:{}", e.getClass().getSimpleName());
             return ApiResponse.error("系统错误，请稍后重试");
         }
     }

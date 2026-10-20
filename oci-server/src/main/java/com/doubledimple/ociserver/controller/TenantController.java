@@ -10,6 +10,8 @@ import com.doubledimple.ociserver.pojo.request.AuditLogRequest;
 import com.doubledimple.ociserver.pojo.request.DeleteOciUserRequest;
 import com.doubledimple.ociserver.pojo.request.ImageInfoReq;
 import com.doubledimple.ociserver.pojo.request.ResetOciPassRequest;
+import com.doubledimple.ociserver.pojo.request.UpdateOciUserStateRequest;
+import com.doubledimple.ociserver.service.permissions.ManagedAccountAccessService;
 import com.doubledimple.ociserver.pojo.request.UpdateCustomNameRequest;
 import com.doubledimple.ociserver.pojo.request.UpdatePasswordPolicyRequest;
 import com.doubledimple.ociserver.pojo.response.PasswordPolicyDetail;
@@ -391,6 +393,8 @@ public class TenantController extends BaseController{
         try {
             tenantService.saveTenant(tenant, keyFile);
             return ApiResponse.success();
+        } catch (IllegalArgumentException e) {
+            return ApiResponse.error(e.getMessage());
         } catch (IOException e) {
             log.error("保存租户信息失败", e);
             return ApiResponse.error("保存失败: " + e.getMessage());
@@ -602,8 +606,16 @@ public class TenantController extends BaseController{
      */
     @PostMapping("/oracle-users/resetPassword")
     @ResponseBody
+    @AuditLog(title = "重置 OCI 用户密码", saveResponse = false)
     public ApiResponse resetPassword(@RequestBody @Valid ResetOciPassRequest request) {
         return tenantService.resetPassword(request);
+    }
+
+    @PostMapping("/oracle-users/state")
+    @ResponseBody
+    @AuditLog(title = "修改 OCI 用户启用状态", saveResponse = false)
+    public ApiResponse updateUserState(@RequestBody @Valid UpdateOciUserStateRequest request) {
+        return tenantService.updateUserState(request);
     }
 
     /**
@@ -659,13 +671,14 @@ public class TenantController extends BaseController{
                                     user.getId(),
                                     user.getName(),
                                     user.getLifecycleState().name(),
-                                    user.getName(),
+                                    user.getId(),
                                     user.getEmail(),
                                     user.getLastSuccessfulLoginTime(),
                                     user.getTimeCreated(),
                                     extractDomain(user.getName())
                             ))
                     .collect(Collectors.toList());
+            ManagedAccountAccessService.enrichUsers(tenantService.getById(Long.valueOf(tenantId)), users);
             return ResponseEntity.ok(users);
         } catch (Exception e) {
             // 打印错误日志并返回失败信息
@@ -686,13 +699,14 @@ public class TenantController extends BaseController{
                                     user.getId(),
                                     user.getName(),
                                     user.getLifecycleState().name(),
-                                    user.getName(),
+                                    user.getId(),
                                     user.getEmail(),
                                     user.getLastSuccessfulLoginTime(),
                                     user.getTimeCreated(),
                                     extractDomain(user.getName())
                             ))
                     .collect(Collectors.toList());
+            ManagedAccountAccessService.enrichUsers(tenantService.getById(Long.valueOf(tenantId)), users);
             Page<UserRes> emptyPage = PageUtils.createEmptyPage(page, size);
             return ResponseEntity.ok(users);
         } catch (Exception e) {

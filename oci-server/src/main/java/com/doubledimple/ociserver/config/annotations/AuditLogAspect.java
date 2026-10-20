@@ -2,6 +2,7 @@ package com.doubledimple.ociserver.config.annotations;
 
 import cn.dev33.satoken.stp.StpUtil;
 import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.filter.ValueFilter;
 import com.doubledimple.ocicommon.utils.IpUtils;
 import com.doubledimple.ociserver.config.context.UserContext;
 import com.doubledimple.ociserver.service.AuditLogService;
@@ -42,7 +43,7 @@ import java.util.regex.Pattern;
 public class AuditLogAspect {
 
     private static final Pattern SENSITIVE_KEY_PATTERN = Pattern.compile(
-            "(?i)(password|passwd|pwd|secret|token|apikey|privatekey|credential|authorization)"
+            "(?i)(password|passwd|pwd|passphrase|secret|token|apikey|privatekey|credential|authorization|verificationcode|mfacode|otp|recoverycode|turnstileresponse|^code$)"
     );
 
     @Resource
@@ -178,13 +179,8 @@ public class AuditLogAspect {
             int status = (error == null) ? 1 : 0;
             String errorMsg = null;
             if (error != null) {
-                errorMsg = error.getMessage();
-                if (!StringUtils.hasText(errorMsg)) {
-                    errorMsg = error.getClass().getSimpleName();
-                }
-                if (errorMsg.length() > 1000) {
-                    errorMsg = errorMsg.substring(0, 997) + "...";
-                }
+                // Exception messages can include rejected credentials or notification URLs.
+                errorMsg = error.getClass().getSimpleName();
             }
 
             // 7. 构建 AuditLog 实体
@@ -211,7 +207,7 @@ public class AuditLogAspect {
                 auditLogService.saveAuditLog(auditLog);
             }
         } catch (Exception e) {
-            log.warn("构建审计日志异常: {}", e.getMessage());
+            log.warn("构建审计日志异常，异常类型: {}", e.getClass().getSimpleName());
         }
     }
 
@@ -229,10 +225,9 @@ public class AuditLogAspect {
         try {
             Map<String, Object> paramMap = new LinkedHashMap<>();
 
-            // URL query 参数
-            String queryString = request.getQueryString();
-            if (StringUtils.hasText(queryString)) {
-                paramMap.put("_query", queryString);
+            // Store decoded parameters so query/form credentials pass through the same filter.
+            if (!request.getParameterMap().isEmpty()) {
+                paramMap.put("_parameters", request.getParameterMap());
             }
 
             // 方法入参提取
@@ -250,7 +245,7 @@ public class AuditLogAspect {
                         continue;
                     }
                     String paramName = (i < paramNames.length) ? paramNames[i] : ("arg" + i);
-                    if (SENSITIVE_KEY_PATTERN.matcher(paramName).find()) {
+                    if (isSensitiveKey(paramName)) {
                         paramMap.put(paramName, "******");
                     } else {
                         paramMap.put(paramName, arg);
@@ -262,7 +257,9 @@ public class AuditLogAspect {
                 return "";
             }
 
-            String json = JSON.toJSONString(paramMap);
+            // DTOs, nested maps and array elements need filtering as well as method arguments.
+            String json = JSON.toJSONString(paramMap,
+                    (ValueFilter) (object, name, value) -> isSensitiveKey(name) ? "******" : value);
             if (json.length() > 2000) {
                 json = json.substring(0, 1997) + "...";
             }
@@ -270,5 +267,9 @@ public class AuditLogAspect {
         } catch (Exception e) {
             return "";
         }
+    }
+
+    private static boolean isSensitiveKey(String name) {
+        return name != null && SENSITIVE_KEY_PATTERN.matcher(name.replaceAll("[^a-zA-Z0-9]", "")).find();
     }
 }

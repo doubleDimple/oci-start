@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { hasTenantPermission, type TenantPermission } from '@/utils/tenantPermissions'
 import { computed, defineAsyncComponent, onBeforeUnmount, ref, watch } from 'vue'
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -53,6 +54,13 @@ async function load() {
   try {
     const value = await getMobileTenantToolContext(tenantId.value, active.signal)
     if (disposed || current !== generation) return
+    const required: Record<MobileTenantTool, TenantPermission> = {
+      users: 'USER_READ', volumes: 'BASIC_READ', security: 'NETWORK_MANAGE', mysql: 'MYSQL_READ',
+    }
+    if (!hasTenantPermission(value, required[tool.value!])) {
+      error.value = 'permissionDenied'
+      return
+    }
     tenant.value = value
     open.value = true
   } catch (cause) {

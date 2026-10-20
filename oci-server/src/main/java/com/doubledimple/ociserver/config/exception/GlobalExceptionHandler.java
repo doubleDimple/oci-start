@@ -16,6 +16,14 @@ import java.io.IOException;
 @ControllerAdvice
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(com.doubledimple.ociserver.service.permissions.OciPermissionDeniedException.class)
+    @ResponseBody
+    public org.springframework.http.ResponseEntity<com.doubledimple.ocicommon.param.ApiResponse> handleOciPermissionDenied(
+            com.doubledimple.ociserver.service.permissions.OciPermissionDeniedException e) {
+        return org.springframework.http.ResponseEntity.status(403)
+                .body(com.doubledimple.ocicommon.param.ApiResponse.error(e.getMessage()));
+    }
+
     @ExceptionHandler(IpBannedException.class)
     public void handleIpBannedException(IpBannedException e, HttpServletRequest request,
                                         HttpServletResponse response) throws IOException {
@@ -36,7 +44,7 @@ public class GlobalExceptionHandler {
             response.setStatus(HttpServletResponse.SC_FORBIDDEN);
             response.setContentType("application/json;charset=UTF-8");
             if (!"HEAD".equalsIgnoreCase(request.getMethod())) {
-                response.getWriter().write("{\"code\":403,\"message\":\"访问被拒绝\"}");
+                response.getWriter().write("{\"success\":false,\"code\":403,\"message\":\"IP 已被封禁，请联系管理员解封\"}");
             }
         } else {
             response.sendRedirect(request.getContextPath() + "/forbidden");

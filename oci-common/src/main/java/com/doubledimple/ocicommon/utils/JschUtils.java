@@ -295,7 +295,7 @@ public class JschUtils {
     }
 
     public static ScriptResult executeDDScript(String host, String username, String password, int port, String scriptContent) {
-        log.debug("开始执行 DD 重装, host:{}, username:{}, password:{}", host, username, password);
+        log.debug("开始执行 DD 重装, host:{}, username:{}", host, username);
 
         JSch jsch = new JSch();
         Session session = null;
@@ -939,7 +939,7 @@ public class JschUtils {
                 String output = outputStream.toString();
                 String error = errorStream.toString();
 
-                log.info("命令执行结果: exitStatus={}, output={}, error={}", exitStatus, output, error);
+                log.info("密码修改命令执行结果: exitStatus={}", exitStatus);
 
                 if (exitStatus == 0) {
                     log.info("密码修改成功");
@@ -962,7 +962,7 @@ public class JschUtils {
                                 .build();
                     }
                 } else {
-                    log.error("密码修改失败: {}, exit code: {}", error, exitStatus);
+                    log.error("密码修改失败, exit code: {}", exitStatus);
 
                     return ScriptResult.builder()
                             .success(false)

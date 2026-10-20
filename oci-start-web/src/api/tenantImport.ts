@@ -1,6 +1,34 @@
 import { isAxiosError } from 'axios'
 import { i18n } from '@/i18n'
-import { tenantPost } from './tenant'
+import { tenantGet, tenantPost } from './tenant'
+
+export interface TenantPermissionOption {
+  code: string
+  label: string
+  labelEn?: string
+  group: string
+  defaultEnabled: boolean
+  required: boolean
+  supported: boolean
+  reason?: string
+  dependencies?: string[]
+}
+export interface TenantAccountScope {
+  allUsers: boolean
+  passwordResetUserIds: string[]
+  userManagementGroupIds: string[]
+}
+export interface RestrictedTenantOptions {
+  managedUserName: string
+  permissions: string[]
+  accountScope: TenantAccountScope
+}
+
+export async function getTenantPermissionCatalog(signal?: AbortSignal): Promise<TenantPermissionOption[]> {
+  const body = await tenantGet<{ success: boolean; data: TenantPermissionOption[] }>('/tenants/permissions/catalog', undefined, { signal })
+  if (!body.success || !Array.isArray(body.data)) throw new Error('无法读取权限列表 / Unable to load permissions')
+  return body.data
+}
 
 export type ImportProvider = 1 | 2
 
@@ -168,6 +196,7 @@ export async function saveTenantCredentials(
   fields: TenantImportFields,
   file: File,
   signal?: AbortSignal,
+  restricted?: RestrictedTenantOptions,
 ): Promise<void> {
   if (
     (provider !== 1 && provider !== 2)
@@ -187,7 +216,15 @@ export async function saveTenantCredentials(
   data.append('status', '0')
   data.append('cloudType', String(provider))
   data.append('keyFileStr', file)
-  const body = await tenantPost<unknown>('/tenants/save', data, {
+  if (provider === 1 && restricted) {
+    if (!restricted?.managedUserName.trim() || !restricted.permissions.includes('BASIC_READ')) {
+      throw new TenantImportValidationError('tenantImport.requestFailed')
+    }
+    data.append('managedUserName', restricted.managedUserName.trim())
+    data.append('permissions', JSON.stringify(restricted.permissions))
+    data.append('accountScope', JSON.stringify(restricted.accountScope))
+  }
+  const body = await tenantPost<unknown>(provider === 1 && restricted ? '/tenants/restricted/save' : '/tenants/save', data, {
     signal,
     // Saving OCI credentials synchronously reads subscribed regions and cloud resources.
     // Aborting this request does not undo a save already running on the server.

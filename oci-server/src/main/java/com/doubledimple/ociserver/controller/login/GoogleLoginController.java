@@ -7,6 +7,8 @@ import com.doubledimple.ociserver.pojo.request.GoogleConfig;
 import com.doubledimple.ociserver.pojo.request.GoogleUser;
 import com.doubledimple.ociserver.service.impl.system.SystemConfigService;
 import com.doubledimple.ociserver.service.login.LoginUserService;
+import com.doubledimple.ociserver.service.login.LoginFailureGuard;
+import com.doubledimple.ociserver.config.exception.IpBannedException;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import cn.dev33.satoken.stp.StpUtil;
@@ -57,6 +59,9 @@ public class GoogleLoginController extends BaseController {
     @Resource
     LoginUserService loginUserService;
 
+    @Resource
+    private LoginFailureGuard loginFailureGuard;
+
     private static final Map<String, Long> STATE_CACHE = new ConcurrentHashMap<>();
 
     private final SecureRandom secureRandom = new SecureRandom();
@@ -100,6 +105,7 @@ public class GoogleLoginController extends BaseController {
                                HttpServletRequest request,
                                HttpServletResponse response) throws IOException {
         try {
+            String clientIp = loginFailureGuard.assertAllowed(request);
             log.info("Receiving Google callback. Code len: {}, State: {}", code.length(), state);
             Long expireTime = STATE_CACHE.get(state);
             if (expireTime == null) {
@@ -136,11 +142,19 @@ public class GoogleLoginController extends BaseController {
 
             boolean isRememberMe = state.endsWith("_true") || state.endsWith("_on");
             StpUtil.login(localUser.getUsername(), isRememberMe);
+            try {
+                loginFailureGuard.loginSucceeded(clientIp);
+            } catch (RuntimeException e) {
+                StpUtil.logout();
+                throw e;
+            }
             log.info("Google login success, user={}, rememberMe={}", localUser.getUsername(), isRememberMe);
 
             String redirectUrl = isMobileRequest(request) ? "/m/tenants" : "/index";
             response.sendRedirect(redirectUrl);
 
+        } catch (IpBannedException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Google Login Fail", e);
             String loginUrl = isMobileRequest(request) ? "/m/login" : "/login";

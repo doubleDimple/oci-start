@@ -173,18 +173,39 @@ watch(() => route.path, async () => {
   content.value?.scrollTo({ top: 0, left: 0 })
 })
 
-const visibleGroups = computed(() => {
-  const q = shell.menuQuery.trim().toLowerCase()
-  return MENU.map((g) => ({
-    ...g,
-    children: [...g.children, ...(compactViewport.value && g.id === 'tools' ? [{ id: 'mobile-telegram', href: '/m/ai', labelKey: 'mobileShell.titles.telegram', icon: 'i-mdi-robot-outline' } as NavItem] : [])].filter((it) => {
-      if (compactViewport.value && /sysHelp|rescue/i.test(`${it.id} ${it.href}`)) return false
-      if (it.cloudTypes && !it.cloudTypes.includes(shell.cloudType)) return false
-      if (!q) return true
-      return `${t(it.labelKey)} ${t(g.labelKey)} ${it.href}`.toLowerCase().includes(q)
-    }),
-  })).filter((g) => g.children.length > 0)
-})
+const menuGroups = computed(() => MENU.map((g) => ({
+  ...g,
+  children: [...g.children, ...(compactViewport.value && g.id === 'tools' ? [{ id: 'mobile-telegram', href: '/m/ai', labelKey: 'mobileShell.titles.telegram', icon: 'i-mdi-robot-outline' } as NavItem] : [])].filter((it) => {
+    if (compactViewport.value && /sysHelp|rescue/i.test(`${it.id} ${it.href}`)) return false
+    if (it.cloudTypes && !it.cloudTypes.includes(shell.cloudType)) return false
+    return true
+  }),
+})).filter((g) => g.children.length > 0))
+
+const menuQuery = computed(() => shell.menuQuery.trim().toLowerCase())
+const visibleGroups = computed(() => menuGroups.value.map(g => ({
+  ...g,
+  children: g.children.filter(it => !menuQuery.value
+    || `${t(it.labelKey)} ${t(g.labelKey)} ${it.href}`.toLowerCase().includes(menuQuery.value)),
+})).filter(g => g.children.length > 0))
+const currentGroupId = computed(() => menuGroups.value.find(g =>
+  g.children.some(it => canonicalPath(it.href) === currentPath.value || it.id === route.meta.id),
+)?.id ?? null)
+const expandedGroupId = ref<string | null>(null)
+
+watch([() => route.path, currentGroupId], () => {
+  expandedGroupId.value = currentGroupId.value
+}, { immediate: true })
+
+function isGroupExpanded(groupId: string) {
+  // Keep every shortcut reachable in the icon rail and reveal all search matches.
+  return sidebarCollapsed.value || !!menuQuery.value || expandedGroupId.value === groupId
+}
+
+function toggleGroup(groupId: string) {
+  if (menuQuery.value) return
+  expandedGroupId.value = expandedGroupId.value === groupId ? null : groupId
+}
 
 function openItem(it: NavItem, event: MouseEvent) {
   if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return
@@ -249,30 +270,44 @@ function retryNavigation() {
       <label v-if="compactViewport" class="mobile-menu-search"><i class="i-mdi-magnify" aria-hidden="true" /><input v-model="shell.menuQuery" type="search" :placeholder="t('mobileShell.search')" :aria-label="t('mobileShell.search')" /></label>
 
       <nav id="primary-navigation" class="nav" :aria-label="t('header.navigation')">
-        <template v-for="g in visibleGroups" :key="g.id">
-          <div class="group-label">{{ t(g.labelKey) }}</div>
-          <a
-            v-for="it in g.children"
-            :key="it.id"
-            :href="router.resolve(itemHref(it)).href"
-            :target="it.newTab ? '_blank' : undefined"
-            :rel="it.newTab ? 'noopener' : undefined"
-            class="nav-item"
-            :class="{ active: isActive(it) }"
-            :title="t(it.labelKey)"
-            :aria-label="t(it.labelKey)"
-            :aria-current="currentPath === canonicalPath(it.href) ? 'page' : undefined"
-            :aria-busy="isActive(it) && navigationPending || undefined"
-            @pointerenter="preparePage(itemHref(it))"
-            @pointerleave="cancelPagePreparation"
-            @focus="preparePage(itemHref(it))"
-            @blur="cancelPagePreparation"
-            @click="openItem(it, $event)"
+        <div v-for="g in visibleGroups" :key="g.id" class="nav-group">
+          <button
+            v-if="!sidebarCollapsed"
+            class="group-label"
+            :class="{ expanded: isGroupExpanded(g.id), 'is-current': currentGroupId === g.id }"
+            type="button"
+            :aria-expanded="isGroupExpanded(g.id)"
+            :aria-controls="`nav-group-${g.id}`"
+            :disabled="!!menuQuery"
+            @click="toggleGroup(g.id)"
           >
-            <i :class="it.icon" />
-            <span>{{ t(it.labelKey) }}</span>
-          </a>
-        </template>
+            <span>{{ t(g.labelKey) }}</span>
+            <i class="i-mdi-chevron-down" aria-hidden="true" />
+          </button>
+          <div v-show="isGroupExpanded(g.id)" :id="`nav-group-${g.id}`">
+            <a
+              v-for="it in g.children"
+              :key="it.id"
+              :href="router.resolve(itemHref(it)).href"
+              :target="it.newTab ? '_blank' : undefined"
+              :rel="it.newTab ? 'noopener' : undefined"
+              class="nav-item"
+              :class="{ active: isActive(it) }"
+              :title="t(it.labelKey)"
+              :aria-label="t(it.labelKey)"
+              :aria-current="currentPath === canonicalPath(it.href) ? 'page' : undefined"
+              :aria-busy="isActive(it) && navigationPending || undefined"
+              @pointerenter="preparePage(itemHref(it))"
+              @pointerleave="cancelPagePreparation"
+              @focus="preparePage(itemHref(it))"
+              @blur="cancelPagePreparation"
+              @click="openItem(it, $event)"
+            >
+              <i :class="it.icon" />
+              <span>{{ t(it.labelKey) }}</span>
+            </a>
+          </div>
+        </div>
         <div v-if="visibleGroups.length === 0" class="empty">{{ t('noMenu') }}</div>
       </nav>
 
@@ -475,23 +510,37 @@ function retryNavigation() {
 }
 .collapsed .nav { padding-right: 0; }
 .group-label {
-  margin: 14px 10px 6px;
-  font-size: var(--font-size-caption);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 32px;
+  margin: 10px 0 6px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font-family: inherit;
+  font-size: var(--font-size-section);
+  font-weight: 600;
+  text-align: left;
+  letter-spacing: 0;
   color: var(--text-on-dark-muted);
-  max-height: 32px;
-  overflow: hidden;
-  white-space: nowrap;
-  opacity: 1;
-  transition: opacity 0.16s ease, max-height 0.28s ease, margin 0.28s ease;
+  cursor: pointer;
 }
-.collapsed .group-label {
-  opacity: 0;
-  max-height: 0;
-  margin-top: 0;
-  margin-bottom: 0;
+.group-label span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.group-label i {
+  flex-shrink: 0;
+  font-size: 18px;
+  transform: rotate(-90deg);
+  transition: transform 180ms ease;
 }
+.group-label.expanded i { transform: rotate(0); }
+.group-label.is-current { color: var(--text-on-dark); }
+.group-label:enabled:hover { background: color-mix(in srgb, var(--text-on-dark) 8%, transparent); color: var(--text-on-dark); }
+.group-label:focus-visible { outline: 2px solid var(--text-on-dark); outline-offset: -2px; }
+.group-label:disabled { cursor: default; }
 .nav-item {
   display: flex;
   align-items: center;
@@ -682,6 +731,7 @@ function retryNavigation() {
   .brand-text { max-width: none; }
   .leaf { width: 44px; height: 44px; }
   .nav { min-height: 0; overscroll-behavior: contain; }
+  .group-label { min-height: 44px; }
   .nav-item { min-height: 44px; white-space: normal; }
   .nav-item span { max-width: none; }
   .mobile-menu-search { display: flex; flex: none; align-items: center; gap: 8px; min-height: 44px; margin-bottom: 8px; padding: 8px 12px; border: 1px solid color-mix(in srgb, var(--text-on-dark) 25%, transparent); border-radius: var(--r-pill); }
@@ -710,7 +760,7 @@ function retryNavigation() {
   .mobile-nav-backdrop { position: fixed; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .icon-btn, .leaf, .navigation-shade-enter-active, .navigation-shade-leave-active { transition: none; }
+  .icon-btn, .leaf, .group-label i, .navigation-shade-enter-active, .navigation-shade-leave-active { transition: none; }
 }
 </style>
 

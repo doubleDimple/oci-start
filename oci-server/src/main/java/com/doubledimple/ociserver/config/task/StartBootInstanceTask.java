@@ -1,6 +1,5 @@
 package com.doubledimple.ociserver.config.task;
 
-import cn.hutool.json.JSONUtil;
 import com.doubledimple.dao.entity.BootInstance;
 import com.doubledimple.dao.repository.TenantRepository;
 import com.doubledimple.ociserver.pojo.domain.dto.OracleInstanceDetail;
@@ -74,7 +73,8 @@ public class StartBootInstanceTask {
 
     public void doHandlerSuccess(User user,OracleInstanceDetail instanceData ) {
         //修改开机状态,修改ip
-        log.info("当前用户:{},创建了实例:{}",user.getUserName(), JSONUtil.toJsonStr(instanceData));
+        log.info("当前用户:{},创建实例成功，租户ID:{},区域:{}",
+                user.getUserName(), instanceData.getTenantId(), instanceData.getRegion());
         try {
             sendNotification(user.getUserName(), instanceData);
             bootTotalInstanceService.updatePublicIp(user.getBootId(),2,instanceData.getPublicIp());

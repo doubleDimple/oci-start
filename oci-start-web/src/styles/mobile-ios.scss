@@ -77,7 +77,7 @@
   html:root .shell .mobile-menu-search { border: 0; border-radius: 10px; background: var(--bg-search); }
   html:root .shell .mobile-menu-search input { font-size: 16px; }
   html:root .shell .side .nav { padding-right: 0; }
-  html:root .shell .side .group-label { margin: 22px 14px 8px; letter-spacing: 0; font-size: 12px; font-weight: 400; }
+  html:root .shell .side .group-label { margin: 22px 0 8px; padding-inline: 14px; letter-spacing: 0; font-size: var(--font-size-section); font-weight: 600; }
   html:root .shell .side .nav-item {
     min-height: 48px;
     margin-bottom: 0;
@@ -101,9 +101,9 @@
     transform: rotate(45deg);
     flex: none;
   }
-  html:root .shell .side .group-label + .nav-item { border-radius: 12px 12px 0 0; }
-  html:root .shell .side .nav-item:last-child,
-  html:root .shell .side .nav-item:has(+ .group-label) { border-radius: 0 0 12px 12px; border-bottom: 0; }
+  html:root .shell .side .nav-group .nav-item:first-child { border-radius: 12px 12px 0 0; }
+  html:root .shell .side .nav-group .nav-item:last-child { border-radius: 0 0 12px 12px; border-bottom: 0; }
+  html:root .shell .side .nav-group .nav-item:only-child { border-radius: 12px; }
   html:root .shell .side .nav-item.active { color: var(--brand); background: var(--status-ok-bg); }
   html:root .shell .side-user { margin-top: 12px; border-top-color: var(--mobile-separator); }
 

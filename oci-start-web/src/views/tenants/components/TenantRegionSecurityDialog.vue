@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { hasTenantPermission } from '@/utils/tenantPermissions'
 import { ElTableColumn as BaseTableColumn } from 'element-plus'
 import PageErrorNotice from '@/components/PageErrorNotice.vue'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
@@ -95,6 +96,7 @@ function clearEditor() {
 }
 
 async function loadRules() {
+  if (!hasTenantPermission(props.tenant, 'NETWORK_MANAGE')) return
   if (disposed) return
   readController?.abort()
   const version = ++readVersion
@@ -151,6 +153,7 @@ async function changeDirection(value: Direction) {
 }
 
 function addRule() {
+  if (!hasTenantPermission(props.tenant, 'NETWORK_MANAGE')) return
   if (busy.value || loading.value || editor.value || error.value) return
   clearEditor()
   editor.value = true
@@ -185,6 +188,7 @@ function validateForm() {
 }
 
 async function saveRule() {
+  if (!hasTenantPermission(props.tenant, 'NETWORK_MANAGE')) return
   if (busy.value || loading.value || !editor.value) return
   formError.value = validateForm()
   if (formError.value) return
@@ -222,6 +226,7 @@ async function saveRule() {
 }
 
 async function deleteRule(rule: SecurityRule & { ruleIndex: number }) {
+  if (!hasTenantPermission(props.tenant, 'NETWORK_MANAGE')) return
   if (busy.value || loading.value || editor.value) return
   busy.value = true
   const id = `${props.tenant.id}_${rule.ruleIndex}_${direction.value}`

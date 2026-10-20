@@ -5,6 +5,7 @@ import com.doubledimple.dao.entity.ServerMetrics;
 import com.doubledimple.ocicommon.enums.RegionEnum;
 import com.doubledimple.ocicommon.utils.IpUtils;
 import com.doubledimple.ociserver.config.exception.RateLimitException;
+import com.doubledimple.ociserver.config.exception.IpBannedException;
 import com.doubledimple.ociserver.pojo.request.MfaConfig;
 import com.doubledimple.ociserver.pojo.request.ServerMetricsDTO;
 import com.doubledimple.ociserver.pojo.request.TurnstileConfig;
@@ -167,6 +168,8 @@ public class ApiController  extends BaseController{
         try {
             verifyService.sendVerificationCodeForLogin(request.getUsername(),httpServletRequest);
             return ResponseEntity.ok().build();
+        } catch (IpBannedException e) {
+            throw e;
         } catch (RateLimitException e) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                     .body(e.getMessage());
