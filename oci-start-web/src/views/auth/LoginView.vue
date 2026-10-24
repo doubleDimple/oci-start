@@ -369,9 +369,12 @@ onBeforeUnmount(() => {
         <div v-else-if="configError" class="config-error"><p class="message error-message" role="alert">{{ errorText(configError) }}</p><button type="button" class="submit" @click="loadConfig()">{{ copy.retry }}</button></div>
         <template v-else-if="config">
           <section v-if="loginBlocked || loginStateUnavailable" class="login-access-notice message error-message" role="alert" aria-labelledby="login-access-title">
-            <strong id="login-access-title">{{ t(loginBlocked ? 'login.blocked.title' : 'login.blocked.unavailableTitle') }}</strong>
+            <strong id="login-access-title">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V6a4 4 0 0 1 8 0v4M12 14v3"/></svg>
+              <span>{{ t(loginBlocked ? 'login.blocked.title' : 'login.blocked.unavailableTitle') }}</span>
+            </strong>
             <p>{{ t(loginBlocked ? 'login.blocked.reason' : 'login.blocked.unavailable') }}</p>
-            <p>{{ t('login.blocked.refreshHint') }}</p>
+            <p class="login-access-hint">{{ t('login.blocked.refreshHint') }}</p>
             <button id="refresh-login-status" type="button" :disabled="configRefreshing || busy || sending || !!oauthBusy" @click="refreshLoginStatus">{{ configRefreshing ? copy.loading : t('login.blocked.refresh') }}</button>
           </section>
           <div v-if="config.allowRegister" class="tab-group"><button type="button" class="tab" :class="{ active: tab === 'login' }" :aria-pressed="tab === 'login'" :disabled="busy" @click="tab = 'login'">{{ t('login.title') }}</button><button type="button" class="tab" :class="{ active: tab === 'register' }" :aria-pressed="tab === 'register'" :disabled="busy" @click="tab = 'register'">{{ t('login.register') }}</button></div>

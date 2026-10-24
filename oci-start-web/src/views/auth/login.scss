@@ -570,8 +570,21 @@
 }
 
 .auth-page .login-access-notice {
+  display: block;
+  padding: 16px;
   line-height: 1.65;
-  p { margin: 8px 0; }
-  button { padding: 6px 10px; border: 1px solid var(--line-2); border-radius: 7px; background: var(--surface); color: var(--text); font: inherit; cursor: pointer; }
+  overflow-wrap: break-word;
+  strong { display: flex; align-items: flex-start; gap: 8px; font-size: 15px; font-weight: 600; line-height: 1.5; }
+  strong svg { flex: none; width: 20px; height: 20px; margin-top: 1px; }
+  strong span { min-width: 0; }
+  p { margin: 10px 0 0; color: var(--text); }
+  .login-access-hint { margin-top: 6px; color: var(--muted); font-size: 12.5px; }
+  button {
+    display: inline-flex; align-items: center; justify-content: center;
+    max-width: 100%; min-height: 44px; margin-top: 14px; padding: 8px 14px;
+    border: 1px solid var(--line-2); border-radius: 8px; background: var(--surface); color: var(--text);
+    font: inherit; font-size: 13px; font-weight: 600; line-height: 1.5; white-space: nowrap; cursor: pointer;
+  }
+  button:hover:not(:disabled) { border-color: currentColor; background: var(--raise); }
   button:disabled { opacity: .5; cursor: default; }
 }
