@@ -186,8 +186,6 @@ location ~ ^/websockify/(\d+)$ {
 
 > 旧版本升级时,删除旧 `security` 配置,并按上述要求检查可信代理及 `server.forward-headers-strategy` 配置。
 
----
-
 ## 截图
 
 <div align="center">

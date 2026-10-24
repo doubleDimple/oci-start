@@ -1,4 +1,4 @@
-/** First-account policy only; existing accounts can still sign in with these names. */
+/** Common defaults are rejected at registration; existing users can still sign in and receive a reminder. */
 export function isReservedRegistrationUsername(value: string): boolean {
   const name = value.trim().normalize('NFKC').trim().toLowerCase()
   return ['root', 'admin', 'administrator', 'superadmin', 'superuser', 'system', 'guest', 'test', 'user'].includes(name)

@@ -6,6 +6,7 @@ import { mobileAliases } from './mobile'
 import { beginRouteNavigation, endRouteNavigation, isSameNavigation, navigationPending } from '@/utils/navigation'
 import { hasTenantPermission, loadTenantPermissionContext, loadInstancePermissionContext, type TenantPermission } from '@/utils/tenantPermissions'
 import { sessionExpired } from '@/utils/session'
+import { createAuthenticationGuard } from './authGuard'
 
 const layout = () => import('@/layouts/DefaultLayout.vue')
 
@@ -109,8 +110,9 @@ export const routePreloader = createRoutePreloader(router)
 watch(navigationPending, value => routePreloader.navigationPending(value), { immediate: true, flush: 'sync' })
 let progressOwner: RouteLocationNormalized | null = null
 let permissionGuardController: AbortController | undefined
+const authenticate = createAuthenticationGuard()
 
-router.beforeEach(to => {
+router.beforeEach(async to => {
   permissionGuardController?.abort()
   if (to.matched.some(record => record.path === '/oci/sysHelp') && window.matchMedia('(max-width: 760px)').matches) {
     return { path: '/m/instances', replace: true }
@@ -120,7 +122,7 @@ router.beforeEach(to => {
   if (progressOwner) doneProgress()
   progressOwner = to
   startProgress()
-  return true
+  return authenticate(to)
 })
 // Resolve local authorization before a deep-linked page starts its cloud requests.
 const tenantRoutePermissions: Record<string, TenantPermission> = {

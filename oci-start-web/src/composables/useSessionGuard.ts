@@ -8,7 +8,7 @@ export function useSessionGuard() {
   let timer: ReturnType<typeof setInterval> | undefined
   const verify = () => { if (route.matched.length && !route.meta.public && !sessionExpired.value) void checkSession() }
   onMounted(() => {
-    // The shell's initial userInfo read already checks entry authentication.
+    // The router verifies the initial userInfo response before mounting a private page.
     timer = setInterval(verify, 30000)
     window.addEventListener('focus', verify)
     window.addEventListener('online', verify)

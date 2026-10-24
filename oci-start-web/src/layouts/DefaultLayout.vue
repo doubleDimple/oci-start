@@ -21,6 +21,7 @@ import HeaderMessages from '@/components/header/HeaderMessages.vue'
 import HeaderAssets from '@/components/header/HeaderAssets.vue'
 import HeaderVersion from '@/components/header/HeaderVersion.vue'
 import ThemeDrawer from '@/components/ThemeDrawer.vue'
+import DefaultUsernameNotice from '@/components/DefaultUsernameNotice.vue'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -145,7 +146,6 @@ function closeMobileNavWithEscape(event: KeyboardEvent) {
 
 onMounted(() => {
   void refreshHeaderVersionOnEntry()
-  void user.load(userRequest.signal)
   void loadSiteBrand(siteBrandRequest.signal)
   compactMedia.addEventListener('change', updateViewport)
   document.addEventListener('focusin', keepMobileFocus)
@@ -408,6 +408,7 @@ function retryNavigation() {
       </nav>
     </div>
     <HeaderAssets ref="assets" />
+    <DefaultUsernameNotice :username="user.username" :ready="!user.loading && !user.loadFailed && !user.signingOut" />
     <ThemeDrawer v-model="themeDrawerOpen" />
     <el-dialog v-model="mobilePreferencesOpen" class="mobile-preferences-dialog" :title="t('mobileShell.preferences')" width="min(460px, calc(100vw - 24px))" align-center append-to-body>
       <div class="mobile-preferences">

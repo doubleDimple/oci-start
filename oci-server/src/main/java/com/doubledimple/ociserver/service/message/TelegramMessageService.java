@@ -22,6 +22,8 @@ import javax.servlet.http.HttpServletRequest;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.Optional;
 
 import static com.doubledimple.ocicommon.template.MessageTemplate.LEGACY_MESSAGE_TEMPLATE;
@@ -110,6 +112,44 @@ public class TelegramMessageService implements MessageService {
             log.info("发送通知消息");
         }
         doSendHtml(message);
+    }
+
+    /** Recovery secrets go only to the unchanged, enabled, prebound private Telegram destination. */
+    public void sendPrivateRecoveryMessage(String message, long expectedChatId, String expectedBotTokenHash) {
+        try {
+            TelegramConfig config = getTelegramConfig();
+            if (!isTelegramAvailable(config) || !config.isEnabled() || expectedChatId <= 0
+                    || config.getChatId() == null || !config.getChatId().trim().matches("[1-9][0-9]{0,18}")
+                    || Long.parseLong(config.getChatId().trim()) != expectedChatId || expectedBotTokenHash == null) return;
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(config.getBotToken().getBytes(StandardCharsets.UTF_8));
+            StringBuilder hash = new StringBuilder(64);
+            for (byte b : digest) hash.append(String.format("%02x", b & 255));
+            if (!MessageDigest.isEqual(hash.toString().getBytes(StandardCharsets.US_ASCII),
+                    expectedBotTokenHash.getBytes(StandardCharsets.US_ASCII))) return;
+            sendPrivateTelegramRequest(config.getBotToken(), expectedChatId, message);
+        } catch (Exception failure) {
+            log.warn("Telegram 私聊恢复通知失败，异常类型：{}", failure.getClass().getSimpleName());
+        }
+    }
+
+    protected void sendPrivateTelegramRequest(String botToken, long chatId, String message) throws Exception {
+        URL endpoint = new URL("https://api.telegram.org/bot" + botToken + "/sendMessage");
+        HttpURLConnection connection = (HttpURLConnection) endpoint.openConnection();
+        try {
+            connection.setRequestMethod("POST");
+            connection.setConnectTimeout(5000);
+            connection.setReadTimeout(5000);
+            connection.setDoOutput(true);
+            connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded;charset=UTF-8");
+            byte[] body = ("chat_id=" + chatId + "&parse_mode=HTML&text="
+                    + URLEncoder.encode(message, StandardCharsets.UTF_8.name())).getBytes(StandardCharsets.UTF_8);
+            connection.setFixedLengthStreamingMode(body.length);
+            try (java.io.OutputStream output = connection.getOutputStream()) { output.write(body); }
+            int status = connection.getResponseCode();
+            if (status < 200 || status >= 300) log.warn("Telegram 私聊恢复通知未送达，HTTP状态码：{}", status);
+        } finally {
+            connection.disconnect();
+        }
     }
 
     @Override
@@ -205,21 +245,21 @@ public class TelegramMessageService implements MessageService {
      * @Date: 12/22/24 9:10 AM
      */
     private void doSendHtml(String message){
-        TelegramConfig telegramConfig = getTelegramConfig();
-        if (!isTelegramAvailable(telegramConfig)){
-            log.warn("TG 无法推送消息,消息未配置");
-        } else if (!telegramConfig.isEnabled()){
-            log.debug("TG 无法推送消息,消息推送已被禁用");
-        } else {
-            try {
+        try {
+            TelegramConfig telegramConfig = getTelegramConfig();
+            if (!isTelegramAvailable(telegramConfig)){
+                log.warn("TG 无法推送消息,消息未配置");
+            } else if (!telegramConfig.isEnabled()){
+                log.debug("TG 无法推送消息,消息推送已被禁用");
+            } else {
                 String encodedMessage = URLEncoder.encode(message, "UTF-8");
                 String urlString = String.format(
                         TG_URL + "&parse_mode=HTML",
                         telegramConfig.getBotToken(), telegramConfig.getChatId(), encodedMessage);
                 sendTelegramRequest(urlString, "HTML");
-            }  catch (Exception e) {
-                log.warn("TG 消息发送失败，异常类型:{}", e.getClass().getSimpleName());
             }
+        } catch (Exception e) {
+            log.warn("TG 消息发送失败，异常类型:{}", e.getClass().getSimpleName());
         }
 
         sendOtherChannels(message);
@@ -257,8 +297,16 @@ public class TelegramMessageService implements MessageService {
             log.error("钉钉消息发送失败");
         }
 
-        sendBark(message);
-        feishuService.sendMessageTemplate(message);
+        try {
+            sendBark(message);
+        } catch (Exception e) {
+            log.warn("BARK 消息发送失败，异常类型:{}", e.getClass().getSimpleName());
+        }
+        try {
+            feishuService.sendMessageTemplate(message);
+        } catch (Exception e) {
+            log.warn("飞书消息发送失败，异常类型:{}", e.getClass().getSimpleName());
+        }
     }
 
     private boolean isTelegramAvailable(TelegramConfig telegramConfig) {
@@ -267,7 +315,7 @@ public class TelegramMessageService implements MessageService {
                 && StringUtils.isNotBlank(telegramConfig.getChatId());
     }
 
-    private void sendTelegramRequest(String urlString, String mode) throws Exception {
+    protected void sendTelegramRequest(String urlString, String mode) throws Exception {
         URL url = new URL(urlString);
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
         try {
@@ -299,19 +347,22 @@ public class TelegramMessageService implements MessageService {
             return;
         }
 
-        final String url = barkConfig.getUrl();
-        final String deviceKey = barkConfig.getDeviceKey();
         boolean enabled = barkConfig.isEnabled();
         if (!enabled){
             log.debug("BARK 无法推送消息,消息推送已被禁用");
+            return;
         }
+        if (StringUtils.isBlank(barkConfig.getUrl()) || StringUtils.isBlank(barkConfig.getDeviceKey())) return;
 
         try {
-            BarkPush pusher = new BarkPush(url, deviceKey);
-            pusher.simpleWithResp(message);
+            sendBarkRequest(barkConfig, message);
         } catch (Exception e) {
             log.debug("bark消息发送失败");
         }
+    }
+
+    protected void sendBarkRequest(BarkConfig config, String message) {
+        new BarkPush(config.getUrl(), config.getDeviceKey()).simpleWithResp(message);
     }
 
 

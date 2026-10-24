@@ -1,13 +1,10 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
-import { createRequire } from 'node:module'
-import { pathToFileURL } from 'node:url'
 import test from 'node:test'
 import ts from 'typescript'
 import { createRenderer, h, nextTick, reactive, ref } from 'vue'
 
-const require = createRequire(import.meta.url)
-const vueUrl = pathToFileURL(require.resolve('vue/dist/vue.runtime.esm-bundler.js')).href
+const vueUrl = import.meta.resolve('vue')
 const source = (await readFile(new URL('../src/composables/useSessionGuard.ts', import.meta.url), 'utf8'))
   .replace("from 'vue'", `from '${vueUrl}'`)
   .replace("import { useRoute } from 'vue-router'", 'const useRoute = () => globalThis.authGuardFixture.route')

@@ -20,6 +20,11 @@ public interface TenantRepository extends JpaRepository<Tenant, Long> {
 
     List<Tenant> findByTenancy(String tenancy);
 
+    @Query("select count(t) from Tenant t where t.userName = :name or t.tenancyName = :name " +
+            "or exists (select c.id from CloudTenancy c where c.type = 1 and c.defName = :name " +
+            "and c.cloudType = t.cloudType and c.tenancyName = t.tenancy)")
+    long countByRecoveryName(@Param("name") String name);
+
     /**
     * 根据tenancy查询租户
     */

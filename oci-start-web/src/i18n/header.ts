@@ -7,6 +7,12 @@ export const headerZh = {
   sidebarColor: '侧栏背景 {color}', pageColor: '内容区配色 {color}', customSidebar: '自定义侧栏背景', customPage: '自定义内容区配色',
   search: '搜索并打开页面', searchHint: '输入菜单名称，按 Enter 打开', clearSearch: '清空搜索',
   searchResults: '匹配页面', searchCount: '找到 {count} 个页面', newTab: '在新标签页打开',
+  defaultUsername: {
+    title: '建议修改默认用户名',
+    message: '当前用户名“{username}”属于常见默认名称，容易被猜到。建议到“安全管理 → 账号与站点”修改为专属用户名。',
+    optional: '此提醒不强制修改，关闭后可以继续使用。',
+    dismiss: '暂不修改', change: '去修改',
+  },
 }
 
 export const headerEn = {
@@ -18,4 +24,10 @@ export const headerEn = {
   sidebarColor: 'Sidebar background {color}', pageColor: 'Content palette {color}', customSidebar: 'Custom sidebar background', customPage: 'Custom content palette',
   search: 'Find and open a page', searchHint: 'Type a menu name and press Enter', clearSearch: 'Clear search',
   searchResults: 'Matching pages', searchCount: '{count} matching pages', newTab: 'Open in a new tab',
+  defaultUsername: {
+    title: 'Consider changing your default username',
+    message: '“{username}” is a common default username and easy to guess. Choose a personal username in Security settings → Account & site.',
+    optional: 'This is optional. You can dismiss this reminder and continue using the app.',
+    dismiss: 'Not now', change: 'Change username',
+  },
 }

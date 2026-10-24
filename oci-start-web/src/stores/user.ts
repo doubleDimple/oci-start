@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { fetchUserInfo, logout } from '@/api/user'
+import { noteSessionVerified } from '@/utils/session'
 
 let loadGeneration = 0
 
@@ -18,8 +19,9 @@ export const useUserStore = defineStore('user', {
       try {
         const res = await fetchUserInfo({ signal })
         if (signal?.aborted || generation !== loadGeneration) return
-        if (!res?.success || typeof res.data?.username !== 'string' || !res.data.username) throw new Error('Invalid user response')
+        if (res?.success !== true || typeof res.data?.username !== 'string' || !res.data.username.trim()) throw new Error('Invalid user response')
         this.username = res.data.username
+        noteSessionVerified()
       } catch {
         if (!signal?.aborted && generation === loadGeneration) this.loadFailed = true
       } finally {

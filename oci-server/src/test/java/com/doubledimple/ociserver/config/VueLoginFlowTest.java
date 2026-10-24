@@ -287,6 +287,8 @@ class VueLoginFlowTest {
 
         assertEquals(403, response.getStatus());
         assertTrue(json.readTree(response.getContentAsString()).get("loginBlocked").asBoolean());
+        assertTrue(json.readTree(response.getContentAsString()).get("loginBlockedUntil").isNull());
+        assertNoDeadlineDisclosure(response);
         assertNull(response.getCookie(TOKEN_NAME));
         verifyNoInteractions(users, failureGuard, exportGuard);
     }
@@ -301,6 +303,8 @@ class VueLoginFlowTest {
 
         assertEquals(403, response.getStatus());
         assertTrue(json.readTree(response.getContentAsString()).get("loginBlocked").asBoolean());
+        assertTrue(json.readTree(response.getContentAsString()).get("loginBlockedUntil").isNull());
+        assertNoDeadlineDisclosure(response);
         assertNull(response.getCookie(TOKEN_NAME));
         verify(failureGuard).failed(anyString(), eq(USER), eq(!accountExists));
         if (accountExists) verify(exportGuard).recordPasswordFailure(USER);
@@ -314,6 +318,8 @@ class VueLoginFlowTest {
         MockHttpServletResponse response = mvc.perform(loginRequest(true)).andReturn().getResponse();
 
         assertEquals(403, response.getStatus());
+        assertTrue(json.readTree(response.getContentAsString()).get("loginBlockedUntil").isNull());
+        assertNoDeadlineDisclosure(response);
         assertNull(response.getCookie(TOKEN_NAME));
         verify(users).validateCredentials(USER, PASSWORD);
         verify(globalGuard).assertAllowed();
@@ -342,7 +348,8 @@ class VueLoginFlowTest {
 
         assertEquals(200, response.getStatus());
         assertTrue(json.readTree(response.getContentAsString()).get("loginBlocked").asBoolean());
-        assertEquals("2026-10-25T00:00+08:00", json.readTree(response.getContentAsString()).get("loginBlockedUntil").asText());
+        assertTrue(json.readTree(response.getContentAsString()).get("loginBlockedUntil").isNull());
+        assertNoDeadlineDisclosure(response);
         assertNull(response.getCookie(TOKEN_NAME));
     }
 
@@ -376,6 +383,7 @@ class VueLoginFlowTest {
             assertEquals("no-store", response.getHeader("Cache-Control"));
         }
         verifyNoInteractions(users, settings, failureGuard, remote);
+        assertNoDeadlineDisclosure(response);
         verify(globalGuard).assertAllowed();
         verify(globalGuard, never()).completeLogin(any(), any());
     }
@@ -437,6 +445,7 @@ class VueLoginFlowTest {
 
         assertEquals(302, result.getStatus());
         if (lockAtCompletion) {
+            assertNoDeadlineDisclosure(result);
             assertEquals("/login?error=" + URLEncoder.encode(GlobalLoginGuardTestSupport.BLOCKED_MESSAGE, StandardCharsets.UTF_8.name()),
                     result.getRedirectedUrl());
             assertNull(result.getCookie(TOKEN_NAME));
@@ -585,6 +594,14 @@ class VueLoginFlowTest {
 
     private MockHttpServletRequestBuilder loginRequest(boolean ajax) {
         return loginRequest(ajax, PASSWORD);
+    }
+
+    private void assertNoDeadlineDisclosure(MockHttpServletResponse response) throws Exception {
+        assertNull(response.getHeader("Retry-After"));
+        assertFalse(response.getContentAsString().contains("2026-10-25T00:00"));
+        if (response.getRedirectedUrl() != null) {
+            assertFalse(response.getRedirectedUrl().contains("2026-10-25"));
+        }
     }
 
     private void useRealCredentialValidation(boolean accountExists) {

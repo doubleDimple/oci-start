@@ -107,7 +107,7 @@ public class LoginController {
             config.put("mfaEnabled", mfa != null && mfa.isEnabled());
             config.put("locale", LocaleContextHolder.getLocale().toLanguageTag());
             config.put("loginBlocked", loginStatus.isBlocked());
-            config.put("loginBlockedUntil", loginStatus.getBlockedUntil());
+            config.put("loginBlockedUntil", null);
             config.put("loginBlockedMessage", loginStatus.getMessage());
             return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(config);
         } catch (Exception e) {
@@ -206,7 +206,7 @@ public class LoginController {
                 error.put("success", false);
                 error.put("message", e.getMessage());
                 error.put("loginBlocked", e.isBlocked());
-                error.put("loginBlockedUntil", e.getBlockedUntil());
+                error.put("loginBlockedUntil", null);
                 objectMapper.writeValue(response.getWriter(), error);
             } else {
                 redirectError(response, request, false, mobile, e.getMessage());

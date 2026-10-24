@@ -5,6 +5,9 @@ export const sessionExpired = readonly(expired)
 let checking: Promise<void> | undefined
 let checkedAt = 0
 
+/** Reuse a verified identity read when the route monitor runs immediately after entry. */
+export function noteSessionVerified() { checkedAt = Date.now() }
+
 /** Full navigation bypasses route-leave guards; unmount first to release sessions
  * and their beforeunload handlers. Never repeat redirects for concurrent 401s. */
 export function redirectToLogin() {

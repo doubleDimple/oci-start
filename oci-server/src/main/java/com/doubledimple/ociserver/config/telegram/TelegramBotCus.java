@@ -36,6 +36,7 @@ import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
@@ -264,6 +265,33 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
             return;
         }
 
+        // Recovery messages must never reach generic logs, boot input, or AI, including on failure.
+        Message recoveryMessage = update.getMessage();
+        if (recoveryMessage != null && TelegramLoginRecoveryHandler.isRecoveryText(recoveryMessage.getText())) {
+            try {
+                applicationContext.getBean(TelegramLoginRecoveryHandler.class).handle(
+                        recoveryMessage, botToken, new TelegramLoginRecoveryHandler.Messenger() {
+                            @Override
+                            public void reply(long chatId, String text) throws TelegramApiException {
+                                execute(SendMessage.builder().chatId(chatId).text(text).build());
+                            }
+
+                            @Override
+                            public void delete(long chatId, int messageId) throws TelegramApiException {
+                                execute(new DeleteMessage(String.valueOf(chatId), messageId));
+                            }
+                        });
+            } catch (Exception exception) {
+                log.warn("Telegram recovery dispatch failed: {}", exception.getClass().getSimpleName());
+            }
+            return;
+        }
+        // Edited/forwarded callback inputs are never a recovery channel.
+        if (update.getEditedMessage() != null
+                && TelegramLoginRecoveryHandler.isRecoveryText(update.getEditedMessage().getText())) return;
+        if (update.hasCallbackQuery()
+                && TelegramLoginRecoveryHandler.isRecoveryText(update.getCallbackQuery().getData())) return;
+
         try {
             // 处理文本消息
             if (update.hasMessage() && update.getMessage().hasText()) {
@@ -286,7 +314,7 @@ public class TelegramBotCus extends TelegramLongPollingBot implements Initializi
         String text = message.getText();
         User user = message.getFrom();
 
-        log.debug("收到消息: {} 来自: {}", text, chatId);
+        log.debug("收到 Telegram 文本消息，messageId: {}，chatId: {}", message.getMessageId(), chatId);
 
         try {
             TelegramUserService telegramUserService = getTelegramUserService();

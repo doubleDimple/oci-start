@@ -188,10 +188,12 @@ class LoginVerificationCodeTest {
         ReflectionTestUtils.setField(controller, "verifyService", service);
         MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
 
-        mvc.perform(post("/api/send-verification-code").contentType("application/json")
+        org.springframework.mock.web.MockHttpServletResponse response = mvc.perform(post("/api/send-verification-code").contentType("application/json")
                         .content("{\"username\":\"" + USER + "\"}"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isForbidden()).andReturn().getResponse();
 
+        assertNull(response.getHeader("Retry-After"));
+        assertFalse(response.getContentAsString().contains("2026-10-25T00:00"));
         verifyNoInteractions(users, messages, guard);
         assertTrue(delivered.isEmpty());
     }
