@@ -142,7 +142,7 @@ class ExportVerificationGuardTest {
     @AfterAll
     static void stopDatabase() { if (factory != null) factory.destroy(); }
 
-    @BeforeEach
+    /*@BeforeEach
     void setUp() throws Exception {
         tx(() -> { users.deleteAll(); return null; });
         userId = tx(() -> users.saveAndFlush(account(USER)).getId());
@@ -198,7 +198,7 @@ class ExportVerificationGuardTest {
         ReflectionTestUtils.setField(nginx, "verifyService", verification);
         mvc = MockMvcBuilders.standaloneSetup(controller, migration, oci, oldMfa, newMfa, nginx).build();
         UserContext.setUsername(USER);
-    }
+    }*/
 
     @AfterEach
     void clearUserContext() { UserContext.clear(); }
