@@ -225,18 +225,8 @@ enum BootJSON {
     }
 
     static func ensureSuccess(_ raw: Data, fallback: String = "操作失败") throws {
-        guard let root = obj(raw) else { return }
-        if let success = root["success"] as? Bool {
-            if !success {
-                let msg = string(root["message"]).isEmpty ? fallback : string(root["message"])
-                throw APIError.serverMessage(msg)
-            }
-            return
-        }
-        if let code = root["code"] as? Int, code != 200, code != 0 {
-            let msg = string(root["message"]).isEmpty ? fallback : string(root["message"])
-            throw APIError.serverMessage(msg)
-        }
+        let result = InstanceJSON.successMessage(raw, fallback: fallback)
+        guard result.ok else { throw APIError.serverMessage(result.message) }
     }
 
     static func parseList(_ raw: Data) throws -> BootListResponse {
@@ -324,7 +314,7 @@ enum BootJSON {
             throw APIError.serverMessage("详情响应无效")
         }
         try ensureSuccess(raw, fallback: "加载详情失败")
-        let arr = (root["data"] as? [[String: Any]]) ?? []
+        guard let arr = root["data"] as? [[String: Any]] else { throw APIError.invalidResponse }
         return arr.map { parseDetail($0) }
     }
 }

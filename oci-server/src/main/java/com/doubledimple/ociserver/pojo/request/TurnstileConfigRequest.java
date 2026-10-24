@@ -10,4 +10,5 @@ public class TurnstileConfigRequest {
     private boolean enabled;
     private String siteKey;
     private String secretKey;
+    private Boolean keepSecret;
 }

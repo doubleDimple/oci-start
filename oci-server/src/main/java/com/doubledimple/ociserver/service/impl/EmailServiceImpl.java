@@ -307,7 +307,7 @@ public class EmailServiceImpl implements EmailService {
             return smtpCredentialsRes;
         }
         OciEmailUtils.SmtpCredentialsResult smtpResult = (OciEmailUtils.SmtpCredentialsResult) smtpCredentialsRes.getData();
-        log.info("创建SMTP凭据成功: {}", JSON.toJSONString(smtpResult));
+        log.info("创建SMTP凭据成功，租户ID:{},凭据ID:{}", tenantId, smtpResult.getCredentialId());
 
         // 第五步. 获取邮件配置
         String smtpHost = "smtp.email." + RegionEnum.getRegionCode(tenant.getRegion()) + ".oci.oraclecloud.com";

@@ -133,9 +133,9 @@ public class BarkPush {
             request = JSONObject.from(pushRequest);
         }
 
-        log.info("bark request url:{},request body :{}", pushUrl, request.toJSONString());
+        log.info("发送 Bark 通知");
         HttpResponse httpResponse = HttpRequest.post(pushUrl).body(request.toJSONString()).header(Header.CONTENT_TYPE, ContentType.JSON.getValue()).execute();
-        log.debug("bark push response: {}", httpResponse);
+        log.debug("Bark 通知响应状态: {}", httpResponse.getStatus());
         return JSON.parseObject(httpResponse.body(), BarkPushResp.class);
     }
 

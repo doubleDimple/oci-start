@@ -63,28 +63,25 @@ struct InstancesView: View {
     }
 
     private var listPage: some View {
-        PageScaffold(
-            title: "实例列表",
-            subtitle: filterSubtitle,
-            systemImage: "server.rack",
-            toolbar: { toolbar },
-            content: {
-                VStack(spacing: 0) {
-                    filterBar
-                    if let err = model.errorText, !err.isEmpty { errorBanner(err) }
-                    summaryBar
-                    listBody
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 12)
-                    PaginationBar(state: $model.pageState) {
-                        model.onPageChange()
+        GeometryReader { proxy in
+            PageScaffold(
+                title: "实例列表",
+                subtitle: filterSubtitle,
+                systemImage: "server.rack",
+                content: {
+                    VStack(spacing: 0) {
+                        filterBar(width: proxy.size.width - AppTheme.pagePadding * 2)
+                        listBody
+                        PaginationBar(state: $model.pageState, disabled: model.isLoading) {
+                            model.onPageChange()
+                        }
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .appLoading(model.isLoading && !model.rows.isEmpty)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .appLoading(model.isLoading && !model.rows.isEmpty)
-            }
-        )
-        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+            )
+            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+        }
     }
 
     private var filterSubtitle: String {
@@ -98,6 +95,9 @@ struct InstancesView: View {
 
     private var toolbar: some View {
         HStack(spacing: 8) {
+            if let error = model.errorText, !error.isEmpty {
+                PageErrorIndicator(message: error, retry: { Task { await model.reload() } })
+            }
             AppButton(
                 title: model.namesHidden ? "显示名称" : "隐藏名称",
                 systemImage: model.namesHidden ? "eye" : "eye.slash",
@@ -123,9 +123,11 @@ struct InstancesView: View {
 
     // MARK: - Filter
 
-    private var filterBar: some View {
-        FilterBar(
-            leading: {
+    private func filterBar(width: CGFloat) -> some View {
+        AdaptiveListToolbar(
+            compactBelow: 900,
+            availableWidth: width,
+            filters: {
                 HStack(spacing: 10) {
                     SelectMenu(
                         options: model.parentTenants.map { SelectOption(id: $0.id, title: parentLabel($0)) },
@@ -134,7 +136,7 @@ struct InstancesView: View {
                             set: { model.onParentChanged($0) }
                         ),
                         placeholder: "选择租户…",
-                        width: 200,
+                        width: 160,
                         allowClear: true,
                         searchable: true
                     )
@@ -145,14 +147,12 @@ struct InstancesView: View {
                             set: { model.onRegionChanged($0) }
                         ),
                         placeholder: model.selectedParentId.isEmpty ? "先选租户" : "选择区域…",
-                        width: 200,
+                        width: 160,
                         enabled: !model.selectedParentId.isEmpty,
                         allowClear: true,
                         searchable: true
                     )
                 }
-            },
-            trailing: {
                 HStack(spacing: 8) {
                     if model.hasActiveFilter {
                         AppButton(title: "重置", systemImage: "xmark", kind: .secondary) {
@@ -168,7 +168,8 @@ struct InstancesView: View {
                         model.applyFilter()
                     }
                 }
-            }
+            },
+            actions: { toolbar }
         )
     }
 
@@ -187,70 +188,6 @@ struct InstancesView: View {
 
     // MARK: - Summary
 
-    private var summaryBar: some View {
-        HStack(spacing: 10) {
-            summaryChip(icon: "server.rack", title: "本页", value: "\(model.rows.count)", accent: AppTheme.sidebarActive)
-            summaryChip(icon: "play.circle.fill", title: "运行中", value: "\(model.runningCount)", accent: Color(hex: "3fb950"))
-            summaryChip(icon: "stop.circle.fill", title: "已停止", value: "\(model.stoppedCount)", accent: Color(hex: "f85149"))
-            if model.otherStateCount > 0 {
-                summaryChip(icon: "ellipsis.circle", title: "其他", value: "\(model.otherStateCount)", accent: Color(hex: "d29922"))
-            }
-            Spacer(minLength: 0)
-            Text("快捷：启停 · 复制IP · SSH · 更多")
-                .font(.system(size: 11))
-                .foregroundColor(AppTheme.sidebarText(dark).opacity(0.85))
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-    }
-
-    private func summaryChip(icon: String, title: String, value: String, accent: Color) -> some View {
-        HStack(spacing: 8) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(accent.opacity(0.15))
-                    .frame(width: 28, height: 28)
-                Image(systemName: icon)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(accent)
-            }
-            VStack(alignment: .leading, spacing: 1) {
-                Text(title)
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(AppTheme.sidebarText(dark))
-                Text(value)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(dark ? Color.white.opacity(0.92) : Color.primary)
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(AppTheme.sidebarBg(dark))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(AppTheme.border(dark).opacity(0.55), lineWidth: 1)
-        )
-    }
-
-    private func errorBanner(_ text: String) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "exclamationmark.triangle.fill")
-            Text(text).font(.system(size: 12))
-            Spacer()
-            Button("重试") { Task { await model.reload() } }
-                .buttonStyle(PlainButtonStyle())
-                .font(.system(size: 12, weight: .semibold))
-        }
-        .foregroundColor(Color(hex: "f85149"))
-        .padding(12)
-        .background(Color(hex: "f85149").opacity(0.1))
-        .cornerRadius(10)
-        .padding(.horizontal, 16)
-        .padding(.top, 4)
-    }
 
     // MARK: - Table
 
@@ -261,8 +198,8 @@ struct InstancesView: View {
                 Spacer()
                 ProgressView()
                 Text("加载实例…")
-                    .font(.system(size: 12))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .font(.system(size: 13))
+                    .foregroundColor(AppTheme.textSecondary(dark))
                 Spacer()
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -285,8 +222,6 @@ struct InstancesView: View {
                 let flex = max(0, totalW - fixedColsWidth)
                 let wName = minName + flex * 0.55
                 let wIp = minIp + flex * 0.45
-                let needsHScroll = totalW > geo.size.width + 0.5
-
                 let table = VStack(spacing: 0) {
                     headerRow(wName: wName, wIp: wIp, width: totalW)
                     ScrollView {
@@ -297,31 +232,17 @@ struct InstancesView: View {
                         }
                     }
                 }
-                .frame(width: totalW, height: geo.size.height, alignment: .topLeading)
+                .frame(width: totalW, alignment: .topLeading)
 
-                Group {
-                    if needsHScroll {
-                        ScrollView(.horizontal, showsIndicators: true) { table }
-                            .frame(width: geo.size.width, height: geo.size.height)
-                    } else {
-                        table
-                    }
-                }
+                NativeFixedTrailingTable(contentWidth: totalW, viewportWidth: geo.size.width, height: geo.size.height) { table }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(tableCardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(AppTheme.border(dark).opacity(0.55), lineWidth: 1)
-            )
-            .shadow(color: Color.black.opacity(dark ? 0.22 : 0.06), radius: 8, x: 0, y: 2)
         }
     }
 
     private var tableCardBackground: some View {
-        RoundedRectangle(cornerRadius: 12)
-            .fill(AppTheme.sidebarBg(dark))
+        AppTheme.cardBg(dark)
     }
 
     private func headerRow(wName: CGFloat, wIp: CGFloat, width: CGFloat) -> some View {
@@ -339,13 +260,16 @@ struct InstancesView: View {
                 colHeader("公网 IPv4", wIp)
                 colHeader("IPv6", wIpv6, align: .center)
                 colHeader("创建时间", wTime)
-                colHeader("操作", wAction, align: .center)
+                Color.clear.frame(width: wAction, height: 1)
             }
         }
         .padding(.horizontal, hPad)
         .padding(.vertical, 10)
         .frame(width: width, alignment: .leading)
-        .background(AppTheme.sidebarHover(dark).opacity(0.65))
+        .background(AppTheme.inputBg(dark))
+        .modifier(NativeFixedTableActions(width: wAction, trailingPadding: hPad, background: AppTheme.inputBg(dark)) {
+            colHeader("操作", wAction, align: .center)
+        })
         .overlay(
             Rectangle().frame(height: 1).foregroundColor(AppTheme.border(dark).opacity(0.5)),
             alignment: .bottom
@@ -369,8 +293,7 @@ struct InstancesView: View {
                 ipCell(item, width: wIp)
                 ipv6Cell(item, width: wIpv6)
                 cellText(item.createDateText, wTime, muted: true)
-                actionBar(item)
-                    .frame(width: wAction, alignment: .center)
+                Color.clear.frame(width: wAction, height: 26)
             }
         }
         .padding(.horizontal, hPad)
@@ -387,6 +310,10 @@ struct InstancesView: View {
                 hoveredRowId = inside ? item.id : (hoveredRowId == item.id ? nil : hoveredRowId)
             }
         }
+        .modifier(NativeFixedTableActions(width: wAction, trailingPadding: hPad,
+                                         background: hovered ? AppTheme.mix(AppTheme.sidebarActive, fraction: dark ? 0.12 : 0.08, with: AppTheme.cardBg(dark)) : grp % 2 == 1 ? AppTheme.hover(dark) : AppTheme.cardBg(dark)) {
+            actionBar(item).frame(width: wAction, alignment: .center)
+        })
     }
 
     private func rowBackground(group: Int, hovered: Bool) -> Color {
@@ -394,7 +321,7 @@ struct InstancesView: View {
             return AppTheme.sidebarActive.opacity(dark ? 0.12 : 0.08)
         }
         return group % 2 == 1
-            ? Color(hex: "63b3ed").opacity(dark ? 0.05 : 0.07)
+            ? AppTheme.hover(dark)
             : Color.clear
     }
 
@@ -417,18 +344,19 @@ struct InstancesView: View {
 
     private func colHeader(_ title: String, _ width: CGFloat, align: Alignment = .leading) -> some View {
         Text(title)
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundColor(AppTheme.sidebarText(dark))
+            .lineLimit(1)
+            .font(.system(size: AppTheme.bodySize, weight: .semibold))
+            .foregroundColor(AppTheme.textSecondary(dark))
             .frame(width: width, alignment: align)
     }
 
     private func cellText(_ text: String, _ width: CGFloat, muted: Bool = false) -> some View {
         Text(text)
-            .font(.system(size: 12))
+            .font(.system(size: 14))
             .foregroundColor(
                 muted
-                    ? AppTheme.sidebarText(dark)
-                    : (dark ? Color.white.opacity(0.9) : Color.primary)
+                    ? AppTheme.textSecondary(dark)
+                    : (AppTheme.textPrimary(dark))
             )
             .lineLimit(1)
             .frame(width: width, alignment: .leading)
@@ -439,8 +367,8 @@ struct InstancesView: View {
             withAnimation(.easeInOut(duration: 0.15)) { model.namesHidden.toggle() }
         }) {
             Text(model.namesHidden ? item.maskedTenancyName : (item.tenancyName.isEmpty ? "—" : item.tenancyName))
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(dark ? Color.white.opacity(0.88) : Color.primary)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(AppTheme.textPrimary(dark))
                 .lineLimit(1)
                 .frame(width: width, alignment: .leading)
                 .contentShape(Rectangle())
@@ -458,18 +386,18 @@ struct InstancesView: View {
                 .frame(width: 7, height: 7)
             VStack(alignment: .leading, spacing: 1) {
                 Text(item.displayName.isEmpty ? "—" : item.displayName)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(AppTheme.textPrimary(dark))
                     .lineLimit(1)
                 HStack(spacing: 6) {
                     Text(item.stateLabel)
-                        .font(.system(size: 10, weight: .medium))
+                        .font(.system(size: 12, weight: .medium))
                         .foregroundColor(statusColor(item))
                         .lineLimit(1)
                     if hasRemark {
                         Text(remark)
-                            .font(.system(size: 10))
-                            .foregroundColor(AppTheme.sidebarText(dark))
+                            .font(.system(size: 13))
+                            .foregroundColor(AppTheme.textSecondary(dark))
                             .lineLimit(1)
                     }
                 }
@@ -495,8 +423,8 @@ struct InstancesView: View {
         let hasPriv = !priv.isEmpty && priv != "—" && priv != "-"
         return Button(action: { model.copyText(item.publicIps, label: "IPv4") }) {
             Text(item.publicIps.isEmpty ? "—" : item.publicIps)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(item.publicIps.isEmpty ? AppTheme.sidebarText(dark) : AppTheme.sidebarActive)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(item.publicIps.isEmpty ? AppTheme.textSecondary(dark) : AppTheme.sidebarActive)
                 .lineLimit(1)
                 .frame(width: width, alignment: .leading)
                 .contentShape(Rectangle())
@@ -514,7 +442,7 @@ struct InstancesView: View {
             if item.hasIpv6 {
                 Button(action: { model.copyText(item.ipv6Addresses, label: "IPv6") }) {
                     Text("已开")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(Color(hex: "3fb950"))
                         .padding(.horizontal, 7)
                         .padding(.vertical, 2)
@@ -525,8 +453,8 @@ struct InstancesView: View {
                 .help("点击复制 IPv6：\(item.ipv6Addresses)")
             } else {
                 Text("无")
-                    .font(.system(size: 11))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .font(.system(size: 13))
+                    .foregroundColor(AppTheme.textSecondary(dark))
             }
         }
         .frame(width: width, alignment: .center)
@@ -552,7 +480,7 @@ struct InstancesView: View {
             }
             InstanceActionMoreButton(dark: dark, item: item, model: model)
                 .environmentObject(appearance)
-                .frame(width: 30, height: 26)
+                .frame(width: 30, height: 30)
         }
     }
 
@@ -565,13 +493,13 @@ struct InstancesView: View {
         Button(action: action) {
             Image(systemName: systemImage)
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(accent ? .white : (dark ? Color.white.opacity(0.9) : Color.primary))
+                .foregroundColor(accent ? .white : (AppTheme.textPrimary(dark)))
                 .frame(width: 28, height: 26)
                 .background(
                     RoundedRectangle(cornerRadius: 7)
                         .fill(accent
                               ? AppTheme.sidebarActive
-                              : (dark ? Color(hex: "2c3136") : Color(hex: "eef2f6")))
+                              : (AppTheme.inputBg(dark)))
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 7)
@@ -846,8 +774,8 @@ struct InstanceActionMenuContent: View {
         VStack(alignment: .leading, spacing: 8) {
             if !title.isEmpty {
                 Text(title)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(AppTheme.textSecondary(dark))
                     .lineLimit(1)
                     .padding(.horizontal, 2)
             }
@@ -882,14 +810,14 @@ struct InstanceActionMenuContent: View {
                     .font(.system(size: 11, weight: .semibold))
                     .frame(width: 14)
                 Text(act.title)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: 14, weight: .medium))
                     .lineLimit(1)
                 Spacer(minLength: 0)
             }
             .foregroundColor(
                 act.isDanger
                     ? Color(hex: "f85149")
-                    : (dark ? Color.white.opacity(0.92) : Color.primary)
+                    : (AppTheme.textPrimary(dark))
             )
             .padding(.horizontal, 10)
             .padding(.vertical, 9)
@@ -945,32 +873,10 @@ private struct InstanceActionMoreButton: NSViewRepresentable {
     }
 
     func makeNSView(context: Context) -> NSButton {
-        let b = NSButton(frame: NSRect(x: 0, y: 0, width: 30, height: 26))
-        b.bezelStyle = .shadowlessSquare
-        b.isBordered = false
-        b.title = ""
-        b.image = NSImage(systemSymbolName: "ellipsis", accessibilityDescription: "更多")
-        b.imagePosition = .imageOnly
-        b.imageScaling = .scaleProportionallyDown
-        b.contentTintColor = dark
-            ? NSColor.white.withAlphaComponent(0.9)
-            : NSColor.labelColor
-        b.wantsLayer = true
-        if let layer = b.layer {
-            layer.cornerRadius = 7
-            layer.backgroundColor = (dark
-                ? NSColor(calibratedRed: 0.17, green: 0.19, blue: 0.21, alpha: 1)
-                : NSColor(calibratedRed: 0.93, green: 0.95, blue: 0.96, alpha: 1)).cgColor
-            layer.borderWidth = 1
-            layer.borderColor = (dark
-                ? NSColor.white.withAlphaComponent(0.12)
-                : NSColor.black.withAlphaComponent(0.08)).cgColor
-        }
-        b.target = context.coordinator
-        b.action = #selector(Coordinator.toggle(_:))
-        b.setButtonType(.momentaryChange)
-        b.toolTip = "更多操作"
-        return b
+        let button = TableActionButton(dark: dark)
+        button.target = context.coordinator
+        button.action = #selector(Coordinator.toggle(_:))
+        return button
     }
 
     func updateNSView(_ nsView: NSButton, context: Context) {
@@ -978,17 +884,7 @@ private struct InstanceActionMoreButton: NSViewRepresentable {
         context.coordinator.model = model
         context.coordinator.appearance = appearance
         context.coordinator.dark = dark
-        nsView.contentTintColor = dark
-            ? NSColor.white.withAlphaComponent(0.9)
-            : NSColor.labelColor
-        if let layer = nsView.layer {
-            layer.backgroundColor = (dark
-                ? NSColor(calibratedRed: 0.17, green: 0.19, blue: 0.21, alpha: 1)
-                : NSColor(calibratedRed: 0.93, green: 0.95, blue: 0.96, alpha: 1)).cgColor
-            layer.borderColor = (dark
-                ? NSColor.white.withAlphaComponent(0.12)
-                : NSColor.black.withAlphaComponent(0.08)).cgColor
-        }
+        (nsView as? TableActionButton)?.updateAppearance(dark: dark)
     }
 
     final class Coordinator: NSObject {

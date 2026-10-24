@@ -13,14 +13,16 @@ final class MainShellViewController: NSViewController {
     private var statusOverlayHost: DropdownHostingView?
     private var dropdownHost: DropdownHostingView?
     private var cancellables = Set<AnyCancellable>()
+    private var searchKeyMonitor: Any?
 
     private var topHost: NSHostingController<AnyView>!
     private var sidebarHost: NSHostingController<AnyView>!
     private var detail: ContentHostViewController!
     private var divider: NSView!
 
-    private let topHeight: CGFloat = 56
-    private let sidebarWidth: CGFloat = 196
+    private let topHeight: CGFloat = AppTheme.topBarHeight
+    private let sidebarWidth: CGFloat = AppTheme.sidebarWidth
+    private let collapsedSidebarWidth: CGFloat = AppTheme.sidebarCollapsedWidth
     private let dividerWidth: CGFloat = 1
 
     init(session: AppSession, navigation: NavigationState, appearance: AppearanceController = .shared) {
@@ -44,6 +46,8 @@ final class MainShellViewController: NSViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        // Vue exposes OCI only; a cached hidden provider must not hide its menus.
+        if session.cloudProvider != 1 { session.setCloudProvider(1) }
 
         let top = TopNavView()
             .environmentObject(session)
@@ -51,7 +55,7 @@ final class MainShellViewController: NSViewController {
             .environmentObject(appearance)
             .environmentObject(header)
             .environmentObject(chrome)
-            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 56, maxHeight: 56)
+            .frame(minWidth: 0, maxWidth: .infinity, minHeight: topHeight, maxHeight: topHeight)
         topHost = NSHostingController(rootView: AnyView(top))
 
         let sidebarRoot = SidebarView()
@@ -65,7 +69,7 @@ final class MainShellViewController: NSViewController {
 
         divider = NSView()
         divider.wantsLayer = true
-        divider.layer?.backgroundColor = NSColor.separatorColor.cgColor
+        divider.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.08).cgColor
 
         addChild(topHost)
         addChild(sidebarHost)
@@ -82,6 +86,7 @@ final class MainShellViewController: NSViewController {
 
         // Full-window dropdown overlay (above content, below toast)
         let overlay = TopNavDropdownOverlay(chrome: chrome, header: header)
+            .environmentObject(navigation)
             .environmentObject(session)
             .environmentObject(appearance)
         let drop = DropdownHostingView(rootView: AnyView(overlay))
@@ -89,6 +94,12 @@ final class MainShellViewController: NSViewController {
             guard let self = self else { return false }
             // 语言/用户下拉 或 右侧消息抽屉打开时接收点击
             return self.chrome.open != .none || self.header.showMessages
+        }
+        drop.shouldPassThrough = { [weak self] point in
+            guard let self = self, !self.header.showMessages else { return false }
+            // hitTest receives a point in this overlay's superview coordinates.
+            // Keep the actual top bar editable/clickable while a dropdown is open.
+            return self.topHost.view.frame.contains(point)
         }
         drop.translatesAutoresizingMaskIntoConstraints = true
         drop.autoresizingMask = [.width, .height]
@@ -109,6 +120,7 @@ final class MainShellViewController: NSViewController {
         statusOverlayHost = status
 
         layoutChildren()
+        installSearchShortcut()
 
         navigation.$sidebarCollapsed
             .receive(on: DispatchQueue.main)
@@ -134,25 +146,42 @@ final class MainShellViewController: NSViewController {
         layoutChildren()
     }
 
+    deinit {
+        if let searchKeyMonitor = searchKeyMonitor { NSEvent.removeMonitor(searchKeyMonitor) }
+    }
+
+    private func installSearchShortcut() {
+        guard searchKeyMonitor == nil else { return }
+        searchKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self = self, let window = self.view.window, event.window === window,
+                  window.isKeyWindow, self.session.isLoggedIn, window.attachedSheet == nil, NSApp.modalWindow == nil,
+                  !self.header.showMessages, !LoadingHUD.shared.isVisible else { return event }
+            let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            guard (modifiers.contains(.command) || modifiers.contains(.control)), !modifiers.contains(.option),
+                  event.charactersIgnoringModifiers?.lowercased() == "k" else { return event }
+            if let editor = window.firstResponder as? NSTextView, editor.hasMarkedText() { return event }
+            self.chrome.focusSearch()
+            return nil
+        }
+    }
+
     private func layoutChildren() {
         let b = view.bounds
         guard b.width > 1, b.height > 1 else { return }
 
         let collapsed = navigation.sidebarCollapsed
-        let sideW: CGFloat = collapsed ? 0 : sidebarWidth
+        let sideW: CGFloat = collapsed ? collapsedSidebarWidth : sidebarWidth
         let bodyH = max(0, b.height - topHeight)
         let bodyY: CGFloat = 0
         let topY = b.height - topHeight
 
-        topHost.view.frame = NSRect(x: 0, y: topY, width: b.width, height: topHeight)
-        sidebarHost.view.frame = NSRect(x: 0, y: bodyY, width: sideW, height: bodyH)
-        sidebarHost.view.isHidden = collapsed
+        let detailX = sideW + dividerWidth
+        topHost.view.frame = NSRect(x: detailX, y: topY, width: max(0, b.width - detailX), height: topHeight)
+        sidebarHost.view.frame = NSRect(x: 0, y: bodyY, width: sideW, height: b.height)
 
         let divX = sideW
-        divider.frame = NSRect(x: divX, y: bodyY, width: collapsed ? 0 : dividerWidth, height: bodyH)
-        divider.isHidden = collapsed
+        divider.frame = NSRect(x: divX, y: bodyY, width: dividerWidth, height: b.height)
 
-        let detailX = collapsed ? 0 : (sideW + dividerWidth)
         detail.view.frame = NSRect(x: detailX, y: bodyY, width: max(0, b.width - detailX), height: bodyH)
 
         dropdownHost?.frame = b

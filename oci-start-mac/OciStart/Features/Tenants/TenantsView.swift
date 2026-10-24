@@ -43,11 +43,11 @@ struct TenantsView: View {
                 minNameShownFloor, minDefShown, minRegionShown)
     }
 
-    /// 按最长租户名单行估算名称列宽（约 12pt 等宽字符）
+    /// 按 14pt 列表正文估算完整租户名单行宽度。
     private func estimatedNameWidth(for items: [TenantItem], floor: CGFloat) -> CGFloat {
         let longest = items.map(\.displayName).max(by: { $0.count < $1.count }) ?? ""
         // 中文偏宽、英文偏窄，取折中系数
-        let estimated = CGFloat(longest.count) * 8.0 + 12
+        let estimated = CGFloat(longest.count) * 9.5 + 12
         return max(floor, min(estimated, 720))
     }
 
@@ -117,68 +117,64 @@ struct TenantsView: View {
     }
 
     private var listPage: some View {
-        PageScaffold(
-            title: "租户管理",
-            subtitle: "OCI API 配置与账号列表",
-            systemImage: "person.2",
-            toolbar: { toolbar },
-            content: {
-                VStack(spacing: 0) {
-                    filterBar
-                    if let err = model.errorText, !err.isEmpty { errorBanner(err) }
-                    listBody
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 12)
-                    PaginationBar(state: $model.pageState) {
-                        Task { await model.reload() }
+        GeometryReader { proxy in
+            PageScaffold(
+                title: "租户管理",
+                subtitle: "OCI API 配置与账号列表",
+                systemImage: "person.2",
+                content: {
+                    VStack(spacing: 0) {
+                        filterBar(width: proxy.size.width - AppTheme.pagePadding * 2)
+                        listBody
+                        PaginationBar(state: $model.pageState, disabled: model.isLoading) {
+                            Task { await model.reload() }
+                        }
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-        )
+            )
+        }
     }
 
     // MARK: - Toolbar
 
     private var toolbar: some View {
         HStack(spacing: 8) {
-            AppButton(
-                title: model.namesHidden ? "显示名称" : "隐藏名称",
-                systemImage: model.namesHidden ? "eye" : "eye.slash",
-                kind: .secondary
-            ) {
-                model.namesHidden.toggle()
+            if let error = model.errorText, !error.isEmpty {
+                PageErrorIndicator(message: error, retry: { Task { await model.reload() } })
             }
-            AppButton(title: "API 导入", systemImage: "bolt.fill", kind: .primary) {
-                model.openAdd()
-            }
-            AppButton(title: "导出", systemImage: "square.and.arrow.down", kind: .secondary) {
-                model.openExportAll()
-            }
-            AppButton(title: "导入", systemImage: "square.and.arrow.up", kind: .secondary) {
-                model.importJSON()
-            }
-            AppButton(title: "账号检测", systemImage: "checkmark.circle", kind: .secondary) {
-                model.startAccountCheck()
-            }
-            AppButton(title: "刷新", systemImage: "arrow.clockwise", kind: .secondary) {
+            PageToolbarIcon(title: model.namesHidden ? "显示名称" : "隐藏名称",
+                            systemImage: model.namesHidden ? "eye" : "eye.slash") { model.namesHidden.toggle() }
+            PageToolbarIcon(title: "刷新", systemImage: "arrow.clockwise", disabled: model.isLoading) {
                 Task { await model.reload() }
             }
+            Menu {
+                Button("导出全部") { model.openExportAll() }
+                Button("导入 JSON") { model.importJSON() }
+                Button("账号检测") { model.startAccountCheck() }
+            } label: {
+                Image(systemName: "ellipsis").font(.system(size: 16)).frame(width: 32, height: 36)
+            }
+            .menuStyle(BorderlessButtonMenuStyle()).fixedSize().help("更多操作")
+            AppButton(title: "API 导入", systemImage: "plus", kind: .primary) { model.openAdd() }
         }
     }
 
-    private var filterBar: some View {
-        FilterBar(
-            leading: {
+    private func filterBar(width: CGFloat) -> some View {
+        AdaptiveListToolbar(
+            compactBelow: 640,
+            availableWidth: width,
+            filters: {
                 SearchField(
                     text: $model.searchText,
                     placeholder: "搜索租户名称…",
                     onSubmit: { model.onSearchSubmit() },
-                    maxWidth: 320
+                    maxWidth: 220
                 )
                 .onChange(of: model.searchText) { _ in model.onSearchChanged() }
             },
-            trailing: {
+            actions: {
+                toolbar
                 if model.isLoading {
                     ProgressView().scaleEffect(0.7).frame(width: 20, height: AppInputStyle.height)
                 } else {
@@ -189,17 +185,6 @@ struct TenantsView: View {
         .zIndex(40)
     }
 
-    private func errorBanner(_ text: String) -> some View {
-        HStack {
-            Image(systemName: "exclamationmark.triangle.fill")
-            Text(text).font(.system(size: 12))
-            Spacer()
-            Button("重试") { Task { await model.reload() } }.buttonStyle(PlainButtonStyle())
-        }
-        .foregroundColor(Color(hex: "f85149"))
-        .padding(12)
-        .background(Color(hex: "f85149").opacity(0.1))
-    }
 
     // MARK: - List（铺满内容区）
 
@@ -223,8 +208,8 @@ struct TenantsView: View {
                 Spacer()
                 ProgressView()
                 Text("加载中…")
-                    .font(.system(size: 12))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .font(.system(size: 13))
+                    .foregroundColor(AppTheme.textSecondary(dark))
                 Spacer()
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -251,8 +236,6 @@ struct TenantsView: View {
                     task: m.task, region: wRegion, multi: m.multi, type: m.type,
                     create: m.create, time: m.time, status: wStatus, action: wAction, hPad: hPad
                 )
-                let needsHScroll = totalW > geo.size.width + 0.5
-
                 // 表头固定在顶部 + 仅纵向滚动。禁止双轴 ScrollView：内容矮于视口时
                 // macOS 会把表格竖直居中，搜索栏和分页之间出现大块空白。
                 let table = VStack(spacing: 0) {
@@ -265,30 +248,17 @@ struct TenantsView: View {
                         }
                     }
                 }
-                .frame(width: totalW, height: geo.size.height, alignment: .topLeading)
+                .frame(width: totalW, alignment: .topLeading)
 
-                Group {
-                    if needsHScroll {
-                        ScrollView(.horizontal, showsIndicators: true) { table }
-                            .frame(width: geo.size.width, height: geo.size.height)
-                    } else {
-                        table
-                    }
-                }
+                NativeFixedTrailingTable(contentWidth: totalW, viewportWidth: geo.size.width, height: geo.size.height) { table }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(tableCardBackground)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(AppTheme.border(dark).opacity(0.55), lineWidth: 1)
-            )
-            .shadow(color: Color.black.opacity(dark ? 0.22 : 0.06), radius: 8, x: 0, y: 2)
         }
     }
 
     private var tableCardBackground: some View {
-        RoundedRectangle(cornerRadius: 12)
-            .fill(AppTheme.sidebarBg(dark))
+        AppTheme.cardBg(dark)
     }
 
     private func headerRow(cols: TenantColWidths, width: CGFloat) -> some View {
@@ -297,7 +267,7 @@ struct TenantsView: View {
                 // 对齐 Web：盾牌图标表头（绑定代理）
                 Image(systemName: "shield.fill")
                     .font(.system(size: 11))
-                    .foregroundColor(AppTheme.sidebarText(dark).opacity(0.55))
+                    .foregroundColor(AppTheme.textSecondary(dark))
                     .frame(width: cols.proxy, alignment: .center)
                     .help("绑定代理")
                 colHeader("名称", cols.name)
@@ -313,13 +283,16 @@ struct TenantsView: View {
                 colHeader("创建", cols.create)
                 colHeader("创建时间", cols.time)
                 colHeader("状态", cols.status)
-                colHeader("操作", cols.action, align: .center)
+                Color.clear.frame(width: cols.action, height: 1)
             }
         }
         .padding(.horizontal, cols.hPad)
         .padding(.vertical, 9)
         .frame(width: width, alignment: .leading)
-        .background(AppTheme.sidebarHover(dark).opacity(0.65))
+        .background(AppTheme.inputBg(dark))
+        .modifier(NativeFixedTableActions(width: cols.action, trailingPadding: cols.hPad, background: AppTheme.inputBg(dark)) {
+            colHeader("操作", cols.action, align: .center)
+        })
         .overlay(
             Rectangle().frame(height: 1).foregroundColor(AppTheme.border(dark).opacity(0.5)),
             alignment: .bottom
@@ -345,7 +318,7 @@ struct TenantsView: View {
                 cell(item.createdAt.isEmpty ? "—" : item.createdAt, cols.time, muted: true)
                 StatusBadge(text: item.statusText, tone: item.isActive ? .success : .danger)
                     .frame(width: cols.status, alignment: .leading)
-                actionCell(item, width: cols.action)
+                Color.clear.frame(width: cols.action, height: 28)
             }
         }
         .padding(.horizontal, cols.hPad)
@@ -358,9 +331,13 @@ struct TenantsView: View {
         )
         .background(
             (index % 2 == 1)
-                ? AppTheme.sidebarHover(dark).opacity(0.18)
+                ? AppTheme.hover(dark).opacity(0.18)
                 : Color.clear
         )
+        .modifier(NativeFixedTableActions(width: cols.action, trailingPadding: cols.hPad,
+                                         background: index % 2 == 1 ? AppTheme.mix(AppTheme.hover(dark), fraction: 0.18, with: AppTheme.cardBg(dark)) : AppTheme.cardBg(dark)) {
+            actionCell(item, width: cols.action)
+        })
     }
 
     // MARK: - Cells
@@ -394,8 +371,8 @@ struct TenantsView: View {
         let shown = !model.namesHidden
         return Button(action: { model.namesHidden.toggle() }) {
             Text(shown ? item.displayName : item.maskedName)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(AppTheme.textPrimary(dark))
                 // 始终单行；展开时靠加宽名称列完整显示，禁止换行
                 .lineLimit(1)
                 .truncationMode(.tail)
@@ -409,7 +386,7 @@ struct TenantsView: View {
     private func defNameCell(_ item: TenantItem, width: CGFloat) -> some View {
         Button(action: { model.openEditName(item) }) {
             Text(item.defNameText)
-                .font(.system(size: 12))
+                .font(.system(size: 14))
                 .foregroundColor(AppTheme.sidebarActive)
                 .lineLimit(1)
                 .frame(width: width, alignment: .leading)
@@ -420,7 +397,7 @@ struct TenantsView: View {
     private func costCell(_ item: TenantItem, width: CGFloat) -> some View {
         Button(action: { model.openEditCost(item) }) {
             Text(item.costText)
-                .font(.system(size: 12))
+                .font(.system(size: 14))
                 .foregroundColor(AppTheme.sidebarActive)
                 .lineLimit(1)
                 .frame(width: width, alignment: .leading)
@@ -433,7 +410,7 @@ struct TenantsView: View {
         if item.accountTypeName != "未知", !item.accountTypeName.isEmpty {
             Button(action: { model.activeSheet = .accountDetail(item) }) {
                 Text(item.typeText)
-                    .font(.system(size: 12))
+                    .font(.system(size: 14))
                     .foregroundColor(AppTheme.sidebarActive)
                     .lineLimit(1)
                     .frame(width: width, alignment: .leading)
@@ -449,7 +426,7 @@ struct TenantsView: View {
         if item.cloudType == 1 {
             Button(action: { model.openBoot(item) }) {
                 Text("创建")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.white)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
@@ -467,20 +444,22 @@ struct TenantsView: View {
     private func actionCell(_ item: TenantItem, width: CGFloat) -> some View {
         TenantActionEllipsisButton(dark: dark, item: item, model: model)
             .environmentObject(appearance)
-            .frame(width: width, height: 28)
+            .frame(width: 30, height: 30)
+            .frame(width: width, height: 30)
     }
 
     private func colHeader(_ title: String, _ w: CGFloat, align: Alignment = .leading) -> some View {
         Text(title)
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundColor(AppTheme.sidebarText(dark))
+            .lineLimit(1)
+            .font(.system(size: AppTheme.bodySize, weight: .semibold))
+            .foregroundColor(AppTheme.textSecondary(dark))
             .frame(width: w, alignment: align)
     }
 
     private func cell(_ text: String, _ w: CGFloat, bold: Bool = false, muted: Bool = false) -> some View {
         Text(text)
-            .font(.system(size: 12, weight: bold ? .semibold : .regular))
-            .foregroundColor(muted ? AppTheme.sidebarText(dark) : (dark ? Color.white.opacity(0.9) : Color.primary))
+            .font(.system(size: muted ? 13 : 14, weight: bold ? .semibold : .regular))
+            .foregroundColor(muted ? AppTheme.textSecondary(dark) : (AppTheme.textPrimary(dark)))
             .lineLimit(1)
             .frame(width: w, alignment: .leading)
     }
@@ -495,7 +474,7 @@ private struct TenantColWidths {
 // MARK: - AppKit ellipsis + 窗内浮层（绝不使用 NSPopover，保证在应用窗口内）
 
 private enum TenantActionMenuLayout {
-    static let width: CGFloat = 300
+    static let width: CGFloat = 340
     static let vPad: CGFloat = 12
     static let titleH: CGFloat = 18
     static let gridGap: CGFloat = 8
@@ -709,16 +688,11 @@ private struct TenantActionEllipsisButton: NSViewRepresentable {
     }
 
     func makeNSView(context: Context) -> NSButton {
-        let b = NSButton(frame: NSRect(x: 0, y: 0, width: 32, height: 26))
-        b.bezelStyle = .rounded
-        b.isBordered = true
-        b.title = "···"
-        b.font = NSFont.systemFont(ofSize: 14, weight: .bold)
-        b.target = context.coordinator
-        b.action = #selector(Coordinator.toggleMenu(_:))
-        b.setButtonType(.momentaryPushIn)
-        context.coordinator.button = b
-        return b
+        let button = TableActionButton(dark: dark)
+        button.target = context.coordinator
+        button.action = #selector(Coordinator.toggleMenu(_:))
+        context.coordinator.button = button
+        return button
     }
 
     func updateNSView(_ nsView: NSButton, context: Context) {
@@ -726,6 +700,7 @@ private struct TenantActionEllipsisButton: NSViewRepresentable {
         context.coordinator.model = model
         context.coordinator.appearance = appearance
         context.coordinator.dark = dark
+        (nsView as? TableActionButton)?.updateAppearance(dark: dark)
     }
 
     final class Coordinator: NSObject {
@@ -773,11 +748,12 @@ enum TenantActionPanel {
     static func actions(for item: TenantItem, model: TenantsViewModel) -> [TenantActionItem] {
         var list: [TenantActionItem] = []
         if item.cloudType == 1, !item.isTransferred {
-            if item.supportAI == 1 {
-                list.append(TenantActionItem(id: "ai", title: "AI", systemImage: "sparkles", isDanger: false) {
-                    model.openAI(item)
-                })
-            }
+            // 暂停租户 AI 对话入口，待服务恢复后再启用。
+            // if item.supportAI == 1 {
+            //     list.append(TenantActionItem(id: "ai", title: "AI", systemImage: "sparkles", isDanger: false) {
+            //         model.openAI(item)
+            //     })
+            // }
             list.append(contentsOf: [
                 TenantActionItem(id: "boot", title: "创建开机", systemImage: "plus.circle", isDanger: false) { model.openBoot(item) },
                 TenantActionItem(id: "upd", title: "更新信息", systemImage: "arrow.clockwise", isDanger: false) { model.updateTenantSSE(item) },
@@ -810,11 +786,12 @@ enum TenantActionPanel {
     static func detailActions(for item: TenantItem, model: TenantsViewModel) -> [TenantActionItem] {
         var list: [TenantActionItem] = []
         if item.cloudType == 1 {
-            if item.supportAI == 1 {
-                list.append(TenantActionItem(id: "ai", title: "AI", systemImage: "sparkles", isDanger: false) {
-                    model.openAI(item)
-                })
-            }
+            // 暂停租户 AI 对话入口，待服务恢复后再启用。
+            // if item.supportAI == 1 {
+            //     list.append(TenantActionItem(id: "ai", title: "AI", systemImage: "sparkles", isDanger: false) {
+            //         model.openAI(item)
+            //     })
+            // }
             list.append(contentsOf: [
                 TenantActionItem(id: "sync", title: "同步", systemImage: "arrow.2.circlepath", isDanger: false) {
                     model.syncDetailRow(item)
@@ -871,8 +848,8 @@ struct TenantActionMenuContent: View {
         VStack(alignment: .leading, spacing: 8) {
             if !title.isEmpty {
                 Text(title)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(AppTheme.textSecondary(dark))
                     .lineLimit(1)
                     .padding(.horizontal, 2)
             }
@@ -891,11 +868,11 @@ struct TenantActionMenuContent: View {
                                     .font(.system(size: 11, weight: .semibold))
                                     .frame(width: 14)
                                 Text(act.title)
-                                    .font(.system(size: 12, weight: .medium))
+                                    .font(.system(size: 14, weight: .medium))
                                     .lineLimit(1)
                                 Spacer(minLength: 0)
                             }
-                            .foregroundColor(act.isDanger ? Color(hex: "f85149") : (dark ? Color.white.opacity(0.9) : Color.primary))
+                            .foregroundColor(act.isDanger ? Color(hex: "f85149") : (AppTheme.textPrimary(dark)))
                             .padding(.horizontal, 10)
                             .padding(.vertical, 9)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -903,7 +880,7 @@ struct TenantActionMenuContent: View {
                                 RoundedRectangle(cornerRadius: 8)
                                     .fill(act.isDanger
                                           ? Color(hex: "f85149").opacity(0.1)
-                                          : AppTheme.sidebarHover(dark).opacity(dark ? 0.55 : 0.7))
+                                          : AppTheme.hover(dark).opacity(dark ? 0.55 : 0.7))
                             )
                             .overlay(
                                 RoundedRectangle(cornerRadius: 8)
@@ -919,5 +896,175 @@ struct TenantActionMenuContent: View {
         .frame(width: TenantActionMenuLayout.width, height: panelHeight, alignment: .topLeading)
         .background(AppTheme.pageBg(dark))
         .cornerRadius(12)
+    }
+}
+
+// MARK: - Shared table trailing column (macOS 11)
+
+private struct NativeTableTrailingInset: EnvironmentKey {
+    static let defaultValue: CGFloat = 0
+}
+private extension EnvironmentValues {
+    var nativeTableTrailingInset: CGFloat {
+        get { self[NativeTableTrailingInset.self] }
+        set { self[NativeTableTrailingInset.self] = newValue }
+    }
+}
+
+/// Retains the existing single vertical scroll view. The native clip bounds
+/// supply the trailing overlay offset; row heights never need syncing.
+struct NativeFixedTrailingTable<Content: View>: View {
+    let contentWidth: CGFloat
+    let viewportWidth: CGFloat
+    let height: CGFloat
+    @ViewBuilder var content: () -> Content
+    @State private var measuredTrailingInset: CGFloat?
+
+    private var overflow: CGFloat { max(0, contentWidth - viewportWidth) }
+    private var trailingInset: CGFloat { overflow > 0.5 ? (measuredTrailingInset ?? overflow) : 0 }
+
+    var body: some View {
+        NativeHorizontalTable(contentWidth: contentWidth, viewportWidth: viewportWidth, height: height) {
+            content()
+                .background(NativeTableScrollProbe { inset in
+                    // Hover transitions must not animate scroll compensation.
+                    var transaction = Transaction()
+                    transaction.animation = nil
+                    transaction.disablesAnimations = true
+                    withTransaction(transaction) { measuredTrailingInset = inset }
+                })
+        }
+        .environment(\.nativeTableTrailingInset, trailingInset)
+    }
+}
+
+/// On macOS 11, a SwiftUI named coordinate space can retain its original frame
+/// while the containing NSClipView scrolls. Observe the actual clip instead.
+private struct NativeTableScrollProbe: NSViewRepresentable {
+    let onChange: (CGFloat) -> Void
+
+    func makeNSView(context: Context) -> NativeTableScrollProbeView {
+        let view = NativeTableScrollProbeView()
+        view.onChange = onChange
+        return view
+    }
+
+    func updateNSView(_ view: NativeTableScrollProbeView, context: Context) {
+        view.onChange = onChange
+        view.refresh()
+    }
+
+    static func dismantleNSView(_ view: NativeTableScrollProbeView, coordinator: ()) {
+        view.stopObserving()
+        view.onChange = nil
+    }
+}
+
+private final class NativeTableScrollProbeView: NSView {
+    var onChange: ((CGFloat) -> Void)?
+    private weak var observedScroll: NSScrollView?
+    private var measurementQueued = false
+    private var lastInset: CGFloat?
+
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    override func viewDidMoveToSuperview() {
+        super.viewDidMoveToSuperview()
+        refresh()
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if window == nil { stopObserving() } else { refresh() }
+    }
+
+    override func layout() {
+        super.layout()
+        refresh()
+    }
+
+    func refresh() {
+        guard !measurementQueued else { return }
+        measurementQueued = true
+        // Coalesce clip notifications and publish outside SwiftUI's layout pass.
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.measurementQueued = false
+            guard self.window != nil else { return }
+            self.attachToHorizontalScroll()
+            guard let scroll = self.observedScroll, let document = scroll.documentView else { return }
+            let clip = scroll.contentView
+            let overflow = max(0, document.bounds.width - clip.bounds.width)
+            let inset = max(0, min(overflow, document.bounds.maxX - clip.bounds.maxX))
+            if let previous = self.lastInset, abs(previous - inset) < 0.01 { return }
+            self.lastInset = inset
+            self.onChange?(inset)
+        }
+    }
+
+    private func attachToHorizontalScroll() {
+        var ancestor = superview
+        var horizontalScroll: NSScrollView?
+        while let view = ancestor {
+            if let scroll = view as? NSScrollView,
+               scroll.hasHorizontalScroller || (scroll.documentView?.bounds.width ?? 0) > scroll.contentView.bounds.width + 0.5 {
+                horizontalScroll = scroll
+                break
+            }
+            ancestor = view.superview
+        }
+        guard horizontalScroll !== observedScroll else { return }
+        stopObserving()
+        guard let scroll = horizontalScroll else { return }
+        observedScroll = scroll
+        let clip = scroll.contentView
+        clip.postsBoundsChangedNotifications = true
+        clip.postsFrameChangedNotifications = true
+        let center = NotificationCenter.default
+        center.addObserver(self, selector: #selector(clipGeometryDidChange(_:)), name: NSView.boundsDidChangeNotification, object: clip)
+        center.addObserver(self, selector: #selector(clipGeometryDidChange(_:)), name: NSView.frameDidChangeNotification, object: clip)
+        if let document = scroll.documentView {
+            document.postsFrameChangedNotifications = true
+            center.addObserver(self, selector: #selector(clipGeometryDidChange(_:)), name: NSView.frameDidChangeNotification, object: document)
+        }
+    }
+
+    @objc private func clipGeometryDidChange(_ notification: Notification) { refresh() }
+
+    func stopObserving() {
+        NotificationCenter.default.removeObserver(self)
+        observedScroll = nil
+        lastInset = nil
+    }
+
+    deinit { NotificationCenter.default.removeObserver(self) }
+}
+
+/// The real action controls live here once. The scrolling row reserves their
+/// width using a noninteractive spacer, so the overlay never duplicates actions.
+struct NativeFixedTableActions<Actions: View>: ViewModifier {
+    let width: CGFloat
+    let trailingPadding: CGFloat
+    let background: Color
+    @ViewBuilder var actions: () -> Actions
+    @Environment(\.nativeTableTrailingInset) private var inset
+    @EnvironmentObject private var appearance: AppearanceController
+
+    func body(content: Content) -> some View {
+        content.overlay(
+            actions()
+                .frame(width: width)
+                .padding(.trailing, trailingPadding)
+                .frame(maxHeight: .infinity)
+                .background(background)
+                .overlay(Rectangle().fill(AppTheme.border(appearance.isDarkEffective).opacity(0.3)).frame(height: 1), alignment: .bottom)
+                .overlay(
+                    Rectangle().fill(Color.black.opacity(inset > 0.5 ? 0.08 : 0)).frame(width: 1),
+                    alignment: .leading
+                )
+                .offset(x: -inset)
+                .zIndex(1),
+            alignment: .trailing
+        )
     }
 }

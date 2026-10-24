@@ -23,6 +23,8 @@ import javax.servlet.http.HttpSession;
 import java.io.IOException;
 import java.util.Map;
 
+import static com.doubledimple.ocicommon.utils.IpUtils.getClientIpAddress;
+
 import static com.doubledimple.ocicommon.constant.Constants.RSA_PRIVATE_KEY;
 import static com.doubledimple.ocicommon.constant.Constants.RSA_PUBLIC_KEY;
 
@@ -73,13 +75,13 @@ public class RsaDecryptionFilter extends OncePerRequestFilter {
                         return;
                     }
                 } catch (Exception e) {
-                    log.warn("【降级登录告警】解密失败，回退至明文验证,请尽快升级到最新版本。IP: {}, User-Agent: {}, 错误: {}",
-                            request.getRemoteAddr(), request.getHeader("User-Agent"), e.getMessage());
+                    log.warn("【降级登录告警】解密失败，回退至明文验证,请尽快升级到最新版本。IP: {}, User-Agent: {}, 异常类型: {}",
+                            getClientIpAddress(request), request.getHeader("User-Agent"), e.getClass().getSimpleName());
                 }
             } else {
                 if (encryptedPassword != null) {
                     log.warn("【异常登录告警】未获取到RSA私钥，回退至明文验证,请尽快升级到最新版本。IP: {}, User-Agent: {}",
-                            request.getRemoteAddr(), request.getHeader("User-Agent"));
+                            getClientIpAddress(request), request.getHeader("User-Agent"));
                 }
             }
         }
@@ -87,32 +89,50 @@ public class RsaDecryptionFilter extends OncePerRequestFilter {
     }
 
     /**
-     * 如果 Turnstile 已启用，则验证 token；验证失败时重定向并返回 false。
+     * Vue receives a JSON failure; legacy browser forms keep their login redirect.
      */
     private boolean verifyTurnstileIfEnabled(HttpServletRequest request, HttpServletResponse response) throws IOException {
         try {
             TurnstileConfig config = systemConfigService.getTurnstileConfig();
-            if (!config.isEnabled() || StringUtils.isBlank(config.getSecretKey())) {
+            if (!config.isEnabled()) {
                 return true;
+            }
+            if (StringUtils.isBlank(config.getSecretKey())) {
+                return rejectChallenge(request, response, HttpServletResponse.SC_SERVICE_UNAVAILABLE);
             }
 
             String token = request.getParameter(TURNSTILE_RESPONSE_PARAM);
             if (StringUtils.isBlank(token)) {
-                log.warn("Turnstile 验证失败: 未提供 token，IP={}", request.getRemoteAddr());
-                response.sendRedirect("/login?error=true");
-                return false;
+                log.warn("Turnstile 验证失败: 未提供 token，IP={}", getClientIpAddress(request));
+                return rejectChallenge(request, response, HttpServletResponse.SC_FORBIDDEN);
             }
 
-            boolean verified = callTurnstileApi(token, config.getSecretKey(), request.getRemoteAddr());
+            boolean verified = callTurnstileApi(token, config.getSecretKey(), getClientIpAddress(request));
             if (!verified) {
-                log.warn("Turnstile 验证失败: token 无效，IP={}", request.getRemoteAddr());
-                response.sendRedirect("/login?error=true");
-                return false;
+                log.warn("Turnstile 验证失败: token 无效，IP={}", getClientIpAddress(request));
+                return rejectChallenge(request, response, HttpServletResponse.SC_FORBIDDEN);
             }
         } catch (Exception e) {
-            log.error("Turnstile 验证异常，跳过验证: {}", e.getMessage());
+            log.error("Turnstile 验证异常，异常类型: {}", e.getClass().getSimpleName());
+            return rejectChallenge(request, response, HttpServletResponse.SC_SERVICE_UNAVAILABLE);
         }
         return true;
+    }
+
+    private boolean rejectChallenge(HttpServletRequest request, HttpServletResponse response, int status)
+            throws IOException {
+        String accept = request.getHeader("Accept");
+        if ("XMLHttpRequest".equals(request.getHeader("X-Requested-With"))
+                || (accept != null && accept.contains("application/json"))) {
+            response.setStatus(status);
+            response.setContentType("application/json;charset=utf-8");
+            response.setHeader("Cache-Control", "no-store");
+            response.getWriter().write("{\"success\":false,\"code\":\"TURNSTILE_FAILED\",\"message\":\"人机验证失败，请重试\"}");
+        } else {
+            boolean mobile = com.doubledimple.ociserver.utils.DesktopUtils.isMobileRequest(request);
+            response.sendRedirect((mobile ? "/m/login" : "/login") + "?error=true");
+        }
+        return false;
     }
 
     @SuppressWarnings("unchecked")
@@ -124,7 +144,7 @@ public class RsaDecryptionFilter extends OncePerRequestFilter {
             MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
             body.add("secret", secretKey);
             body.add("response", token);
-            if (StringUtils.isNotBlank(remoteIp)) {
+            if (StringUtils.isNotBlank(remoteIp) && !"unknown".equals(remoteIp)) {
                 body.add("remoteip", remoteIp);
             }
 

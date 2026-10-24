@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Web-parity 系统监控 page (`dashboard.ftl` + `dashboard.css` + `dashboard.js`).
+/// Native system monitor using the Vue console's shared visual tokens.
 struct DashboardView: View {
     @EnvironmentObject private var session: AppSession
     @EnvironmentObject private var appearance: AppearanceController
@@ -10,7 +10,7 @@ struct DashboardView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 16) {
                 pageHeader
                 if let err = model.errorText, !err.isEmpty {
                     errorBanner(err)
@@ -18,7 +18,9 @@ struct DashboardView: View {
                 statsGrid
                 monitorGrid
             }
-            .padding(24)
+            .padding(.horizontal, 24)
+            .padding(.top, 8)
+            .padding(.bottom, 24)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .background(DashboardTheme.bg(dark).ignoresSafeArea())
@@ -34,51 +36,26 @@ struct DashboardView: View {
 
     private var pageHeader: some View {
         HStack(alignment: .center) {
-            HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 11)
-                        .fill(Color(hex: "3b82f6").opacity(0.14))
-                        .frame(width: 40, height: 40)
-                    Image(systemName: "gauge")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundColor(DashboardTheme.blue(dark))
-                }
-                Text("系统监控")
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundColor(DashboardTheme.text(dark))
-            }
             Spacer()
             HStack(spacing: 7) {
                 Circle()
                     .fill(DashboardTheme.green(dark))
                     .frame(width: 7, height: 7)
                 Text(model.lastUpdateText)
-                    .font(.system(size: 12))
+                    .font(.system(size: 13))
                     .foregroundColor(DashboardTheme.muted(dark))
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 6)
-            .background(
-                Capsule()
-                    .fill(DashboardTheme.surface(dark))
-                    .overlay(Capsule().stroke(DashboardTheme.border(dark), lineWidth: 1))
-            )
+            AppButton(title: "刷新", systemImage: "arrow.clockwise", kind: .secondary) {
+                Task { await model.refreshAll() }
+            }
         }
-        .padding(.bottom, 4)
-        .overlay(
-            Rectangle()
-                .fill(DashboardTheme.border(dark))
-                .frame(height: 1),
-            alignment: .bottom
-        )
-        .padding(.bottom, 8)
     }
 
     private func errorBanner(_ text: String) -> some View {
         HStack {
             Image(systemName: "exclamationmark.triangle.fill")
             Text(text)
-                .font(.system(size: 12))
+                .font(.system(size: 14))
             Spacer()
             Button("重试") {
                 Task { await model.refreshAll() }
@@ -123,7 +100,7 @@ struct DashboardView: View {
                 }
                 Spacer(minLength: 4)
                 Text(title)
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.system(size: 13, weight: .medium))
                     .foregroundColor(DashboardTheme.muted(dark))
                     .multilineTextAlignment(.trailing)
                     .lineLimit(2)
@@ -142,10 +119,10 @@ struct DashboardView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(DashboardTheme.surface(dark))
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: 18)
                 .stroke(DashboardTheme.border(dark), lineWidth: 1)
         )
-        .cornerRadius(12)
+        .cornerRadius(18)
     }
 
     // MARK: - Monitor grid
@@ -281,10 +258,10 @@ struct DashboardView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(DashboardTheme.surface(dark))
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: 18)
                 .stroke(DashboardTheme.border(dark), lineWidth: 1)
         )
-        .cornerRadius(12)
+        .cornerRadius(18)
     }
 
     private func monitorCard(
@@ -328,11 +305,11 @@ struct DashboardView: View {
             }
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(DashboardTheme.text(dark))
                     .lineLimit(1)
                 Text(subtitle)
-                    .font(.system(size: 11))
+                    .font(.system(size: 13))
                     .foregroundColor(DashboardTheme.muted(dark))
                     .lineLimit(1)
                     .truncationMode(.tail)
@@ -362,12 +339,12 @@ struct DashboardView: View {
             ForEach(Array(rows.enumerated()), id: \.offset) { idx, item in
                 HStack(alignment: .center) {
                     Text(item.0.isEmpty ? " " : item.0)
-                        .font(.system(size: 12))
+                        .font(.system(size: 13))
                         .foregroundColor(DashboardTheme.muted(dark))
                         .lineLimit(1)
                     Spacer(minLength: 8)
                     Text(item.1.isEmpty ? " " : item.1)
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: 14, weight: .medium))
                         .foregroundColor(DashboardTheme.text(dark))
                         .multilineTextAlignment(.trailing)
                         .lineLimit(1)
@@ -516,17 +493,17 @@ struct NetworkTrafficChart: View {
 // MARK: - Theme tokens from dashboard.css
 
 enum DashboardTheme {
-    static func bg(_ dark: Bool) -> Color { dark ? Color(hex: "1a1d21") : Color(hex: "f0f4f8") }
-    static func surface(_ dark: Bool) -> Color { dark ? Color(hex: "22262b") : Color.white }
-    static func border(_ dark: Bool) -> Color { dark ? Color(hex: "31363d") : Color(hex: "dde3ec") }
-    static func text(_ dark: Bool) -> Color { dark ? Color(hex: "cdd9e5") : Color(hex: "1a202c") }
-    static func muted(_ dark: Bool) -> Color { dark ? Color(hex: "768390") : Color(hex: "64748b") }
+    static func bg(_ dark: Bool) -> Color { AppTheme.pageBg(dark) }
+    static func surface(_ dark: Bool) -> Color { AppTheme.cardBg(dark) }
+    static func border(_ dark: Bool) -> Color { AppTheme.border(dark) }
+    static func text(_ dark: Bool) -> Color { AppTheme.textPrimary(dark) }
+    static func muted(_ dark: Bool) -> Color { AppTheme.textSecondary(dark) }
     static func blue(_ dark: Bool) -> Color { dark ? Color(hex: "4d9eff") : Color(hex: "2563eb") }
     static func green(_ dark: Bool) -> Color { dark ? Color(hex: "3fb950") : Color(hex: "16a34a") }
     static func orange(_ dark: Bool) -> Color { dark ? Color(hex: "f78166") : Color(hex: "ea580c") }
     static func red(_ dark: Bool) -> Color { dark ? Color(hex: "ff6b6b") : Color(hex: "dc2626") }
     static func purple(_ dark: Bool) -> Color { dark ? Color(hex: "bc8cff") : Color(hex: "7c3aed") }
     static func cyan(_ dark: Bool) -> Color { dark ? Color(hex: "39c5cf") : Color(hex: "0891b2") }
-    static func gaugeTrack(_ dark: Bool) -> Color { dark ? Color(hex: "252a30") : Color(hex: "e8edf3") }
-    static func gaugeCenter(_ dark: Bool) -> Color { dark ? Color(hex: "22262b") : Color.white }
+    static func gaugeTrack(_ dark: Bool) -> Color { AppTheme.inputBg(dark) }
+    static func gaugeCenter(_ dark: Bool) -> Color { AppTheme.cardBg(dark) }
 }

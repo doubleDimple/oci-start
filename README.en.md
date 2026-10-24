@@ -137,7 +137,39 @@ server:
 
 ### Nginx Reverse Proxy
 
-To expose the dashboard via a domain, Nginx must forward WebSocket traffic (used by the VNC console):
+By default, client IP detection uses the connection peer and ignores all proxy headers. For direct access through a public `IP:9856` only, leave `client-ip.trusted-proxies` empty.
+
+To support both direct public access and Nginx / BaoTa on the same host, add the following application configuration and restart the application:
+
+```yaml
+server:
+  port: 9856
+  forward-headers-strategy: none
+client-ip:
+  trusted-proxies: "127.0.0.1/32,::1/128"
+```
+
+You can also set the comma-separated list of trusted proxy IPs / CIDRs with `CLIENT_IP_TRUSTED_PROXIES`; its default is empty. `server.forward-headers-strategy` must be `none`, and neither `server.tomcat.remoteip.remote-ip-header` nor `server.tomcat.remoteip.protocol-header` may be configured. Conflicting settings prevent startup so the servlet container cannot rewrite the connection peer before validation.
+
+Add the following application proxy to the site's Nginx / BaoTa `server` block. Ensure login paths, including `/perform_login`, use these headers, then check the configuration and reload Nginx:
+
+```nginx
+location / {
+    proxy_pass http://127.0.0.1:9856;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+This example assumes a single Nginx proxy receiving public traffic directly and overwrites client-supplied IP headers. Direct public requests still use the connection IP. Only requests from a configured proxy may use `X-Forwarded-For`: the application walks it from right to left, removing trusted proxies and selecting the first untrusted address. Other IP headers do not determine login bans. IP-protected endpoints reject requests from trusted proxies when `X-Forwarded-For` is missing, an address in the trusted chain is malformed, or no client address can be determined. If a CDN or load balancer sits in front of Nginx, configure trust and header sanitization for that actual chain instead of applying this single-proxy example unchanged.
+
+With Docker, the application may see a bridge address instead of `127.0.0.1`. Trust only the actual proxy's individual IP or the smallest necessary CIDR. First verify that direct public requests and proxied requests have distinguishable connection peers. If NAT makes both appear from the same address, adjust networking or isolate the entry points before trusting that address. Do not trust an entire private network, `0.0.0.0/0`, or `::/0`.
+
+Historical mistaken bans, including `127.0.0.1`, are not removed automatically. Review the logs and manually lift confirmed mistaken bans through ban management; do not clear all bans in bulk.
+
+The VNC console also requires this WebSocket proxy configuration:
 
 ```nginx
 location ~ ^/websockify/(\d+)$ {
@@ -152,7 +184,7 @@ location ~ ^/websockify/(\d+)$ {
 }
 ```
 
-> When upgrading from older versions, remove the `security` block entirely. All other configuration entries can be kept as-is.
+> When upgrading from older versions, remove the old `security` block and review trusted proxies and `server.forward-headers-strategy` as described above.
 
 ---
 

@@ -128,7 +128,7 @@ public class SshUtils {
     * 密码连接
     */
     public static ScriptResult executeScriptByPass(String host, String username, String password, String scriptContent) {
-        log.debug("开始执行远程连接,host:{},username:{},password:{}", host, username,password);
+        log.debug("开始执行远程连接,host:{},username:{}", host, username);
 
         SSHClient ssh = new SSHClient();
         try {

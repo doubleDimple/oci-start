@@ -2463,19 +2463,9 @@ public class OciUtils {
      * @return 操作结果，true表示成功，false表示失败
      */
     public static boolean disablePasswordExpirationWithAutoDomain(Tenant tenant) {
+        com.doubledimple.ociserver.service.permissions.OciPermissions.require(tenant, "PASSWORD_POLICY");
         log.debug("开始自动获取Domain URL并禁用密码过期功能");
-        SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
-        String compartmentId = provider.getTenantId();
-
-        try (IdentityClient identityClient = IdentityClient.builder().clientConfigurator(ProxyContext.get()).build(provider);
-             IdentityDomainsClient identityDomainsClient = IdentityDomainsClient.builder()
-                     .clientConfigurator(ProxyContext.get()).build(provider)) {
-            String domainUrl = getDomain(identityClient, compartmentId);
-            if (StringUtils.isEmpty(domainUrl)){
-                log.warn("自动获取Domain URL失败");
-                return false;
-            }
-            identityDomainsClient.setEndpoint(domainUrl);
+        try (IdentityDomainsClient identityDomainsClient = SignOnPolicyUtils.initIdentityDomainsClient(tenant)) {
 
             // 获取现有密码策略
             ListPasswordPoliciesRequest listRequest =
@@ -2548,24 +2538,12 @@ public class OciUtils {
      * @return 操作结果
      */
     public static boolean enablePasswordExpirationWithAutoDomain(Tenant tenant, Integer expirationDays) {
+        com.doubledimple.ociserver.service.permissions.OciPermissions.require(tenant, "PASSWORD_POLICY");
         log.info("开始自动获取Domain URL并启用密码过期功能");
-        SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
-        String compartmentId = provider.getTenantId();
 
         int expireDays = expirationDays != null ? expirationDays : 120;
 
-        try (IdentityClient identityClient = IdentityClient.builder().clientConfigurator(ProxyContext.get()).build(provider);
-             IdentityDomainsClient identityDomainsClient = IdentityDomainsClient.builder()
-                     .clientConfigurator(ProxyContext.get()).build(provider)) {
-
-            String domainUrl = getDomain(identityClient, compartmentId);
-
-            if (domainUrl == null) {
-                log.error("未找到活跃状态的Domain");
-                return false;
-            }
-
-            identityDomainsClient.setEndpoint(domainUrl);
+        try (IdentityDomainsClient identityDomainsClient = SignOnPolicyUtils.initIdentityDomainsClient(tenant)) {
 
             // 获取现有密码策略
             com.oracle.bmc.identitydomains.requests.ListPasswordPoliciesRequest listRequest =
@@ -2636,19 +2614,9 @@ public class OciUtils {
 
     //获取当前密码策略
     public static List<com.oracle.bmc.identitydomains.model.PasswordPolicy> getCurrentPasswordPolicy(Tenant tenant) {
+        com.doubledimple.ociserver.service.permissions.OciPermissions.require(tenant, "PASSWORD_POLICY");
         List<com.oracle.bmc.identitydomains.model.PasswordPolicy> passwordPolicies = new ArrayList<>();
-        SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
-        String compartmentId = provider.getTenantId();
-
-        try (IdentityClient identityClient = IdentityClient.builder().clientConfigurator(ProxyContext.get()).build(provider);
-             IdentityDomainsClient identityDomainsClient = IdentityDomainsClient.builder()
-                     .clientConfigurator(ProxyContext.get()).build(provider)){
-
-            String domainUrl = getDomain(identityClient, compartmentId);
-            if (StringUtils.isEmpty(domainUrl)){
-                return new ArrayList<>();
-            }
-            identityDomainsClient.setEndpoint(domainUrl);
+        try (IdentityDomainsClient identityDomainsClient = SignOnPolicyUtils.initIdentityDomainsClient(tenant)) {
 
             // 获取现有密码策略
             ListPasswordPoliciesRequest listRequest =

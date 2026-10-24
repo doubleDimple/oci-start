@@ -17,12 +17,13 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BooleanSupplier;
 
 /**
  * Websockify 进程管理：把本机 VNC(TCP) 转成 WebSocket，供 noVNC 使用。
  * <p>
- * 注意：探测端口必须用 {@code 127.0.0.1}，不要用 {@code localhost}
- * （部分环境 localhost 解析到 IPv6 ::1，而 SSH -L 只监听 IPv4）。
+ * VNC 就绪由本次 SSH 自身的监听确认消息提供，不再绑定或连接其转发端口。
+ * websockify 自身的 WebSocket 监听端口可使用 TCP 检查。
  * <p>
  * 若配置了反代，需类似：
  * <pre>
@@ -43,24 +44,51 @@ public class WebsockifyConfig {
 
     private final ConcurrentHashMap<String, Process> websockifyProcesses = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Integer> sessionPorts = new ConcurrentHashMap<>();
+    private final Object localVncPortLock = new Object();
+    private final ConcurrentHashMap<Integer, LocalVncPortReservation> localVncPortReservations = new ConcurrentHashMap<>();
+    private volatile boolean stopping;
+
+    /** Identity is the ownership token; an old cleanup cannot release a new owner. */
+    public static final class LocalVncPortReservation {
+        private final int port;
+
+        private LocalVncPortReservation(int port) { this.port = port; }
+
+        public int getPort() { return port; }
+    }
+
+    /** Reserve before SSH authentication starts, retaining ownership until cleanup. */
+    public LocalVncPortReservation reserveLocalVncPort() {
+        synchronized (localVncPortLock) {
+            if (stopping) return null;
+            int port = allocateLocalVncPort();
+            if (port <= 0) return null;
+            LocalVncPortReservation reservation = new LocalVncPortReservation(port);
+            localVncPortReservations.put(port, reservation);
+            return reservation;
+        }
+    }
+
+    public void releaseLocalVncPort(LocalVncPortReservation reservation) {
+        if (reservation != null) localVncPortReservations.remove(reservation.port, reservation);
+    }
 
     /**
      * 启动 websockify：0.0.0.0:wsPort → 127.0.0.1:vncPort
      *
      * @param sessionId 会话 ID
-     * @param vncPort   本机 VNC/SSH 隧道端口（通常 5900 或动态端口）
+     * @param reservation 本次 SSH 隧道持有的本地端口预留
+     * @param tunnelReady 本次 SSH 已确认监听、进程仍存活且会话未取消
      * @return websockify 监听端口；失败返回 -1
      */
-    public int startWebsockifyProxy(String sessionId, int vncPort) {
+    public int startWebsockifyProxy(String sessionId, LocalVncPortReservation reservation,
+                                    BooleanSupplier tunnelReady) {
+        Process startedProcess = null;
+        boolean retained = false;
         try {
-            log.info("开始检测本机 VNC 端口 127.0.0.1:{}", vncPort);
-
-            // ① 等待 SSH 隧道 / VNC 在 IPv4 回环上可连（避免 localhost→::1）
-            if (!waitPortConnectable(LOOPBACK, vncPort, 15000)) {
-                log.error("❌ 等待 15 秒后 127.0.0.1:{} 仍不可连接，放弃启动 Websockify（检查 SSH -L 是否绑到 127.0.0.1）", vncPort);
-                return -1;
-            }
-            log.info("✅ VNC 端口 127.0.0.1:{} 可连接，准备启动 Websockify", vncPort);
+            if (!isReservedVncTunnelReady(reservation, tunnelReady)) return -1;
+            int vncPort = reservation.getPort();
+            log.info("本次 SSH 已确认监听 127.0.0.1:{}，准备启动 Websockify（不探测 VNC 连接）", vncPort);
 
             int websockifyPort = findAvailableHighPort();
             if (websockifyPort == -1) {
@@ -85,8 +113,11 @@ public class WebsockifyConfig {
             pb.redirectErrorStream(true);
             enrichPath(pb);
 
+            if (!isReservedVncTunnelReady(reservation, tunnelReady)) return -1;
             Process process = pb.start();
+            startedProcess = process;
             websockifyProcesses.put(sessionId, process);
+            if (!isReservedVncTunnelReady(reservation, tunnelReady)) return -1;
 
             final AtomicBoolean started = new AtomicBoolean(false);
             final StringBuilder bootLog = new StringBuilder();
@@ -120,7 +151,9 @@ public class WebsockifyConfig {
 
             // 最长等 10 秒就绪
             for (int i = 0; i < 20; i++) {
+                if (!isReservedVncTunnelReady(reservation, tunnelReady)) return -1;
                 Thread.sleep(500);
+                if (!isReservedVncTunnelReady(reservation, tunnelReady)) return -1;
                 if (!process.isAlive()) {
                     break;
                 }
@@ -129,21 +162,29 @@ public class WebsockifyConfig {
                 }
             }
 
-            if (process.isAlive() && isPortConnectable(LOOPBACK, websockifyPort)) {
+            if (process.isAlive() && isPortConnectable(LOOPBACK, websockifyPort)
+                    && isReservedVncTunnelReady(reservation, tunnelReady)) {
                 sessionPorts.put(sessionId, websockifyPort);
+                retained = true;
                 log.info("Websockify 启动成功: session={}, port={}", sessionId, websockifyPort);
                 return websockifyPort;
             }
 
             log.error("❌ Websockify 启动失败 session={} exitAlive={} portOpen={} log=\n{}",
                     sessionId, process.isAlive(), isPortConnectable(LOOPBACK, websockifyPort), bootLog);
-            process.destroyForcibly();
-            websockifyProcesses.remove(sessionId);
             return -1;
 
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return -1;
         } catch (Exception e) {
             log.error("启动 Websockify 失败: {}", e.getMessage(), e);
             return -1;
+        } finally {
+            if (!retained && startedProcess != null) {
+                websockifyProcesses.remove(sessionId, startedProcess);
+                startedProcess.destroyForcibly();
+            }
         }
     }
 
@@ -438,21 +479,11 @@ public class WebsockifyConfig {
         return "'" + s.replace("'", "'\\''") + "'";
     }
 
-    public boolean waitPortConnectable(String host, int port, int timeoutMs) {
-        int elapsed = 0;
-        while (elapsed < timeoutMs) {
-            if (isPortConnectable(host, port)) {
-                return true;
-            }
-            try {
-                Thread.sleep(300);
-            } catch (InterruptedException ignored) {
-                Thread.currentThread().interrupt();
-                return false;
-            }
-            elapsed += 300;
-        }
-        return false;
+    private boolean isReservedVncTunnelReady(LocalVncPortReservation reservation,
+                                             BooleanSupplier tunnelReady) {
+        return !stopping && reservation != null
+                && localVncPortReservations.get(reservation.port) == reservation
+                && tunnelReady != null && tunnelReady.getAsBoolean();
     }
 
     public boolean isPortConnectable(String host, int port) {
@@ -466,9 +497,10 @@ public class WebsockifyConfig {
 
     /** 分配本机可用的本地 VNC 转发端口（避免多会话抢 5900）。 */
     public int allocateLocalVncPort() {
+        if (stopping) return -1;
         // 优先 5900，再 5901…，再高位随机
         for (int port = 5900; port <= 5920; port++) {
-            if (isPortAvailable(port) && !isPortConnectable(LOOPBACK, port)) {
+            if (!localVncPortReservations.containsKey(port) && isPortAvailable(port)) {
                 return port;
             }
         }
@@ -476,13 +508,16 @@ public class WebsockifyConfig {
     }
 
     private int findAvailableHighPort() {
+        if (stopping) return -1;
         int basePort = 10000 + (int) (Math.random() * 50000);
         for (int i = 0; i < 200; i++) {
             int port = basePort + i;
             if (port > 65535) {
                 port = 10000 + (port % 50000);
             }
-            if (isPortAvailable(port)) {
+            // This allocator also selects websockify listener ports. Do not
+            // take a VNC port whose SSH process has not bound it yet.
+            if (!localVncPortReservations.containsKey(port) && isPortAvailable(port)) {
                 return port;
             }
         }
@@ -525,6 +560,7 @@ public class WebsockifyConfig {
 
     @PreDestroy
     public void cleanup() {
+        synchronized (localVncPortLock) { stopping = true; }
         log.debug("清理所有websockify进程...");
         websockifyProcesses.forEach((sessionId, process) -> {
             try {
@@ -536,6 +572,7 @@ public class WebsockifyConfig {
         });
         websockifyProcesses.clear();
         sessionPorts.clear();
+        localVncPortReservations.clear();
     }
 
     public int getActiveSessionCount() {

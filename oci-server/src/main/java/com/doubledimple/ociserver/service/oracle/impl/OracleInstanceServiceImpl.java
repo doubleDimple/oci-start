@@ -9,6 +9,8 @@ import com.doubledimple.dao.repository.CloudTenancyRepository;
 import com.doubledimple.dao.repository.CloudSshConnRepository;
 import com.doubledimple.dao.repository.OracleInstanceDetailRepository;
 import com.doubledimple.dao.repository.TenantRepository;
+import com.doubledimple.ociserver.service.permissions.OciPermissions;
+import com.doubledimple.ocicommon.enums.CloudTypeEnum;
 import com.doubledimple.ocicommon.enums.RegionEnum;
 import com.doubledimple.ocicommon.param.ScriptResult;
 import com.doubledimple.ocicommon.template.MessageTemplate;
@@ -324,11 +326,26 @@ public class OracleInstanceServiceImpl implements OracleInstanceService {
 
     @Override
     public Page<InstanceDetailsRes> getAllInstances(int page, int size, String tenantId) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("tenantId").ascending());
+        return getInstanceRecords(page, size, tenantId, null);
+    }
+
+    @Override
+    public Page<InstanceDetailsRes> getOciInstances(int page, int size, String tenantId) {
+        return getInstanceRecords(page, size, tenantId, CloudTypeEnum.ORACLE_CLOUD.getType());
+    }
+
+    private Page<InstanceDetailsRes> getInstanceRecords(int page, int size, String tenantId, Integer cloudType) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("tenantId").ascending().and(Sort.by("id").ascending()));
 
         // 创建 Specification 用于动态查询
         Specification<InstanceDetails> specification = (root, query, criteriaBuilder) -> {
             List<Predicate> predicates = new ArrayList<>();
+
+            // Apply before pagination so OCI pages and totals share the same provider scope.
+            // The existing all-provider callers pass null and retain their original scope.
+            if (cloudType != null) {
+                predicates.add(criteriaBuilder.equal(root.get("cloudType"), cloudType));
+            }
 
             // 当 instanceId 不为空时添加查询条件
             if (StringUtils.hasText(tenantId)) {
@@ -563,10 +580,11 @@ public class OracleInstanceServiceImpl implements OracleInstanceService {
         try(ComputeClient computeClient = ComputeClient.builder().build(provider)) {
 
             // 创建终止实例的请求
-            // preserveBootVolume设置为false表示同时删除引导卷
+            // 受限用户未勾选独立删盘时，本应用终止实例默认保留启动盘。
             TerminateInstanceRequest terminateInstanceRequest = TerminateInstanceRequest.builder()
                     .instanceId(instanceId)
-                    .preserveBootVolume(false)
+                    .preserveBootVolume(OciPermissions.isManaged(tenant)
+                            && !OciPermissions.allows(tenant, "BOOT_VOLUME_DELETE"))
                     .build();
 
             // 发送终止请求
@@ -714,6 +732,14 @@ public class OracleInstanceServiceImpl implements OracleInstanceService {
     */
     @Override
     public String createOciAdminUser(Long tenantId, String username, String email,String groupId) {
+        Tenant sourceTenant = tenantRepository.findById(tenantId).get();
+        if (OciPermissions.isManaged(sourceTenant)) {
+            OciPermissions.require(sourceTenant, "USER_CREATE");
+            if (groupId != null && !groupId.trim().isEmpty()) {
+                throw new IllegalArgumentException("专用 API 只允许创建普通用户，不能添加管理员组或其他用户组");
+            }
+            return createBaseOciUser(tenantId, username, email, "oci-start-create-user");
+        }
         String password = createBaseOciUser(tenantId, username, email, "oci-admin-user");
 
         // 添加到管理员组
@@ -803,6 +829,10 @@ public class OracleInstanceServiceImpl implements OracleInstanceService {
             CreateUserResponse response = identityClient.createUser(request);
             userId = response.getUser().getId();
 
+            if (OciPermissions.isManaged(tenant)) {
+                // 创建用户不捎带重置密码和用户组管理权限。
+                return "";
+            }
             // 设置初始密码
             CreateOrResetUIPasswordResponse orResetUIPassword = identityClient.createOrResetUIPassword(
                     CreateOrResetUIPasswordRequest
@@ -810,7 +840,7 @@ public class OracleInstanceServiceImpl implements OracleInstanceService {
                             .userId(userId)
                             .build());
             password = orResetUIPassword.getUIPassword().getPassword();
-            log.info("创建用户:{} 的初始密码是:{}", username, password);
+            log.info("用户:{} 创建成功，初始密码已设置", username);
 
             return password;
         } catch (Exception e) {
@@ -904,7 +934,20 @@ public class OracleInstanceServiceImpl implements OracleInstanceService {
     public void stopInstance(String instanceId, String tenancy) {
         List<Tenant> byTenancy = tenantRepository.findByTenancy(tenancy);
         if (byTenancy.size() > 0){
-            Tenant tenant = byTenancy.get(0);
+            InstanceDetails stored = oracleInstanceDetailRepository.findByInstanceId(instanceId);
+            Tenant tenant;
+            if (stored != null) {
+                tenant = tenantRepository.findById(stored.getTenantId()).orElse(null);
+                if (tenant == null || !tenancy.equals(tenant.getTenancy())) {
+                    throw new IllegalArgumentException("实例与租户不匹配");
+                }
+            } else {
+                if (byTenancy.stream().anyMatch(OciPermissions::isManaged)) {
+                    throw new IllegalArgumentException("无法确认实例所属专用用户，已停止操作");
+                }
+                tenant = byTenancy.get(0);
+            }
+            OciPermissions.require(tenant, "INSTANCE_POWER");
             SimpleAuthenticationDetailsProvider provider = OciUtils.getProvider(tenant);
             try(ComputeClient computeClient = ComputeClient.builder().build(provider)) {
                  InstanceDetails byInstanceId = oracleInstanceDetailRepository.findByInstanceId(instanceId);
@@ -985,7 +1028,7 @@ public class OracleInstanceServiceImpl implements OracleInstanceService {
 
     @Override
     public void updateInstance(InstanceDetails instance) {
-        log.info("保存SSH配置,请求参数是:{}", JSONUtil.toJsonStr(instance));
+        log.info("保存SSH配置,本地实例ID:{}", instance.getId());
         ociSshConnService.saveOrUpdate(instance);
 
     }
@@ -1036,7 +1079,6 @@ public class OracleInstanceServiceImpl implements OracleInstanceService {
         List<String> cidrList = request.getCidrRanges();
         InstanceDetails instanceDetails = oracleInstanceDetailRepository.findByInstanceId(request.getInstanceId());
         String instanceId = instanceDetails.getInstanceId();
-        String publicIpsDb = instanceDetails.getPublicIps();
         Tenant tenant = tenantRepository.findById(instanceDetails.getTenantId()).get();
 
         //如果cidr不为空,检测cidr是不是输入正确
@@ -1060,22 +1102,27 @@ public class OracleInstanceServiceImpl implements OracleInstanceService {
 
             String newPublicIp = "";
             Vnic vnic = getVnicById(request.getVnicId(),computeClient,provider,vnClient);
+            String oldPublicIp = vnic.getPublicIp();
+            boolean primaryVnic = Boolean.TRUE.equals(vnic.getIsPrimary());
             if (CollectionUtils.isEmpty(cidrs)){
                 newPublicIp = reassignEphemeralPublicIp(vnic,vnClient,provider.getTenantId());
                 // 9. 构建成功响应
                 Map<String, String> details = new HashMap<>();
-                details.put("oldIp", publicIpsDb);
+                details.put("oldIp", oldPublicIp);
                 details.put("newIp", newPublicIp);
 
                 result.put("status", "success");
                 result.put("message", "IP切换成功");
                 result.put("details", details);
-                instanceDetails.setPublicIps(newPublicIp);
-                oracleInstanceDetailRepository.saveAndFlush(instanceDetails);
+                // SSH 等实例入口使用主网卡地址，辅助网卡换 IP 不应覆盖该记录。
+                if (primaryVnic) {
+                    instanceDetails.setPublicIps(newPublicIp);
+                    oracleInstanceDetailRepository.saveAndFlush(instanceDetails);
+                }
                 ipSwitchTasks.remove(instanceId);
 
                 //发消息
-                messageFactory.getType(MessageEnum.TELEGRAM).sendMessageTemplate(String.format(MessageTemplate.MESSAGE_CONFIG_IP_SWITCH_TEMPLATE,tenant.getUserName(),instanceId,publicIpsDb,newPublicIp));
+                messageFactory.getType(MessageEnum.TELEGRAM).sendMessageTemplate(String.format(MessageTemplate.MESSAGE_CONFIG_IP_SWITCH_TEMPLATE,tenant.getUserName(),instanceId,oldPublicIp,newPublicIp));
                 return ResponseEntity.ok(result);
             }
 
@@ -1094,12 +1141,14 @@ public class OracleInstanceServiceImpl implements OracleInstanceService {
                     } else {
                         ipSwitchTasks.remove(instanceId);
 
-                        instanceDetails.setPublicIps(newPublicIp);
-                        oracleInstanceDetailRepository.saveAndFlush(instanceDetails);
+                        if (primaryVnic) {
+                            instanceDetails.setPublicIps(newPublicIp);
+                            oracleInstanceDetailRepository.saveAndFlush(instanceDetails);
+                        }
 
                         // 构建成功响应
                         Map<String, String> details = new HashMap<>();
-                        details.put("oldIp", publicIpsDb);
+                        details.put("oldIp", oldPublicIp);
                         details.put("newIp", newPublicIp);
 
                         result.put("status", "success");

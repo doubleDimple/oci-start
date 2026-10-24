@@ -3,7 +3,9 @@ package com.doubledimple.ociserver.config.socker;
 import com.doubledimple.dao.entity.Tenant;
 import com.doubledimple.dao.repository.TenantRepository;
 import com.doubledimple.ociai.utils.OciAiChatUtils;
+import com.doubledimple.ociai.utils.OciAiClientManager;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.oracle.bmc.model.BmcException;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -330,51 +332,83 @@ public class AiChatWebSocketHandler extends TextWebSocketHandler {
         CompletableFuture.runAsync(() -> {
             try {
                 List<Map<String, String>> history = conversationHistory.get(sessionId);
+                if (history == null || sessions.get(sessionId) != session || !session.isOpen()) return;
+                // Failed or cancelled replies must not leave an unanswered user
+                // message in the shared history. Include it only in this request.
+                List<Map<String, String>> pendingHistory;
+                synchronized (history) {
+                    pendingHistory = new ArrayList<>(history);
+                }
                 Map<String, String> userMsg = new HashMap<>();
                 userMsg.put("role", "user");
                 userMsg.put("content", userMessage);
                 userMsg.put("timestamp", LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
-                history.add(userMsg);
+                pendingHistory.add(userMsg);
 
                 StringBuilder fullAiResponse = new StringBuilder();
-                if (useHistory && history.size() > 1) {
-                    ociAiChatUtils.chatWithHistoryStream(finalTenant, history, modelId, (chunk) -> {
+                if (useHistory && pendingHistory.size() > 1) {
+                    ociAiChatUtils.chatWithHistoryStreamOrThrow(finalTenant, pendingHistory, modelId, chunk -> {
                         pushChunkToFrontend(session, chunk, fullAiResponse);
-                    },null);
+                    }, null);
                 } else {
-                    ociAiChatUtils.chatWithStream(finalTenant, userMessage, modelId, (chunk) -> {
+                    ociAiChatUtils.chatWithStreamOrThrow(finalTenant, userMessage, modelId, chunk -> {
                         pushChunkToFrontend(session, chunk, fullAiResponse);
                     });
                 }
+                if (StringUtils.isBlank(fullAiResponse)) {
+                    throw new IllegalStateException("AI stream completed without reply text");
+                }
+                if (sessions.get(sessionId) != session || !session.isOpen()) return;
                 Map<String, String> aiMsg = new HashMap<>();
                 aiMsg.put("role", "assistant");
                 aiMsg.put("content", fullAiResponse.toString());
                 aiMsg.put("timestamp", LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
-                history.add(aiMsg);
-                if (history.size() > MAX_HISTORY_SIZE) {
-                    history.subList(0, history.size() - MAX_HISTORY_SIZE).clear();
+                pendingHistory.add(aiMsg);
+                if (pendingHistory.size() > MAX_HISTORY_SIZE) {
+                    pendingHistory.subList(0, pendingHistory.size() - MAX_HISTORY_SIZE).clear();
                 }
-                sendMessage(session, createMessage("chat_end", "生成完毕", "success"));
-
+                synchronized (history) {
+                    if (conversationHistory.get(sessionId) == history && sessions.get(sessionId) == session
+                            && sendMessage(session, createMessage("chat_end", "生成完毕", "success"))) {
+                        history.clear();
+                        history.addAll(pendingHistory);
+                    }
+                }
             } catch (Exception e) {
-                log.error("AI对话处理失败", e);
-                sendMessage(session, createMessage("error", "处理请求时发生错误", "error"));
+                log.error("AI对话处理失败: sessionId={}", sessionId, e);
+                sendMessage(session, createMessage("error", replyFailureMessage(e), "error"));
             }
         }, taskExecutor);
+    }
+
+    private String replyFailureMessage(Throwable failure) {
+        // Inspect SDK causes, not raw messages: these may contain tenant OCIDs.
+        // Bound traversal so a malformed cause cycle cannot stall error delivery.
+        for (int depth = 0; failure != null && depth < 32; depth++, failure = failure.getCause()) {
+            if (failure instanceof BmcException && ((BmcException) failure).getStatusCode() == 429) {
+                return "OCI 已限制当前租户的模型请求（429），请稍后重试；持续出现时请检查该区域模型的服务限额。";
+            }
+        }
+        return "AI 回复失败，请检查模型服务后重试";
     }
 
     /**
      * 提取重复的推送逻辑
      */
     private void pushChunkToFrontend(WebSocketSession session, String chunk, StringBuilder accumulator) {
-        accumulator.append(chunk);
+        if (sessions.get(session.getId()) != session || !session.isOpen()) {
+            throw new IllegalStateException("AI chat session is closed");
+        }
         Map<String, Object> chunkMsg = new HashMap<>();
         chunkMsg.put("type", "chat");
         chunkMsg.put("role", "assistant");
         chunkMsg.put("message", chunk);
         chunkMsg.put("isChunk", true);
         chunkMsg.put("timestamp", LocalDateTime.now().toString());
-        sendMessage(session, chunkMsg);
+        if (!sendMessage(session, chunkMsg)) {
+            throw new IllegalStateException("AI reply could not be delivered");
+        }
+        accumulator.append(chunk);
     }
 
     /**
@@ -382,40 +416,52 @@ public class AiChatWebSocketHandler extends TextWebSocketHandler {
      */
     private void handleInitMessage(WebSocketSession session, Map<String, Object> request) {
         String sessionId = session.getId();
-        Map<String, Object> tenantData = (Map<String, Object>) request.get("tenant");
-
-        if (tenantData == null) {
+        Object tenantValue = request.get("tenant");
+        if (!(tenantValue instanceof Map)) {
             sendMessage(session, createMessage("error", "缺少租户信息", "error"));
             return;
         }
 
-        // 使用线程池异步处理初始化
-        CompletableFuture.runAsync(() -> {
-            try {
-                Map<String, Object> response = new HashMap<>();
-                String modelId = (String) tenantData.get("modelId");
-                if (StringUtils.isBlank(modelId)){
-                    throw new RuntimeException("模型未选择");
-                }
-                Optional<Tenant> optional = tenantRepository.findById(Long.valueOf((String) tenantData.get("tenantId")));
-                Tenant tenant = optional.get();
-                sessionTenants.put(sessionId, tenant);
-                // 预热客户端连接
-                ociAiChatUtils.warmupClient(tenant);
-
-                // 检查AI服务是否可用
-                boolean isAvailable = ociAiChatUtils.isAiServiceAvailable(tenant,modelId);
-
-                response.put("type", "init");
-                response.put("status", isAvailable ? "success" : "failed");
-                response.put("message", isAvailable ? "初始化成功，AI服务已就绪" : "AI服务不可用");
-                sendMessage(session, response);
-
-            } catch (Exception e) {
-                log.error("初始化失败: sessionId={}", sessionId, e);
-                sendMessage(session, createMessage("error", "初始化失败: " + e.getMessage(), "error"));
+        // Initialization is local preparation, not an inference request or a
+        // proxy connectivity test. Do not queue it behind shared cloud tasks.
+        try {
+            Map<?, ?> tenantData = (Map<?, ?>) tenantValue;
+            Object modelValue = tenantData.get("modelId");
+            if (!(modelValue instanceof String) || StringUtils.isBlank((String) modelValue)) {
+                sendMessage(session, createMessage("error", "模型未选择", "error"));
+                return;
             }
-        }, taskExecutor);
+            Object tenantIdValue = tenantData.get("tenantId");
+            if (!(tenantIdValue instanceof String) || !((String) tenantIdValue).matches("[1-9][0-9]{0,18}")) {
+                sendMessage(session, createMessage("error", "租户参数无效", "error"));
+                return;
+            }
+            Long tenantId = Long.valueOf((String) tenantIdValue);
+            Tenant tenant = tenantRepository.findById(tenantId).orElse(null);
+            if (tenant == null) {
+                sendMessage(session, createMessage("error", "租户信息不存在", "error"));
+                return;
+            }
+            if (tenant.getCloudType() != 1 || StringUtils.isAnyBlank(tenant.getTenantId(),
+                    tenant.getTenancy(), tenant.getFingerprint(), tenant.getKeyFile(), tenant.getRegion())) {
+                sendMessage(session, createMessage("error", "租户认证配置不完整或不支持 OCI AI", "error"));
+                return;
+            }
+            // This builds only the local authentication parameters. It does not
+            // read the key supplier, construct a cloud client, or resolve/probe a proxy.
+            OciAiClientManager.buildAuthProvider(tenant);
+            if (!session.isOpen() || sessions.get(sessionId) != session) return;
+            sessionTenants.put(sessionId, tenant);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("type", "init");
+            response.put("status", "success");
+            response.put("message", "会话初始化完成");
+            sendMessage(session, response);
+        } catch (Exception e) {
+            log.error("初始化失败: sessionId={}", sessionId, e);
+            sendMessage(session, createMessage("error", "会话初始化失败，请检查租户配置", "error"));
+        }
     }
 
     /**
@@ -498,14 +544,26 @@ public class AiChatWebSocketHandler extends TextWebSocketHandler {
     /**
      * 发送消息到客户端
      */
-    private void sendMessage(WebSocketSession session, Map<String, Object> message) {
+    private boolean sendMessage(WebSocketSession session, Map<String, Object> message) {
         try {
-            if (session.isOpen()) {
+            // Heartbeats, pong and inference chunks run on different threads.
+            // The native WebSocket BasicRemote permits only one writer at a time.
+            synchronized (session) {
+                if (!session.isOpen()) return false;
                 String json = objectMapper.writeValueAsString(message);
                 session.sendMessage(new TextMessage(json));
+                return true;
             }
-        } catch (IOException e) {
+        } catch (IOException | RuntimeException e) {
             log.error("发送消息失败: sessionId={}", session.getId(), e);
+            // Close outside the write lock. A healthy-looking socket must not
+            // survive after its reply or terminal event failed to reach the UI.
+            try {
+                if (session.isOpen()) session.close(CloseStatus.SERVER_ERROR);
+            } catch (IOException | RuntimeException closeError) {
+                log.warn("关闭失败的AI会话失败: sessionId={}", session.getId(), closeError);
+            }
+            return false;
         }
     }
 
@@ -524,12 +582,10 @@ public class AiChatWebSocketHandler extends TextWebSocketHandler {
         // 清理资源
         sessions.remove(sessionId);
         conversationHistory.remove(sessionId);
-        Tenant tenant = sessionTenants.remove(sessionId);
+        sessionTenants.remove(sessionId);
 
-        // 清理AI客户端
-        if (tenant != null) {
-            ociAiChatUtils.cleanupClient(tenant);
-        }
+        // The tenant client is shared by other chats and managed by
+        // OciAiClientManager. Closing this socket must not close their client.
 
         // 取消心跳任务
         cancelHeartbeat(sessionId);
@@ -559,9 +615,6 @@ public class AiChatWebSocketHandler extends TextWebSocketHandler {
                 log.error("关闭会话失败", e);
             }
         });
-
-        // 清理所有AI客户端
-        sessionTenants.values().forEach(ociAiChatUtils::cleanupClient);
 
         // 清理资源
         sessions.clear();
@@ -628,12 +681,8 @@ public class AiChatWebSocketHandler extends TextWebSocketHandler {
             // 清空对话历史
             conversationHistory.remove(sessionId);
 
-            // 获取并清理租户客户端
-            Tenant tenant = sessionTenants.remove(sessionId);
-            if (tenant != null) {
-                ociAiChatUtils.cleanupClient(tenant);
-                log.debug("已清理租户AI客户端: tenantId={}", tenant.getId());
-            }
+            // Release only this session's reference, not the shared client.
+            sessionTenants.remove(sessionId);
 
             // 取消心跳任务
             cancelHeartbeat(sessionId);

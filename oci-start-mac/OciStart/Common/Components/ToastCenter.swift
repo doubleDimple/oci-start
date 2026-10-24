@@ -62,8 +62,8 @@ struct ToastHost: View {
         VStack {
             if let message = center.message {
                 Text(message)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.white)
+                    .font(.system(size: AppTheme.bodySize))
+                    .foregroundColor(foreground)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
                     .background(background)
@@ -79,10 +79,14 @@ struct ToastHost: View {
     }
 
     private var background: Color {
+        AppTheme.statusBg(foreground, dark)
+    }
+
+    private var foreground: Color {
         switch center.style {
-        case .info: return AppTheme.sidebarActive
-        case .success: return Color(hex: "3fb950")
-        case .error: return Color(hex: "f85149")
+        case .info: return AppTheme.info
+        case .success: return AppTheme.success
+        case .error: return AppTheme.danger
         }
     }
 }

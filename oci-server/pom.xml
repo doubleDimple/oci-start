@@ -238,11 +238,6 @@
         </dependency>
 
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-freemarker</artifactId>
-        </dependency>
-
-        <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
         </dependency>
@@ -640,6 +635,83 @@
     <build>
         <finalName>oci-start-release</finalName>
         <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <id>require-vue-distribution</id>
+                        <phase>prepare-package</phase>
+                        <goals><goal>run</goal></goals>
+                        <configuration>
+                            <target>
+                                <fail message="Vue build missing. Run pnpm --dir oci-start-web run build before packaging, or build from the root with mvn -Pweb -pl oci-server -am clean package.">
+                                    <condition>
+                                        <not><and>
+                                            <available file="${project.build.outputDirectory}/static/index.html"/>
+                                            <resourcecount when="greater" count="0">
+                                                <fileset dir="${project.build.outputDirectory}/static/assets" includes="*.js" erroronmissingdir="false"/>
+                                            </resourcecount>
+                                        </and></not>
+                                    </condition>
+                                </fail>
+                                <!-- Check the files referenced by the HTML, not unrelated or stale chunks. -->
+                                <loadfile property="vue.entry.assets" srcFile="${project.build.outputDirectory}/static/index.html" encoding="UTF-8">
+                                    <filterchain>
+                                        <tokenfilter delimoutput=",">
+                                            <stringtokenizer delims="&lt;&gt;"/>
+                                            <containsregex pattern="(?s)^\s*(?:script|link)\s+.*?\b(?:src|href)\s*=\s*['&quot;]/(assets/[^'&quot;?\s#]+\.(?:js|css))(?:[?#][^'&quot;]*)?['&quot;].*$" replace="\1"/>
+                                        </tokenfilter>
+                                    </filterchain>
+                                </loadfile>
+                                <loadfile property="vue.entry.script" srcFile="${project.build.outputDirectory}/static/index.html" encoding="UTF-8">
+                                    <filterchain>
+                                        <tokenfilter delimoutput=",">
+                                            <stringtokenizer delims="&lt;&gt;"/>
+                                            <containsregex pattern="(?s)^\s*script\s+.*?\bsrc\s*=\s*['&quot;]/(assets/[^'&quot;?\s#]+\.js)(?:[?#][^'&quot;]*)?['&quot;].*$" replace="\1"/>
+                                        </tokenfilter>
+                                    </filterchain>
+                                </loadfile>
+                                <fail unless="vue.entry.script" message="Vue index.html has no generated entry script. Rebuild the Vue frontend before packaging."/>
+                                <fail unless="vue.entry.assets" message="Vue index.html has no generated assets. Rebuild the Vue frontend before packaging."/>
+                                <restrict id="vue.missing.assets">
+                                    <filelist dir="${project.build.outputDirectory}/static" files="${vue.entry.assets}"/>
+                                    <not><and><exists/><type type="file"/></and></not>
+                                </restrict>
+                                <fail message="Vue index.html references missing JS/CSS files. Rebuild the Vue frontend before packaging. Expected: ${vue.entry.assets}">
+                                    <condition>
+                                        <resourcecount when="greater" count="0">
+                                            <resources refid="vue.missing.assets"/>
+                                        </resourcecount>
+                                    </condition>
+                                </fail>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <configuration>
+                    <!-- Also exclude stale resources left by incremental builds from older versions. -->
+                    <excludes>
+                        <exclude>templates/**</exclude>
+                        <exclude>static/css/**</exclude>
+                        <exclude>static/fonts/**</exclude>
+                        <exclude>static/webfonts/**</exclude>
+                        <exclude>static/js/common/**</exclude>
+                        <exclude>static/js/system/**</exclude>
+                        <exclude>static/js/mobile/**</exclude>
+                        <exclude>static/js/login/**</exclude>
+                        <exclude>static/js/mobile-navigation.js</exclude>
+                        <exclude>static/js/sweetalert2*.js</exclude>
+                        <exclude>static/js/leaflet.min.js</exclude>
+                        <exclude>static/js/xterm-addon-webgl.js</exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
             <!--<plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
@@ -734,4 +806,21 @@
             </plugin>
         </plugins>
     </build>
+    <profiles>
+        <profile>
+            <id>web</id>
+            <dependencies>
+                <!-- Explicit reactor dependency: Vue completes before server resources are copied,
+                     including parallel Maven builds. This POM is not a runtime dependency. -->
+                <dependency>
+                    <groupId>com.doubleDimple.ocistartpro</groupId>
+                    <artifactId>oci-start-web</artifactId>
+                    <version>1.0.0-SNAPSHOT</version>
+                    <type>pom</type>
+                    <scope>provided</scope>
+                    <optional>true</optional>
+                </dependency>
+            </dependencies>
+        </profile>
+    </profiles>
 </project>

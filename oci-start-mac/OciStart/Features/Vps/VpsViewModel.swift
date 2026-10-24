@@ -1,6 +1,7 @@
 import Foundation
 import Combine
 import AppKit
+import CoreFoundation
 
 @MainActor
 final class VpsViewModel: ObservableObject {
@@ -8,336 +9,420 @@ final class VpsViewModel: ObservableObject {
     @Published private(set) var isLoading = false
     @Published private(set) var isBusy = false
     @Published private(set) var errorText: String?
+    @Published private(set) var requiresReview = false
+    @Published private(set) var reviewLoaded = false
     @Published var searchText = ""
     @Published var showIP = false
     @Published var showTenant = false
     @Published var offlineOnly = false
+    @Published var provider = ""
+    @Published var pageState = PageState(page: 0, size: 20)
     @Published private(set) var isLatencyTesting = false
-    @Published private(set) var moreMenuOpen = false
-
-    /// 内嵌 SSH 整页（对齐 Web 跳转终端）
     @Published var sshItem: InstanceItem?
-
+    @Published private(set) var monitorConnected = false
     private let session: AppSession
     private var service: VpsService { VpsService(baseURL: session.serverURL) }
     private let monitorWS = NativeWSClient()
     private var heartbeatTimer: Timer?
-    private var metricsByToken: [String: VpsLiveMetrics] = [:]
+    private var reconnect: DispatchWorkItem?
+    private var active = false
+    private var loadGeneration = 0
+    private var latencyGeneration = 0
+    private var latencyRun: VpsLatencyRun?
+    private var observed: [String: (token: String, metrics: VpsLiveMetrics)] = [:]
 
     var totalCount: Int { cards.count }
     var onlineCount: Int { cards.filter(\.isOnline).count }
-    var offlineCount: Int { max(0, totalCount - onlineCount) }
-
+    var offlineCount: Int { cards.filter { $0.item.onLineEnable == 0 }.count }
     var filteredCards: [VpsCardItem] {
-        let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         return cards.filter { card in
-            if offlineOnly && card.isOnline { return false }
-            guard !q.isEmpty else { return true }
-            let it = card.item
-            return it.publicIps.lowercased().contains(q)
-                || it.tenancyName.lowercased().contains(q)
-                || it.regionName.lowercased().contains(q)
-                || it.displayName.lowercased().contains(q)
-                || it.architecture.lowercased().contains(q)
-                || it.instanceId.lowercased().contains(q)
+            if offlineOnly && card.item.onLineEnable != 0 { return false }
+            if !provider.isEmpty && "\(card.item.cloudType)" != provider { return false }
+            let item = card.item
+            return q.isEmpty || [item.publicIps, item.tenancyName, item.regionName, item.displayName,
+                                item.architecture, item.instanceId].contains { $0.localizedCaseInsensitiveContains(q) }
         }
+    }
+    var visibleCards: [VpsCardItem] {
+        Array(filteredCards.dropFirst(pageState.page * pageState.size).prefix(pageState.size))
     }
 
     init(session: AppSession = .shared) {
         self.session = session
-        wireMonitorWS()
-    }
-
-    func start() {
-        Task { await reload() }
-        connectMonitor()
-        startHeartbeatWatch()
-    }
-
-    func teardown() {
-        heartbeatTimer?.invalidate()
-        heartbeatTimer = nil
-        monitorWS.disconnect(reason: nil)
-        moreMenuOpen = false
-    }
-
-    func reload() async {
-        isLoading = true
-        errorText = nil
-        defer { isLoading = false }
-        do {
-            let resp = try await service.listAll()
-            cards = resp.content.map { item in
-                var c = VpsCardItem(item: item)
-                if let m = metricsByToken[item.instanceId], m.hasData {
-                    c.metrics = m
-                    c.item.monitorInstalled = true
-                } else if item.lastHeartbeatMs > 0 {
-                    c.metrics.lastBeatMs = item.lastHeartbeatMs
-                }
-                return c
-            }
-            refreshWarnings()
-        } catch {
-            cards = []
-            errorText = error.localizedDescription
-            ToastCenter.shared.error(error.localizedDescription)
-        }
-    }
-
-    // MARK: - Actions
-
-    func toggleOfflineFilter() {
-        offlineOnly.toggle()
-    }
-
-    func toggleShowIP() { showIP.toggle() }
-    func toggleShowTenant() { showTenant.toggle() }
-    func toggleMoreMenu() { moreMenuOpen.toggle() }
-    func closeMoreMenu() { moreMenuOpen = false }
-
-    func enablePing() {
-        closeMoreMenu()
-        Task {
-            isBusy = true
-            do {
-                ToastCenter.shared.success(try await service.enablePing())
-            } catch {
-                ToastCenter.shared.error(error.localizedDescription)
-            }
-            isBusy = false
-        }
-    }
-
-    func disablePing() {
-        closeMoreMenu()
-        Task {
-            isBusy = true
-            do {
-                ToastCenter.shared.success(try await service.disablePing())
-            } catch {
-                ToastCenter.shared.error(error.localizedDescription)
-            }
-            isBusy = false
-        }
-    }
-
-    func manualPing() {
-        closeMoreMenu()
-        Task {
-            isBusy = true
-            do {
-                ToastCenter.shared.success(try await service.manualPing())
-                // 稍后再刷在线状态
-                try? await Task.sleep(nanoseconds: 1_500_000_000)
-                await reload()
-            } catch {
-                ToastCenter.shared.error(error.localizedDescription)
-            }
-            isBusy = false
-        }
-    }
-
-    func runLatencyTest() {
-        guard !isLatencyTesting else { return }
-        isLatencyTesting = true
-        for i in cards.indices {
-            cards[i].isLatencyTesting = true
-            cards[i].latencyMs = nil
-        }
-        let targets: [(String, String)] = cards.compactMap { card in
-            let ip = card.item.publicIps.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !ip.isEmpty, ip != "无IP", ip != "无 IP" else { return nil }
-            return (card.id, ip)
-        }
-        Task {
-            var results: [String: Int] = [:]
-            await withTaskGroup(of: (String, Int).self) { group in
-                for (id, ip) in targets {
-                    group.addTask {
-                        var ms = await VpsService.pingLatency(ip: ip)
-                        if ms < 0 { ms = await VpsService.pingLatency(ip: ip) }
-                        return (id, ms)
-                    }
-                }
-                for await (id, ms) in group {
-                    results[id] = ms
-                }
-            }
-            for i in cards.indices {
-                if let ms = results[cards[i].id] {
-                    cards[i].latencyMs = ms
-                }
-                cards[i].isLatencyTesting = false
-            }
-            isLatencyTesting = false
-            ToastCenter.shared.success("延迟测试完成")
-        }
-    }
-
-    func installMonitor(_ card: VpsCardItem) {
-        guard AppAlert.confirm(
-            title: "安装监控探针",
-            message: "将通过 SSH 连接 \(card.displayIP) 并安装 Agent。"
-        ) else { return }
-        Task {
-            isBusy = true
-            do {
-                let msg = try await service.installMonitor(vpsId: card.item.id)
-                ToastCenter.shared.success(msg)
-                if let idx = cards.firstIndex(where: { $0.id == card.id }) {
-                    cards[idx].item.monitorInstalled = true
-                }
-            } catch {
-                ToastCenter.shared.error(error.localizedDescription)
-            }
-            isBusy = false
-        }
-    }
-
-    func uninstallMonitor(_ card: VpsCardItem) {
-        guard AppAlert.confirm(
-            title: "停止监控？",
-            message: "将卸载 \(card.displayIP) 上的 Agent 服务。"
-        ) else { return }
-        Task {
-            isBusy = true
-            do {
-                let msg = try await service.uninstallMonitor(vpsId: card.item.id)
-                ToastCenter.shared.success(msg)
-                if let idx = cards.firstIndex(where: { $0.id == card.id }) {
-                    cards[idx].item.monitorInstalled = false
-                    cards[idx].metrics = VpsLiveMetrics()
-                    cards[idx].monitorWarning = false
-                }
-            } catch {
-                ToastCenter.shared.error(error.localizedDescription)
-            }
-            isBusy = false
-        }
-    }
-
-    func openSSH(_ card: VpsCardItem) {
-        FloatingMenuDismiss.all()
-        sshItem = card.item
-    }
-
-    func closeSSH() {
-        sshItem = nil
-    }
-
-    func copyIP(_ card: VpsCardItem) {
-        let t = card.item.publicIps.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !t.isEmpty else {
-            ToastCenter.shared.error("无公网 IP")
-            return
-        }
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(t, forType: .string)
-        ToastCenter.shared.success("IP 已复制")
-    }
-
-    // MARK: - Monitor WS
-
-    private func wireMonitorWS() {
         monitorWS.onText = { [weak self] text in
-            self?.handleMonitorMessage(text)
+            guard let self = self else { return }
+            Task { @MainActor in self.handleMonitorMessage(text) }
         }
         monitorWS.onState = { [weak self] state in
             guard let self = self else { return }
-            if case .closed = state {
-                // 自动重连
-                DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
-                    self?.connectMonitor()
-                }
-            }
+            Task { @MainActor in self.monitorState(state) }
         }
     }
 
-    private func connectMonitor() {
-        do {
-            let url = try NativeWSURL.make(baseHTTP: session.serverURL, path: "/ws/monitor")
-            monitorWS.connect(url: url)
-        } catch {
-            // 监控非致命
-        }
-    }
-
-    private func handleMonitorMessage(_ text: String) {
-        guard let data = text.data(using: .utf8),
-              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let token = obj["token"] as? String, !token.isEmpty else { return }
-
-        var m = metricsByToken[token] ?? VpsLiveMetrics()
-        m.hasData = true
-        m.lastBeatMs = Int64(Date().timeIntervalSince1970 * 1000)
-
-        if let cpu = obj["cpu"] as? [String: Any] {
-            if let u = cpu["usage"] as? Double { m.cpuPercent = u }
-            else if let n = cpu["usage"] as? NSNumber { m.cpuPercent = n.doubleValue }
-            if let load = cpu["load"] as? [Any], let first = load.first {
-                m.load = "\(first)"
-            }
-        }
-        if let mem = obj["memory"] as? [String: Any] {
-            let used = (mem["used"] as? NSNumber)?.doubleValue ?? 0
-            let total = (mem["total"] as? NSNumber)?.doubleValue ?? 0
-            if total > 0 { m.memPercent = (used / total) * 100 }
-        }
-        if let disk = obj["disk"] as? [String: Any] {
-            let used = (disk["used"] as? NSNumber)?.doubleValue ?? 0
-            let total = (disk["total"] as? NSNumber)?.doubleValue ?? 0
-            if total > 0 {
-                m.diskPercent = (used / total) * 100
-                m.diskTotalLabel = VpsFormat.sizeMB(total)
-            }
-        }
-        if let host = obj["host"] as? [String: Any],
-           let up = (host["uptime"] as? NSNumber)?.doubleValue {
-            m.uptime = VpsFormat.uptime(up)
-        }
-        if let net = obj["network"] as? [String: Any] {
-            let rx = (net["rx_rate"] as? NSNumber)?.doubleValue ?? 0
-            let tx = (net["tx_rate"] as? NSNumber)?.doubleValue ?? 0
-            m.netRx = VpsFormat.speed(rx)
-            m.netTx = VpsFormat.speed(tx)
-        }
-
-        metricsByToken[token] = m
-        if let idx = cards.firstIndex(where: { $0.item.instanceId == token }) {
-            cards[idx].metrics = m
-            cards[idx].item.monitorInstalled = true
-            cards[idx].monitorWarning = false
-        }
-    }
-
-    private func startHeartbeatWatch() {
-        heartbeatTimer?.invalidate()
+    func start() {
+        guard !active else { return }
+        active = true
+        Task { await reload() }
+        connectMonitor()
         heartbeatTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in
             guard let self = self else { return }
-            Task { @MainActor [weak self] in
-                self?.refreshWarnings()
-            }
+            Task { @MainActor in self.refreshWarnings() }
         }
+    }
+    func teardown() {
+        active = false
+        loadGeneration += 1
+        stopLatencyTest()
+        heartbeatTimer?.invalidate()
+        heartbeatTimer = nil
+        reconnect?.cancel()
+        reconnect = nil
+        monitorConnected = false
+        monitorWS.disconnect(reason: nil)
+    }
+    func updatePagination(reset: Bool = false) {
+        if reset { pageState.page = 0 }
+        pageState.apply(totalElements: Int64(filteredCards.count))
+    }
+    func reload() async {
+        loadGeneration += 1
+        let generation = loadGeneration
+        isLoading = true
+        defer { if generation == loadGeneration { isLoading = false } }
+        do {
+            let response = try await service.listAll()
+            guard generation == loadGeneration else { return }
+            let previous = Dictionary(uniqueKeysWithValues: cards.map { ($0.id, $0) })
+            cards = response.content.map { item in
+                var card = VpsCardItem(item: item)
+                if let old = previous[item.id], old.item.instanceId == item.instanceId,
+                   !(old.item.monitorInstalled && !item.monitorInstalled),
+                   let report = observed[item.id], report.token == item.instanceId {
+                    card.metrics = report.metrics
+                    card.latencyMs = old.latencyMs
+                } else { observed[item.id] = nil }
+                return card
+            }
+            let ids = Set(cards.map(\.id))
+            observed = observed.filter { ids.contains($0.key) }
+            updatePagination()
+            refreshWarnings()
+            reviewLoaded = requiresReview
+            if !requiresReview { errorText = nil }
+        } catch {
+            guard generation == loadGeneration else { return }
+            errorText = error.localizedDescription
+            reviewLoaded = false
+        }
+    }
+    func acknowledgeReview() {
+        guard reviewLoaded else { return }
+        requiresReview = false
+        reviewLoaded = false
+        errorText = nil
     }
 
-    private func refreshWarnings() {
-        let now = Int64(Date().timeIntervalSince1970 * 1000)
-        let timeout: Int64 = 12_000
-        for i in cards.indices {
-            let card = cards[i]
-            guard card.item.monitorInstalled, card.isOnline else {
-                cards[i].monitorWarning = false
-                continue
-            }
-            let last = card.metrics.lastBeatMs > 0
-                ? card.metrics.lastBeatMs
-                : card.item.lastHeartbeatMs
-            if last > 0, now - last > timeout {
-                cards[i].monitorWarning = true
-            } else if last > 0 {
-                cards[i].monitorWarning = false
+    func enablePing() { ping("enable") }
+    func disablePing() { ping("disable") }
+    func manualPing() { ping("manual") }
+    private func ping(_ kind: String) {
+        guard !isBusy, !requiresReview, AppAlert.confirm(
+            title: vpsText("确认全局 Ping 操作", "Confirm global Ping operation"),
+            message: vpsText("此操作影响全部 OCI 实例，不受当前搜索或厂商筛选限制。手动检测包含关闭自动 Ping 的实例，并可能发送通知。",
+                             "This affects all OCI instances regardless of filters. Manual Ping includes instances with automatic Ping disabled and may send notifications.")
+        ) else { return }
+        perform {
+            switch kind {
+            case "enable": return try await self.service.enablePing()
+            case "disable": return try await self.service.disablePing()
+            default: return try await self.service.manualPing()
             }
         }
     }
+    private func perform(_ operation: @escaping () async throws -> String, completed: (() -> Void)? = nil) {
+        guard !isBusy, !requiresReview else { return }
+        isBusy = true
+        Task {
+            do {
+                let message = try await operation()
+                completed?()
+                ToastCenter.shared.success(message)
+                await reload()
+            } catch {
+                requiresReview = (error as? NetworkQualityMutationError)?.needsReview ?? true
+                reviewLoaded = false
+                errorText = error.localizedDescription
+            }
+            isBusy = false
+        }
+    }
+    func installMonitor(_ card: VpsCardItem) {
+        guard AppAlert.confirm(title: vpsText("安装 / 升级监控探针", "Install / upgrade monitoring agent"),
+                               message: vpsText("将通过 SSH 在 \(card.item.displayName) 上安装。安装完成后仍需等待真实上报。",
+                                                "Install over SSH on \(card.item.displayName). Monitoring becomes available after an actual report.")) else { return }
+        perform { try await self.service.installMonitor(vpsId: card.id) }
+    }
+    func uninstallMonitor(_ card: VpsCardItem) {
+        guard AppAlert.confirm(title: vpsText("卸载监控探针", "Uninstall monitoring agent"),
+                               message: card.item.displayName) else { return }
+        perform({ try await self.service.uninstallMonitor(vpsId: card.id) }, completed: {
+            self.observed[card.id] = nil
+            if let index = self.cards.firstIndex(where: { $0.id == card.id }) {
+                self.cards[index].metrics = VpsLiveMetrics()
+                self.cards[index].item.monitorInstalled = false
+            }
+        })
+    }
+    func openSSH(_ card: VpsCardItem) { FloatingMenuDismiss.all(); stopLatencyTest(); sshItem = card.item }
+    func closeSSH() { sshItem = nil }
+    func copyIP(_ card: VpsCardItem) {
+        guard !card.item.publicIps.isEmpty else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(card.item.publicIps, forType: .string)
+    }
+    func runLatencyTest() {
+        guard !isLatencyTesting else { return }
+        latencyGeneration += 1
+        let generation = latencyGeneration
+        latencyRun?.cancel()
+        let run = VpsLatencyRun()
+        latencyRun = run
+        isLatencyTesting = true
+        let targets = filteredCards.filter { !$0.item.publicIps.isEmpty }
+        Task {
+            // Bounded batches avoid occupying all network/worker slots during navigation.
+            var offset = 0
+            while offset < targets.count, generation == latencyGeneration, active {
+                let batch = Array(targets.dropFirst(offset).prefix(4))
+                let results = await withTaskGroup(of: (String, Int).self, returning: [(String, Int)].self) { group in
+                    for card in batch { group.addTask { (card.id, await VpsService.httpLatency(ip: card.item.publicIps, run: run)) } }
+                    var values: [(String, Int)] = []
+                    for await value in group { values.append(value) }
+                    return values
+                }
+                guard generation == latencyGeneration, active else { return }
+                for (id, value) in results {
+                    if let original = targets.first(where: { $0.id == id }),
+                       let index = cards.firstIndex(where: { $0.id == id && $0.item.publicIps == original.item.publicIps }) {
+                        cards[index].latencyMs = value
+                    }
+                }
+                offset += batch.count
+            }
+            if generation == latencyGeneration { isLatencyTesting = false }
+        }
+    }
+    func stopLatencyTest() {
+        latencyGeneration += 1
+        latencyRun?.cancel()
+        latencyRun = nil
+        isLatencyTesting = false
+    }
+
+    func agentLabel(_ card: VpsCardItem) -> String {
+        if !monitorConnected { return vpsText("待确认", "Unconfirmed") }
+        if card.metrics.hasData { return card.monitorWarning ? vpsText("上报过期", "Stale report") : vpsText("在线", "Online") }
+        return card.item.monitorInstalled ? vpsText("等待上报", "Awaiting report") : vpsText("未安装", "Not installed")
+    }
+    private func connectMonitor() {
+        guard active else { return }
+        do { monitorWS.connect(url: try NativeWSURL.make(baseHTTP: session.serverURL, path: "/ws/monitor")) }
+        catch { monitorConnected = false }
+    }
+    private func monitorState(_ state: NativeWSClient.State) {
+        guard active else { return }
+        // NativeWSClient's .open means transport started, not an observed heartbeat.
+        if case .open = state { monitorConnected = true }
+        if case .closed = state {
+            monitorConnected = false
+            reconnect?.cancel()
+            let work = DispatchWorkItem { [weak self] in self?.connectMonitor() }
+            reconnect = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3, execute: work)
+            refreshWarnings()
+        }
+    }
+    private func handleMonitorMessage(_ text: String) {
+        guard active, text.utf8.count <= 65536, let data = text.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let token = object["token"] as? String, !token.isEmpty,
+              cards.contains(where: { $0.item.instanceId == token }) else { return }
+        func number(_ raw: Any?) -> Double? {
+            guard let number = raw as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID(),
+                  number.doubleValue.isFinite, number.doubleValue >= 0 else { return nil }
+            return number.doubleValue
+        }
+        func percentage(_ raw: Any?) -> Double? {
+            guard let source = raw as? [String: Any], let used = number(source["used"]),
+                  let total = number(source["total"]), total > 0, used <= total else { return nil }
+            return used / total * 100
+        }
+        let cpu = object["cpu"] as? [String: Any] ?? [:]
+        let host = object["host"] as? [String: Any] ?? [:]
+        let disk = object["disk"] as? [String: Any] ?? [:]
+        let network = object["network"] as? [String: Any] ?? [:]
+        var metrics = VpsLiveMetrics()
+        metrics.cpuPercent = number(cpu["usage"]).flatMap { $0 <= 100 ? $0 : nil }
+        metrics.memPercent = percentage(object["memory"])
+        metrics.diskPercent = percentage(object["disk"])
+        metrics.diskTotalLabel = number(disk["total"]).map(VpsFormat.sizeMB) ?? "—"
+        metrics.uptime = number(host["uptime"]).map(VpsFormat.uptime) ?? "—"
+        metrics.netRx = number(network["rx_rate"]).map(VpsFormat.bytes) ?? "—"
+        metrics.netTx = number(network["tx_rate"]).map(VpsFormat.bytes) ?? "—"
+        if let load = cpu["load"] as? [Any] {
+            metrics.load = load.prefix(3).map { number($0).map { String(format: "%.2f", $0) } ?? "—" }.joined(separator: " / ")
+        }
+        guard metrics.cpuPercent != nil || metrics.memPercent != nil || metrics.diskPercent != nil ||
+                metrics.diskTotalLabel != "—" || metrics.uptime != "—" || metrics.netRx != "—" ||
+                metrics.netTx != "—" || (metrics.load != "—" && !metrics.load.isEmpty) else { return }
+        metrics.hasData = true
+        metrics.lastBeatMs = Int64(Date().timeIntervalSince1970 * 1000)
+        for index in cards.indices where cards[index].item.instanceId == token {
+            observed[cards[index].id] = (token, metrics)
+            cards[index].metrics = metrics
+            cards[index].monitorWarning = false
+        }
+    }
+    private func refreshWarnings() {
+        let now = Int64(Date().timeIntervalSince1970 * 1000)
+        for index in cards.indices {
+            let metrics = cards[index].metrics
+            cards[index].monitorWarning = metrics.hasData && (!monitorConnected || now - metrics.lastBeatMs > 12000)
+        }
+    }
+}
+
+@MainActor
+final class NetworkQualityViewModel: ObservableObject {
+    @Published private(set) var overview: NetworkQualityOverview?
+    @Published private(set) var history: NetworkQualityHistory?
+    @Published private(set) var loading = false
+    @Published private(set) var historyLoading = false
+    @Published private(set) var busy = false
+    @Published private(set) var errorText: String?
+    @Published private(set) var requiresReview = false
+    @Published private(set) var reviewLoaded = false
+    @Published var editor: NetworkQualityTask?
+    @Published var selectedInstance = ""
+    @Published var selectedTask = ""
+    @Published var hours = "24"
+    @Published var query = ""
+    @Published var pageState = PageState(page: 0, size: 20)
+    private var generation = 0
+    private var historyGeneration = 0
+    private var service: NetworkQualityService { NetworkQualityService(baseURL: AppSession.shared.serverURL) }
+    var filteredTasks: [NetworkQualityTask] {
+        (overview?.tasks ?? []).filter {
+            (selectedInstance.isEmpty || $0.instanceIds.contains(selectedInstance)) &&
+            (query.isEmpty || [$0.name, $0.target, $0.region, $0.operatorLabel].contains { $0.localizedCaseInsensitiveContains(query) })
+        }
+    }
+    var visibleTasks: [NetworkQualityTask] { Array(filteredTasks.dropFirst(pageState.page * pageState.size).prefix(pageState.size)) }
+    var task: NetworkQualityTask? { overview?.tasks.first { $0.id == selectedTask && $0.instanceIds.contains(selectedInstance) } }
+    var canMutate: Bool { overview != nil && !loading && !busy && !requiresReview }
+
+    func refresh() async {
+        generation += 1
+        let current = generation
+        loading = true
+        defer { if generation == current { loading = false } }
+        do {
+            let snapshot = try await service.overview()
+            guard generation == current else { return }
+            overview = snapshot
+            updatePagination()
+            reviewLoaded = requiresReview
+            if !requiresReview { errorText = nil }
+        } catch {
+            guard generation == current else { return }
+            errorText = error.localizedDescription
+            reviewLoaded = false
+        }
+    }
+    func updatePagination(reset: Bool = false) {
+        if reset { pageState.page = 0 }
+        pageState.apply(totalElements: Int64(filteredTasks.count))
+    }
+    func openHistory(instance: String, task: NetworkQualityTask? = nil) {
+        selectedInstance = instance
+        selectedTask = task?.id ?? overview?.tasks.first(where: { $0.instanceIds.contains(instance) })?.id ?? ""
+        Task { await loadHistory() }
+    }
+    func loadHistory() async {
+        historyGeneration += 1
+        let current = historyGeneration
+        history = nil
+        guard let task = task, let window = Int(hours) else { return }
+        historyLoading = true
+        defer { if current == historyGeneration { historyLoading = false } }
+        do {
+            let result = try await service.history(instance: selectedInstance, task: task, hours: window)
+            guard current == historyGeneration else { return }
+            history = result
+            if !requiresReview { errorText = nil }
+        } catch {
+            guard current == historyGeneration else { return }
+            errorText = error.localizedDescription
+        }
+    }
+    func create(instance: String? = nil) { guard canMutate else { return }; editor = .draft(instanceID: instance) }
+    func edit(_ task: NetworkQualityTask) { guard canMutate else { return }; editor = task }
+    func closeEditor() {
+        guard !busy else { return }
+        guard editor == nil || AppAlert.confirm(title: vpsText("放弃未保存的更改？", "Discard unsaved changes?"), message: "") else { return }
+        editor = nil
+    }
+    func save() {
+        guard let draft = editor, canMutate else { return }
+        do { try draft.validate() } catch { errorText = error.localizedDescription; return }
+        guard AppAlert.confirm(title: vpsText("保存检测任务", "Save monitoring task"),
+                               message: "\(draft.name)\n\(draft.type.uppercased()) · \(draft.target)\n\(draft.instanceIds.count) " + vpsText("台实例", "instances")) else { return }
+        mutate {
+            _ = try await self.service.save(draft)
+            self.editor = nil
+            return vpsText("任务已保存", "Task saved")
+        }
+    }
+    func run(_ task: NetworkQualityTask) {
+        guard canMutate, AppAlert.confirm(title: vpsText("执行检测任务", "Run task"), message: "\(task.name) · \(task.instanceIds.count) " + vpsText("台实例", "instances")) else { return }
+        mutate { try await self.service.run(task) }
+    }
+    func toggle(_ task: NetworkQualityTask) {
+        guard canMutate, AppAlert.confirm(title: task.enabled ? vpsText("暂停任务", "Pause task") : vpsText("恢复任务", "Resume task"), message: task.name) else { return }
+        var changed = task
+        changed.enabled.toggle()
+        mutate { _ = try await self.service.save(changed); return vpsText("任务已更新", "Task updated") }
+    }
+    func delete(_ task: NetworkQualityTask) {
+        guard canMutate, AppAlert.confirm(title: vpsText("删除检测任务", "Delete task"), message: task.name) else { return }
+        mutate { try await self.service.delete(task); return vpsText("任务已删除", "Task deleted") }
+    }
+    func install(_ agent: NetworkQualityAgent) {
+        guard canMutate, AppAlert.confirm(title: vpsText("安装 / 升级探针", "Install / upgrade agent"), message: agent.title) else { return }
+        mutate { try await VpsService(baseURL: AppSession.shared.serverURL).installMonitor(vpsId: agent.id) }
+    }
+    private func mutate(_ operation: @escaping () async throws -> String) {
+        guard canMutate else { return }
+        busy = true
+        Task {
+            do {
+                ToastCenter.shared.success(try await operation())
+                await refresh()
+                if !selectedInstance.isEmpty { await loadHistory() }
+            } catch {
+                requiresReview = (error as? NetworkQualityMutationError)?.needsReview ?? true
+                reviewLoaded = false
+                errorText = error.localizedDescription
+            }
+            busy = false
+        }
+    }
+    func acknowledgeReview() {
+        guard reviewLoaded else { return }
+        requiresReview = false
+        reviewLoaded = false
+        errorText = nil
+    }
+    func stop() { generation += 1; historyGeneration += 1 }
 }

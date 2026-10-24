@@ -116,6 +116,14 @@ enum FeatureRouter {
                     .environmentObject(AppearanceController.shared)
                     .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
             )
+        case .auditLogs:
+            root = AnyView(
+                AuditLogsView()
+                    .environmentObject(session)
+                    .environmentObject(navigation)
+                    .environmentObject(AppearanceController.shared)
+                    .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+            )
         case .systemLogs:
             root = AnyView(
                 SystemLogsView()

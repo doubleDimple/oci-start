@@ -146,7 +146,7 @@ public class FeishuService implements MessageService{
                 throw new RuntimeException("飞书消息发送失败，HTTP状态码: " + response.getStatusCode());
             }
         } catch (Exception e) {
-            log.warn("飞书消息发送错误,原因为:{}", e.getMessage(), e);
+            log.warn("飞书消息发送错误，异常类型:{}", e.getClass().getSimpleName());
         }
     }
 

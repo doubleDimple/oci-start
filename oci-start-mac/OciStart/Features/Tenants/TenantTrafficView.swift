@@ -15,12 +15,12 @@ struct TenantTrafficView: View {
     private var accentGreen: Color { AppTheme.sidebarActive } // #1abc9c
     private var accentBlue: Color { Color(hex: "4d9eff") }
     private var accentRed: Color { Color(hex: "f87171") }
-    private var surface: Color { dark ? Color(hex: "1a1d27") : Color.white }
-    private var surface2: Color { dark ? Color(hex: "1f2233") : Color(hex: "f8f9fa") }
-    private var cardBorder: Color { dark ? Color(hex: "2a2d3a") : Color(hex: "e2e8f0") }
-    private var primaryText: Color { dark ? Color(hex: "e2e8f0") : Color(hex: "222222") }
-    private var secondaryText: Color { dark ? Color(hex: "8892a4") : Color(hex: "555555") }
-    private var pageBg: Color { dark ? Color(hex: "0f1117") : Color(hex: "f3f6fa") }
+    private var surface: Color { AppTheme.cardBg(dark) }
+    private var surface2: Color { AppTheme.inputBg(dark) }
+    private var cardBorder: Color { AppTheme.border(dark) }
+    private var primaryText: Color { AppTheme.textPrimary(dark) }
+    private var secondaryText: Color { AppTheme.textSecondary(dark) }
+    private var pageBg: Color { AppTheme.pageBg(dark) }
     private var inColor: Color { Color(hex: "34d399") }
     private var outColor: Color { Color(hex: "f87171") }
 
@@ -89,7 +89,8 @@ struct TenantTrafficView: View {
             title: "实例流量监控",
             subtitle: tenant.map { $0.displayName },
             systemImage: "chart.bar.xaxis",
-            toolbar: { toolbar },
+            layout: .workspace,
+            toolbar: { EmptyView() },
             content: { mainContent }
         )
     }
@@ -98,6 +99,13 @@ struct TenantTrafficView: View {
 
     private var toolbar: some View {
         HStack(spacing: 8) {
+            if let selectedTenant = tenant {
+                Text("流量查询 · \(selectedTenant.displayName)")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(AppTheme.textSecondary(dark))
+                    .lineLimit(1)
+                    .frame(maxWidth: 220, alignment: .leading)
+            }
             AppButton(title: "返回", systemImage: "chevron.left", kind: .secondary) {
                 model.closeTrafficPage()
             }
@@ -115,7 +123,7 @@ struct TenantTrafficView: View {
                 trendCard
                 instanceSection
             }
-            .padding(16)
+            .padding(AppTheme.pagePadding)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .background(pageBg)
@@ -125,7 +133,7 @@ struct TenantTrafficView: View {
     // MARK: - Filter (Web .filter-controls)
 
     private var filterControls: some View {
-        HStack(alignment: .center, spacing: 14) {
+        SingleLineToolbar(spacing: 14) {
             // Region multi-select
             regionMultiSelect
                 .frame(width: 240)
@@ -133,7 +141,7 @@ struct TenantTrafficView: View {
             // Time presets
             HStack(spacing: 8) {
                 Text("时间范围：")
-                    .font(.system(size: 13))
+                    .font(.system(size: 14))
                     .foregroundColor(secondaryText)
                 presetBtn("今天", value: "today")
                 presetBtn("本月", value: "month")
@@ -144,7 +152,7 @@ struct TenantTrafficView: View {
                 HStack(spacing: 8) {
                     dateField(text: $model.tqStart)
                     Text("至")
-                        .font(.system(size: 12))
+                        .font(.system(size: 14))
                         .foregroundColor(secondaryText)
                     dateField(text: $model.tqEnd)
                 }
@@ -158,34 +166,20 @@ struct TenantTrafficView: View {
                     Image(systemName: "magnifyingglass")
                         .font(.system(size: 11, weight: .semibold))
                     Text("查询")
-                        .font(.system(size: 13, weight: .medium))
+                        .font(.system(size: 14, weight: .medium))
                 }
                 .foregroundColor(.white)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
                 .background(accentGreen)
-                .cornerRadius(4)
+                .cornerRadius(AppTheme.controlRadius)
             }
             .buttonStyle(PlainButtonStyle())
 
             Spacer(minLength: 8)
 
-            Button(action: { model.closeTrafficPage() }) {
-                HStack(spacing: 6) {
-                    Image(systemName: "arrow.left")
-                        .font(.system(size: 11, weight: .semibold))
-                    Text("返回")
-                        .font(.system(size: 13, weight: .medium))
-                }
-                .foregroundColor(accentGreen)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 4)
-                        .stroke(accentGreen, lineWidth: 1)
-                )
-            }
-            .buttonStyle(PlainButtonStyle())
+            toolbar
+                .fixedSize(horizontal: true, vertical: false)
         }
         .padding(14)
         .background(surface)
@@ -197,16 +191,16 @@ struct TenantTrafficView: View {
         let active = model.tqTimePreset == value
         return Button(action: { model.applyTrafficPreset(value) }) {
             Text(title)
-                .font(.system(size: 12, weight: .medium))
+                .font(.system(size: 14, weight: .medium))
                 .foregroundColor(active ? .white : accentGreen)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .background(active ? accentGreen : Color.clear)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 4)
+                    RoundedRectangle(cornerRadius: AppTheme.controlRadius)
                         .stroke(accentGreen, lineWidth: 1)
                 )
-                .cornerRadius(4)
+                .cornerRadius(AppTheme.controlRadius)
         }
         .buttonStyle(PlainButtonStyle())
     }
@@ -223,7 +217,7 @@ struct TenantTrafficView: View {
             Button(action: { regionMenuOpen.toggle() }) {
                 HStack {
                     Text(regionDisplayText)
-                        .font(.system(size: 13))
+                        .font(.system(size: 14))
                         .foregroundColor(primaryText)
                         .lineLimit(1)
                     Spacer()
@@ -233,16 +227,17 @@ struct TenantTrafficView: View {
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 8)
-                .background(dark ? Color(hex: "161820") : Color.white)
+                .background(AppTheme.cardBg(dark))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 4)
+                    RoundedRectangle(cornerRadius: AppTheme.controlRadius)
                         .stroke(cardBorder, lineWidth: 1)
                 )
-                .cornerRadius(4)
+                .cornerRadius(AppTheme.controlRadius)
             }
             .buttonStyle(PlainButtonStyle())
 
-            if regionMenuOpen {
+            .popover(isPresented: $regionMenuOpen, arrowEdge: .bottom) {
+                ScrollView(.vertical) {
                 VStack(alignment: .leading, spacing: 0) {
                     regionOptionRow(
                         title: model.tqSelectedRegionIds.count == model.tqRegions.count && !model.tqRegions.isEmpty
@@ -259,7 +254,7 @@ struct TenantTrafficView: View {
                     Divider().background(cardBorder)
                     if model.tqRegions.isEmpty {
                         Text("暂无区域（将使用当前租户）")
-                            .font(.system(size: 12))
+                            .font(.system(size: 14))
                             .foregroundColor(secondaryText)
                             .padding(10)
                     } else {
@@ -276,12 +271,14 @@ struct TenantTrafficView: View {
                 }
                 .background(surface)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 4)
+                    RoundedRectangle(cornerRadius: AppTheme.controlRadius)
                         .stroke(cardBorder, lineWidth: 1)
                 )
-                .cornerRadius(4)
-                .shadow(color: Color.black.opacity(dark ? 0.35 : 0.08), radius: 6, y: 2)
-                .padding(.top, 4)
+                .cornerRadius(AppTheme.controlRadius)
+                .padding(8)
+                }
+                .frame(width: 300, height: min(320, CGFloat(max(1, model.tqRegions.count) + 1) * 38 + 16))
+                .background(surface)
             }
         }
         .zIndex(regionMenuOpen ? 20 : 0)
@@ -296,7 +293,7 @@ struct TenantTrafficView: View {
                         .foregroundColor(selected ? accentGreen : secondaryText)
                 }
                 Text(title)
-                    .font(.system(size: 13))
+                    .font(.system(size: 14))
                     .foregroundColor(primaryText)
                     .lineLimit(1)
                 Spacer()

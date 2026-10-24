@@ -1,0 +1,12 @@
+.vnc-canvas {
+  position: relative; display: flex; width: 100%; height: 100%; min-width: 0; min-height: 0;
+  overflow: hidden; background: var(--bg-card); color: var(--text-primary);
+}
+.vnc-canvas-mount {
+  position: relative; display: flex; flex: 1; width: 100%; height: 100%; min-width: 0; min-height: 0;
+  overflow: hidden; background: var(--bg-card);
+}
+// noVNC owns canvas pixels and its viewport scrollbars. Never theme, filter,
+// recolor or impose a CSS max-width on the remote framebuffer itself.
+.vnc-canvas-mount canvas { display: block; max-width: none; max-height: none; outline: none; }
+.vnc-canvas-mount canvas:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }

@@ -13,27 +13,20 @@ struct EdgeOneView: View {
             title: "EdgeOne",
             subtitle: "腾讯云 DNS 记录 · 加速域名 · 同步管理",
             systemImage: "globe",
-            toolbar: { toolbar },
+            toolbar: { EmptyView() },
             content: {
                 VStack(spacing: 0) {
-                    if let err = model.errorText, !err.isEmpty {
-                        errorBanner(err)
-                            .padding(.horizontal, 16)
-                            .padding(.top, 12)
-                    }
                     modePicker
                         .padding(.horizontal, 16)
                         .padding(.top, 12)
                     filterBar
-                        .padding(.horizontal, 16)
-                        .padding(.top, 10)
                     listBody
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
                 .appLoading((model.isLoading || model.isZonesLoading) && model.zones.isEmpty)
             },
             footer: {
-                PaginationBar(state: $model.pageState) {
+                PaginationBar(state: $model.pageState, disabled: model.isLoading) {
                     model.onPageChange()
                 }
             }
@@ -60,6 +53,9 @@ struct EdgeOneView: View {
 
     private var toolbar: some View {
         HStack(spacing: 8) {
+            if let error = model.errorText, !error.isEmpty {
+                PageErrorIndicator(message: error, retry: { Task { await model.reloadRecords() } })
+            }
             AppButton(title: "密钥配置", systemImage: "key", kind: .secondary) {
                 model.openConfig()
             }
@@ -101,11 +97,11 @@ struct EdgeOneView: View {
                         Image(systemName: m.systemImage)
                             .font(.system(size: 11, weight: .semibold))
                         Text(m.title)
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(.system(size: 14, weight: .semibold))
                     }
                     .foregroundColor(model.mode == m
                                      ? .white
-                                     : (dark ? Color.white.opacity(0.75) : Color(hex: "1e2f42")))
+                                     : (AppTheme.textPrimary(dark)))
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
                     .background(
@@ -122,7 +118,7 @@ struct EdgeOneView: View {
         .padding(4)
         .background(
             RoundedRectangle(cornerRadius: 10)
-                .fill(AppTheme.sidebarBg(dark).opacity(0.85))
+                .fill(AppTheme.cardBg(dark).opacity(0.85))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 10)
@@ -133,11 +129,11 @@ struct EdgeOneView: View {
     // MARK: - Filter
 
     private var filterBar: some View {
-        FilterBar {
+        FilterBar(leading: {
             HStack(spacing: 10) {
                 Text("域名")
-                    .font(.system(size: 12))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .font(.system(size: 13))
+                    .foregroundColor(AppTheme.textSecondary(dark))
                 SelectMenu(
                     options: model.zoneOptions,
                     selection: Binding(
@@ -174,7 +170,7 @@ struct EdgeOneView: View {
                     }
                 }
             }
-        }
+        }, trailing: { toolbar })
     }
 
     // MARK: - List
@@ -216,7 +212,7 @@ struct EdgeOneView: View {
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                DataList {
+                DataList(minimumWidth: 760) {
                     DataListColumnHeader(title: "类型", width: 72)
                     DataListColumnHeader(title: "记录名", width: nil)
                     DataListColumnHeader(title: "记录值", width: nil)
@@ -253,7 +249,7 @@ struct EdgeOneView: View {
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                DataList {
+                DataList(minimumWidth: 760) {
                     DataListColumnHeader(title: "域名", width: nil)
                     DataListColumnHeader(title: "状态", width: 90)
                     DataListColumnHeader(title: "CNAME", width: nil)
@@ -327,8 +323,8 @@ struct EdgeOneView: View {
 
     private func cell(_ text: String, width: CGFloat?) -> some View {
         Text(text.isEmpty ? "—" : text)
-            .font(.system(size: 12))
-            .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
+            .font(.system(size: 14))
+            .foregroundColor(AppTheme.textPrimary(dark))
             .lineLimit(1)
             .truncationMode(.middle)
             .frame(width: width, alignment: .leading)
@@ -348,22 +344,4 @@ struct EdgeOneView: View {
         .help(tip)
     }
 
-    private func errorBanner(_ text: String) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundColor(Color(hex: "f85149"))
-            Text(text).font(.system(size: 12))
-            Spacer()
-            Button("密钥配置") { model.openConfig() }
-                .buttonStyle(PlainButtonStyle())
-            Button("重试") {
-                Task { await model.loadZones(selectFirst: true) }
-            }
-            .buttonStyle(PlainButtonStyle())
-        }
-        .foregroundColor(Color(hex: "f85149"))
-        .padding(12)
-        .background(Color(hex: "f85149").opacity(0.1))
-        .cornerRadius(8)
-    }
 }

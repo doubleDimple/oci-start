@@ -1,5 +1,6 @@
 package com.doubledimple.ociserver.pojo.request;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import lombok.Data;
 
 /**
@@ -13,8 +14,10 @@ import lombok.Data;
 public class GithubConfigRequest {
     private String clientId;
     private String clientSecret;
+    private Boolean keepSecret;
     private String redirectUri;
     private String githubId;
+    @JsonAlias("username")
     private String userName;
     private boolean enabled;
 }

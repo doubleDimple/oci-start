@@ -102,10 +102,10 @@ public class DingDingMessageService implements MessageService {
             );
 
             if (!response.getStatusCode().is2xxSuccessful()) {
-                log.error("钉钉消息发送失败: {}", response.getBody());
+                log.error("钉钉消息发送失败，HTTP状态码: {}", response.getStatusCodeValue());
             }
         } catch (Exception e) {
-            log.error("钉钉消息发送异常", e);
+            log.error("钉钉消息发送异常，异常类型:{}", e.getClass().getSimpleName());
         }
     }
 
@@ -177,10 +177,10 @@ public class DingDingMessageService implements MessageService {
             );
 
             if (!response.getStatusCode().is2xxSuccessful()) {
-                log.error("钉钉消息发送失败: {}", response.getBody());
+                log.error("钉钉消息发送失败，HTTP状态码: {}", response.getStatusCodeValue());
             }
         } catch (Exception e) {
-            log.error("钉钉消息发送异常", e);
+            log.error("钉钉消息发送异常，异常类型:{}", e.getClass().getSimpleName());
         }
     }
 

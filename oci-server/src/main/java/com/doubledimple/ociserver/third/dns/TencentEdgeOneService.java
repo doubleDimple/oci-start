@@ -94,6 +94,151 @@ public class TencentEdgeOneService {
         }
     }
 
+    private String requireEdgeOneId(String value) {
+        if (value == null || !value.matches("[A-Za-z0-9_-]+")) {
+            throw new IllegalArgumentException("EdgeOne区域或记录标识无效");
+        }
+        return value;
+    }
+
+    private String requiredText(String value, String field) {
+        if (StringUtils.isBlank(value)) throw new IllegalStateException("EdgeOne字段不完整: " + field);
+        return value;
+    }
+
+    private Integer localNumber(Long value, int minimum, int maximum, String field) {
+        if (value == null) return null;
+        if (value < minimum || value > maximum) throw new IllegalStateException("EdgeOne数值字段无效: " + field);
+        return value.intValue();
+    }
+
+    private long validatePage(Long total, long offset, int length, long limit, Long expectedTotal) {
+        if (total == null || total < 0 || total > Integer.MAX_VALUE
+                || (expectedTotal != null && !expectedTotal.equals(total))) {
+            throw new IllegalStateException("EdgeOne分页总量无效或读取期间已变化，请重新读取");
+        }
+        long expectedLength = Math.max(0L, Math.min(limit, total - offset));
+        if (length != expectedLength) {
+            throw new IllegalStateException("EdgeOne分页记录不完整，未接受部分列表");
+        }
+        return total;
+    }
+
+    private RecordType requireDnsType(String value) {
+        RecordType type = RecordType.fromValue(value);
+        if (type == null || type == RecordType.SP_DOMAIN) {
+            throw new IllegalArgumentException("本地DNS记录暂不支持此类型: " + value);
+        }
+        return type;
+    }
+
+    private boolean matchesCacheType(DnsRecord record, int type) {
+        return Integer.valueOf(type).equals(record.getType())
+                && (type == 2 ? record.getRecordType() == RecordType.SP_DOMAIN
+                : record.getRecordType() != RecordType.SP_DOMAIN);
+    }
+
+    private List<DnsRecord> scopedCache(String zoneId, int type) {
+        return dnsRecordRepository.findByZoneIdAndProviderType(zoneId, ProviderType.TENCENT).stream()
+                .filter(record -> matchesCacheType(record, type)).collect(Collectors.toList());
+    }
+
+    private DnsRecord findCachedRecord(String zoneId, String recordId, int type) {
+        DnsRecord match = null;
+        for (DnsRecord record : scopedCache(zoneId, type)) {
+            if (!recordId.equals(record.getProviderRecordId())) continue;
+            if (match != null) throw new IllegalStateException("当前区域存在重复本地记录，请先核对缓存");
+            match = record;
+        }
+        return match;
+    }
+
+    private String resolveDnsZone(String recordId, String zoneId) {
+        requireEdgeOneId(recordId);
+        if (StringUtils.isNotBlank(zoneId)) return requireEdgeOneId(zoneId);
+        // Legacy callers may omit the zone; never use another provider or an acceleration domain.
+        DnsRecord match = null;
+        for (DnsRecord record : dnsRecordRepository.findByProviderType(ProviderType.TENCENT)) {
+            if (!matchesCacheType(record, 1) || !recordId.equals(record.getProviderRecordId())) continue;
+            if (match != null) throw new IllegalStateException("本地记录标识不唯一，请明确指定区域");
+            match = record;
+        }
+        if (match == null) throw new IllegalArgumentException("未找到当前服务商的DNS缓存，请指定区域并刷新");
+        return requireEdgeOneId(match.getZoneId());
+    }
+
+    private Map<String, Object> dnsRecordInfo(com.tencentcloudapi.teo.v20220901.models.DnsRecord record,
+                                               String zoneId) {
+        if (record == null) throw new IllegalStateException("EdgeOne DNS记录为空");
+        if (record.getZoneId() != null && !zoneId.equals(record.getZoneId())) {
+            throw new IllegalStateException("EdgeOne DNS记录不属于当前区域");
+        }
+        Map<String, Object> item = new HashMap<>();
+        item.put("id", requireEdgeOneId(record.getRecordId()));
+        item.put("type", requiredText(record.getType(), "type"));
+        item.put("name", requiredText(record.getName(), "name"));
+        if (record.getContent() == null) throw new IllegalStateException("EdgeOne DNS记录值缺失");
+        item.put("content", record.getContent());
+        item.put("ttl", localNumber(record.getTTL(), 1, Integer.MAX_VALUE, "ttl"));
+        item.put("priority", localNumber(record.getPriority(), 0, 65535, "priority"));
+        item.put("weight", localNumber(record.getWeight(), 0, Integer.MAX_VALUE, "weight"));
+        item.put("status", record.getStatus());
+        item.put("location", record.getLocation());
+        return item;
+    }
+
+    private List<com.tencentcloudapi.teo.v20220901.models.DnsRecord> readDnsSnapshot(String zoneId) {
+        requireEdgeOneId(zoneId);
+        TeoClient client = createTeoClient();
+        List<com.tencentcloudapi.teo.v20220901.models.DnsRecord> records = new ArrayList<>();
+        Set<String> ids = new HashSet<>();
+        Long expectedTotal = null;
+        long limit = 100L;
+        try {
+            for (long offset = 0L; ; offset += limit) {
+                DescribeDnsRecordsRequest request = new DescribeDnsRecordsRequest();
+                request.setZoneId(zoneId);
+                request.setOffset(offset);
+                request.setLimit(limit);
+                DescribeDnsRecordsResponse response = client.DescribeDnsRecords(request);
+                if (response == null) throw new IllegalStateException("EdgeOne未返回DNS列表");
+                com.tencentcloudapi.teo.v20220901.models.DnsRecord[] page = response.getDnsRecords();
+                int count = page == null ? 0 : page.length;
+                long total = validatePage(response.getTotalCount(), offset, count, limit, expectedTotal);
+                expectedTotal = total;
+                if (page != null) for (com.tencentcloudapi.teo.v20220901.models.DnsRecord record : page) {
+                    Map<String, Object> item = dnsRecordInfo(record, zoneId);
+                    if (!ids.add((String) item.get("id"))) throw new IllegalStateException("EdgeOne DNS分页包含重复记录");
+                    records.add(record);
+                }
+                if (offset + count >= total) break;
+            }
+            return records;
+        } catch (TencentCloudSDKException e) {
+            throw new IllegalStateException("读取EdgeOne完整DNS列表失败: " + e.getMessage(), e);
+        }
+    }
+
+    private com.tencentcloudapi.teo.v20220901.models.DnsRecord requireCloudDnsRecord(String zoneId, String recordId) {
+        for (com.tencentcloudapi.teo.v20220901.models.DnsRecord record : readDnsSnapshot(zoneId)) {
+            if (recordId.equals(record.getRecordId())) return record;
+        }
+        throw new IllegalArgumentException("当前EdgeOne区域未找到此DNS记录，请刷新列表");
+    }
+
+    private String requireZoneName(String zoneId, String requestedName) {
+        requireEdgeOneId(zoneId);
+        for (Map<String, Object> zone : listAllZones()) {
+            if (!zoneId.equals(zone.get("id"))) continue;
+            String actualName = (String) zone.get("name");
+            if (requestedName != null && !actualName.equalsIgnoreCase(requestedName.trim())) {
+                throw new IllegalArgumentException("域名与当前EdgeOne区域不匹配，请刷新区域列表");
+            }
+            return actualName;
+        }
+        throw new IllegalArgumentException("当前账号未找到此EdgeOne区域，请刷新区域列表");
+    }
+
     /**
      * 获取DNS记录
      */
@@ -101,36 +246,14 @@ public class TencentEdgeOneService {
         log.debug("开始获取EdgeOne DNS记录，zoneId: {}", zoneId);
 
         try {
-            TeoClient client = createTeoClient();
-
-            //查询dns记录
-            DescribeDnsRecordsRequest req = new DescribeDnsRecordsRequest();
-            req.setZoneId(zoneId);
-            req.setLimit(200L);
-            DescribeDnsRecordsResponse resp = client.DescribeDnsRecords(req);
-
             List<Map<String, Object>> records = new ArrayList<>();
-
-            if (resp.getDnsRecords() != null && resp.getDnsRecords().length > 0) {
-                for (com.tencentcloudapi.teo.v20220901.models.DnsRecord record : resp.getDnsRecords()) {
-                    Map<String, Object> recordInfo = new HashMap<>();
-                    recordInfo.put("id", record.getRecordId());
-                    recordInfo.put("type", record.getType());
-                    recordInfo.put("name", record.getName());
-                    recordInfo.put("content", record.getContent());
-                    recordInfo.put("ttl", record.getTTL());
-                    recordInfo.put("priority", record.getPriority());
-                    recordInfo.put("weight", record.getWeight());
-                    records.add(recordInfo);
-                }
+            for (com.tencentcloudapi.teo.v20220901.models.DnsRecord record : readDnsSnapshot(zoneId)) {
+                records.add(dnsRecordInfo(record, zoneId));
             }
 
             log.info("获取EdgeOne DNS记录成功，共 {} 条", records.size());
             return records;
 
-        } catch (TencentCloudSDKException e) {
-            log.error("获取EdgeOne DNS记录失败: {}", e.getMessage());
-            throw new RuntimeException("获取DNS记录失败: " + e.getMessage());
         } catch (Exception e) {
             log.error("获取EdgeOne DNS记录失败: {}", e.getMessage(), e);
             throw new RuntimeException("获取DNS记录失败: " + e.getMessage());
@@ -146,12 +269,14 @@ public class TencentEdgeOneService {
         log.info("开始同步EdgeOne DNS记录，zoneId: {}, domain: {}", zoneId, domainName);
         int type = 1;
         try {
+            domainName = requireZoneName(zoneId, domainName);
             // 获取EdgeOne的所有DNS记录
             List<Map<String, Object>> edgeOneRecords = listDnsRecords(zoneId);
+            // Validate every type before the first managed entity can be changed.
+            for (Map<String, Object> record : edgeOneRecords) requireDnsType((String) record.get("type"));
 
             // 获取数据库中已存在的记录
-            List<DnsRecord> existingRecords = dnsRecordRepository.findByZoneIdAndProviderType(zoneId,
-                    ProviderType.TENCENT);
+            List<DnsRecord> existingRecords = scopedCache(zoneId, type);
 
             Map<String, DnsRecord> existingRecordsMap = existingRecords.stream()
                     .collect(Collectors.toMap(DnsRecord::getProviderRecordId, record -> record));
@@ -173,6 +298,7 @@ public class TencentEdgeOneService {
                     log.info("新增DNS记录: {} -> {}", dnsRecord.getRecordName(), dnsRecord.getRecordValue());
                 } else {
                     // 已存在，更新
+                    dnsRecord.setDomainName(domainName);
                     updateDnsRecordFromEdgeOne(dnsRecord, eoRecord,type);
                     dnsRecordRepository.save(dnsRecord);
                     log.debug("更新DNS记录: {} -> {}", dnsRecord.getRecordName(), dnsRecord.getRecordValue());
@@ -208,12 +334,11 @@ public class TencentEdgeOneService {
         log.info("开始同步EdgeOne加速域名，zoneId: {}, zoneName: {}", zoneId, zoneName);
         int type = 2;
         try {
+            zoneName = requireZoneName(zoneId, zoneName);
             // 获取EdgeOne的所有加速域名
             List<Map<String, Object>> edgeOneDomains = listAccelerationDomains(zoneId);
 
-            // 获取数据库中已存在的加速域名记录 (使用 ACCELERATION_DOMAIN 类型标识)
-            List<DnsRecord> existingDomains = dnsRecordRepository.findByZoneIdAndProviderTypeAndRecordType(
-                    zoneId, ProviderType.TENCENT, RecordType.SP_DOMAIN);
+            List<DnsRecord> existingDomains = scopedCache(zoneId, type);
 
             Map<String, DnsRecord> existingDomainsMap = existingDomains.stream()
                     .collect(Collectors.toMap(DnsRecord::getProviderRecordId, record -> record));
@@ -269,33 +394,35 @@ public class TencentEdgeOneService {
      */
     @Transactional
     public boolean deleteDnsRecord(String recordId) {
+        return deleteDnsRecord(recordId, null);
+    }
+
+    @Transactional
+    public boolean deleteDnsRecord(String recordId, String zoneId) {
         log.info("开始删除EdgeOne DNS记录，recordId: {}", recordId);
 
         try {
-            // 从数据库查找记录
-            Optional<DnsRecord> optionalRecord = dnsRecordRepository.findByProviderRecordId(recordId);
-            if (!optionalRecord.isPresent()) {
-                throw new IllegalArgumentException("未找到DNS记录: " + recordId);
-            }
-
-            DnsRecord dnsRecord = optionalRecord.get();
+            String resolvedZone = resolveDnsZone(recordId, zoneId);
+            DnsRecord dnsRecord = findCachedRecord(resolvedZone, recordId, 1);
+            requireCloudDnsRecord(resolvedZone, recordId);
             TeoClient client = createTeoClient();
 
             // 调用EdgeOne API删除记录
             DeleteDnsRecordsRequest req = new DeleteDnsRecordsRequest();
-            req.setZoneId(dnsRecord.getZoneId());
+            req.setZoneId(resolvedZone);
             req.setRecordIds(new String[]{recordId});
 
             DeleteDnsRecordsResponse resp = client.DeleteDnsRecords(req);
 
-            if (resp != null) {
+            if (resp != null && StringUtils.isNotBlank(resp.getRequestId())) {
                 // 删除成功，更新数据库记录状态
-                dnsRecord.setStatus(RecordStatus.INACTIVE);
-                dnsRecord.setRemark("已删除");
-                dnsRecord.setUpdateTime(LocalDateTime.now());
-                dnsRecordRepository.save(dnsRecord);
-
-                log.info("删除EdgeOne DNS记录成功: {} -> {}", dnsRecord.getRecordName(), dnsRecord.getRecordValue());
+                if (dnsRecord != null) {
+                    dnsRecord.setStatus(RecordStatus.INACTIVE);
+                    dnsRecord.setRemark("已删除");
+                    dnsRecord.setUpdateTime(LocalDateTime.now());
+                    dnsRecordRepository.save(dnsRecord);
+                }
+                log.info("EdgeOne已接受DNS记录删除，recordId: {}", recordId);
                 return true;
             }
 
@@ -399,22 +526,32 @@ public class TencentEdgeOneService {
         try {
             TeoClient client = createTeoClient();
 
-            DescribeZonesRequest req = new DescribeZonesRequest();
-            req.setLimit(100L); // 设置单次查询限制
-
-            DescribeZonesResponse resp = client.DescribeZones(req);
-
             List<Map<String, Object>> zones = new ArrayList<>();
-
-            if (resp.getZones() != null) {
-                for (com.tencentcloudapi.teo.v20220901.models.Zone zone : resp.getZones()) {
+            Set<String> ids = new HashSet<>();
+            Long expectedTotal = null;
+            long limit = 100L;
+            for (long offset = 0L; ; offset += limit) {
+                DescribeZonesRequest req = new DescribeZonesRequest();
+                req.setOffset(offset);
+                req.setLimit(limit);
+                DescribeZonesResponse resp = client.DescribeZones(req);
+                if (resp == null) throw new IllegalStateException("EdgeOne未返回区域列表");
+                com.tencentcloudapi.teo.v20220901.models.Zone[] page = resp.getZones();
+                int count = page == null ? 0 : page.length;
+                long total = validatePage(resp.getTotalCount(), offset, count, limit, expectedTotal);
+                expectedTotal = total;
+                if (page != null) for (com.tencentcloudapi.teo.v20220901.models.Zone zone : page) {
+                    if (zone == null) throw new IllegalStateException("EdgeOne区域记录为空");
+                    String id = requireEdgeOneId(zone.getZoneId());
+                    if (!ids.add(id)) throw new IllegalStateException("EdgeOne区域分页包含重复标识");
                     Map<String, Object> zoneInfo = new HashMap<>();
-                    zoneInfo.put("id", zone.getZoneId());
-                    zoneInfo.put("name", zone.getZoneName());
+                    zoneInfo.put("id", id);
+                    zoneInfo.put("name", requiredText(zone.getZoneName(), "zoneName"));
                     zoneInfo.put("status", zone.getStatus());
                     zoneInfo.put("type", zone.getType());
                     zones.add(zoneInfo);
                 }
+                if (offset + count >= total) break;
             }
 
             log.debug("获取EdgeOne Zone列表成功，共 {} 个域名", zones.size());
@@ -587,8 +724,7 @@ public class TencentEdgeOneService {
             // 将协议信息等存储到extraData
             Map<String, Object> extraData = new HashMap<>();
             extraData.put("status", status);
-            extraData.put("http", eoRecord.get("http"));
-            extraData.put("https", eoRecord.get("https"));
+            extraData.put("originProtocol", eoRecord.get("originProtocol"));
             try {
                 dnsRecord.setExtraData(JSON.toJSONString(extraData));
             } catch (Exception e) {
@@ -602,11 +738,12 @@ public class TencentEdgeOneService {
             dnsRecord.setRecordName(recordName);
 
             String type = (String) eoRecord.get("type");
-            dnsRecord.setRecordType(RecordType.valueOf(type));
+            dnsRecord.setRecordType(requireDnsType(type));
 
             dnsRecord.setRecordValue((String) eoRecord.get("content"));
             dnsRecord.setTtl((Integer) eoRecord.get("ttl"));
             dnsRecord.setPriority((Integer) eoRecord.get("priority"));
+            dnsRecord.setWeight((Integer) eoRecord.get("weight"));
             dnsRecord.setStatus(RecordStatus.ACTIVE);
             dnsRecord.setType(defaultType);
         }
@@ -621,6 +758,8 @@ public class TencentEdgeOneService {
     private void updateDnsRecordFromEdgeOne(DnsRecord dnsRecord, Map<String, Object> eoRecord,int type) {
         if (type == 2) {
             // 更新加速域名
+            dnsRecord.setRecordName((String) eoRecord.get("domainName"));
+            dnsRecord.setDomainName((String) eoRecord.get("domainName"));
             String cname = (String) eoRecord.get("cname");
             dnsRecord.setRecordValue(cname != null ? cname : "");
 
@@ -630,8 +769,7 @@ public class TencentEdgeOneService {
             // 更新extraData
             Map<String, Object> extraData = new HashMap<>();
             extraData.put("status", status);
-            extraData.put("http", eoRecord.get("http"));
-            extraData.put("https", eoRecord.get("https"));
+            extraData.put("originProtocol", eoRecord.get("originProtocol"));
             try {
                 dnsRecord.setExtraData(JSON.toJSONString(extraData));
             } catch (Exception e) {
@@ -639,12 +777,16 @@ public class TencentEdgeOneService {
             }
         } else {
             // 更新DNS记录 - 原有逻辑
+            dnsRecord.setRecordName(extractRecordName((String) eoRecord.get("name"), dnsRecord.getDomainName()));
+            dnsRecord.setRecordType(requireDnsType((String) eoRecord.get("type")));
             dnsRecord.setRecordValue((String) eoRecord.get("content"));
             dnsRecord.setTtl((Integer) eoRecord.get("ttl"));
             dnsRecord.setPriority((Integer) eoRecord.get("priority"));
+            dnsRecord.setWeight((Integer) eoRecord.get("weight"));
             dnsRecord.setStatus(RecordStatus.ACTIVE);
         }
 
+        dnsRecord.setType(type);
         dnsRecord.setLastSyncTime(LocalDateTime.now());
         dnsRecord.setUpdateTime(LocalDateTime.now());
     }
@@ -670,32 +812,31 @@ public class TencentEdgeOneService {
         log.info("开始添加EdgeOne DNS记录，zoneId: {}, type: {}, name: {}, content: {}", zoneId, type, name, content);
 
         try {
+            requireEdgeOneId(zoneId);
+            requireDnsType(type);
+            if (StringUtils.isBlank(name) || StringUtils.isBlank(content) || (ttl != null && ttl < 1)
+                    || (priority != null && (priority < 0 || priority > 65535))) {
+                throw new IllegalArgumentException("DNS名称、记录值、TTL或优先级无效");
+            }
             TeoClient client = createTeoClient();
 
             CreateDnsRecordRequest req = new CreateDnsRecordRequest();
             req.setZoneId(zoneId);
-
-            // 构建DNS记录对象
-            com.tencentcloudapi.teo.v20220901.models.DnsRecord[] dnsRecords =
-                    new com.tencentcloudapi.teo.v20220901.models.DnsRecord[1];
-
-            com.tencentcloudapi.teo.v20220901.models.DnsRecord dnsRecord =
-                    new com.tencentcloudapi.teo.v20220901.models.DnsRecord();
-
-            dnsRecord.setType(type);
-            dnsRecord.setName(name);
-            dnsRecord.setContent(content);
-            dnsRecord.setTTL(ttl != null ? ttl.longValue() : 300L);
+            // CreateDnsRecordRequest is flat; a detached DnsRecord array is never serialized.
+            req.setType(type);
+            req.setName(name);
+            req.setContent(content);
+            req.setTTL(ttl != null ? ttl.longValue() : 300L);
 
             // 设置优先级（仅MX记录需要）
             if ("MX".equals(type) && priority != null) {
-                dnsRecord.setPriority(priority.longValue());
+                req.setPriority(priority.longValue());
             }
 
-            dnsRecords[0] = dnsRecord;
-
             CreateDnsRecordResponse resp = client.CreateDnsRecord(req);
-            if (resp != null && resp.getRecordId() != null) {
+            if (resp != null && StringUtils.isNotBlank(resp.getRequestId())
+                    && StringUtils.isNotBlank(resp.getRecordId())) {
+                requireEdgeOneId(resp.getRecordId());
                 log.info("添加EdgeOne DNS记录成功: {} -> {}", name, content);
                 return true;
             }
@@ -717,26 +858,38 @@ public class TencentEdgeOneService {
     @Transactional
     public boolean updateDnsRecord(String recordId, String content, String recordType, String recordName,
                                    Integer ttl, String zoneId, Integer priority) {
-        log.info("开始更新EdgeOne DNS记录，recordId: {}, content: {}", recordId, content);
+        log.info("开始更新EdgeOne DNS记录，recordId: {}", recordId);
 
         try {
+            if (StringUtils.isBlank(content) || (ttl != null && ttl < 1)
+                    || (priority != null && (priority < 0 || priority > 65535))) {
+                throw new IllegalArgumentException("DNS记录值、TTL或优先级无效");
+            }
+            String resolvedZone = resolveDnsZone(recordId, zoneId);
+            DnsRecord cached = findCachedRecord(resolvedZone, recordId, 1);
+            com.tencentcloudapi.teo.v20220901.models.DnsRecord original = requireCloudDnsRecord(resolvedZone, recordId);
+            requireDnsType(original.getType());
+            if (!original.getType().equals(recordType) || !original.getName().equals(recordName)) {
+                throw new IllegalStateException("云端DNS记录名称或类型已变化，请刷新后重试");
+            }
+            String domainName = requireZoneName(resolvedZone, null);
             TeoClient client = createTeoClient();
 
             ModifyDnsRecordsRequest req = new ModifyDnsRecordsRequest();
-            req.setZoneId(zoneId);
+            req.setZoneId(resolvedZone);
 
             // 构建DNS记录对象
             com.tencentcloudapi.teo.v20220901.models.DnsRecord[] dnsRecords =
                     new com.tencentcloudapi.teo.v20220901.models.DnsRecord[1];
 
+            // Preserve current Location, Weight, Status and other record fields. Response
+            // timestamps are read-only; this API has no atomic compare-and-set contract.
             com.tencentcloudapi.teo.v20220901.models.DnsRecord modifyRecord =
-                    new com.tencentcloudapi.teo.v20220901.models.DnsRecord();
-
-            modifyRecord.setRecordId(recordId);
-            modifyRecord.setName(recordName);
-            modifyRecord.setType(recordType);
+                    new com.tencentcloudapi.teo.v20220901.models.DnsRecord(original);
+            modifyRecord.setCreatedOn(null);
+            modifyRecord.setModifiedOn(null);
             modifyRecord.setContent(content);
-            modifyRecord.setTTL(ttl != null ? ttl.longValue() : 300L);
+            if (ttl != null) modifyRecord.setTTL(ttl.longValue());
 
             // 设置优先级（仅MX记录需要）
             if ("MX".equals(recordType) && priority != null) {
@@ -748,20 +901,17 @@ public class TencentEdgeOneService {
 
             ModifyDnsRecordsResponse resp = client.ModifyDnsRecords(req);
 
-            if (resp != null) {
-                // 更新数据库中的记录
-                Optional<DnsRecord> optionalRecord = dnsRecordRepository.findByProviderRecordId(recordId);
-                if (optionalRecord.isPresent()) {
-                    DnsRecord dnsRecord = optionalRecord.get();
-                    dnsRecord.setRecordValue(content);
-                    dnsRecord.setTtl(ttl);
-                    dnsRecord.setPriority(priority);
-                    dnsRecord.setUpdateTime(LocalDateTime.now());
-                    dnsRecord.setLastSyncTime(LocalDateTime.now());
-                    dnsRecordRepository.save(dnsRecord);
+            if (resp != null && StringUtils.isNotBlank(resp.getRequestId())) {
+                Map<String, Object> accepted = dnsRecordInfo(modifyRecord, resolvedZone);
+                if (cached == null) {
+                    cached = createDnsRecordFromEdgeOne(accepted, resolvedZone, domainName, 1);
+                } else {
+                    cached.setDomainName(domainName);
+                    updateDnsRecordFromEdgeOne(cached, accepted, 1);
                 }
-
-                log.info("更新EdgeOne DNS记录成功: {} -> {}", recordName, content);
+                cached.setRemark("EdgeOne已接受更新，最终云端状态请刷新核对");
+                dnsRecordRepository.save(cached);
+                log.info("EdgeOne已接受DNS记录更新，recordId: {}", recordId);
                 return true;
             }
 
@@ -783,40 +933,43 @@ public class TencentEdgeOneService {
         log.debug("开始获取EdgeOne加速域名，zoneId: {}", zoneId);
 
         try {
+            requireEdgeOneId(zoneId);
             TeoClient client = createTeoClient();
-
-            DescribeAccelerationDomainsRequest req = new DescribeAccelerationDomainsRequest();
-            req.setZoneId(zoneId);
-            req.setLimit(100L);
-
-            DescribeAccelerationDomainsResponse resp = client.DescribeAccelerationDomains(req);
-
             List<Map<String, Object>> domains = new ArrayList<>();
-
-            if (resp.getAccelerationDomains() != null) {
-                for (AccelerationDomain domain : resp.getAccelerationDomains()) {
+            Set<String> ids = new HashSet<>();
+            Long expectedTotal = null;
+            long limit = 100L;
+            for (long offset = 0L; ; offset += limit) {
+                DescribeAccelerationDomainsRequest req = new DescribeAccelerationDomainsRequest();
+                req.setZoneId(zoneId);
+                req.setOffset(offset);
+                req.setLimit(limit);
+                DescribeAccelerationDomainsResponse resp = client.DescribeAccelerationDomains(req);
+                if (resp == null) throw new IllegalStateException("EdgeOne未返回加速域名列表");
+                AccelerationDomain[] page = resp.getAccelerationDomains();
+                int count = page == null ? 0 : page.length;
+                long total = validatePage(resp.getTotalCount(), offset, count, limit, expectedTotal);
+                expectedTotal = total;
+                if (page != null) for (AccelerationDomain domain : page) {
+                    if (domain == null || !zoneId.equals(domain.getZoneId())) {
+                        throw new IllegalStateException("EdgeOne加速域名不属于当前区域");
+                    }
+                    String domainName = requiredText(domain.getDomainName(), "domainName");
+                    String id = zoneId + "_" + domainName;
+                    if (!ids.add(id)) throw new IllegalStateException("EdgeOne加速域名分页包含重复记录");
                     Map<String, Object> domainInfo = new HashMap<>();
-                    domainInfo.put("id", domain.getZoneId()+"_"+domain.getDomainName());
-                    domainInfo.put("domainName", domain.getDomainName());
+                    domainInfo.put("id", id);
+                    domainInfo.put("zoneId", zoneId);
+                    domainInfo.put("domainName", domainName);
                     domainInfo.put("status", domain.getDomainStatus());
                     domainInfo.put("cname", domain.getCname());
-
-                    // 获取协议信息
-                    boolean http = false;
-                    boolean https = false;
-
-                    if (domain.getOriginDetail() != null) {
-                        // 这里需要根据实际的API响应结构来解析协议信息
-                        // 示例代码，实际需要根据腾讯云API文档调整
-                        http = true; // 默认支持HTTP
-                        https = true; // 默认支持HTTPS
-                    }
-
-                    domainInfo.put("http", http);
-                    domainInfo.put("https", https);
-
+                    domainInfo.put("originProtocol", domain.getOriginProtocol());
+                    // Origin configuration cannot prove client-facing HTTP/HTTPS availability.
+                    domainInfo.put("http", null);
+                    domainInfo.put("https", null);
                     domains.add(domainInfo);
                 }
+                if (offset + count >= total) break;
             }
 
             log.debug("获取EdgeOne加速域名成功，共 {} 个", domains.size());
@@ -837,18 +990,55 @@ public class TencentEdgeOneService {
      */
     @Transactional
     public boolean deleteAccelerationDomain(String domainId) {
+        return deleteAccelerationDomain(domainId, null, null);
+    }
+
+    @Transactional
+    public boolean deleteAccelerationDomain(String domainId, String zoneId, String domainName) {
         log.info("开始删除EdgeOne加速域名，domainId: {}", domainId);
 
         try {
+            if (StringUtils.isBlank(domainId)) throw new IllegalArgumentException("加速域名标识不能为空");
+            if (StringUtils.isBlank(zoneId) && StringUtils.isBlank(domainName)) {
+                DnsRecord match = null;
+                for (DnsRecord record : dnsRecordRepository.findByProviderType(ProviderType.TENCENT)) {
+                    if (!matchesCacheType(record, 2) || !domainId.equals(record.getProviderRecordId())) continue;
+                    if (match != null) throw new IllegalStateException("加速域名缓存不唯一，请明确指定区域和域名");
+                    match = record;
+                }
+                if (match == null) throw new IllegalArgumentException("未找到加速域名缓存，请指定区域和域名");
+                zoneId = match.getZoneId();
+                domainName = match.getRecordName();
+            }
+            requireEdgeOneId(zoneId);
+            requiredText(domainName, "domainName");
+            if (!domainId.equals(zoneId + "_" + domainName)) {
+                throw new IllegalArgumentException("加速域名标识与当前区域或域名不匹配");
+            }
+            DnsRecord cached = findCachedRecord(zoneId, domainId, 2);
+            boolean found = false;
+            for (Map<String, Object> domain : listAccelerationDomains(zoneId)) {
+                if (domainId.equals(domain.get("id")) && domainName.equals(domain.get("domainName"))) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) throw new IllegalArgumentException("当前区域未找到此加速域名，请刷新列表");
             TeoClient client = createTeoClient();
 
             DeleteAccelerationDomainsRequest req = new DeleteAccelerationDomainsRequest();
-            req.setZoneId(domainId);
+            req.setZoneId(zoneId);
+            req.setDomainNames(new String[]{domainName});
 
             DeleteAccelerationDomainsResponse resp = client.DeleteAccelerationDomains(req);
 
-            if (resp != null) {
-                log.info("删除EdgeOne加速域名成功: {}", domainId);
+            if (resp != null && StringUtils.isNotBlank(resp.getRequestId())) {
+                if (cached != null) {
+                    cached.setStatus(RecordStatus.INACTIVE);
+                    cached.setRemark("EdgeOne已接受加速域名删除，最终状态请刷新核对");
+                    dnsRecordRepository.save(cached);
+                }
+                log.info("EdgeOne已接受加速域名删除: {}", domainId);
                 return true;
             }
 

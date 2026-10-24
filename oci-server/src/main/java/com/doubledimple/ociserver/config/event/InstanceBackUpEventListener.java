@@ -1,6 +1,5 @@
 package com.doubledimple.ociserver.config.event;
 
-import com.alibaba.fastjson2.JSON;
 import com.doubledimple.dao.entity.InstanceDetails;
 import com.doubledimple.dao.entity.Tenant;
 import com.doubledimple.dao.repository.TenantRepository;
@@ -49,7 +48,7 @@ public class InstanceBackUpEventListener {
     @Async
     @EventListener
     public void handleInstanceBackUpEvent(InstanceBackUpEvent event) {
-        log.debug("handleInstanceBackUpEvent 开始执行......: {}", JSON.toJSONString(event.getInstanceData()));
+        log.debug("handleInstanceBackUpEvent 开始执行，租户ID:{}", event.getInstanceData().getTenantId());
         try {
             OracleInstanceDetail instanceData = event.getInstanceData();
             Instance instance = instanceData.getInstance();
@@ -59,6 +58,9 @@ public class InstanceBackUpEventListener {
                 return;
             }
             Tenant tenant = byId.get();
+            if (!com.doubledimple.ociserver.service.permissions.OciPermissions.allows(tenant, "VOLUME_MANAGE")) {
+                return;
+            }
             String accountType = tenant.getAccountType();
 
             if (StringUtils.isEmpty(accountType) || accountType.equals(AccountTypeEnum.UN_KNOW_ACCOUNT.getType())){

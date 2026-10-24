@@ -1,22 +1,12 @@
 package com.doubledimple.ociserver.controller.dns;
 
-import com.doubledimple.dao.entity.DnsRecord;
 import com.doubledimple.dao.repository.DnsRecordRepository;
-import com.doubledimple.ocicommon.enums.ProviderType;
-import com.doubledimple.ocicommon.enums.RecordType;
 import com.doubledimple.ociserver.controller.BaseController;
-import com.doubledimple.ociserver.pojo.request.EdgeOneConfig;
 import com.doubledimple.ocicommon.param.ApiResponse;
 import com.doubledimple.ociserver.service.impl.system.SystemConfigService;
 import com.doubledimple.ociserver.third.dns.TencentEdgeOneService;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -28,13 +18,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import javax.annotation.Resource;
-import javax.persistence.criteria.Predicate;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import static com.doubledimple.ocicommon.enums.RecordStatus.getByName;
 
 /**
  * 腾讯云EdgeOne DNS管理控制器
@@ -51,95 +37,6 @@ public class EdgeOneController  extends BaseController {
 
     @Resource
     SystemConfigService systemConfigService;
-
-    /**
-     * EdgeOne DNS管理页面
-     */
-    @GetMapping
-    public String edgeOnePage(
-            @RequestParam(value = "zoneId", required = false) String zoneId,
-            @RequestParam(value = "searchName", required = false) String searchName,
-            @RequestParam(value = "searchContent", required = false) String searchContent,
-            @RequestParam(value = "page", defaultValue = "0") int page,
-            @RequestParam(value = "size", defaultValue = "20") int size,
-            @RequestParam(value = "type", defaultValue = "dns") String type,
-            @RequestParam(value = "status", defaultValue = "pending") String status,
-            Model model) {
-
-        log.debug("访问EdgeOne DNS管理页面，zoneId: {}, searchName: {}, searchContent: {}, page: {}, size: {}, type: {}",
-                zoneId, searchName, searchContent, page, size,type);
-
-        try {
-            // 添加搜索参数到模型
-            model.addAttribute("searchName", searchName);
-            model.addAttribute("searchContent", searchContent);
-            model.addAttribute("selectedZoneId", zoneId);
-            model.addAttribute("currentPage", page);
-            model.addAttribute("size", size);
-
-            // 如果选择了域名，查询DNS记录
-            if (zoneId != null && !zoneId.trim().isEmpty()) {
-                Pageable pageable = PageRequest.of(page, size, Sort.by("createTime").descending());
-
-                // 构建查询条件
-                Specification<DnsRecord> spec = (root, query, cb) -> {
-                    List<Predicate> predicates = new ArrayList<>();
-
-                    // 固定条件：zoneId 和 providerType
-                    predicates.add(cb.equal(root.get("zoneId"), zoneId));
-                    predicates.add(cb.equal(root.get("providerType"), ProviderType.TENCENT));
-                    if (type != null && type.equals("domain")){
-                        predicates.add(cb.equal(root.get("type"), 2));
-                    } else if (type != null && type.equals("dns")) {
-                        predicates.add(cb.equal(root.get("type"), 1));
-                    }
-
-                    predicates.add(cb.equal(root.get("status"), getByName(status)));
-
-                    // 搜索条件
-                    if (searchName != null && !searchName.trim().isEmpty()) {
-                        predicates.add(cb.like(cb.lower(root.get("recordName")),
-                                "%" + searchName.toLowerCase() + "%"));
-                    }
-
-                    if (searchContent != null && !searchContent.trim().isEmpty()) {
-                        predicates.add(cb.like(cb.lower(root.get("recordValue")),
-                                "%" + searchContent.toLowerCase() + "%"));
-                    }
-
-                    return cb.and(predicates.toArray(new Predicate[0]));
-                };
-
-                Page<DnsRecord> recordsPage = dnsRecordRepository.findAll(spec, pageable);
-
-                // 转换为前端需要的格式
-                List<Map<String, Object>> dnsRecords = new ArrayList<>();
-                for (DnsRecord record : recordsPage.getContent()) {
-                    Map<String, Object> recordMap = new HashMap<>();
-                    recordMap.put("id", record.getProviderRecordId());
-                    recordMap.put("type", record.getRecordType().name());
-                    recordMap.put("name", record.getRecordName());
-                    recordMap.put("content", record.getRecordValue());
-                    recordMap.put("ttl", record.getTtl());
-                    recordMap.put("priority", record.getPriority());
-                    dnsRecords.add(recordMap);
-                }
-
-                model.addAttribute("dnsRecords", dnsRecords);
-                model.addAttribute("totalElements", recordsPage.getTotalElements());
-                model.addAttribute("totalPages", recordsPage.getTotalPages());
-                model.addAttribute("recordType", type);
-            }
-            EdgeOneConfig edgeOneConfig = systemConfigService.getEdgeOneConfig();
-            model.addAttribute("edgeOneConfig", edgeOneConfig);
-            model.addAttribute("activePage", "edgeOne-servers");
-        } catch (Exception e) {
-            log.error("加载EdgeOne DNS管理页面失败: {}", e.getMessage(), e);
-            model.addAttribute("error", "加载页面失败: " + e.getMessage());
-        }
-
-        return "eo_manage";
-    }
 
     /**
      * 获取Zone列表
@@ -168,8 +65,10 @@ public class EdgeOneController  extends BaseController {
             List<Map<String, Object>> records;
             if ("domain".equals(type)) {
                 records = edgeOneService.listAccelerationDomains(zoneId);
-            } else {
+            } else if ("dns".equals(type)) {
                 records = edgeOneService.listDnsRecords(zoneId);
+            } else {
+                return ApiResponse.error("记录类型参数无效");
             }
             return ApiResponse.success(records);
         } catch (Exception e) {
@@ -239,9 +138,10 @@ public class EdgeOneController  extends BaseController {
      */
     @DeleteMapping("/api/records/{recordId}")
     @ResponseBody
-    public ApiResponse deleteDnsRecord(@PathVariable String recordId) {
+    public ApiResponse deleteDnsRecord(@PathVariable String recordId,
+                                      @RequestParam(required = false) String zoneId) {
         try {
-            boolean success = edgeOneService.deleteDnsRecord(recordId);
+            boolean success = edgeOneService.deleteDnsRecord(recordId, zoneId);
 
             if (success) {
                 return ApiResponse.success("DNS记录删除成功");
@@ -269,7 +169,7 @@ public class EdgeOneController  extends BaseController {
             Map<String, Object> result = new HashMap<>();
             result.put("syncCount", syncCount);
 
-            return ApiResponse.success("DNS记录同步成功，共处理 " + syncCount + " 条记录");
+            return ApiResponse.success("DNS记录同步成功，共处理 " + syncCount + " 条记录", result);
         } catch (Exception e) {
             log.error("同步EdgeOne DNS记录失败: {}", e.getMessage(), e);
             return ApiResponse.error("同步DNS记录失败: " + e.getMessage());
@@ -296,9 +196,11 @@ public class EdgeOneController  extends BaseController {
      */
     @DeleteMapping("/api/domains/{domainId}")
     @ResponseBody
-    public ApiResponse deleteAccelerationDomain(@PathVariable String domainId) {
+    public ApiResponse deleteAccelerationDomain(@PathVariable String domainId,
+                                               @RequestParam(required = false) String zoneId,
+                                               @RequestParam(required = false) String domainName) {
         try {
-            boolean success = edgeOneService.deleteAccelerationDomain(domainId);
+            boolean success = edgeOneService.deleteAccelerationDomain(domainId, zoneId, domainName);
 
             if (success) {
                 return ApiResponse.success("加速域名删除成功");
@@ -326,7 +228,7 @@ public class EdgeOneController  extends BaseController {
             Map<String, Object> result = new HashMap<>();
             result.put("syncCount", syncCount);
 
-            return ApiResponse.success("加速域名同步成功，共处理 " + syncCount + " 个域名");
+            return ApiResponse.success("加速域名同步成功，共处理 " + syncCount + " 个域名", result);
         } catch (Exception e) {
             log.error("同步EdgeOne加速域名失败: {}", e.getMessage(), e);
             return ApiResponse.error("同步加速域名失败: " + e.getMessage());

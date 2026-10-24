@@ -10,6 +10,7 @@ import com.doubledimple.ociserver.pojo.enums.MessageEnum;
 import com.doubledimple.ociserver.pojo.response.TenantTrafficStats;
 import com.doubledimple.ociserver.service.message.factory.MessageFactory;
 import com.doubledimple.ociserver.service.oracle.OracleInstanceService;
+import com.doubledimple.ociserver.service.permissions.OciPermissions;
 import com.doubledimple.ociserver.utils.oracle.OciUtils;
 import com.doubledimple.ociserver.utils.oracle.TrafficMetricsUtils;
 import com.doubledimple.ociserver.utils.oracle.vnic.VnicCreationResult;
@@ -70,6 +71,9 @@ public class InstanceTrafficTask {
                 log.warn("[流量预警] 本轮已超时间预算 {} 分钟，提前结束，剩余租户下轮处理", RUN_BUDGET_MS / 60000);
                 break;
             }
+            if (!OciPermissions.allows(tenant, "TRAFFIC_READ")) {
+                continue;
+            }
             Optional<TrafficAlert> alertOpt = trafficAlertRepository.findByTenantId(tenant.getId());
             if (alertOpt.isPresent() && alertOpt.get().getStatisticsEnabled()) {
                 try {
@@ -86,6 +90,9 @@ public class InstanceTrafficTask {
      * 供外部调用，例如 TG 菜单查询
      */
     public TenantTrafficStats queryTenantTraffic(Tenant tenant) {
+        tenant = tenantRepository.findById(tenant.getId())
+                .orElseThrow(() -> new IllegalArgumentException("租户不存在"));
+        OciPermissions.require(tenant, "TRAFFIC_READ");
         TenantTrafficStats stats = new TenantTrafficStats();
         stats.setTenantId(tenant.getId());
         stats.setTenancy(tenant.getTenancy());
@@ -194,9 +201,14 @@ public class InstanceTrafficTask {
             TenantTrafficStats.InstanceTraffic first = stats.getInstances().get(0);
             String publicIp = first.getPublicIp();
 
-            boolean shutdown = alert.getAutoShutdown();
+            Tenant currentTenant = tenantRepository.findById(tenant.getId()).orElse(null);
+            if (!OciPermissions.allows(currentTenant, "TRAFFIC_READ")) {
+                return;
+            }
+            boolean shutdown = Boolean.TRUE.equals(alert.getAutoShutdown())
+                    && OciPermissions.allows(currentTenant, "INSTANCE_POWER");
             if (shutdown) {
-                oracleInstanceService.stopInstance(first.getInstanceId(), tenant.getTenancy());
+                oracleInstanceService.stopInstance(first.getInstanceId(), currentTenant.getTenancy());
                 log.info("租户 [{}] 实例 [{}] 已自动关机，超出阈值 {} GB",
                         tenant.getTenancy(), first.getInstanceName(), threshold);
             }

@@ -33,6 +33,9 @@ public class Memo {
     @Column(columnDefinition = "TEXT")
     private String summary;
 
+    @Column(columnDefinition = "TEXT")
+    private String htmlContent;
+
     private LocalDateTime createTime;
 
     private LocalDateTime updateTime;

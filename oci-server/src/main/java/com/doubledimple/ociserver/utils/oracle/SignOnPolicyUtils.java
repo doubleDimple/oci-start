@@ -806,20 +806,7 @@ public class SignOnPolicyUtils {
 
 
     public static IdentityDomainsClient  initIdentityDomainsClient(Tenant tenant){
-        try {
-            SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
-            String compartmentId = provider.getTenantId();
-
-            IdentityClient identityClient = IdentityClient.builder().clientConfigurator(ProxyContext.get()).build(provider);
-            IdentityDomainsClient identityDomainsClient = IdentityDomainsClient.builder().clientConfigurator(ProxyContext.get()).build(provider);
-
-            String domainUrl = OciUtils.getDomain(identityClient, compartmentId);
-            identityDomainsClient.setEndpoint(domainUrl);
-            return identityDomainsClient;
-        } catch (Exception e) {
-            log.warn("初始化IdentityDomainsClient失败: {}", e.getMessage(),e);
-            throw new RuntimeException("初始化IdentityDomainsClient失败: " + e.getMessage());
-        }
+        return com.doubledimple.ociserver.service.permissions.ManagedAccountAccessService.openDomainClient(tenant);
     }
 
 
@@ -975,6 +962,8 @@ public class SignOnPolicyUtils {
     * @Date: 9/7/25 8:58 AM
     */
     public static ResetOciPassResponse resetPass(Tenant tenant,String userId){
+        com.doubledimple.ociserver.service.permissions.ManagedAccountAccessService
+                .requireUserAction(tenant, "USER_PASSWORD_RESET", userId);
         SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
         ResetOciPassResponse resetOciPassResponse = new ResetOciPassResponse();
 
@@ -985,32 +974,21 @@ public class SignOnPolicyUtils {
                     .build();
 
             CreateOrResetUIPasswordResponse response = identityClient.createOrResetUIPassword(request);
-            String temporaryPassword = response.getUIPassword().getPassword();
-            String loginUser = response.getUIPassword().getUserId();
+            com.oracle.bmc.identity.model.UIPassword password = response.getUIPassword();
+            String temporaryPassword = password == null ? null : password.getPassword();
+            String loginUser = password == null ? userId : password.getUserId();
             resetOciPassResponse.setTemporaryPassword(temporaryPassword);
             resetOciPassResponse.setLoginUser(loginUser);
-            resetOciPassResponse.setResetTime(DateTimeUtils.formatDate(response.getUIPassword().getTimeCreated()));
-
-            log.info("=====================================================");
+            resetOciPassResponse.setResetTime(DateTimeUtils.formatDate(
+                    password == null || password.getTimeCreated() == null ? new Date() : password.getTimeCreated()));
+            resetOciPassResponse.setSuccess(true);
+            // In identity-domain tenancies OCI sends a reset link instead of
+            // returning a temporary password. An empty body is not a failure.
+            resetOciPassResponse.setEmailSent(StringUtils.isBlank(temporaryPassword));
+            resetOciPassResponse.setMessage(StringUtils.isBlank(temporaryPassword)
+                    ? "密码重置请求已完成，请用户查收身份域发送的重置邮件"
+                    : "密码重置成功，请使用临时密码登录并修改密码");
             log.info("用户:{}控制台密码重置成功", tenant.getUserName());
-            log.info("临时密码: {}",temporaryPassword);
-            log.info("密码状态: {}",response.getUIPassword().getLifecycleState());
-            log.info("创建时间: {}",response.getUIPassword().getTimeCreated());
-            log.info("=====================================================");
-
-        } catch (BmcException e) {
-            log.error("重置密码失败: {}", e.getMessage(), e);
-
-            // 根据错误类型设置特殊标记
-            if (e.getStatusCode() == 404 && e.getMessage().contains("NotAuthorizedOrNotFound")) {
-                // 身份域用户或权限不足
-                resetOciPassResponse.setResetTime("IDENTITY_DOMAIN_USER");
-            } else if (e.getStatusCode() == 401) {
-                // 权限不足
-                resetOciPassResponse.setResetTime("PERMISSION_DENIED");
-            }
-        } catch (Exception e) {
-            log.error("重置密码失败: {}", e.getMessage(), e);
         }
 
         return resetOciPassResponse;
@@ -1018,7 +996,6 @@ public class SignOnPolicyUtils {
 
     private static String generateTemporaryPassword() {
         final String s = "TP-Oci-Start" + IdUtil.getSnowflakeNextId() + "!";
-        log.info("生成临时密码: {}", s);
         return s;
     }
 

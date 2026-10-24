@@ -1,8 +1,6 @@
 package com.doubledimple.ociserver.controller;
 
-import com.doubledimple.dao.entity.InstanceDetails;
 import com.doubledimple.dao.entity.Tenant;
-import com.doubledimple.ocicommon.utils.IpUtils;
 import com.doubledimple.ociserver.config.socket.WebsockifyConfig;
 import com.doubledimple.ociserver.service.oracle.OracleInstanceService;
 import com.doubledimple.ociserver.service.TenantService;
@@ -12,7 +10,6 @@ import com.oracle.bmc.core.model.InstanceConsoleConnection;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -23,6 +20,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import javax.annotation.Resource;
+import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -49,50 +48,69 @@ public class CloudShellController  extends BaseController{
     @Resource
     private WebsockifyConfig websockifyConfig;
 
-    /**
-     * 显示控制台终端页面
-     */
-    @GetMapping("/terminal")
-    public String showConsoleTerminal(Model model) {
-        // 设置侧边栏激活菜单
-        model.addAttribute("activePage", "api-ociBootList");
-        return "console_terminal";
-    }
+    @PersistenceContext
+    private EntityManager entityManager;
 
     /**
-     * 显示指定实例的控制台终端页面
+     * Vue 控制台的只读上下文。仅投影所需列，不加载实例密码、租户私钥或访问云端。
+     * 路径使用本地实例 ID；OCI ID 和租户 ID 始终由真实的数据库关联推导。
      */
-    @GetMapping("/terminal/{instanceId}")
-    public String showConsoleTerminalWithInstance(@PathVariable String instanceId,
-                                                  Model model) {
+    @GetMapping("/metadata/{instanceId}")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> consoleMetadata(@PathVariable String instanceId) {
+        Map<String, Object> response = new HashMap<>();
+        final Long localId;
         try {
-            // 获取实例详情
-            InstanceDetails instanceByInstanceId = oracleInstanceService.getInstanceById(Long.valueOf(instanceId));
-            if (instanceByInstanceId == null) {
-                throw new RuntimeException("实例不存在");
+            if (instanceId == null || !instanceId.matches("[1-9][0-9]{0,18}")) {
+                throw new NumberFormatException();
+            }
+            localId = Long.valueOf(instanceId);
+        } catch (NumberFormatException e) {
+            response.put("success", false);
+            response.put("errorKey", "invalidInput");
+            return ResponseEntity.badRequest().body(response);
+        }
+
+        try {
+            List<Object[]> records = entityManager.createQuery(
+                    "select i.id, i.instanceId, i.tenantId, i.publicIps, i.displayName "
+                            + "from InstanceDetails i, Tenant t "
+                            + "where i.id = :localId and i.cloudType = 1 "
+                            + "and t.id = i.tenantId and t.cloudType = 1", Object[].class)
+                    .setParameter("localId", localId)
+                    .setMaxResults(1)
+                    .getResultList();
+            if (records.isEmpty()) {
+                response.put("success", false);
+                response.put("errorKey", "notFound");
+                return ResponseEntity.status(404).body(response);
             }
 
-            // 添加实例信息到模型
-            model.addAttribute("instance", instanceByInstanceId);
-            model.addAttribute("instanceId", instanceId);
-            model.addAttribute("ociInstanceId", instanceByInstanceId.getInstanceId());
-            model.addAttribute("instanceIp", instanceByInstanceId.getPublicIps());  // 公网IP
-            model.addAttribute("instanceName", instanceByInstanceId.getDisplayName());  // 实例名称
+            Object[] record = records.get(0);
+            String ociInstanceId = (String) record[1];
+            long tenantId = ((Number) record[2]).longValue();
+            if (tenantId <= 0 || ociInstanceId == null
+                    || !ociInstanceId.matches("ocid1\\.instance\\.[^\\s\\p{Cntrl}]+")) {
+                response.put("success", false);
+                response.put("errorKey", "invalidContext");
+                return ResponseEntity.badRequest().body(response);
+            }
 
-            // 添加租户ID（优先使用实例中的租户ID）
-            Long actualTenantId = instanceByInstanceId.getTenantId();
-            model.addAttribute("tenantId", String.valueOf(actualTenantId));
-
-            String publicIp = IpUtils.getPublicIp();
-            model.addAttribute("serverIp", publicIp);
-            // 设置侧边栏激活菜单
-            model.addAttribute("activePage", "api-ociBootList");
-
-            return "console_terminal";
-
-        } catch (NumberFormatException e) {
-            log.error("无效的实例ID格式: {}", instanceId);
-            throw new RuntimeException("无效的实例ID格式");
+            // Long identifiers must reach JavaScript as strings without precision loss.
+            Map<String, String> data = new HashMap<>();
+            data.put("instanceId", String.valueOf(record[0]));
+            data.put("ociInstanceId", ociInstanceId);
+            data.put("tenantId", String.valueOf(tenantId));
+            data.put("instanceIp", record[3] == null ? "" : (String) record[3]);
+            data.put("instanceName", record[4] == null ? "" : (String) record[4]);
+            response.put("success", true);
+            response.put("data", data);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("读取控制台元数据失败，实例ID: {}", localId, e);
+            response.put("success", false);
+            response.put("errorKey", "requestFailed");
+            return ResponseEntity.status(500).body(response);
         }
     }
 

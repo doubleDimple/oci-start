@@ -5,6 +5,7 @@ import com.doubledimple.dao.entity.ServerMetrics;
 import com.doubledimple.ocicommon.enums.RegionEnum;
 import com.doubledimple.ocicommon.utils.IpUtils;
 import com.doubledimple.ociserver.config.exception.RateLimitException;
+import com.doubledimple.ociserver.config.exception.IpBannedException;
 import com.doubledimple.ociserver.pojo.request.MfaConfig;
 import com.doubledimple.ociserver.pojo.request.ServerMetricsDTO;
 import com.doubledimple.ociserver.pojo.request.TurnstileConfig;
@@ -15,11 +16,11 @@ import com.doubledimple.ociserver.service.MetricsService;
 import com.doubledimple.ociserver.service.VerifyService;
 import com.doubledimple.ociserver.service.impl.system.SystemConfigService;
 import com.doubledimple.ociserver.service.mfa.OTPService;
+import com.doubledimple.ociserver.service.login.GlobalLoginGuard;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -167,7 +168,12 @@ public class ApiController  extends BaseController{
     public ResponseEntity<String> sendVerificationCode(@RequestBody @Valid UsernameRequest request, HttpServletRequest  httpServletRequest) {
         try {
             verifyService.sendVerificationCodeForLogin(request.getUsername(),httpServletRequest);
-            return ResponseEntity.ok().build();
+            return ResponseEntity.ok().header("Cache-Control", "no-store").build();
+        } catch (GlobalLoginGuard.LoginGuardException e) {
+            return ResponseEntity.status(e.isBlocked() ? HttpStatus.FORBIDDEN : HttpStatus.SERVICE_UNAVAILABLE)
+                    .header("Cache-Control", "no-store").body(e.getMessage());
+        } catch (IpBannedException e) {
+            throw e;
         } catch (RateLimitException e) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                     .body(e.getMessage());

@@ -47,6 +47,7 @@ import com.oracle.bmc.core.responses.ListVnicAttachmentsResponse;
 import com.oracle.bmc.core.responses.DeleteIpv6Response;
 import com.oracle.bmc.identity.IdentityClient;
 import com.oracle.bmc.identity.model.Compartment;
+import com.oracle.bmc.model.BmcException;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.conn.ConnectTimeoutException;
@@ -379,11 +380,15 @@ public class VnicManagementUtils {
 
             final SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
 
+            // Verify ownership and the authoritative primary flag before any write,
+            // including IPv6 deletion. A failed/unknown read must never authorize it.
+            VnicAttachment attachment = requireSecondaryVnicAttachment(provider, tenant, instanceId, vnicId);
+
             // 1. 删除VNIC上的所有IPv6地址
             boolean ipv6DeleteSuccess = deleteAllIpv6FromVnic(provider, tenant, vnicId);
 
             // 2. 删除VNIC附件
-            boolean vnicDeleteSuccess = detachVnicFromInstance(provider, tenant, instanceId, vnicId);
+            boolean vnicDeleteSuccess = detachVnicFromInstance(provider, tenant, attachment);
 
             boolean overallSuccess = ipv6DeleteSuccess && vnicDeleteSuccess;
 
@@ -488,6 +493,132 @@ public class VnicManagementUtils {
         }
 
         return vnicInfos;
+    }
+
+    /** Complete management snapshot: no partial/failed cloud read is returned as success. */
+    public static List<VnicCreationResult> getInstanceVnicsStrict(Tenant tenant, String instanceId, String compartmentId) {
+        List<VnicCreationResult> vnicInfos = new ArrayList<>();
+        try {
+            final SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
+            try (ComputeClient computeClient = ComputeClient.builder().clientConfigurator(ProxyContext.get()).build(provider);
+                 VirtualNetworkClient networkClient = VirtualNetworkClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
+                computeClient.setRegion(RegionEnum.getRegionCode(tenant.getRegion()));
+                networkClient.setRegion(RegionEnum.getRegionCode(tenant.getRegion()));
+                // A moved instance can leave a nonempty but stale local compartment.
+                // Management reads must use the actual cloud instance scope.
+                compartmentId = requireInstanceCompartment(computeClient, instanceId);
+                for (VnicAttachment attachment : listInstanceVnicAttachments(computeClient, compartmentId, instanceId, null)) {
+                    if (StringUtils.isBlank(attachment.getVnicId())) {
+                        if (attachment.getLifecycleState() == VnicAttachment.LifecycleState.Detached) continue;
+                        throw new IllegalStateException("VNIC附件信息不完整，请重新查询");
+                    }
+                    Vnic vnic;
+                    try {
+                        vnic = networkClient.getVnic(GetVnicRequest.builder().vnicId(attachment.getVnicId()).build()).getVnic();
+                    } catch (BmcException e) {
+                        // A confirmed detached historical attachment may outlive its
+                        // VNIC. Other failures must not masquerade as an empty list.
+                        if (e.getStatusCode() == 404 && attachment.getLifecycleState() == VnicAttachment.LifecycleState.Detached) continue;
+                        throw e;
+                    }
+                    if (vnic == null || vnic.getIsPrimary() == null || !attachment.getVnicId().equals(vnic.getId())) {
+                        throw new IllegalStateException("无法确认VNIC及主网卡信息，请重新查询");
+                    }
+                    VnicCreationResult vnicInfo = new VnicCreationResult();
+                    vnicInfo.setAttachmentId(attachment.getId());
+                    vnicInfo.setVnicId(vnic.getId());
+                    vnicInfo.setLifecycleState(attachment.getLifecycleState());
+                    vnicInfo.setSuccess(attachment.getLifecycleState() == VnicAttachment.LifecycleState.Attached);
+                    vnicInfo.setVnicDisplayName(vnic.getDisplayName());
+                    vnicInfo.setPrivateIp(vnic.getPrivateIp());
+                    vnicInfo.setPublicIp(vnic.getPublicIp());
+                    vnicInfo.setSubnetId(vnic.getSubnetId());
+                    vnicInfo.setIsPrimary(vnic.getIsPrimary());
+                    List<String> ipv6Addresses = new ArrayList<>();
+                    for (Ipv6 ipv6 : listVnicIpv6s(networkClient, vnic.getId())) ipv6Addresses.add(ipv6.getIpAddress());
+                    vnicInfo.setIpv6Addresses(ipv6Addresses);
+                    vnicInfos.add(vnicInfo);
+                }
+            }
+            return vnicInfos;
+        } catch (Exception e) {
+            log.error("获取实例VNIC信息失败: {}", e.getMessage(), e);
+            throw new IllegalStateException("获取实例VNIC信息失败: " + e.getMessage(), e);
+        }
+    }
+
+    private static String requireInstanceCompartment(ComputeClient client, String instanceId) {
+        Instance instance = client.getInstance(GetInstanceRequest.builder().instanceId(instanceId).build()).getInstance();
+        if (instance == null || !instanceId.equals(instance.getId()) || StringUtils.isBlank(instance.getCompartmentId())) {
+            throw new IllegalStateException("无法确认实例所属区间");
+        }
+        return instance.getCompartmentId();
+    }
+
+    private static List<VnicAttachment> listInstanceVnicAttachments(ComputeClient client, String compartmentId,
+                                                                    String instanceId, String vnicId) {
+        List<VnicAttachment> attachments = new ArrayList<>();
+        Set<String> seenPages = new HashSet<>();
+        String page = null;
+        do {
+            ListVnicAttachmentsResponse response = client.listVnicAttachments(ListVnicAttachmentsRequest.builder()
+                    .compartmentId(compartmentId).instanceId(instanceId).vnicId(vnicId).page(page).build());
+            if (response.getItems() == null) throw new IllegalStateException("VNIC附件列表响应不完整");
+            for (VnicAttachment attachment : response.getItems()) {
+                if (attachment == null || !instanceId.equals(attachment.getInstanceId())) {
+                    throw new IllegalStateException("VNIC附件与目标实例不匹配");
+                }
+                attachments.add(attachment);
+            }
+            page = response.getOpcNextPage();
+            if (StringUtils.isNotBlank(page) && !seenPages.add(page)) throw new IllegalStateException("VNIC附件分页游标重复");
+        } while (StringUtils.isNotBlank(page));
+        return attachments;
+    }
+
+    private static List<Ipv6> listVnicIpv6s(VirtualNetworkClient client, String vnicId) {
+        List<Ipv6> addresses = new ArrayList<>();
+        Set<String> seenPages = new HashSet<>();
+        String page = null;
+        do {
+            ListIpv6sResponse response = client.listIpv6s(ListIpv6sRequest.builder().vnicId(vnicId).page(page).build());
+            if (response.getItems() == null) throw new IllegalStateException("IPv6列表响应不完整");
+            for (Ipv6 ipv6 : response.getItems()) {
+                if (ipv6 == null || StringUtils.isBlank(ipv6.getId()) || StringUtils.isBlank(ipv6.getIpAddress())
+                        || !vnicId.equals(ipv6.getVnicId())) {
+                    throw new IllegalStateException("IPv6地址与目标VNIC不匹配");
+                }
+                addresses.add(ipv6);
+            }
+            page = response.getOpcNextPage();
+            if (StringUtils.isNotBlank(page) && !seenPages.add(page)) throw new IllegalStateException("IPv6分页游标重复");
+        } while (StringUtils.isNotBlank(page));
+        return addresses;
+    }
+
+    private static VnicAttachment requireSecondaryVnicAttachment(SimpleAuthenticationDetailsProvider provider,
+                                                                 Tenant tenant, String instanceId, String vnicId) {
+        try (ComputeClient computeClient = ComputeClient.builder().clientConfigurator(ProxyContext.get()).build(provider);
+             VirtualNetworkClient networkClient = VirtualNetworkClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
+            computeClient.setRegion(RegionEnum.getRegionCode(tenant.getRegion()));
+            networkClient.setRegion(RegionEnum.getRegionCode(tenant.getRegion()));
+            String compartmentId = requireInstanceCompartment(computeClient, instanceId);
+            VnicAttachment target = null;
+            for (VnicAttachment attachment : listInstanceVnicAttachments(computeClient, compartmentId, instanceId, vnicId)) {
+                if (vnicId.equals(attachment.getVnicId()) && attachment.getLifecycleState() == VnicAttachment.LifecycleState.Attached) {
+                    target = attachment;
+                    break;
+                }
+            }
+            if (target == null || StringUtils.isBlank(target.getId())) {
+                throw new IllegalStateException("目标VNIC未附加到该实例，不能删除");
+            }
+            Vnic vnic = networkClient.getVnic(GetVnicRequest.builder().vnicId(vnicId).build()).getVnic();
+            if (vnic == null || !vnicId.equals(vnic.getId()) || !Boolean.FALSE.equals(vnic.getIsPrimary())) {
+                throw new IllegalStateException("不能删除主VNIC或无法确认类型的VNIC");
+            }
+            return target;
+        }
     }
 
 
@@ -948,17 +1079,14 @@ public class VnicManagementUtils {
         try (VirtualNetworkClient networkClient = VirtualNetworkClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             networkClient.setRegion(RegionEnum.getRegionCode(tenant.getRegion()));
 
-            // 获取VNIC的所有IPv6地址
-            ListIpv6sRequest listRequest = ListIpv6sRequest.builder()
-                    .vnicId(vnicId)
-                    .build();
-
-            ListIpv6sResponse listResponse = networkClient.listIpv6s(listRequest);
+            // Read every page before deleting; a partial/failed list cannot authorize
+            // an apparently complete cleanup.
+            List<Ipv6> ipv6Addresses = listVnicIpv6s(networkClient, vnicId);
 
             boolean allDeleted = true;
             int deleteCount = 0;
 
-            for (Ipv6 ipv6 : listResponse.getItems()) {
+            for (Ipv6 ipv6 : ipv6Addresses) {
                 try {
                     DeleteIpv6Request deleteRequest = DeleteIpv6Request.builder()
                             .ipv6Id(ipv6.getId())
@@ -988,34 +1116,13 @@ public class VnicManagementUtils {
      * 从实例分离VNIC
      */
     private static boolean detachVnicFromInstance(SimpleAuthenticationDetailsProvider provider, Tenant tenant,
-                                                  String instanceId, String vnicId) {
-        final String providerTenantId = provider.getTenantId();
+                                                  VnicAttachment attachment) {
+        String vnicId = attachment.getVnicId();
         try (ComputeClient computeClient = ComputeClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
             computeClient.setRegion(RegionEnum.getRegionCode(tenant.getRegion()));
 
-            // 查找VNIC附件
-            ListVnicAttachmentsRequest listRequest = ListVnicAttachmentsRequest.builder()
-                    .instanceId(instanceId)
-                    .vnicId(vnicId)
-                    .compartmentId(providerTenantId)
-                    .build();
-
-            ListVnicAttachmentsResponse listResponse = computeClient.listVnicAttachments(listRequest);
-
-            if (listResponse.getItems().isEmpty()) {
-                log.warn("未找到VNIC {} 的附件", vnicId);
-                return false;
-            }
-
-            VnicAttachment attachment = listResponse.getItems().get(0);
-
-            // 检查是否为主VNIC
-            if (isPrimaryVnic(providerTenantId,computeClient, instanceId, vnicId)) {
-                log.warn("不能删除主VNIC: {}", vnicId);
-                return false;
-            }
-
-            // 分离VNIC
+            // The attachment and real Vnic.isPrimary were checked before any IPv6
+            // write. Detach that exact attachment, never a newly guessed one.
             DetachVnicRequest detachRequest = DetachVnicRequest.builder()
                     .vnicAttachmentId(attachment.getId())
                     .build();
@@ -1155,70 +1262,29 @@ public class VnicManagementUtils {
      */
     public static Map<String, Boolean> deleteAllSecondaryVnics(Tenant tenant, String instanceId,String compartmentId) {
         Map<String, Boolean> deleteResults = new HashMap<>();
-
         try {
-            log.info("开始删除实例 {} 的所有非主VNIC", instanceId);
-
-            // 获取实例的所有VNIC
-            List<VnicCreationResult> vnicInfos = getInstanceVnics(tenant, instanceId,compartmentId);
-
-            final SimpleAuthenticationDetailsProvider provider = getProvider(tenant);
-            final String providerTenantId = provider.getTenantId();
-            try (ComputeClient computeClient = ComputeClient.builder().clientConfigurator(ProxyContext.get()).build(provider)) {
-                computeClient.setRegion(RegionEnum.getRegionCode(tenant.getRegion()));
-
-                for (VnicCreationResult vnicInfo : vnicInfos) {
-                    if (vnicInfo.getVnicId() == null) {
-                        continue;
-                    }
-
-                    try {
-                        // 检查是否为主VNIC
-                        ListVnicAttachmentsRequest request = ListVnicAttachmentsRequest.builder()
-                                .instanceId(instanceId)
-                                .vnicId(vnicInfo.getVnicId())
-                                .build();
-
-                        ListVnicAttachmentsResponse response = computeClient.listVnicAttachments(request);
-
-                        if (response.getItems().isEmpty()) {
-                            continue;
-                        }
-
-                        VnicAttachment attachment = response.getItems().get(0);
-
-                        // 跳过主VNIC
-                        if (isPrimaryVnic(providerTenantId,computeClient, instanceId, vnicInfo.getVnicId())) {
-                            log.info("跳过主VNIC: {}", vnicInfo.getVnicId());
-                            deleteResults.put(vnicInfo.getVnicId(), true); // 主VNIC算作成功（跳过）
-                            continue;
-                        }
-
-                        // 删除非主VNIC
-                        boolean deleteSuccess = deleteVnicWithIpv6(tenant, instanceId, vnicInfo.getVnicId());
-                        deleteResults.put(vnicInfo.getVnicId(), deleteSuccess);
-
-                        if (deleteSuccess) {
-                            log.info("非主VNIC删除成功: {}", vnicInfo.getVnicId());
-                        } else {
-                            log.error("非主VNIC删除失败: {}", vnicInfo.getVnicId());
-                        }
-
-                    } catch (Exception e) {
-                        log.error("删除VNIC {} 时发生异常: {}", vnicInfo.getVnicId(), e.getMessage());
-                        deleteResults.put(vnicInfo.getVnicId(), false);
-                    }
+            // Strict reads resolve the actual cloud compartment before listing.
+            List<VnicCreationResult> vnicInfos = getInstanceVnicsStrict(tenant, instanceId, compartmentId);
+            // Validate the entire snapshot before the first write. Unknown primary
+            // status must not allow a partly processed batch.
+            for (VnicCreationResult vnicInfo : vnicInfos) {
+                if (StringUtils.isBlank(vnicInfo.getVnicId()) || vnicInfo.getIsPrimary() == null) {
+                    throw new IllegalStateException("无法确认全部VNIC的主辅类型，未开始批量删除");
                 }
             }
-
-            long successCount = deleteResults.values().stream().mapToLong(result -> result ? 1 : 0).sum();
-            log.info("实例 {} 的VNIC删除完成 - 成功: {}/{}", instanceId, successCount, deleteResults.size());
-
+            for (VnicCreationResult vnicInfo : vnicInfos) {
+                if (!Boolean.FALSE.equals(vnicInfo.getIsPrimary())
+                        || vnicInfo.getLifecycleState() == VnicAttachment.LifecycleState.Detached) continue;
+                // This performs a fresh ownership/primary read before its first write.
+                // The result map contains attempted secondary VNICs only.
+                deleteResults.put(vnicInfo.getVnicId(), deleteVnicWithIpv6(tenant, instanceId, vnicInfo.getVnicId()));
+            }
+            return deleteResults;
         } catch (Exception e) {
             log.error("批量删除VNIC失败: " + e.getMessage(), e);
+            // A read failure must reach the controller, not become success 0/0.
+            throw new IllegalStateException("批量删除VNIC失败: " + e.getMessage(), e);
         }
-
-        return deleteResults;
     }
 
     /**

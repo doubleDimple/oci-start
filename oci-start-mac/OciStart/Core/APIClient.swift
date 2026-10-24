@@ -7,6 +7,7 @@ final class APIClient {
     private let session: URLSession
     /// 长耗时接口（如 `/tenants/syncOci`，Web 侧约 3 分钟进度窗口）
     private let longSession: URLSession
+    private let importSession: URLSession
 
     private init() {
         let config = URLSessionConfiguration.default
@@ -24,21 +25,39 @@ final class APIClient {
         longConfig.timeoutIntervalForRequest = 200
         longConfig.timeoutIntervalForResource = 210
         longSession = URLSession(configuration: longConfig)
+        let importConfig = URLSessionConfiguration.default
+        importConfig.httpCookieStorage = HTTPCookieStorage.shared
+        importConfig.timeoutIntervalForRequest = 86_400
+        importConfig.timeoutIntervalForResource = 86_400
+        importSession = URLSession(configuration: importConfig)
     }
 
     // MARK: - Raw
 
-    func data(for request: URLRequest) async throws -> (Data, HTTPURLResponse) {
-        try await data(for: request, using: session)
+    func data(for request: URLRequest, longRunning: Bool = false) async throws -> (Data, HTTPURLResponse) {
+        try await data(for: request, using: longRunning ? importSession : session)
     }
 
     private func data(for request: URLRequest, using session: URLSession) async throws -> (Data, HTTPURLResponse) {
+        let authContext = await MainActor.run {
+            (AppSession.shared.authenticationGeneration, AppSession.shared.serverURL, AppSession.shared.isLoggedIn)
+        }
         do {
             let (data, response) = try await session.compatData(for: request)
             guard let http = response as? HTTPURLResponse else {
                 throw APIError.invalidResponse
             }
-            if http.statusCode == 401 {
+            let body = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+            let redirectedToLogin = http.url?.path == "/login" || http.url?.path == "/m/login"
+            // A 403 may report an IP ban or a denied operation; it does not expire the session.
+            let expired = http.statusCode == 401 || (body?["code"] as? NSNumber)?.intValue == 401
+                || (redirectedToLogin && request.url?.path != http.url?.path)
+            if expired {
+                if authContext.2, Self.sameOrigin(request.url, URL(string: authContext.1)) {
+                    await AppSession.shared.expireSession(generation: authContext.0, baseURL: authContext.1)
+                }
+                // The login endpoint owns its invalid-password / factor error message.
+                if !authContext.2, request.url?.path == "/perform_login" { return (data, http) }
                 throw APIError.unauthorized
             }
             return (data, http)
@@ -47,6 +66,13 @@ final class APIClient {
         } catch {
             throw APIError.network(error)
         }
+    }
+
+    private static func sameOrigin(_ left: URL?, _ right: URL?) -> Bool {
+        guard let left = left, let right = right else { return false }
+        func port(_ url: URL) -> Int { url.port ?? (url.scheme?.lowercased() == "https" ? 443 : 80) }
+        return left.scheme?.lowercased() == right.scheme?.lowercased()
+            && left.host?.lowercased() == right.host?.lowercased() && port(left) == port(right)
     }
 
     func getHTML(_ url: URL) async throws -> String {
@@ -312,7 +338,7 @@ final class APIClient {
                 throw APIError.serverMessage(partial?.message ?? "用户名或密码错误")
             }
             guard (200..<300).contains(http.statusCode) else {
-                throw APIError.serverMessage("登录失败 HTTP \(http.statusCode)")
+                throw APIError.serverMessage(Self.friendlyServerMessage(data: data, status: http.statusCode))
             }
             if data.isEmpty {
                 return LoginResult(success: true, redirectUrl: nil, message: nil)
@@ -325,16 +351,62 @@ final class APIClient {
         }
     }
 
-    /// Parse flags from `/login` HTML (same source as Web page).
+    /// Older servers may reject an unknown bootstrap route before returning 404.
     struct LoginPageMeta {
         var allowRegister: Bool
         var githubEnabled: Bool
         var googleEnabled: Bool
         var publicKey: String?
+        var usesLegacyHTML = false
+        var turnstileEnabled = false
+    }
+
+    private struct LoginBootstrap: Decodable {
+        let allowRegister: Bool
+        let githubEnabled: Bool
+        let googleEnabled: Bool
+        let publicKey: String
+        let turnstileEnabled: Bool
     }
 
     func fetchLoginPageMeta(baseURL: String) async throws -> LoginPageMeta {
+        let url = try makeURL(baseURL, path: "/api/auth/bootstrap")
+        var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("XMLHttpRequest", forHTTPHeaderField: "X-Requested-With")
+        // Use the same session as performLogin so its RSA private key remains available.
+        let data: Data
+        let response: HTTPURLResponse
+        do {
+            (data, response) = try await self.data(for: request)
+        } catch APIError.unauthorized {
+            // A protected legacy route may return 401. Require its real RSA login marker;
+            // a Vue shell or arbitrary HTML must never enable plaintext fallback.
+            return try await fetchLegacyLoginPageMeta(baseURL: baseURL, requiresPublicKey: true)
+        }
+        if response.statusCode != 404 {
+            guard (200..<300).contains(response.statusCode) else {
+                throw APIError.serverMessage(Self.friendlyServerMessage(data: data, status: response.statusCode))
+            }
+            guard let config = try? JSONDecoder().decode(LoginBootstrap.self, from: data),
+                  !config.publicKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                throw APIError.invalidResponse
+            }
+            return LoginPageMeta(allowRegister: config.allowRegister, githubEnabled: config.githubEnabled,
+                                 googleEnabled: config.googleEnabled, publicKey: config.publicKey,
+                                 turnstileEnabled: config.turnstileEnabled)
+        }
+
+        return try await fetchLegacyLoginPageMeta(baseURL: baseURL, requiresPublicKey: false)
+    }
+
+    private func fetchLegacyLoginPageMeta(baseURL: String, requiresPublicKey: Bool) async throws -> LoginPageMeta {
         let html = try await fetchLoginPage(baseURL: baseURL)
+        let publicKey = AuthService.extractPublicKeyPublic(from: html)
+        if requiresPublicKey && (publicKey?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true) {
+            throw APIError.unauthorized
+        }
         let allow = html.contains("id=\"registerForm\"") || html.contains("switchTab('register')")
         let githubOn = html.contains("id=\"githubLoginBtn\"")
         let googleOn = html.contains("id=\"googleLoginBtn\"")
@@ -342,7 +414,8 @@ final class APIClient {
             allowRegister: allow,
             githubEnabled: githubOn,
             googleEnabled: googleOn,
-            publicKey: nil
+            publicKey: publicKey,
+            usesLegacyHTML: true
         )
     }
 
@@ -357,8 +430,7 @@ final class APIClient {
         req.httpBody = try JSONSerialization.data(withJSONObject: body)
         let (data, http) = try await data(for: req)
         guard (200..<300).contains(http.statusCode) else {
-            let msg = String(data: data, encoding: .utf8) ?? "发送失败"
-            throw APIError.serverMessage(msg)
+            throw APIError.serverMessage(Self.friendlyServerMessage(data: data, status: http.statusCode))
         }
     }
 
@@ -482,7 +554,8 @@ final class APIClient {
         return await LoginFactorConfig(messageEnabled: msg, mfaEnabled: mfa)
     }
 
-    // MARK: - Forgot password (web login_user_v1.js)
+    /*
+    // MARK: - Forgot password (disabled with the server endpoints)
 
     func sendResetCode(baseURL: String, username: String) async throws {
         let url = try makeURL(baseURL, path: "/api/send-reset-code")
@@ -531,6 +604,7 @@ final class APIClient {
         guard success else { throw APIError.serverMessage(message) }
         return message
     }
+    */
 
     // MARK: - Helpers
 

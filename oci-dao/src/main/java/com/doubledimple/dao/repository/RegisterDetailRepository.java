@@ -16,5 +16,16 @@ public interface RegisterDetailRepository extends JpaRepository<RegisterDetail, 
      */
     Optional<RegisterDetail> findByTenantId(String tenantId);
 
+    Optional<RegisterDetail> findFirstByTenantPrvIdOrderByIdDesc(Long tenantPrvId);
+
+    List<RegisterDetail> findByTenantPrvIdIn(List<Long> tenantPrvIds);
+
+    /** 降权会更换 OCI 用户，注册信息仍属于原本地租户记录。 */
+    default Optional<RegisterDetail> findForTenant(Long localId, String userId) {
+        Optional<RegisterDetail> local = localId == null ? Optional.empty()
+                : findFirstByTenantPrvIdOrderByIdDesc(localId);
+        return local.isPresent() ? local : userId == null ? Optional.empty() : findByTenantId(userId);
+    }
+
     List<RegisterDetail> findByTenantIdIn(List<String> tenantIds);
 }

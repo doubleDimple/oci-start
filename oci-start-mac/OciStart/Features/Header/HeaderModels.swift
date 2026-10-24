@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 
 // MARK: - System messages
 
@@ -136,5 +137,24 @@ enum AppLocale: String, CaseIterable, Identifiable {
         case .zhTW: return "繁體中文"
         case .enUS: return "English"
         }
+    }
+}
+
+/// Shared native language preference; the two visible choices match the Vue console.
+final class LanguageManager: ObservableObject {
+    static let shared = LanguageManager()
+    @Published private(set) var locale: AppLocale
+
+    private init() {
+        let raw = UserDefaults.standard.string(forKey: "appLocale") ?? AppLocale.zhCN.rawValue
+        locale = raw == AppLocale.enUS.rawValue ? .enUS : .zhCN
+    }
+
+    func text(_ zh: String, _ en: String) -> String { locale == .enUS ? en : zh }
+
+    func setLocale(_ value: AppLocale) {
+        locale = value == .enUS ? .enUS : .zhCN
+        UserDefaults.standard.set(locale.rawValue, forKey: "appLocale")
+        MenuBuilder.rebuildNavigationMenu()
     }
 }

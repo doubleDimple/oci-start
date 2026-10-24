@@ -6,9 +6,11 @@ import com.doubledimple.dao.entity.Tenant;
 import com.doubledimple.dao.repository.ConsoleConnectionRepository;
 import com.doubledimple.dao.repository.TenantRepository;
 import com.doubledimple.ociserver.config.socket.WebsockifyConfig;
+import com.doubledimple.ociserver.config.TenantProxyBinder;
 import com.doubledimple.ociserver.service.oracle.OciNetBootService;
 import com.doubledimple.ociserver.service.oracle.OracleInstanceService;
 import com.doubledimple.ociserver.utils.oracle.OciConsoleUtils;
+import com.doubledimple.ociserver.utils.oracle.VncConnectionPlan;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jcraft.jsch.Session;
 import lombok.extern.slf4j.Slf4j;
@@ -29,16 +31,34 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.URL;
+import java.net.URLConnection;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.PosixFilePermission;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.StringJoiner;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Pattern;
 
 import static com.doubledimple.ociserver.service.oracle.OciNetBootService.ROOT_PASSWORD;
 
@@ -46,6 +66,9 @@ import static com.doubledimple.ociserver.service.oracle.OciNetBootService.ROOT_P
 @Component("consoleWebSocketHandler")
 @Qualifier("consoleWebSocketHandler")
 public class ConsoleWebSocketHandler extends TextWebSocketHandler {
+
+    private static final Pattern VNC_PORT_LISTENER_CREATED = Pattern.compile(
+            "^debug1: channel [0-9]+: new (?:port-listener )?\\[port listener\\](?: .*)?$");
 
     @Value("${baseFile.filePath}")
     private String baseFilePath;
@@ -72,23 +95,108 @@ public class ConsoleWebSocketHandler extends TextWebSocketHandler {
     private final Map<String, Object> sessionLocks = new ConcurrentHashMap<>();
     private final Map<String, SshTunnelProcess> sshTunnelProcesses = new ConcurrentHashMap<>();
     private final Map<String, Thread> netbootThreads = new ConcurrentHashMap<>();
+    private final Map<String, ConsolePreparation> consolePreparations = new ConcurrentHashMap<>();
+    private final AtomicInteger consoleWorkerSequence = new AtomicInteger();
+    private final ThreadPoolExecutor consoleCreationExecutor = new ThreadPoolExecutor(
+            2, 4, 60, TimeUnit.SECONDS, new ArrayBlockingQueue<Runnable>(16), task -> {
+                Thread thread = new Thread(task, "console-create-" + consoleWorkerSequence.incrementAndGet());
+                thread.setDaemon(true);
+                return thread;
+            }, new ThreadPoolExecutor.AbortPolicy());
 
-    private static class SshTunnelProcess {
+    private static class ConsolePreparation {
+        private volatile boolean cancelled;
+        private boolean started;
+    }
+
+    private ConsolePreparation requireConsoleActive(WebSocketSession session) throws IOException {
+        ConsolePreparation preparation = consolePreparations.get(session.getId());
+        if (preparation == null || preparation.cancelled || !session.isOpen()) {
+            throw new IOException("Console connection cancelled");
+        }
+        return preparation;
+    }
+
+    private void cancelConsolePreparation(String sessionId) {
+        ConsolePreparation preparation = consolePreparations.get(sessionId);
+        if (preparation != null) {
+            synchronized (preparation) { preparation.cancelled = true; }
+        }
+    }
+
+    private boolean isVncTunnelActive(WebSocketSession session, ConsolePreparation preparation,
+                                      SshTunnelProcess tunnel) {
+        return !preparation.cancelled && session.isOpen()
+                && consolePreparations.get(session.getId()) == preparation
+                && sshTunnelProcesses.get(session.getId()) == tunnel
+                && !tunnel.destroyed.get() && tunnel.process.isAlive();
+    }
+
+    private class SshTunnelProcess {
         final Process process;
         final Thread stdoutReader;
         final Thread stderrReader;
+        final WebsockifyConfig.LocalVncPortReservation portReservation;
+        final AtomicBoolean listenerReady;
+        final AtomicReference<String> lastError;
+        final AtomicBoolean destroyed = new AtomicBoolean();
+        volatile Thread exitMonitor;
 
-        SshTunnelProcess(Process process, Thread stdoutReader, Thread stderrReader) {
+        SshTunnelProcess(Process process, Thread stdoutReader, Thread stderrReader,
+                         WebsockifyConfig.LocalVncPortReservation portReservation,
+                         AtomicBoolean listenerReady, AtomicReference<String> lastError) {
             this.process = process;
             this.stdoutReader = stdoutReader;
             this.stderrReader = stderrReader;
+            this.portReservation = portReservation;
+            this.listenerReady = listenerReady;
+            this.lastError = lastError;
         }
 
         void destroy() {
+            if (!destroyed.compareAndSet(false, true)) return;
             if (stdoutReader != null) stdoutReader.interrupt();
             if (stderrReader != null) stderrReader.interrupt();
-            if (process != null) process.destroyForcibly();
+            if (exitMonitor != null && exitMonitor != Thread.currentThread()) exitMonitor.interrupt();
+            stopVncProcessAndReleasePort(process, portReservation);
         }
+
+        String failureMessage() {
+            String detail = lastError.get();
+            String exit = process.isAlive() ? "" : "（退出码 " + process.exitValue() + "）";
+            return "VNC SSH 隧道已断开" + exit + (detail == null ? "" : ": " + detail);
+        }
+    }
+
+    private void stopVncProcessAndReleasePort(Process process, WebsockifyConfig.LocalVncPortReservation reservation) {
+        if (process == null) {
+            websockifyService.releaseLocalVncPort(reservation);
+            return;
+        }
+        try { process.destroyForcibly(); } catch (RuntimeException e) {
+            log.warn("Unable to stop VNC tunnel process immediately", e);
+        }
+        if (!process.isAlive()) {
+            websockifyService.releaseLocalVncPort(reservation);
+            return;
+        }
+        // destroyForcibly is asynchronous. Keep the token until the process has
+        // actually exited, without blocking the WebSocket cancellation callback.
+        Thread cleanup = new Thread(() -> {
+            boolean interrupted = false;
+            for (;;) {
+                try {
+                    process.waitFor();
+                    break;
+                } catch (InterruptedException e) {
+                    interrupted = true;
+                }
+            }
+            websockifyService.releaseLocalVncPort(reservation);
+            if (interrupted) Thread.currentThread().interrupt();
+        }, "vnc-port-release-" + (reservation == null ? "none" : reservation.getPort()));
+        cleanup.setDaemon(true);
+        cleanup.start();
     }
 
     // 添加服务器公网IP缓存
@@ -116,6 +224,7 @@ public class ConsoleWebSocketHandler extends TextWebSocketHandler {
     public void afterConnectionEstablished(WebSocketSession session) {
         log.info("New Console WebSocket connection established: {}", session.getId());
         sessionLocks.put(session.getId(), new Object());
+        consolePreparations.put(session.getId(), new ConsolePreparation());
     }
 
     @Override
@@ -125,7 +234,7 @@ public class ConsoleWebSocketHandler extends TextWebSocketHandler {
 
         switch (type) {
             case "create_connection":
-                handleCreateAndConnect(session, (Map<String, Object>) request.get("data"));
+                queueCreateAndConnect(session, (Map<String, Object>) request.get("data"));
                 break;
             case "input":
                 handleUserInput(session, (String) request.get("data"));
@@ -138,9 +247,7 @@ public class ConsoleWebSocketHandler extends TextWebSocketHandler {
                 Map<String, Object> heartbeatResponse = new HashMap<>();
                 heartbeatResponse.put("type", "heartbeat_response");
                 heartbeatResponse.put("timestamp", System.currentTimeMillis());
-                if (session.isOpen()) {
-                    session.sendMessage(new TextMessage(objectMapper.writeValueAsString(heartbeatResponse)));
-                }
+                sendJson(session, heartbeatResponse);
                 break;
             case "heartbeat_response":
                 // 客户端心跳响应，只记录日志
@@ -151,9 +258,7 @@ public class ConsoleWebSocketHandler extends TextWebSocketHandler {
                 Map<String, Object> pongResponse = new HashMap<>();
                 pongResponse.put("type", "pong");
                 pongResponse.put("timestamp", System.currentTimeMillis());
-                if (session.isOpen()) {
-                    session.sendMessage(new TextMessage(objectMapper.writeValueAsString(pongResponse)));
-                }
+                sendJson(session, pongResponse);
                 break;
             case "auto_netboot":
                 handleAutoNetBoot(session, (Map<String, Object>) request.get("data"));
@@ -164,16 +269,58 @@ public class ConsoleWebSocketHandler extends TextWebSocketHandler {
     }
 
     /**
-     * 处理创建控制台连接请求
+     * Keep the WebSocket callback free to receive cancellation and heartbeats.
+     */
+    private void queueCreateAndConnect(WebSocketSession webSocketSession, Map<String, Object> data) {
+        try {
+            ConsolePreparation preparation = requireConsoleActive(webSocketSession);
+            boolean duplicate;
+            synchronized (preparation) {
+                requireConsoleActive(webSocketSession);
+                duplicate = preparation.started;
+                preparation.started = true;
+            }
+            if (duplicate) {
+                sendError(webSocketSession, "当前会话已发起创建，请勿重复提交");
+                return;
+            }
+            Map<String, Object> input = new HashMap<>(data);
+            // started is set before enqueueing, including while this task waits.
+            consoleCreationExecutor.execute(() -> {
+                try {
+                    handleCreateAndConnect(webSocketSession, input);
+                } finally {
+                    // getProvider binds the tenant proxy on this worker. A
+                    // reused worker must not keep its proxy or applied-key cache.
+                    TenantProxyBinder.clear();
+                }
+            });
+        } catch (RejectedExecutionException e) {
+            sendError(webSocketSession, "控制台创建任务繁忙或服务正在关闭，本次未开始创建");
+        } catch (Exception e) {
+            sendError(webSocketSession, "控制台创建请求无效或会话已关闭");
+        }
+    }
+
+    /**
+     * 处理创建控制台连接请求（仅普通 VNC，保留 Netboot 的既有执行方式）
      */
     private void handleCreateAndConnect(WebSocketSession webSocketSession, Map<String, Object> data) {
         try {
+            ConsolePreparation preparation = requireConsoleActive(webSocketSession);
             String instanceDetailsId = (String) data.get("instanceId");
             Long tenantId = Long.valueOf(data.get("tenantId").toString());
             String displayName = (String) data.get("displayName");
 
             // 1. 获取实例和租户信息
             InstanceDetails instanceDetails = oracleInstanceService.getInstanceById(Long.valueOf(instanceDetailsId));
+            if (instanceDetails == null || instanceDetails.getCloudType() != 1
+                    || instanceDetails.getTenantId() != tenantId.longValue()
+                    || instanceDetails.getInstanceId() == null
+                    || !instanceDetails.getInstanceId().startsWith("ocid1.instance.")) {
+                sendError(webSocketSession, "实例与 OCI 租户信息不匹配");
+                return;
+            }
             String instanceId = instanceDetails.getInstanceId();
             Optional<Tenant> tenantOpt = tenantRepository.findById(tenantId);
 
@@ -183,26 +330,35 @@ public class ConsoleWebSocketHandler extends TextWebSocketHandler {
             }
 
             Tenant tenant = tenantOpt.get();
+            if (tenant.getCloudType() != 1) {
+                sendError(webSocketSession, "当前租户不是 OCI 账号");
+                return;
+            }
+            requireConsoleActive(webSocketSession);
 
             // 2. 获取或创建控制台连接
             sendMessage(webSocketSession, "🔍 检查控制台连接...\r\n");
             //ConsoleConnection connection = getOrCreateConsoleConnection(tenant, instanceId, tenantId, displayName);
-            ConsoleConnection connection = createNewConsoleConnection(tenant, instanceId, tenantId, displayName);
+            ConsoleConnection connection = createNewConsoleConnection(tenant, instanceId, tenantId, displayName, webSocketSession);
 
             // 3. 保存连接信息到会话
-            connectionIds.put(webSocketSession.getId(), connection.getConnectionId());
+            synchronized (preparation) {
+                requireConsoleActive(webSocketSession);
+                connectionIds.put(webSocketSession.getId(), connection.getConnectionId());
+            }
 
-            sendMessage(webSocketSession, "控制台连接就绪: " + connection.getConnectionId() + "\r\n");
+            sendMessage(webSocketSession, "OCI 控制台资源已激活: " + connection.getConnectionId() + "\r\n");
             sendMessage(webSocketSession, "密钥文件: " + connection.getPrivateKeyPath() + "\r\n");
 
             // 4. 获取连接字符串并建立VNC连接
-            sendMessage(webSocketSession, "获取连接字符串...\r\n");
-            String connectionString = OciConsoleUtils.getConsoleConnectionString(tenant, connection.getConnectionId());
+            sendMessage(webSocketSession, "获取 VNC 专用连接参数...\r\n");
+            String connectionString = OciConsoleUtils.getVncConnectionString(tenant, connection.getConnectionId());
+            requireConsoleActive(webSocketSession);
 
-            if (connectionString != null) {
+            if (connectionString != null && !connectionString.trim().isEmpty()) {
                 establishVncConnectionWithStoredKey(webSocketSession, connectionString, connection.getPrivateKeyPath(), instanceDetails);
             } else {
-                sendError(webSocketSession, "控制台连接尚未激活，请稍后重试");
+                sendError(webSocketSession, "OCI 尚未提供可用的 VNC 连接参数，请稍后重试");
             }
 
         } catch (Exception e) {
@@ -253,7 +409,14 @@ public class ConsoleWebSocketHandler extends TextWebSocketHandler {
      * 创建新的控制台连接 - 数据库版本
      */
     private ConsoleConnection createNewConsoleConnection(Tenant tenant, String instanceId, Long tenantId, String displayName) {
+        // Preserve the existing Netboot call path; VNC supplies its socket below.
+        return createNewConsoleConnection(tenant, instanceId, tenantId, displayName, null);
+    }
+
+    private ConsoleConnection createNewConsoleConnection(Tenant tenant, String instanceId, Long tenantId,
+                                                         String displayName, WebSocketSession webSocketSession) {
         try {
+            if (webSocketSession != null) requireConsoleActive(webSocketSession);
             log.info("创建新的控制台连接...");
 
             // 1. 创建密钥存储目录
@@ -261,6 +424,7 @@ public class ConsoleWebSocketHandler extends TextWebSocketHandler {
             log.info("密钥存储目录: {}", keyDir);
 
             // 2. 调用OCI API创建控制台连接（自动生成密钥）
+            if (webSocketSession != null) requireConsoleActive(webSocketSession);
             OciConsoleUtils.ConsoleConnectionResult result =
                     OciConsoleUtils.createConsoleConnectionWithAutoKey(tenant, instanceId, displayName);
 
@@ -297,6 +461,9 @@ public class ConsoleWebSocketHandler extends TextWebSocketHandler {
             ConsoleConnection savedConnection = consoleConnectionRepository.save(connection);
             log.info("控制台连接已保存到数据库，连接ID: {}", savedConnection.getConnectionId());
 
+            // A completed cloud write must retain its key and DB record even
+            // if the client closed while OCI was working. Stop before any tunnel.
+            if (webSocketSession != null) requireConsoleActive(webSocketSession);
             return savedConnection;
 
         } catch (Exception e) {
@@ -421,6 +588,7 @@ public class ConsoleWebSocketHandler extends TextWebSocketHandler {
                                                      String privateKeyPath,
                                                      InstanceDetails instanceDetails) {
         try {
+            ConsolePreparation preparation = requireConsoleActive(webSocketSession);
             sendMessage(webSocketSession, "正在解析VNC连接字符串...\r\n");
 
             // 验证密钥文件
@@ -430,27 +598,28 @@ public class ConsoleWebSocketHandler extends TextWebSocketHandler {
                 return;
             }
 
-            // 解析SSH连接字符串
-            Map<String, String> sshConfig = parseConnectionString(connectionString);
-            if (sshConfig.isEmpty()) {
-                sendError(webSocketSession, "无法解析控制台连接字符串");
-                return;
-            }
+            // Preserve OCI's VNC hop/port/forwarding parameters. The serial
+            // connection string is reserved for the separate Netboot path.
+            VncConnectionPlan plan = VncConnectionPlan.parse(connectionString,
+                    instanceDetails.getInstanceId(), connectionIds.get(webSocketSession.getId()));
 
             // 保存SSH配置到会话
-            sessionLocks.put(webSocketSession.getId() + "_ssh_config", sshConfig);
-            sessionLocks.put(webSocketSession.getId() + "_target", sshConfig.get("target"));
-            sessionLocks.put(webSocketSession.getId() + "_key_file", privateKeyPath);
+            synchronized (preparation) {
+                requireConsoleActive(webSocketSession);
+                sessionLocks.put(webSocketSession.getId() + "_target", instanceDetails.getInstanceId());
+                sessionLocks.put(webSocketSession.getId() + "_key_file", privateKeyPath);
+            }
 
             // 建立VNC隧道
             sendMessage(webSocketSession, "正在建立VNC隧道连接...\r\n");
             sendMessage(webSocketSession, "使用密钥文件: " + privateKeyPath + "\r\n");
 
-            boolean connected = establishVncTunnel(webSocketSession, sshConfig, privateKeyPath);
+            boolean connected = establishVncTunnel(webSocketSession, plan, privateKeyPath);
 
             if (!connected) {
+                requireConsoleActive(webSocketSession);
                 sendMessage(webSocketSession, "自动VNC隧道建立失败，提供手动连接方法\r\n");
-                provideVncConnectionInfo(webSocketSession, sshConfig, privateKeyPath);
+                provideVncConnectionInfo(webSocketSession, plan, privateKeyPath);
             }
 
         } catch (Exception e) {
@@ -471,9 +640,15 @@ public class ConsoleWebSocketHandler extends TextWebSocketHandler {
         // 尝试通过网络API获取公网IP
         try {
             URL whatismyip = new URL("http://checkip.amazonaws.com");
-            BufferedReader in = new BufferedReader(new InputStreamReader(whatismyip.openStream()));
-            String ip = in.readLine().trim();
-            in.close();
+            URLConnection connection = whatismyip.openConnection();
+            connection.setConnectTimeout(3000);
+            connection.setReadTimeout(3000);
+            String ip;
+            try (BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
+                String line = in.readLine();
+                if (line == null || line.trim().isEmpty()) throw new IOException("Empty public IP response");
+                ip = line.trim();
+            }
 
             // 缓存IP地址
             serverPublicIp = ip;
@@ -489,11 +664,14 @@ public class ConsoleWebSocketHandler extends TextWebSocketHandler {
      * 建立VNC隧道
      */
     private boolean establishVncTunnel(WebSocketSession webSocketSession,
-                                       Map<String, String> sshConfig,
+                                       VncConnectionPlan plan,
                                        String keyFilePath) {
+        Process process = null;
+        SshTunnelProcess tunnel = null;
+        WebsockifyConfig.LocalVncPortReservation portReservation = null;
+        boolean retained = false;
         try {
-            String target = sshConfig.get("target");
-            String proxyCommand = sshConfig.get("proxyCommand");
+            ConsolePreparation preparation = requireConsoleActive(webSocketSession);
 
             String absoluteKeyFilePath = ensureAbsolutePath(keyFilePath);
 
@@ -504,108 +682,150 @@ public class ConsoleWebSocketHandler extends TextWebSocketHandler {
                 return false;
             }
 
-            // 提取连接信息
-            String connectionId = extractConnectionId(proxyCommand);
-            String proxyHost = extractProxyHost(proxyCommand);
-
-            if (connectionId == null || proxyHost == null) {
-                sendMessage(webSocketSession, "无法解析连接信息\r\n");
-                return false;
-            }
+            String connectionId = connectionIds.get(webSocketSession.getId());
+            String proxyHost = plan.getProxyHost() == null ? plan.getOuterHost() : plan.getProxyHost();
 
             // 本地 VNC 转发必须绑 127.0.0.1，供 websockify 回环接入。
-            // 生产环境若绑公网 IP，websockify 探测 127.0.0.1:5900 会失败（Mac/Web 画面都黑）。
+            // 监听就绪只读取本次 SSH 的确认消息；首次 VNC 连接留给浏览器 RFB。
             String localBind = "127.0.0.1";
-            int localVncPort = websockifyService.allocateLocalVncPort();
-            if (localVncPort <= 0) {
-                localVncPort = 5900;
+            portReservation = websockifyService.reserveLocalVncPort();
+            if (portReservation == null) {
+                sendMessage(webSocketSession, "无法分配独立的本地 VNC 端口\r\n");
+                return false;
             }
+            int localVncPort = portReservation.getPort();
             String serverIp = getServerPublicIp();
+            requireConsoleActive(webSocketSession);
 
             sendMessage(webSocketSession, "服务器公网IP: " + serverIp + "\r\n");
             sendMessage(webSocketSession, "代理主机: " + proxyHost + "\r\n");
             sendMessage(webSocketSession, "连接ID: " + connectionId + "\r\n");
-            sendMessage(webSocketSession, "目标实例: " + target + "\r\n");
+            sendMessage(webSocketSession, "VNC SSH 目标: " + plan.getOuterHost() + ":" + plan.getOuterPort() + "\r\n");
             sendMessage(webSocketSession, "密钥文件: " + absoluteKeyFilePath + "\r\n");
-            sendMessage(webSocketSession, String.format("本机转发: %s:%d → 实例:5900\r\n", localBind, localVncPort));
+            sendMessage(webSocketSession, String.format("本机转发: %s:%d → %s:%d\r\n",
+                    localBind, localVncPort, plan.getForwardHost(), plan.getForwardPort()));
 
-            // SSH -L 127.0.0.1:localPort:localhost:5900（websockify 再暴露给客户端）
-            String vncTunnelCommand = String.format(
-                    "ssh -i %s -o StrictHostKeyChecking=no " +
-                            "-o PubkeyAcceptedKeyTypes=+ssh-rsa -o HostKeyAlgorithms=+ssh-rsa " +
-                            "-o ProxyCommand='ssh -i %s -o StrictHostKeyChecking=no " +
-                            "-o PubkeyAcceptedKeyTypes=+ssh-rsa -o HostKeyAlgorithms=+ssh-rsa " +
-                            "-W %%h:%%p -p 443 %s@%s' " +
-                            "-N -L %s:%d:localhost:5900 %s",
-                    absoluteKeyFilePath,
-                    absoluteKeyFilePath,
-                    connectionId,
-                    proxyHost,
-                    localBind,
-                    localVncPort,
-                    target
-            );
+            // Both SSH hops share a console-scoped trust store, never the
+            // server operator's personal known_hosts. Keep verification on.
+            List<String> tunnelArguments = buildVncTunnelArguments(
+                    absoluteKeyFilePath, connectionId, plan, localVncPort);
+            String vncTunnelCommand = shellCommand(tunnelArguments);
 
             log.info("生成的VNC隧道命令: {}", vncTunnelCommand);
+            sendMessage(webSocketSession, "主机密钥校验: 使用此控制台连接的独立记录，首次登记，后续变更将拒绝连接\r\n");
             sendMessage(webSocketSession, "执行VNC隧道命令...\r\n");
 
-            ProcessBuilder pb = new ProcessBuilder("/bin/bash", "-c", vncTunnelCommand);
+            ProcessBuilder pb = new ProcessBuilder(tunnelArguments);
             pb.directory(new File("/"));
 
-            Process process = pb.start();
-            Thread[] readers = readProcessOutput(webSocketSession, process);
+            requireConsoleActive(webSocketSession);
+            process = pb.start();
+            AtomicReference<String> lastTunnelError = new AtomicReference<>();
+            AtomicBoolean listenerReady = new AtomicBoolean();
+            Thread[] readers = readProcessOutput(webSocketSession, process, lastTunnelError,
+                    localVncPort, listenerReady);
+            tunnel = new SshTunnelProcess(process, readers[0], readers[1], portReservation,
+                    listenerReady, lastTunnelError);
+            synchronized (preparation) {
+                requireConsoleActive(webSocketSession);
+                // Register before waiting, so close can stop the live process.
+                sshTunnelProcesses.put(webSocketSession.getId(), tunnel);
+                sessionLocks.put(webSocketSession.getId() + "_vnc_command", vncTunnelCommand);
+            }
 
             sendMessage(webSocketSession, "等待隧道建立...\r\n");
-            // 等进程存活 + 本地端口可连（最多 ~12s）
+            // Wait for this SSH process's post-listen channel creation message.
+            // Never connect to or temporarily bind the forwarded port here.
             boolean portReady = false;
             for (int i = 0; i < 40; i++) {
+                requireConsoleActive(webSocketSession);
                 Thread.sleep(300);
-                if (!process.isAlive()) {
+                requireConsoleActive(webSocketSession);
+                if (!isVncTunnelActive(webSocketSession, preparation, tunnel)) {
                     break;
                 }
-                if (websockifyService.isPortConnectable(localBind, localVncPort)) {
+                if (tunnel.listenerReady.get()) {
                     portReady = true;
                     break;
                 }
             }
 
             if (!process.isAlive()) {
-                int exitCode = process.exitValue();
-                sendMessage(webSocketSession, "SSH进程已退出，退出码: " + exitCode + "\r\n");
+                sendMessage(webSocketSession, tunnel.failureMessage() + "\r\n");
                 return false;
             }
 
-            sshTunnelProcesses.put(webSocketSession.getId(),
-                    new SshTunnelProcess(process, readers[0], readers[1]));
-            sessionLocks.put(webSocketSession.getId() + "_vnc_command", vncTunnelCommand);
-
-            if (portReady) {
-                sendMessage(webSocketSession, String.format("VNC隧道已建立: %s:%d (本机)\r\n", localBind, localVncPort));
-            } else {
+            if (!portReady) {
                 sendMessage(webSocketSession, String.format(
-                        "⚠️ SSH 进程在跑，但 %s:%d 尚未可连，仍尝试启动 websockify…\r\n",
+                        "未收到本次 SSH 本地转发的监听就绪消息（%s:%d），不启动 websockify\r\n",
                         localBind, localVncPort));
+                return false;
             }
+            sendMessage(webSocketSession, String.format("本地转发已监听: %s:%d，尚待浏览器完成 VNC 握手\r\n", localBind, localVncPort));
 
-            sendVncReadyMessage(webSocketSession, localVncPort, vncTunnelCommand);
+            if (!sendVncReadyMessage(webSocketSession, localVncPort, vncTunnelCommand, tunnel)) return false;
+            requireConsoleActive(webSocketSession);
+            monitorTunnelExit(webSocketSession, tunnel);
+            retained = true;
             return true;
         } catch (Exception e) {
             log.error("VNC隧道连接失败: {}", e.getMessage(), e);
             sendMessage(webSocketSession, "VNC隧道连接失败: " + e.getMessage() + "\r\n");
             return false;
+        } finally {
+            if (!retained) {
+                websockifyService.stopWebsockifyProxy(webSocketSession.getId());
+                if (tunnel != null) {
+                    sshTunnelProcesses.remove(webSocketSession.getId(), tunnel);
+                    tunnel.destroy();
+                } else {
+                    stopVncProcessAndReleasePort(process, portReservation);
+                }
+            }
         }
     }
 
     /**
      * 读取进程输出和错误流，返回两个 reader 线程的引用以便后续清理
      */
-    private Thread[] readProcessOutput(WebSocketSession webSocketSession, Process process) {
+    private Thread[] readProcessOutput(WebSocketSession webSocketSession, Process process,
+                                       AtomicReference<String> lastError, int localVncPort,
+                                       AtomicBoolean listenerReady) {
         // 读取错误输出
         Thread errorReader = new Thread(() -> {
             try {
                 BufferedReader reader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
+                boolean awaitingPortListener = false;
+                String expectedListener = "debug1: Local forwarding listening on 127.0.0.1 port "
+                        + localVncPort + ".";
                 String line;
                 while ((line = reader.readLine()) != null) {
+                    if (listenerReady != null) {
+                        // The address announcement can precede bind/listen. It
+                        // only identifies our unique -L; channel creation is the
+                        // readiness marker. Unknown log formats fail closed.
+                        if (line.startsWith("debug1: Local forwarding listening on ")) {
+                            awaitingPortListener = expectedListener.equals(line);
+                        } else if (awaitingPortListener && VNC_PORT_LISTENER_CREATED.matcher(line).matches()) {
+                            listenerReady.set(true);
+                            awaitingPortListener = false;
+                        }
+                        // Keep normal errors and banners while hiding the extra
+                        // DEBUG1 output from the console and application log.
+                        if (line.startsWith("debug1:") || line.startsWith("debug2:")
+                                || line.startsWith("debug3:")) continue;
+                        if (line.startsWith("bind [") || line.contains("cannot listen to port")) {
+                            awaitingPortListener = false;
+                        }
+                    }
+                    String lower = line.toLowerCase(java.util.Locale.ROOT);
+                    if (lower.contains("closed by remote host") || lower.contains("permission denied")
+                            || lower.contains("connection refused") || lower.contains("forwarding failed")
+                            || lower.contains("could not resolve") || lower.contains("host key verification failed")
+                            || lower.contains("remote host identification has changed") || lower.contains("forwarding disabled")
+                            || lower.contains("timed out") || lower.contains("no route to host") || lower.contains("connection reset")) {
+                        lastError.set(line.substring(0, Math.min(line.length(), 1000)));
+                    }
                     sendMessage(webSocketSession, "SSH: " + line + "\r\n");
                     log.info("SSH: {}", line);
                 }
@@ -632,17 +852,45 @@ public class ConsoleWebSocketHandler extends TextWebSocketHandler {
         outputReader.setDaemon(true);
         outputReader.start();
 
-        return new Thread[]{errorReader, outputReader};
+        return new Thread[]{outputReader, errorReader};
+    }
+
+    /** Watch the actual SSH process after publishing transport readiness. */
+    private void monitorTunnelExit(WebSocketSession session, SshTunnelProcess tunnel) {
+        Thread monitor = new Thread(() -> {
+            try {
+                tunnel.process.waitFor();
+                // Process exit can precede the final stderr line being consumed.
+                if (tunnel.stderrReader != null) tunnel.stderrReader.join(200);
+                ConsolePreparation preparation = consolePreparations.get(session.getId());
+                if (preparation == null) return;
+                synchronized (preparation) {
+                    if (preparation.cancelled || tunnel.destroyed.get()
+                            || sshTunnelProcesses.get(session.getId()) != tunnel || !session.isOpen()) return;
+                    sendError(session, tunnel.failureMessage());
+                    handleDisconnect(session);
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }, "vnc-tunnel-exit-" + session.getId());
+        monitor.setDaemon(true);
+        tunnel.exitMonitor = monitor;
+        if (!tunnel.destroyed.get()) monitor.start();
     }
 
     /**
      * 发送VNC连接就绪消息
      */
-    private void sendVncReadyMessage(WebSocketSession webSocketSession, int vncPort, String vncCommand) {
+    private boolean sendVncReadyMessage(WebSocketSession webSocketSession, int vncPort,
+                                        String vncCommand, SshTunnelProcess tunnel) throws IOException {
+        String sessionId = webSocketSession.getId();
         try {
-            String sessionId = webSocketSession.getId();
+            ConsolePreparation preparation = requireConsoleActive(webSocketSession);
+            if (tunnel.destroyed.get() || !tunnel.process.isAlive()) throw new IOException(tunnel.failureMessage());
             String connectionId = connectionIds.get(sessionId);
             String serverIp = getServerPublicIp();
+            requireConsoleActive(webSocketSession);
 
             Map<String, Object> response = new HashMap<>();
             response.put("type", "vnc_ready");
@@ -652,34 +900,45 @@ public class ConsoleWebSocketHandler extends TextWebSocketHandler {
             response.put("command", vncCommand);
 
             // 启动 websockify：0.0.0.0:wsPort → 127.0.0.1:vncPort
-            int websockifyPort = websockifyService.startWebsockifyProxy(sessionId, vncPort);
+            int websockifyPort = websockifyService.startWebsockifyProxy(sessionId, tunnel.portReservation,
+                    () -> tunnel.listenerReady.get() && isVncTunnelActive(webSocketSession, preparation, tunnel));
+            requireConsoleActive(webSocketSession);
+            // A listening websockify process is not proof that its SSH target
+            // survived proxy startup. Never publish a port for an exited tunnel.
+            if (tunnel.destroyed.get() || !tunnel.process.isAlive()) throw new IOException(tunnel.failureMessage());
 
             if (websockifyPort > 0) {
                 response.put("websockifyPort", websockifyPort);
                 // 客户端用公网 IP + websockify 端口（HTTP 直连）；HTTPS 走 /websockify/{port}
                 response.put("vncUrl", String.format("ws://%s:%d/", serverIp, websockifyPort));
-                response.put("message", String.format("SSH隧道已建立，websockify代理端口: %d", websockifyPort));
+                response.put("message", String.format("转发代理已就绪（端口 %d），等待浏览器完成 VNC 握手", websockifyPort));
 
                 sendMessage(webSocketSession, String.format(
-                        "✅ websockify 已启动: %s:%d → 127.0.0.1:%d\r\n",
+                        "websockify 已监听: %s:%d → 127.0.0.1:%d，尚未确认画面连接\r\n",
                         serverIp, websockifyPort, vncPort));
                 sendMessage(webSocketSession, "   HTTP: ws://" + serverIp + ":" + websockifyPort + "/\r\n");
                 sendMessage(webSocketSession, "   HTTPS 反代: wss://host/websockify/" + websockifyPort + "\r\n");
             } else {
                 // 本地转发仅绑 127.0.0.1，外网 VNC 客户端无法直连；明确告知
-                response.put("vncUrl", "");
-                response.put("message", "SSH隧道已建立，websockify启动失败");
                 sendMessage(webSocketSession, "⚠️ websockify 启动失败，浏览器/Mac 无法显示画面\r\n");
                 sendMessage(webSocketSession, "   请检查: 1) 是否安装 websockify  2) 本机 127.0.0.1:"
-                        + vncPort + " 是否可连  3) 服务端日志 Websockify 错误\r\n");
+                        + vncPort + " 是否已绑定  3) 服务端日志 Websockify 错误\r\n");
+                websockifyService.stopWebsockifyProxy(sessionId);
+                return false;
             }
 
-            if (webSocketSession.isOpen()) {
-                webSocketSession.sendMessage(new TextMessage(objectMapper.writeValueAsString(response)));
+            synchronized (preparation) {
+                // A disconnect must not be followed by an old readiness frame.
+                requireConsoleActive(webSocketSession);
+                if (tunnel.destroyed.get() || !tunnel.process.isAlive()) throw new IOException(tunnel.failureMessage());
+                sendJson(webSocketSession, response);
             }
+            return true;
 
-        } catch (IOException e) {
-            log.error("Error sending VNC ready message", e);
+        } catch (IOException | RuntimeException e) {
+            // Startup can complete after a close callback has already cleaned up.
+            websockifyService.stopWebsockifyProxy(sessionId);
+            throw e;
         }
     }
 
@@ -687,43 +946,133 @@ public class ConsoleWebSocketHandler extends TextWebSocketHandler {
      * 提供VNC连接信息
      */
     private void provideVncConnectionInfo(WebSocketSession webSocketSession,
-                                          Map<String, String> sshConfig,
+                                          VncConnectionPlan plan,
                                           String keyFilePath) {
         try {
-            String target = sshConfig.get("target");
-            String proxyCommand = sshConfig.get("proxyCommand");
-            String bindingIp = getBindingIp();
+            ConsolePreparation preparation = requireConsoleActive(webSocketSession);
             String serverIp = getServerPublicIp();
+            requireConsoleActive(webSocketSession);
 
             sendMessage(webSocketSession, "⚠️ 自动VNC隧道建立失败，提供VNC连接方法\r\n");
             sendMessage(webSocketSession, "\r\n=== Oracle VNC连接 ===\r\n");
 
-            String connectionId = extractConnectionId(proxyCommand);
-            String proxyHost = extractProxyHost(proxyCommand);
+            String connectionId = connectionIds.get(webSocketSession.getId());
 
-            String vncCmd = String.format(
-                    "ssh -i %s -o PubkeyAcceptedKeyTypes=+ssh-rsa -o HostKeyAlgorithms=+ssh-rsa " +
-                            "-o ProxyCommand='ssh -i %s -o PubkeyAcceptedKeyTypes=+ssh-rsa -o HostKeyAlgorithms=+ssh-rsa " +
-                            "-W %%h:%%p -p 443 %s@%s' " +
-                            "-N -L %s:5900:localhost:5900 %s",
-                    keyFilePath,
-                    keyFilePath,
-                    connectionId,
-                    proxyHost,
-                    bindingIp, // 使用适合环境的绑定IP
-                    target
-            );
+            String vncCmd = shellCommand(buildVncTunnelArguments(
+                    ensureAbsolutePath(keyFilePath), connectionId, plan, 5900));
 
             sendMessage(webSocketSession, "私钥文件: " + keyFilePath + "\r\n");
             sendMessage(webSocketSession, "VNC隧道命令已准备就绪（需在服务器本机执行）\r\n");
-            sendMessage(webSocketSession, "本机监听 127.0.0.1:5900；画面仍依赖 websockify\r\n");
+            sendMessage(webSocketSession, "手动命令将监听 127.0.0.1:5900；当前未建立隧道或启动代理\r\n");
 
-            sendVncReadyMessage(webSocketSession, 5900, vncCmd);
+            // No tunnel was established for this instance. Never start a proxy
+            // against an unrelated process that happens to listen on port 5900.
+            Map<String, Object> response = new HashMap<>();
+            response.put("type", "vnc_ready");
+            response.put("port", 5900);
+            response.put("host", serverIp);
+            response.put("connectionId", connectionIds.get(webSocketSession.getId()));
+            response.put("command", vncCmd);
+            response.put("vncUrl", "");
+            response.put("message", "自动 VNC 隧道未建立；仅提供手动连接命令，未启动 websockify 代理");
+            synchronized (preparation) {
+                requireConsoleActive(webSocketSession);
+                sendJson(webSocketSession, response);
+            }
 
         } catch (Exception e) {
             log.error("提供VNC连接信息失败", e);
             sendError(webSocketSession, "提供连接信息失败: " + e.getMessage());
         }
+    }
+
+    /** Build both automatic and manual tunnels with identical host verification. */
+    private List<String> buildVncTunnelArguments(String keyPath, String connectionId,
+                                                VncConnectionPlan plan, int localPort) throws IOException {
+        if (connectionId == null || !connectionId.matches("ocid1\\.instanceconsoleconnection\\.[A-Za-z0-9._-]+")
+                || plan == null
+                || localPort < 1 || localPort > 65535) {
+            throw new IOException("控制台 SSH 连接参数无效");
+        }
+        String scope = consoleTrustScope(connectionId);
+        Path keyFile = Paths.get(keyPath).toAbsolutePath().normalize();
+        Path knownHosts = keyFile.getParent().resolve("known_hosts-" + scope);
+        sshPath(keyFile);
+        sshPath(knownHosts);
+        try {
+            Files.createFile(knownHosts);
+        } catch (FileAlreadyExistsException ignored) {
+            // A reconnect must retain its trusted keys; never truncate or reset.
+        }
+        if (!Files.isRegularFile(knownHosts, LinkOption.NOFOLLOW_LINKS)
+                || !setSecureFilePermissions(knownHosts.toFile())
+                || !Files.isReadable(knownHosts) || !Files.isWritable(knownHosts)) {
+            throw new IOException("控制台专用主机密钥记录不可用: " + knownHosts);
+        }
+
+        // VNC and serial target services can have different ports and host keys;
+        // preserve the proxy record and track the VNC target as its own endpoint.
+        String outerAlias = plan.getProxyHost() == null ? "oci-console-proxy-" + scope
+                : "oci-console-vnc-target-" + plan.getOuterPort() + "-" + scope;
+        List<String> command = consoleSshArguments(keyFile, knownHosts, outerAlias);
+        command.addAll(Arrays.asList("-o", "LogLevel=DEBUG1"));
+        if (plan.getProxyHost() != null) {
+            List<String> proxy = consoleSshArguments(keyFile, knownHosts, "oci-console-proxy-" + scope);
+            // The readiness marker must come from the outer forwarding client.
+            proxy.addAll(Arrays.asList("-o", "LogLevel=INFO"));
+            proxy.addAll(Arrays.asList("-p", String.valueOf(plan.getProxyPort()), "-l", plan.getProxyUser()));
+            // Escape literal arguments before OpenSSH expands only %h/%p.
+            String proxyCommand = shellCommand(proxy).replace("%", "%%")
+                    + " -W %h:%p " + shellQuote(plan.getProxyHost());
+            command.addAll(Arrays.asList("-o", "ProxyCommand=" + proxyCommand));
+        }
+        if (plan.getOuterUser() != null) command.addAll(Arrays.asList("-l", plan.getOuterUser()));
+        command.addAll(Arrays.asList("-o", "ExitOnForwardFailure=yes", "-p", String.valueOf(plan.getOuterPort()),
+                "-N", "-T", "-L", plan.localForward(localPort), plan.getOuterHost()));
+        return command;
+    }
+
+    private List<String> consoleSshArguments(Path keyFile, Path knownHosts, String hostAlias) throws IOException {
+        String hostsPath = sshPath(knownHosts).replace("\\", "\\\\").replace("\"", "\\\"");
+        return new ArrayList<>(Arrays.asList("ssh", "-F", "/dev/null", "-i", sshPath(keyFile),
+                "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new",
+                "-o", "UpdateHostKeys=no",
+                "-o", "UserKnownHostsFile=\"" + hostsPath + "\"", "-o", "HostKeyAlias=" + hostAlias,
+                "-o", "PubkeyAcceptedKeyTypes=+ssh-rsa", "-o", "HostKeyAlgorithms=+ssh-rsa"));
+    }
+
+    private String sshPath(Path path) throws IOException {
+        String value = path.toString();
+        // OpenSSH versions differ in when -i paths are checked/expanded.
+        // Reject token-like paths explicitly instead of silently changing them.
+        if (value.contains("\n") || value.contains("\r") || value.contains("%") || value.contains("${")) {
+            throw new IOException("控制台文件目录不能包含换行、百分号或 ${，请使用普通目录");
+        }
+        return value;
+    }
+
+    private String consoleTrustScope(String connectionId) throws IOException {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(connectionId.getBytes(StandardCharsets.UTF_8));
+            StringBuilder scope = new StringBuilder(digest.length * 2);
+            for (byte value : digest) {
+                scope.append(Character.forDigit((value >>> 4) & 15, 16));
+                scope.append(Character.forDigit(value & 15, 16));
+            }
+            return scope.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new IOException("无法创建控制台主机密钥记录标识", e);
+        }
+    }
+
+    private String shellQuote(String value) {
+        return "'" + value.replace("'", "'\"'\"'") + "'";
+    }
+
+    private String shellCommand(List<String> arguments) {
+        StringJoiner command = new StringJoiner(" ");
+        for (String argument : arguments) command.add(shellQuote(argument));
+        return command.toString();
     }
 
     /**
@@ -874,6 +1223,7 @@ public class ConsoleWebSocketHandler extends TextWebSocketHandler {
      */
     private void handleDisconnect(WebSocketSession webSocketSession) {
         String sessionId = webSocketSession.getId();
+        cancelConsolePreparation(sessionId);
 
         // 停止websockify代理
         websockifyService.stopWebsockifyProxy(sessionId);
@@ -950,19 +1300,13 @@ public class ConsoleWebSocketHandler extends TextWebSocketHandler {
      * 发送消息到WebSocket客户端
      */
     private void sendMessage(WebSocketSession session, String message) {
-        Object lock = sessionLocks.getOrDefault(session.getId(), new Object());
-        synchronized (lock) {
-            try {
-                Map<String, Object> response = new HashMap<>();
-                response.put("type", "output");
-                response.put("data", message);
-
-                if (session.isOpen()) {
-                    session.sendMessage(new TextMessage(objectMapper.writeValueAsString(response)));
-                }
-            } catch (IOException e) {
-                log.error("Error sending message to WebSocket", e);
-            }
+        try {
+            Map<String, Object> response = new HashMap<>();
+            response.put("type", "output");
+            response.put("data", message);
+            sendJson(session, response);
+        } catch (IOException e) {
+            if (session.isOpen()) log.error("Error sending message to WebSocket", e);
         }
     }
 
@@ -970,18 +1314,28 @@ public class ConsoleWebSocketHandler extends TextWebSocketHandler {
      * 发送错误消息到WebSocket客户端
      */
     private void sendError(WebSocketSession session, String error) {
-        Object lock = sessionLocks.getOrDefault(session.getId(), new Object());
-        synchronized (lock) {
-            try {
-                Map<String, Object> response = new HashMap<>();
-                response.put("type", "error");
-                response.put("message", error);
+        try {
+            Map<String, Object> response = new HashMap<>();
+            response.put("type", "error");
+            response.put("message", error);
+            sendJson(session, response);
+        } catch (IOException e) {
+            if (session.isOpen()) log.error("Error sending error message to WebSocket", e);
+        }
+    }
 
-                if (session.isOpen()) {
-                    session.sendMessage(new TextMessage(objectMapper.writeValueAsString(response)));
-                }
-            } catch (IOException e) {
-                log.error("Error sending error message to WebSocket", e);
+    /** One stable lock for output, errors, readiness and heartbeat responses. */
+    private void sendJson(WebSocketSession session, Map<String, Object> response) throws IOException {
+        Object lock = sessionLocks.get(session.getId());
+        if (lock == null) throw new IOException("Console WebSocket is closed");
+        synchronized (lock) {
+            if (!session.isOpen() || sessionLocks.get(session.getId()) != lock) {
+                throw new IOException("Console WebSocket is closed");
+            }
+            try {
+                session.sendMessage(new TextMessage(objectMapper.writeValueAsString(response)));
+            } catch (RuntimeException e) {
+                throw new IOException("Console WebSocket send failed", e);
             }
         }
     }
@@ -1003,6 +1357,7 @@ public class ConsoleWebSocketHandler extends TextWebSocketHandler {
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
         String sessionId = session.getId();
+        cancelConsolePreparation(sessionId);
 
         // 停止websockify代理
         websockifyService.stopWebsockifyProxy(sessionId);
@@ -1021,8 +1376,9 @@ public class ConsoleWebSocketHandler extends TextWebSocketHandler {
         sessionLocks.remove(sessionId + "_vnc_command");
         cleanupSshSession(sessionId);
         connectionIds.remove(sessionId);
+        consolePreparations.remove(sessionId);
 
-        log.info("Console WebSocket connection closed and cleaned up: {}", sessionId);
+        log.info("Console WebSocket connection closed and cleaned up: {}, closeCode={}", sessionId, status.getCode());
     }
 
     /**
@@ -1030,6 +1386,10 @@ public class ConsoleWebSocketHandler extends TextWebSocketHandler {
      */
     @PreDestroy
     public void destroy() {
+        // Reject new tasks without interrupting an already submitted OCI write.
+        // Queued/running tasks observe cancellation before starting any tunnel.
+        consoleCreationExecutor.shutdown();
+        consolePreparations.keySet().forEach(this::cancelConsolePreparation);
         // 停止所有 SSH 隧道进程和 reader 线程
         sshTunnelProcesses.values().forEach(SshTunnelProcess::destroy);
         sshTunnelProcesses.clear();
@@ -1057,6 +1417,7 @@ public class ConsoleWebSocketHandler extends TextWebSocketHandler {
         sshSessions.clear();
         outputStreams.clear();
         connectionIds.clear();
+        consolePreparations.clear();
 
         log.debug("Console WebSocket handler destroyed and all resources cleaned up");
     }

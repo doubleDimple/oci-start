@@ -352,7 +352,7 @@ final class BootViewModel: ObservableObject {
         detailLoading = true
         defer { detailLoading = false }
         do {
-            detailItems = try await service.bootDetail(bootId: item.id)
+            detailItems = try await service.bootDetail(tenantId: item.tenantId, architecture: item.architecture)
         } catch {
             detailItems = []
             ToastCenter.shared.error(error.localizedDescription)

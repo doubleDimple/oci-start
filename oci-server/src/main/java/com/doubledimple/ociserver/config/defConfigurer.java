@@ -55,17 +55,14 @@ public class defConfigurer implements WebMvcConfigurer {
 
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
+        // Entry HTML must refresh across upgrades; its Vite chunks carry content hashes.
+        registry.addResourceHandler("/index.html")
+                .addResourceLocations("classpath:/static/")
+                .setCacheControl(CacheControl.noStore());
         registry.addResourceHandler("/images/**")
                 .addResourceLocations("classpath:/static/images/")
                 .setCacheControl(CacheControl.maxAge(365, TimeUnit.DAYS).cachePublic());
-        // webfonts: long cache so FA icons don't re-fetch on every page load
-        registry.addResourceHandler("/webfonts/**")
-                .addResourceLocations("classpath:/static/webfonts/")
-                .setCacheControl(CacheControl.maxAge(365, TimeUnit.DAYS).cachePublic());
-        // css/js static assets: 7-day cache
-        registry.addResourceHandler("/css/**")
-                .addResourceLocations("classpath:/static/css/")
-                .setCacheControl(CacheControl.maxAge(7, TimeUnit.DAYS).cachePublic());
+        // Shared terminal runtimes are still served locally.
         registry.addResourceHandler("/js/**")
                 .addResourceLocations("classpath:/static/js/")
                 .setCacheControl(CacheControl.maxAge(7, TimeUnit.DAYS).cachePublic());

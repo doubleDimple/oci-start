@@ -78,11 +78,11 @@ struct StorageSheetHost: View {
                 }
                 if let err = model.formError, !err.isEmpty {
                     Text(err)
-                        .font(.system(size: 12))
+                        .font(.system(size: 14))
                         .foregroundColor(AppSheetSurface.accentRed(dark))
                 }
                 Text("名称需全局唯一，仅小写字母、数字、连字符。")
-                    .font(.system(size: 11))
+                    .font(.system(size: 13))
                     .foregroundColor(mutedText)
             }
         }
@@ -103,14 +103,14 @@ struct StorageSheetHost: View {
         }) {
             VStack(alignment: .leading, spacing: 12) {
                 Text("链接有效期约 1 小时。已自动复制到剪贴板。")
-                    .font(.system(size: 12))
+                    .font(.system(size: 13))
                     .foregroundColor(mutedText)
                 if model.presignedURLText.isEmpty {
                     HStack {
                         Spacer()
                         ProgressView().scaleEffect(0.8)
                         Text("生成中…")
-                            .font(.system(size: 12))
+                            .font(.system(size: 13))
                             .foregroundColor(mutedText)
                         Spacer()
                     }
@@ -156,7 +156,7 @@ struct StorageSheetHost: View {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
                         Text("总体进度")
-                            .font(.system(size: 12, weight: .medium))
+                            .font(.system(size: 13, weight: .medium))
                             .foregroundColor(mutedText)
                         Spacer()
                         Text("\(model.uploadOverallPercent)%")
@@ -173,12 +173,12 @@ struct StorageSheetHost: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(task.fileName)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: 14, weight: .medium))
                     .foregroundColor(primaryText)
                     .lineLimit(1)
                 Spacer()
                 Text(task.statusText)
-                    .font(.system(size: 11))
+                    .font(.system(size: 12))
                     .foregroundColor(task.failed ? AppSheetSurface.accentRed(dark) : mutedText)
             }
             progressBar(task.percent, failed: task.failed)

@@ -52,14 +52,4 @@ public class PasswordGenerator {
         return new String(characters);
     }
 
-    public static void main(String[] args) {
-        String password = generatePassword();
-        System.out.println("Generated password: " + password);
-
-        // 生成多个密码示例
-        System.out.println("\n更多密码示例：");
-        for (int i = 0; i < 5; i++) {
-            System.out.println(generatePassword());
-        }
-    }
 }

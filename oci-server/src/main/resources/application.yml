@@ -9,7 +9,7 @@ spring:
         strategy:
           content:
             enabled: true
-            paths: /js/**, /css/**
+            paths: /js/**
   cache:
     type: caffeine
     caffeine:
@@ -36,26 +36,6 @@ spring:
       write-dates-as-timestamps: false
   application:
     name: oci-start
-  freemarker:
-    template-loader-path: classpath:/templates/
-    content-type: text/html
-    cache: true
-    charset: UTF-8
-    check-template-location: true
-    expose-request-attributes: false
-    expose-session-attributes: false
-    request-context-attribute: req
-    suffix: .ftl
-    settings:
-      api_builtin_enabled: true
-      date_format: yyyy-MM-dd
-      time_format: HH:mm:ss
-      datetime_format: yyyy-MM-dd HH:mm:ss
-  messages:
-    basename: i18n/messages
-    encoding: UTF-8
-    fallback-to-system-locale: false
-    use-code-as-default-message: true
 
   servlet:
     multipart:
@@ -80,9 +60,14 @@ spring:
   profiles:
     active: release
 server:
-  #forward-headers-strategy: native
+  # 保留真实连接地址；转发头只由 ClientIpResolver 按可信代理策略解析。
+  forward-headers-strategy: none
   max-http-header-size: 81920
   port: 9856
+
+client-ip:
+  # 默认不信任代理。与本机 Nginx 并用时配置 127.0.0.1/32,::1/128，详见 README。
+  trusted-proxies: ${CLIENT_IP_TRUSTED_PROXIES:}
 
 # 日志配置
 logging:
@@ -142,6 +127,10 @@ thirdApi:
 oci:
   version: 5.7.92
   ssh-version: v-5.7.92
+  web:
+    # IDEA 点 OciServerApplication 时自动 pnpm run dev；生产 jar 找不到 oci-start-web 会跳过
+    auto-start: true
+    port: 5173
 
 ssl:
   staging: false

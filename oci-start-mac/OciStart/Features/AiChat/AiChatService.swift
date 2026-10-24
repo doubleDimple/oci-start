@@ -1,6 +1,11 @@
 import Foundation
 
-struct AiChatService {
+protocol AiChatServing {
+    func listTenants() async throws -> [AiChatTenantOption]
+    func models(tenantId: Int64) async throws -> [AiChatModelOption]
+}
+
+struct AiChatService: AiChatServing {
     let baseURL: String
     private let client = APIClient.shared
 

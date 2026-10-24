@@ -10,6 +10,7 @@ import com.doubledimple.ociserver.pojo.dto.OciGatewayVcnPair;
 import com.doubledimple.ociserver.pojo.enums.ArchitectureEnum;
 import com.doubledimple.ociserver.pojo.enums.OperationSystemEnum;
 import com.doubledimple.ociserver.pojo.request.OciComputerCreateRequest;
+import com.doubledimple.ociserver.service.permissions.OciPermissions;
 import com.oracle.bmc.ClientConfiguration;
 import com.oracle.bmc.Region;
 import com.oracle.bmc.auth.SimpleAuthenticationDetailsProvider;
@@ -29,8 +30,10 @@ import com.oracle.bmc.core.model.Subnet;
 import com.oracle.bmc.core.model.Vcn;
 import com.oracle.bmc.core.requests.ListImagesRequest;
 import com.oracle.bmc.core.requests.ListShapesRequest;
+import com.oracle.bmc.core.requests.ListSubnetsRequest;
 import com.oracle.bmc.core.responses.ListImagesResponse;
 import com.oracle.bmc.core.responses.ListShapesResponse;
+import com.oracle.bmc.core.responses.ListSubnetsResponse;
 import com.oracle.bmc.http.client.jersey.JerseyHttpProvider;
 import com.oracle.bmc.identity.IdentityClient;
 import com.oracle.bmc.identity.model.AvailabilityDomain;
@@ -68,6 +71,41 @@ import com.doubledimple.ociserver.config.ProxyContext;
  */
 @Slf4j
 public class OciComputerUtils {
+
+    public static boolean mustReuseNetwork(Tenant tenant) {
+        return OciPermissions.isManaged(tenant) && !OciPermissions.allows(tenant, "NETWORK_MANAGE");
+    }
+
+    /**
+     * Creation-only credentials can use an existing subnet, but may not repair
+     * its route table, replace its security rules, or create network resources.
+     * Returning null lets the caller try another availability domain.
+     */
+    public static Subnet existingLaunchSubnet(VirtualNetworkClient client, String compartmentId,
+                                              String availabilityDomain) {
+        String page = null;
+        do {
+            ListSubnetsResponse response = client.listSubnets(ListSubnetsRequest.builder()
+                    .compartmentId(compartmentId).page(page).build());
+            for (Subnet subnet : response.getItems()) {
+                if (subnet.getLifecycleState() == Subnet.LifecycleState.Available
+                        && !Boolean.TRUE.equals(subnet.getProhibitPublicIpOnVnic())
+                        && (StringUtils.isBlank(subnet.getAvailabilityDomain())
+                        || subnet.getAvailabilityDomain().equals(availabilityDomain))) {
+                    return subnet;
+                }
+            }
+            page = response.getOpcNextPage();
+        } while (StringUtils.isNotBlank(page));
+        return null;
+    }
+
+    public static void requireUsableNetwork(Tenant tenant, boolean missing) {
+        if (missing && mustReuseNetwork(tenant)) {
+            throw new IllegalStateException(
+                    "未找到可用的现有公网子网，请先在 OCI 配置子网、路由和安全规则，或重新授权网络管理后再创建实例。");
+        }
+    }
 
     /**
     * @Description:  ociComputerDto(库里返回的数据)
@@ -123,17 +161,25 @@ public class OciComputerUtils {
                 OciComputerDto.AvailabilityDomainName domainName = new OciComputerDto.AvailabilityDomainName();
                 List<OciComputerDto.OciShape> ociShapeList = new ArrayList<>();
                 OciComputerDto.OciShape ociShape = new OciComputerDto.OciShape();
-                OciGatewayVcnPair internetGatewayPair = createInternetGateway(virtualNetworkClient, compartmentId, createVcn(virtualNetworkClient, compartmentId));
-                InternetGateway internetGateway = internetGatewayPair.getInternetGateway();
-                Vcn vcn = internetGatewayPair.getVcn();
-                addInternetGatewayToDefaultRouteTable(virtualNetworkClient,vcn,internetGateway);
-                String networkCidrBlock = vcn.getCidrBlock();
-                Subnet subnet = createSubnet(virtualNetworkClient, compartmentId, availabilityDomain, networkCidrBlock, vcn);
+                Subnet subnet;
+                NetworkSecurityGroup networkSecurityGroup = null;
+                if (mustReuseNetwork(tenant)) {
+                    subnet = existingLaunchSubnet(virtualNetworkClient, compartmentId, availabilityDomain.getName());
+                } else {
+                    OciGatewayVcnPair internetGatewayPair = createInternetGateway(virtualNetworkClient, compartmentId, createVcn(virtualNetworkClient, compartmentId));
+                    InternetGateway internetGateway = internetGatewayPair.getInternetGateway();
+                    Vcn vcn = internetGatewayPair.getVcn();
+                    addInternetGatewayToDefaultRouteTable(virtualNetworkClient,vcn,internetGateway);
+                    String networkCidrBlock = vcn.getCidrBlock();
+                    subnet = createSubnet(virtualNetworkClient, compartmentId, availabilityDomain, networkCidrBlock, vcn);
+                    if (subnet != null) {
+                        networkSecurityGroup = createNetworkSecurityGroup(virtualNetworkClient, compartmentId, vcn);
+                        addNetworkSecurityGroupSecurityRules(virtualNetworkClient, networkSecurityGroup, networkCidrBlock);
+                    }
+                }
                 if (null != subnet) {
-                    NetworkSecurityGroup networkSecurityGroup = createNetworkSecurityGroup(virtualNetworkClient, compartmentId, vcn);
-                    addNetworkSecurityGroupSecurityRules(virtualNetworkClient, networkSecurityGroup, networkCidrBlock);
                     ociShape.setCompartmentId(compartmentId);
-                    ociShape.setNetworkSecurityGroupId(networkSecurityGroup.getId());
+                    ociShape.setNetworkSecurityGroupId(networkSecurityGroup == null ? null : networkSecurityGroup.getId());
                     ociShape.setSubnetId(subnet.getId());
                     ociShape.setAvailabilityDomainName(availabilityDomain.getName());
                     ociShapeList.add(ociShape);
@@ -142,6 +188,7 @@ public class OciComputerUtils {
                     availabilityDomainNames.add(domainName);
                 }
             }
+            requireUsableNetwork(tenant, availabilityDomainNames.isEmpty());
             return availabilityDomainNames;
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -151,6 +198,7 @@ public class OciComputerUtils {
 
     //构建启动实例参数(存库)
     public static OciComputerDto buildComputerParam(Tenant tenant,User user){
+        OciPermissions.require(tenant, "INSTANCE_CREATE");
         OciComputerDto ociComputerDto = new OciComputerDto();
         List<OciComputerDto.AvailabilityDomainName> availabilityDomainNameList = new ArrayList<>();
         SimpleAuthenticationDetailsProvider authenticationDetailsProvider = OciUtils.getProvider(tenant);
@@ -189,21 +237,29 @@ public class OciComputerUtils {
                         Shape.BillingType billingType = shape.getBillingType();
                         ociComputerDto.setBillingType(billingType);
                         Image image = getImage(computeClient, compartmentId, shape, user);
-                        List<Vcn> vcns = createVcn(virtualNetworkClient, compartmentId);
-                        OciGatewayVcnPair internetGatewayPair = createInternetGateway(virtualNetworkClient, compartmentId, vcns);
-                        InternetGateway internetGateway = internetGatewayPair.getInternetGateway();
-                        Vcn vcn = internetGatewayPair.getVcn();
-                        addInternetGatewayToDefaultRouteTable(virtualNetworkClient,vcn,internetGateway);
-                        String networkCidrBlock = vcn.getCidrBlock();
-                        Subnet subnet = createSubnet(virtualNetworkClient, compartmentId, availabilityDomain, networkCidrBlock, vcn);
+                        Subnet subnet;
+                        NetworkSecurityGroup networkSecurityGroup = null;
+                        if (mustReuseNetwork(tenant)) {
+                            subnet = existingLaunchSubnet(virtualNetworkClient, compartmentId, availabilityDomain.getName());
+                        } else {
+                            List<Vcn> vcns = createVcn(virtualNetworkClient, compartmentId);
+                            OciGatewayVcnPair internetGatewayPair = createInternetGateway(virtualNetworkClient, compartmentId, vcns);
+                            InternetGateway internetGateway = internetGatewayPair.getInternetGateway();
+                            Vcn vcn = internetGatewayPair.getVcn();
+                            addInternetGatewayToDefaultRouteTable(virtualNetworkClient,vcn,internetGateway);
+                            String networkCidrBlock = vcn.getCidrBlock();
+                            subnet = createSubnet(virtualNetworkClient, compartmentId, availabilityDomain, networkCidrBlock, vcn);
+                            if (subnet != null) {
+                                networkSecurityGroup = createNetworkSecurityGroup(virtualNetworkClient, compartmentId, vcn);
+                                addNetworkSecurityGroupSecurityRules(virtualNetworkClient, networkSecurityGroup, networkCidrBlock);
+                            }
+                        }
                         if (null == subnet) {
                             continue;
                         }
-                        NetworkSecurityGroup networkSecurityGroup = createNetworkSecurityGroup(virtualNetworkClient, compartmentId, vcn);
-                        addNetworkSecurityGroupSecurityRules(virtualNetworkClient, networkSecurityGroup, networkCidrBlock);
                         ociShape.setCompartmentId(compartmentId);
                         ociShape.setImageId(image.getId());
-                        ociShape.setNetworkSecurityGroupId(networkSecurityGroup.getId());
+                        ociShape.setNetworkSecurityGroupId(networkSecurityGroup == null ? null : networkSecurityGroup.getId());
                         ociShape.setSubnetId(subnet.getId());
                         ociShape.setBillingType(shape.getBillingType());
                         ociShape.setAvailabilityDomainName(availabilityDomain.getName());
@@ -214,6 +270,8 @@ public class OciComputerUtils {
                     availabilityDomainNameList.add(domainName);
                 }
             }
+            requireUsableNetwork(tenant, availabilityDomainNameList.stream()
+                    .allMatch(domain -> domain.getOciShapeList() == null || domain.getOciShapeList().isEmpty()));
             ociComputerDto.setAvailabilityDomainNameList(availabilityDomainNameList);
             return ociComputerDto;
         } catch (Exception e) {
@@ -250,7 +308,8 @@ public class OciComputerUtils {
         CreateVnicDetails createVnicDetails =
                 CreateVnicDetails.builder()
                         .subnetId(subnetId)
-                        .nsgIds(Collections.singletonList(networkSecurityGroupId))
+                        .nsgIds(StringUtils.isBlank(networkSecurityGroupId)
+                                ? Collections.emptyList() : Collections.singletonList(networkSecurityGroupId))
                         .assignPublicIp(Boolean.TRUE)
                         .build();
         LaunchInstanceAgentConfigDetails launchInstanceAgentConfigDetails =

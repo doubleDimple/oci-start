@@ -1,0 +1,26 @@
+export default {
+  zh: {
+    openDetails: '实例与引导卷', views: '切换列表', instances: '实例列表', volumes: '关联引导卷',
+    shape: '规格', addresses: 'IP 地址', public: '公网', private: '私网', availabilityDomain: '可用区',
+    instanceState: '实例状态', instanceId: '实例 OCID', recordCreated: '入库时间', tenantId: '租户记录 ID', compartmentId: '隔间 OCID',
+    tenantScope: '租户记录：{id}', range: '实例 {start}–{end} / {total}',
+    invalidScope: '缺少有效的租户参数，请返回租户或实例列表后重新进入。',
+    volumeName: '引导卷名称', volumeId: '引导卷 OCID', volumeSize: '容量', vpu: 'VPU / GB', linkedInstance: '所属实例',
+    volumesHint: '显示当前页实例记录关联的引导卷，分页按实例计算；状态为所属实例状态。',
+    emptyVolumes: '当前页实例记录中没有可显示的关联引导卷',
+    details: '详情', expand: '扩容', volumeDetails: '关联引导卷信息',
+    detailsHint: '以下信息来自已加载的本地实例记录；入库时间为本地记录创建时间。',
+  },
+  en: {
+    openDetails: 'Instances & volumes', views: 'Switch list', instances: 'Instances', volumes: 'Linked boot volumes',
+    shape: 'Shape', addresses: 'IP addresses', public: 'Public', private: 'Private', availabilityDomain: 'Availability domain',
+    instanceState: 'Instance state', instanceId: 'Instance OCID', recordCreated: 'Added on', tenantId: 'Tenant record ID', compartmentId: 'Compartment OCID',
+    tenantScope: 'Tenant record: {id}', range: 'Instances {start}–{end} / {total}',
+    invalidScope: 'A valid tenant parameter is required. Return to the tenant or instance list and open this page again.',
+    volumeName: 'Boot volume name', volumeId: 'Boot volume OCID', volumeSize: 'Capacity', vpu: 'VPU / GB', linkedInstance: 'Linked instance',
+    volumesHint: 'Volumes linked to instance records on this page. Pagination follows instances, and the state belongs to the linked instance.',
+    emptyVolumes: 'No linked boot volumes are available in this page of instance records',
+    details: 'Details', expand: 'Expand', volumeDetails: 'Linked boot volume information',
+    detailsHint: 'These values come from the loaded local instance records. “Added on” is the local record creation time.',
+  },
+}

@@ -285,6 +285,8 @@ public class DbConfigServiceImpl implements DbConfigService {
                     boolean b = terminateMysqlDbSystem(tenantOptional.get(), dbId);
                     if (b){
                         dbConfigRepository.delete(dbConfig);
+                    } else {
+                        return ApiResponse.error("未能确认 MySQL 删除请求成功，本地记录已保留，请核对云端状态后再操作");
                     }
                     break;
                 default:
@@ -304,7 +306,10 @@ public class DbConfigServiceImpl implements DbConfigService {
             DbConfig dbConfig = dbConfigRepository.findById(id).orElse(null);
             if (dbConfig == null) return ApiResponse.error("记录不存在");
 
-            Tenant tenant = tenantRepository.findById(tenantId).orElse(null);
+            if (!java.util.Objects.equals(dbConfig.getTenantId(), tenantId)) {
+                return ApiResponse.error("数据库与租户不匹配");
+            }
+            Tenant tenant = tenantRepository.findById(dbConfig.getTenantId()).orElse(null);
             if (tenant == null) return ApiResponse.error("租户不存在");
 
             String newAdminUser = dbConfig.getDbName();

@@ -19,6 +19,8 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
+import static com.doubledimple.ocicommon.utils.IpUtils.getClientIpAddress;
+
 @Aspect
 @Component
 @Slf4j
@@ -135,17 +137,7 @@ public class ApiTokenAspect {
      * 获取客户端IP
      */
     private String getClientIp(HttpServletRequest request) {
-        String xForwardedFor = request.getHeader("X-Forwarded-For");
-        if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
-            return xForwardedFor.split(",")[0].trim();
-        }
-
-        String xRealIp = request.getHeader("X-Real-IP");
-        if (xRealIp != null && !xRealIp.isEmpty()) {
-            return xRealIp;
-        }
-
-        return request.getRemoteAddr();
+        return getClientIpAddress(request);
     }
 
     /**

@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import AppKit
 
 /// Local embedded backend vs already-deployed remote server.
 enum DeploymentMode: String, CaseIterable {
@@ -18,6 +19,9 @@ final class AppSession: ObservableObject {
     static let localDefaultURL = "http://localhost:9856"
 
     @Published private(set) var isLoggedIn = false
+    private(set) var authenticationGeneration: UInt64 = 0
+    private var sessionChecks = Set<AnyCancellable>()
+    private var checkingSession = false
     @Published var lastError: String?
     @Published private(set) var isBusy = false
     @Published private(set) var username: String = ""
@@ -189,7 +193,9 @@ final class AppSession: ObservableObject {
             )
             self.username = username
             UserDefaults.standard.set(username, forKey: userKey)
+            authenticationGeneration &+= 1
             isLoggedIn = true
+            startSessionMonitoring()
         } catch {
             lastError = error.localizedDescription
             throw error
@@ -216,10 +222,13 @@ final class AppSession: ObservableObject {
 
     @MainActor
     func logout() async {
+        guard !isLoggedIn || NavigationState.shared.canLeaveCurrentPage() else { return }
         isBusy = true
         defer { isBusy = false }
         // Close main shell first, then hit logout API / clear cookies.
         let base = serverURL
+        authenticationGeneration &+= 1
+        sessionChecks.removeAll()
         isLoggedIn = false
         await auth.logout(baseURL: base)
         APIClient.shared.clearCookies(for: base)
@@ -227,8 +236,44 @@ final class AppSession: ObservableObject {
 
     @MainActor
     func forceLogout() {
+        authenticationGeneration &+= 1
+        sessionChecks.removeAll()
         isLoggedIn = false
         APIClient.shared.clearCookies(for: serverURL)
+    }
+
+    @MainActor
+    func expireSession(generation: UInt64, baseURL: String) {
+        guard isLoggedIn, authenticationGeneration == generation, serverURL == baseURL else { return }
+        lastError = "登录已过期，请重新登录"
+        forceLogout()
+    }
+
+    @MainActor
+    private func startSessionMonitoring() {
+        sessionChecks.removeAll()
+        Timer.publish(every: 30, on: .main, in: .common).autoconnect()
+            .sink { [weak self] _ in
+                guard NSApp.isActive else { return }
+                guard let session = self else { return }
+                Task { @MainActor in await session.checkSession() }
+            }.store(in: &sessionChecks)
+        NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
+            .sink { [weak self] _ in
+                guard let session = self else { return }
+                Task { @MainActor in await session.checkSession() }
+            }
+            .store(in: &sessionChecks)
+    }
+
+    /// A network failure is not proof of expiration. APIClient handles confirmed 401s.
+    @MainActor
+    func checkSession() async {
+        guard isLoggedIn, !checkingSession else { return }
+        checkingSession = true
+        defer { checkingSession = false }
+        guard let url = try? APIClient.shared.makeURL(serverURL, path: "/api/userInfo") else { return }
+        _ = try? await APIClient.shared.getJSON(url, headers: ["Cache-Control": "no-cache, no-store"])
     }
 
     /// Local embedded backend (localhost) vs remote deployment.
@@ -293,13 +338,16 @@ final class AppSession: ObservableObject {
         await auth.loginFactorConfig(baseURL: serverURL)
     }
 
-    private static func normalize(_ raw: String) -> String {
+    static func normalize(_ raw: String) -> String {
         var s = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         if s.isEmpty { return "http://localhost:9856" }
+        // Keep an empty remote address editable; never turn the scheme into a hostname.
+        if ["https:", "https:/", "https://"].contains(s.lowercased()) { return "https://" }
+        if ["http:", "http:/", "http://"].contains(s.lowercased()) { return "http://" }
         if !s.hasPrefix("http://") && !s.hasPrefix("https://") {
             s = "http://\(s)"
         }
-        while s.hasSuffix("/") { s.removeLast() }
+        while s.hasSuffix("/") && !s.hasSuffix("://") { s.removeLast() }
         // 用户常从浏览器地址栏粘贴带路径的 URL（/login、/index、/tenants…），
         // 若保留 path，后续 makeURL 会拼成 /tenants/boot/... 导致整站 404 Not Found。
         if var comps = URLComponents(string: s), comps.host != nil {

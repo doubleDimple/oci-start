@@ -23,6 +23,7 @@ import com.doubledimple.ociserver.pojo.enums.OperationSystemEnum;
 import com.doubledimple.ociserver.config.exception.OciExceptionFactory;
 import com.doubledimple.ociserver.service.BootTotalInstanceService;
 import com.doubledimple.ociserver.service.OpenSuccessService;
+import com.doubledimple.ociserver.service.permissions.OciPermissions;
 import com.doubledimple.ociserver.utils.oracle.OciComputerUtils;
 import com.doubledimple.ociserver.utils.oracle.OciUtils;
 import com.oracle.bmc.ClientConfiguration;
@@ -118,6 +119,8 @@ public class OracleCloudService {
         Long bootId = user.getBootId();
         long tenantId = user.getId();
         Tenant tenant = tenantRepository.findById(tenantId).orElseThrow(() -> OciExceptionFactory.createException(DEF_ERROR_NO_TENANT_ID));
+        // Reload the tenant for every attempt so a running retry task observes revocations.
+        OciPermissions.require(tenant, "INSTANCE_CREATE");
         Optional<BootInstance> byId = bootInstanceRepository.findById(bootId);
         if (byId.isPresent()){
             BootInstance bootInstance = byId.get();
@@ -186,6 +189,17 @@ public class OracleCloudService {
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
+            if (OciComputerUtils.mustReuseNetwork(tenant)) {
+                boolean usableSubnet = false;
+                for (AvailabilityDomain domain : availabilityDomains) {
+                    if (OciComputerUtils.existingLaunchSubnet(
+                            virtualNetworkClient, compartmentId, domain.getName()) != null) {
+                        usableSubnet = true;
+                        break;
+                    }
+                }
+                OciComputerUtils.requireUsableNetwork(tenant, !usableSubnet);
+            }
             int size = availabilityDomains.size();
             String kmsKeyId = null;
             InternetGateway internetGateway = null;
@@ -225,22 +239,26 @@ public class OracleCloudService {
                         }
                         String imageId = image.getId();
 
-                        //String networkCidrBlock = getCidr(virtualNetworkClient, compartmentId);
-                        List<Vcn> vcns = createVcn(virtualNetworkClient, compartmentId);
-                        OciGatewayVcnPair internetGatewayPair = createInternetGateway(virtualNetworkClient, compartmentId, vcns);
-                        internetGateway = internetGatewayPair.getInternetGateway();
-                        Vcn vcn = internetGatewayPair.getVcn();
-                        String networkCidrBlock = vcn.getCidrBlock();
-                        addInternetGatewayToDefaultRouteTable(virtualNetworkClient, vcn, internetGateway);
-
-                        subnet = createSubnet(virtualNetworkClient, compartmentId, availablityDomain, networkCidrBlock, vcn);
+                        networkSecurityGroup = null;
+                        if (OciComputerUtils.mustReuseNetwork(tenant)) {
+                            subnet = OciComputerUtils.existingLaunchSubnet(
+                                    virtualNetworkClient, compartmentId, availablityDomain.getName());
+                        } else {
+                            List<Vcn> vcns = createVcn(virtualNetworkClient, compartmentId);
+                            OciGatewayVcnPair internetGatewayPair = createInternetGateway(virtualNetworkClient, compartmentId, vcns);
+                            internetGateway = internetGatewayPair.getInternetGateway();
+                            Vcn vcn = internetGatewayPair.getVcn();
+                            String networkCidrBlock = vcn.getCidrBlock();
+                            addInternetGatewayToDefaultRouteTable(virtualNetworkClient, vcn, internetGateway);
+                            subnet = createSubnet(virtualNetworkClient, compartmentId, availablityDomain, networkCidrBlock, vcn);
+                            if (subnet != null) {
+                                networkSecurityGroup = createNetworkSecurityGroup(virtualNetworkClient, compartmentId, vcn);
+                                addNetworkSecurityGroupSecurityRules(virtualNetworkClient, networkSecurityGroup, networkCidrBlock);
+                            }
+                        }
                         if (null == subnet) {
                             continue;
                         }
-                        networkSecurityGroup =
-                                createNetworkSecurityGroup(virtualNetworkClient, compartmentId, vcn);
-                        addNetworkSecurityGroupSecurityRules(
-                                virtualNetworkClient, networkSecurityGroup, networkCidrBlock);
 
                         if (log.isDebugEnabled()){
                             log.info("current user:[{}] and region:[{}] Instance is being created via image and KMS key ...", user.getUserName(), user.getRegion());
@@ -315,7 +333,7 @@ public class OracleCloudService {
                  if (!hasComputeCapacity(computeClient, compartmentId, availabilityDomain,
                          launchInstanceDetails.getShape(), ocpus, memory)) {
                      skippedDueToNoCapacity = true;
-                     log.debug("[TaskId={}] 用户:[{}] AD:{} shape:{} 无容量，跳过创建",
+                     log.warn("[TaskId={}] 用户:[{}] AD:{} shape:{} 无容量，跳过创建",
                              user.getBootId(), user.getUserName(), availabilityDomain, launchInstanceDetails.getShape());
                      continue;
                  }
@@ -911,7 +929,8 @@ public class OracleCloudService {
                 CreateVnicDetails.builder()
                         .subnetId(subnet.getId())
                         .assignPublicIp(Boolean.TRUE)
-                        .nsgIds(Collections.singletonList(networkSecurityGroup.getId()))
+                        .nsgIds(networkSecurityGroup == null
+                                ? Collections.emptyList() : Collections.singletonList(networkSecurityGroup.getId()))
                         .build();
         LaunchInstanceAgentConfigDetails launchInstanceAgentConfigDetails =
                 LaunchInstanceAgentConfigDetails.builder().isMonitoringDisabled(false).build();

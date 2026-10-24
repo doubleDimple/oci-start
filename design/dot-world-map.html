@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>点阵世界地图组件</title>
+<style>
+  :root{
+    --bg:#f2f4f7; --card:#fff; --ink:#1b2733; --muted:#6b7c8c; --line:#dfe5ea;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",Segoe UI,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+       padding:32px 20px;line-height:1.6}
+  .wrap{max-width:1080px;margin:0 auto}
+  h1{font-size:19px;font-weight:600;margin:0 0 4px}
+  .sub{color:var(--muted);font-size:13px;margin:0 0 22px}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;
+        padding:18px;margin-bottom:18px}
+  .card.dark{background:#0a1420;border-color:#16293c}
+
+  .bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+  button{font-family:inherit;font-size:12.5px;padding:6px 12px;border-radius:6px;
+         border:1px solid var(--line);background:#fff;color:var(--ink);cursor:pointer}
+  button:hover{border-color:#9bb0c0}
+  button:focus-visible{outline:2px solid #2f9e8f;outline-offset:1px}
+  button[aria-pressed="true"]{background:#e6f5f2;border-color:#2f9e8f;color:#1c6f63}
+
+  h2{font-size:14px;font-weight:600;margin:26px 0 8px}
+  p.note{font-size:13px;color:var(--muted);margin:0 0 10px}
+  pre{background:#0d1a26;color:#cfe3ee;padding:14px 16px;border-radius:8px;
+      overflow-x:auto;font-family:var(--mono);font-size:12px;line-height:1.65;margin:0 0 14px}
+  code{font-family:var(--mono)}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--muted);font-weight:500;font-size:12px}
+  td code{font-size:12px;background:#eef2f5;padding:1px 5px;border-radius:3px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>点阵世界地图</h1>
+  <p class="sub">Canvas 2D 绘制，无第三方依赖，按经纬度点亮标记。放在页面任意容器里即可。</p>
+
+  <!-- ===== 演示一：深色 ===== -->
+  <div class="card dark">
+    <div id="mapDark" style="width:100%"></div>
+  </div>
+  <div class="bar">
+    <button id="tArc" aria-pressed="true">连线</button>
+    <button id="tLabel" aria-pressed="true">标签</button>
+    <button id="tPulse" aria-pressed="true">脉冲</button>
+    <button id="rand">随机点亮一个</button>
+    <button id="reset">重置数据</button>
+  </div>
+
+  <!-- ===== 演示二：浅色 ===== -->
+  <h2>浅色主题</h2>
+  <p class="note">同一个组件，换一组颜色。</p>
+  <div class="card">
+    <div id="mapLight" style="width:100%"></div>
+  </div>
+
+  <h2>接入方式</h2>
+  <pre>&lt;div id="world" style="width:100%"&gt;&lt;/div&gt;
+
+&lt;script src="dot-world-map.js"&gt;&lt;/script&gt;
+&lt;script&gt;
+  var map = DotWorldMap(document.getElementById('world'), {
+    theme: 'dark',
+    points: [
+      { id: 1, lat: 31.2304, lng: 121.4737, name: '上海' },
+      { id: 2, lat: 1.3521,  lng: 103.8198, name: '新加坡' }
+    ],
+    onSelect: function (p) { console.log('点击了', p.name); }
+  });
+
+  // 后端拉数据
+  fetch('/api/nodes')
+    .then(function (r) { return r.json(); })
+    .then(function (list) { map.setPoints(list); });
+
+  // WebSocket 推来一个新节点，实时点亮
+  ws.onmessage = function (e) { map.add(JSON.parse(e.data)); };
+&lt;/script&gt;</pre>
+
+  <h2>API</h2>
+  <table>
+    <tr><th>方法 / 选项</th><th>说明</th></tr>
+    <tr><td><code>setPoints(list)</code></td><td>整体替换数据，字段兼容 lat/latitude、lng/lon/longitude、name/title</td></tr>
+    <tr><td><code>add(point)</code></td><td>追加一个点并触发点亮动画，返回内部对象</td></tr>
+    <tr><td><code>remove(id)</code></td><td>按 id 移除</td></tr>
+    <tr><td><code>clear()</code></td><td>清空</td></tr>
+    <tr><td><code>focus(id)</code></td><td>把某个点设为高亮态</td></tr>
+    <tr><td><code>set(opts)</code></td><td>运行时改选项，如 <code>{ arcs:false }</code></td></tr>
+    <tr><td><code>destroy()</code></td><td>停止动画并解绑事件</td></tr>
+    <tr><td><code>onSelect(p)</code></td><td>点击标记的回调</td></tr>
+    <tr><td><code>arcs / labels / pulse</code></td><td>连线、标签、脉冲开关，默认全开</td></tr>
+    <tr><td><code>dotStep</code></td><td>点阵密度（像素间距），默认 5，调大更稀疏、更省性能</td></tr>
+  </table>
+</div>
+
+<!-- ============================================================
+     组件本体：把下面整段 script 单独存成 dot-world-map.js 即可复用
+============================================================ -->
+<script>
+window.DotWorldMap = (function () {
+"use strict";
+
+/* 简化陆地轮廓（非精确国界，仅用于点阵造型） */
+var LAND = [
+  [[-168,65],[-165,60],[-158,57],[-152,58],[-146,60],[-138,59],[-131,53],[-125,49],[-124,42],[-120,34],[-117,32],[-110,24],[-105,20],[-97,16],[-92,15],[-88,16],[-87,21],[-91,21],[-95,19],[-97,23],[-97,26],[-94,29],[-89,29],[-84,30],[-81,25],[-80,32],[-76,35],[-70,42],[-67,45],[-60,47],[-56,51],[-56,54],[-64,60],[-78,62],[-78,55],[-82,55],[-86,66],[-95,68],[-105,68],[-115,70],[-125,70],[-135,69],[-145,70],[-156,71],[-166,68]],
+  [[-45,60],[-52,64],[-53,68],[-62,70],[-68,76],[-62,82],[-40,83],[-24,80],[-20,73],[-30,68],[-42,61]],
+  [[-81,-4],[-79,0],[-77,8],[-72,12],[-62,10],[-60,8],[-52,5],[-50,0],[-44,-2],[-38,-5],[-35,-8],[-39,-13],[-39,-18],[-48,-25],[-53,-34],[-58,-38],[-62,-40],[-65,-45],[-68,-50],[-70,-54],[-75,-52],[-74,-45],[-73,-37],[-71,-30],[-70,-20],[-75,-15],[-81,-6]],
+  [[-17,15],[-16,20],[-12,28],[-10,32],[-5,36],[10,37],[20,32],[28,31],[33,28],[35,23],[38,18],[43,12],[51,12],[51,5],[42,-1],[40,-10],[35,-20],[32,-26],[27,-34],[20,-35],[18,-30],[13,-20],[9,-1],[3,6],[-8,4],[-13,9]],
+  [[-10,36],[-9,43],[-2,48],[3,51],[6,53],[9,54],[11,58],[16,60],[22,60],[30,60],[28,66],[21,70],[32,71],[46,68],[62,70],[76,73],[92,75],[106,77],[116,74],[132,72],[146,70],[160,70],[170,66],[179,65],[172,60],[162,58],[155,52],[142,48],[135,43],[130,35],[122,32],[120,25],[110,20],[105,10],[100,6],[97,16],[90,22],[82,17],[77,8],[72,20],[66,25],[57,25],[50,30],[45,37],[36,36],[30,41],[26,38],[22,40],[16,38],[13,45],[8,44],[3,42],[-2,37]],
+  [[95,5],[105,-6],[115,-9],[125,-9],[135,-5],[141,-3],[141,-9],[131,-8],[120,-10],[110,-8],[100,0]],
+  [[113,-22],[114,-35],[118,-35],[129,-32],[137,-35],[141,-38],[147,-39],[151,-37],[153,-28],[145,-15],[142,-11],[136,-12],[130,-11],[125,-14],[118,-20]],
+  [[172,-41],[174,-37],[178,-38],[176,-41],[174,-46],[168,-46],[167,-44]],
+  [[130,31],[134,34],[139,35],[141,39],[145,44],[142,42],[137,37],[132,34]],
+  [[-5,50],[-6,55],[-3,58],[-1,56],[1,53],[1,51],[-4,50]],
+  [[43,-12],[50,-15],[50,-25],[45,-25],[43,-17]],
+  [[-24,65],[-22,66],[-14,66],[-14,64],[-22,63]],
+  [[120,18],[124,18],[126,10],[122,6],[119,11]],
+  [[-85,22],[-77,23],[-74,20],[-80,21]],
+  [[8,55],[11,57],[13,55],[10,54]]
+];
+
+function inPoly(x, y, poly) {
+  var hit = false;
+  for (var i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    var xi = poly[i][0], yi = poly[i][1], xj = poly[j][0], yj = poly[j][1];
+    if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) hit = !hit;
+  }
+  return hit;
+}
+function isLand(lng, lat) {
+  for (var i = 0; i < LAND.length; i++) if (inPoly(lng, lat, LAND[i])) return true;
+  return false;
+}
+
+var THEMES = {
+  dark:  { land:"#22506b", glow:"#4fe3c1", arc:"rgba(79,227,193,.35)", text:"#dcecf3", sub:"#6f93a8", tipBg:"rgba(6,16,26,.94)" },
+  light: { land:"#c3d2dc", glow:"#e0703c", arc:"rgba(224,112,60,.4)",  text:"#25323d", sub:"#7d8c99", tipBg:"rgba(255,255,255,.96)" }
+};
+
+/* 等距柱状投影，裁掉极地无用区域 */
+var LAT_TOP = 84, LAT_BOT = -58, LAT_SPAN = LAT_TOP - LAT_BOT;
+
+return function DotWorldMap(host, opts) {
+  opts = opts || {};
+  var o = {
+    theme:   opts.theme || "dark",
+    colors:  null,
+    arcs:    opts.arcs !== false,
+    labels:  opts.labels !== false,
+    pulse:   opts.pulse !== false,
+    dotStep: opts.dotStep || 5,
+    minHeight: opts.minHeight || 180,
+    onSelect: opts.onSelect || null
+  };
+  function C() { return o.colors || THEMES[o.theme] || THEMES.dark; }
+
+  /* DOM */
+  host.style.position = "relative";
+  var cv = document.createElement("canvas");
+  cv.style.display = "block";
+  cv.style.width = "100%";
+  host.appendChild(cv);
+
+  var tip = document.createElement("div");
+  tip.style.cssText = "position:absolute;pointer-events:none;opacity:0;transition:opacity .15s;" +
+    "padding:6px 9px;border-radius:6px;font-size:12px;line-height:1.45;white-space:nowrap;" +
+    "transform:translate(-50%,-125%);z-index:2;box-shadow:0 2px 10px rgba(0,0,0,.25)";
+  host.appendChild(tip);
+
+  var ctx = cv.getContext("2d");
+  var W = 0, H = 0, dpr = Math.min(window.devicePixelRatio || 1, 2);
+  var base = document.createElement("canvas");   // 陆地点阵缓存
+  var pts = [], seq = 0, activeId = null, hoverId = null, raf = 0, t0 = performance.now();
+  var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  function project(lat, lng) {
+    return {
+      x: (lng + 180) / 360 * W,
+      y: (LAT_TOP - lat) / LAT_SPAN * H
+    };
+  }
+  function unproject(x, y) {
+    return { lng: x / W * 360 - 180, lat: LAT_TOP - y / H * LAT_SPAN };
+  }
+
+  /* 陆地点阵：像素网格采样，画进离屏 canvas */
+  function buildBase() {
+    base.width = W * dpr; base.height = H * dpr;
+    var b = base.getContext("2d");
+    b.setTransform(dpr, 0, 0, dpr, 0, 0);
+    b.clearRect(0, 0, W, H);
+    b.fillStyle = C().land;
+    var s = o.dotStep, r = Math.max(0.7, s * 0.22);
+    for (var y = s / 2; y < H; y += s) {
+      for (var x = s / 2; x < W; x += s) {
+        var ll = unproject(x, y);
+        if (!isLand(ll.lng, ll.lat)) continue;
+        b.beginPath();
+        b.arc(x, y, r, 0, Math.PI * 2);
+        b.fill();
+      }
+    }
+  }
+
+  function resize() {
+    var w = host.clientWidth || 800;
+    W = w;
+    H = Math.max(o.minHeight, Math.round(w * LAT_SPAN / 360));
+    cv.width = W * dpr; cv.height = H * dpr;
+    cv.style.height = H + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    buildBase();
+    pts.forEach(cache);
+  }
+
+  function cache(p) { var q = project(p.lat, p.lng); p.px = q.x; p.py = q.y; }
+
+  /* 数据 */
+  function norm(raw) {
+    var lat = Number(raw.lat != null ? raw.lat : raw.latitude);
+    var lng = Number(raw.lng != null ? raw.lng : (raw.lon != null ? raw.lon : raw.longitude));
+    if (!isFinite(lat) || !isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+    var p = {
+      id: raw.id != null ? raw.id : ++seq,
+      lat: lat, lng: lng,
+      name: String(raw.name || raw.title || "").slice(0, 30),
+      color: raw.color || null,
+      born: performance.now(),
+      phase: Math.random() * 2000
+    };
+    cache(p);
+    return p;
+  }
+
+  var api = {
+    setPoints: function (list) {
+      pts = [];
+      (list || []).forEach(function (d) { var p = norm(d); if (p) pts.push(p); });
+      return api;
+    },
+    add: function (d) { var p = norm(d); if (p) pts.push(p); return p; },
+    remove: function (id) {
+      pts = pts.filter(function (p) { return p.id !== id; });
+      if (activeId === id) activeId = null;
+      return api;
+    },
+    clear: function () { pts = []; activeId = null; return api; },
+    focus: function (id) { activeId = id; return api; },
+    get: function () { return pts.slice(); },
+    set: function (n) { Object.keys(n).forEach(function (k) { o[k] = n[k]; }); buildBase(); return api; },
+    destroy: function () {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", onResize);
+      if (ro) ro.disconnect();
+      host.innerHTML = "";
+    }
+  };
+
+  /* 交互 */
+  function hitTest(mx, my) {
+    var best = null, bd = 14 * 14;
+    for (var i = 0; i < pts.length; i++) {
+      var dx = pts[i].px - mx, dy = pts[i].py - my, d = dx * dx + dy * dy;
+      if (d < bd) { bd = d; best = pts[i]; }
+    }
+    return best;
+  }
+  cv.addEventListener("mousemove", function (e) {
+    var r = cv.getBoundingClientRect();
+    var p = hitTest(e.clientX - r.left, e.clientY - r.top);
+    hoverId = p ? p.id : null;
+    cv.style.cursor = p ? "pointer" : "default";
+    if (p) {
+      tip.style.left = p.px + "px";
+      tip.style.top = p.py + "px";
+      tip.style.background = C().tipBg;
+      tip.style.color = C().text;
+      tip.innerHTML = "<b style='font-weight:500'>" + escapeHtml(p.name || "未命名") + "</b>" +
+        "<div style='font-family:ui-monospace,monospace;font-size:10.5px;color:" + C().sub + "'>" +
+        p.lat.toFixed(4) + ", " + p.lng.toFixed(4) + "</div>";
+      tip.style.opacity = 1;
+    } else tip.style.opacity = 0;
+  });
+  cv.addEventListener("mouseleave", function () { hoverId = null; tip.style.opacity = 0; });
+  cv.addEventListener("click", function (e) {
+    var r = cv.getBoundingClientRect();
+    var p = hitTest(e.clientX - r.left, e.clientY - r.top);
+    if (!p) return;
+    activeId = p.id;
+    if (o.onSelect) o.onSelect(p);
+  });
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"]/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+    });
+  }
+
+  /* 绘制 */
+  function drawArc(a, b, now) {
+    var mx = (a.px + b.px) / 2, my = (a.py + b.py) / 2;
+    var dx = b.px - a.px, dy = b.py - a.py, len = Math.sqrt(dx * dx + dy * dy);
+    var cx = mx - dy * 0.22, cy = my + dx * 0.22;   // 控制点抬到弦的一侧
+
+    ctx.strokeStyle = C().arc;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(a.px, a.py);
+    ctx.quadraticCurveTo(cx, cy, b.px, b.py);
+    ctx.stroke();
+
+    if (!o.pulse || reduce) return;
+    var t = ((now / 2600) % 1);
+    var u = 1 - t;
+    var fx = u * u * a.px + 2 * u * t * cx + t * t * b.px;
+    var fy = u * u * a.py + 2 * u * t * cy + t * t * b.py;
+    ctx.fillStyle = C().glow;
+    ctx.globalAlpha = Math.sin(Math.PI * t);
+    ctx.beginPath(); ctx.arc(fx, fy, 1.8, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  function draw(now) {
+    raf = requestAnimationFrame(draw);
+    ctx.clearRect(0, 0, W, H);
+    ctx.drawImage(base, 0, 0, W, H);
+
+    if (o.arcs) for (var i = 0; i < pts.length - 1; i++) drawArc(pts[i], pts[i + 1], now);
+
+    var glow = C().glow;
+    for (var k = 0; k < pts.length; k++) {
+      var p = pts[k], on = p.id === activeId || p.id === hoverId;
+      var col = p.color || glow;
+
+      /* 点亮时的一次性扩散 */
+      var age = now - p.born;
+      if (age < 900) {
+        var f = age / 900;
+        ctx.strokeStyle = col;
+        ctx.globalAlpha = (1 - f) * 0.9;
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(p.px, p.py, 4 + f * 26, 0, Math.PI * 2); ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+
+      /* 持续脉冲 */
+      if (o.pulse && !reduce) {
+        var t = (((now + p.phase) % 2200) / 2200);
+        ctx.strokeStyle = col;
+        ctx.globalAlpha = (1 - t) * (on ? 0.75 : 0.45);
+        ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.arc(p.px, p.py, 3 + t * (on ? 16 : 11), 0, Math.PI * 2); ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+
+      /* 光晕 + 实心点 */
+      var g = ctx.createRadialGradient(p.px, p.py, 0, p.px, p.py, on ? 13 : 9);
+      g.addColorStop(0, col); g.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.globalAlpha = on ? 0.5 : 0.32;
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(p.px, p.py, on ? 13 : 9, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1;
+
+      ctx.fillStyle = col;
+      ctx.beginPath(); ctx.arc(p.px, p.py, on ? 3.4 : 2.6, 0, Math.PI * 2); ctx.fill();
+
+      /* 标签 */
+      if (o.labels && p.name && W > 420) {
+        ctx.font = "11px -apple-system,'PingFang SC','Microsoft YaHei',sans-serif";
+        ctx.fillStyle = on ? C().text : C().sub;
+        ctx.textAlign = p.px > W - 90 ? "right" : "left";
+        ctx.textBaseline = "middle";
+        ctx.fillText(p.name, p.px + (p.px > W - 90 ? -8 : 8), p.py - 7);
+      }
+    }
+  }
+
+  /* 尺寸监听 */
+  function onResize() { resize(); }
+  var ro = null;
+  if (window.ResizeObserver) { ro = new ResizeObserver(onResize); ro.observe(host); }
+  else window.addEventListener("resize", onResize);
+
+  if (opts.points) api.setPoints(opts.points);
+  resize();
+  raf = requestAnimationFrame(draw);
+  return api;
+};
+})();
+</script>
+
+<!-- ============================================================
+     演示页脚本
+============================================================ -->
+<script>
+(function () {
+  var SEED = [
+    { id: "bj", lat: 39.9042,  lng: 116.4074, name: "北京" },
+    { id: "sh", lat: 31.2304,  lng: 121.4737, name: "上海" },
+    { id: "hk", lat: 22.3193,  lng: 114.1694, name: "香港" },
+    { id: "sg", lat: 1.3521,   lng: 103.8198, name: "新加坡" },
+    { id: "tk", lat: 35.6762,  lng: 139.6503, name: "东京" },
+    { id: "du", lat: 25.2048,  lng: 55.2708,  name: "迪拜" },
+    { id: "fr", lat: 50.1109,  lng: 8.6821,   name: "法兰克福" },
+    { id: "ld", lat: 51.5074,  lng: -0.1278,  name: "伦敦" },
+    { id: "ny", lat: 40.7128,  lng: -74.0060, name: "纽约" },
+    { id: "sf", lat: 37.7749,  lng: -122.4194,name: "旧金山" },
+    { id: "sp", lat: -23.5505, lng: -46.6333, name: "圣保罗" },
+    { id: "sy", lat: -33.8688, lng: 151.2093, name: "悉尼" }
+  ];
+
+  var dark = DotWorldMap(document.getElementById("mapDark"), {
+    theme: "dark",
+    points: SEED,
+    onSelect: function (p) { dark.focus(p.id); }
+  });
+
+  DotWorldMap(document.getElementById("mapLight"), {
+    theme: "light",
+    points: SEED.slice(0, 6),
+    arcs: false,
+    dotStep: 6
+  });
+
+  function toggle(btnId, key) {
+    var b = document.getElementById(btnId);
+    b.addEventListener("click", function () {
+      var next = b.getAttribute("aria-pressed") !== "true";
+      b.setAttribute("aria-pressed", next);
+      var patch = {}; patch[key] = next;
+      dark.set(patch);
+    });
+  }
+  toggle("tArc", "arcs");
+  toggle("tLabel", "labels");
+  toggle("tPulse", "pulse");
+
+  var pool = [
+    { lat: 55.7558, lng: 37.6173, name: "莫斯科" },
+    { lat: -1.2921, lng: 36.8219, name: "内罗毕" },
+    { lat: 19.4326, lng: -99.1332, name: "墨西哥城" },
+    { lat: 28.6139, lng: 77.2090, name: "新德里" },
+    { lat: -34.6037,lng: -58.3816, name: "布宜诺斯艾利斯" },
+    { lat: 60.1699, lng: 24.9384, name: "赫尔辛基" }
+  ], pi = 0;
+
+  document.getElementById("rand").addEventListener("click", function () {
+    var p = pool[pi % pool.length]; pi++;
+    dark.add({ id: "x" + pi, lat: p.lat, lng: p.lng, name: p.name });
+  });
+  document.getElementById("reset").addEventListener("click", function () {
+    dark.setPoints(SEED); pi = 0;
+  });
+})();
+</script>
+</body>
+</html>

@@ -7,6 +7,9 @@ import com.doubledimple.ociserver.pojo.request.GithubConfig;
 import com.doubledimple.ociserver.pojo.request.GithubUser;
 import com.doubledimple.ociserver.service.impl.system.SystemConfigService;
 import com.doubledimple.ociserver.service.login.LoginUserService;
+import com.doubledimple.ociserver.service.login.LoginFailureGuard;
+import com.doubledimple.ociserver.service.login.GlobalLoginGuard;
+import com.doubledimple.ociserver.config.exception.IpBannedException;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import cn.dev33.satoken.stp.StpUtil;
@@ -46,6 +49,13 @@ public class GithubLoginController extends BaseController {
 
     @Resource
     private LoginUserService loginUserService;
+
+    @Resource
+    private LoginFailureGuard loginFailureGuard;
+    @Resource
+    private GlobalLoginGuard globalLoginGuard;
+    @Resource
+    private RestTemplate restTemplate;
     private static final Map<String, StateInfo> STATE_CACHE = new ConcurrentHashMap<>();
 
     private static class StateInfo {
@@ -73,6 +83,7 @@ public class GithubLoginController extends BaseController {
     @ResponseBody
     public ResponseEntity<String> getGithubLoginUrl(@RequestParam(name = "remember-me", required = false) String rememberMe) {
         try {
+            globalLoginGuard.assertAllowed();
             GithubConfig config = systemConfigService.getGithubConfig();
             if (!config.isEnabled()) {
                 return ResponseEntity.badRequest().body("GitHub登录未启用");
@@ -88,7 +99,10 @@ public class GithubLoginController extends BaseController {
                     URLEncoder.encode(config.getRedirectUri(), StandardCharsets.UTF_8.name()),
                     URLEncoder.encode(state, StandardCharsets.UTF_8.name())
             );
-            return ResponseEntity.ok(url);
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(url);
+        } catch (GlobalLoginGuard.LoginGuardException e) {
+            return ResponseEntity.status(e.isBlocked() ? HttpStatus.FORBIDDEN : HttpStatus.SERVICE_UNAVAILABLE)
+                    .cacheControl(CacheControl.noStore()).body(e.getMessage());
         } catch (Exception e) {
             log.error("获取GitHub登录URL失败", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -104,7 +118,10 @@ public class GithubLoginController extends BaseController {
                                @RequestParam String state,
                                HttpServletRequest request,
                                HttpServletResponse response) throws IOException {
+        response.setHeader("Cache-Control", "no-store");
         try {
+            globalLoginGuard.assertAllowed();
+            String clientIp = loginFailureGuard.assertAllowed(request);
             log.info("Receiving GitHub callback. Code len: {}, State: {}", code.length(), state);
             StateInfo stateInfo = STATE_CACHE.remove(state);
             if (stateInfo == null) {
@@ -131,12 +148,22 @@ public class GithubLoginController extends BaseController {
                     LoginTypeEnum.GITHUB
             );
 
-            StpUtil.login(localUser.getUsername(), stateInfo.rememberMe);
+            boolean[] sessionAttempted = {false};
+            loginFailureGuard.withLoginLock(clientIp, () -> globalLoginGuard.completeLogin(() -> {
+                loginFailureGuard.loginSucceededInCurrentTransaction(clientIp);
+                sessionAttempted[0] = true;
+                StpUtil.login(localUser.getUsername(), stateInfo.rememberMe);
+            }, () -> { if (sessionAttempted[0]) StpUtil.logout(); }));
             log.info("GitHub login success, user={}, rememberMe={}", localUser.getUsername(), stateInfo.rememberMe);
 
             String redirectUrl = isMobileRequest(request) ? "/m/tenants" : "/index";
             response.sendRedirect(redirectUrl);
 
+        } catch (GlobalLoginGuard.LoginGuardException e) {
+            String loginUrl = isMobileRequest(request) ? "/m/login" : "/login";
+            response.sendRedirect(loginUrl + "?error=" + URLEncoder.encode(e.getMessage(), StandardCharsets.UTF_8.name()));
+        } catch (IpBannedException e) {
+            throw e;
         } catch (Exception e) {
             log.error("GitHub Login fail", e);
             String loginUrl = isMobileRequest(request) ? "/m/login" : "/login";
@@ -153,7 +180,6 @@ public class GithubLoginController extends BaseController {
     }
 
     private String getGithubAccessToken(String code, GithubConfig config) {
-        RestTemplate restTemplate = new RestTemplate();
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
@@ -176,7 +202,6 @@ public class GithubLoginController extends BaseController {
     }
 
     private GithubUser getGithubUser(String accessToken) {
-        RestTemplate restTemplate = new RestTemplate();
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(accessToken);
 

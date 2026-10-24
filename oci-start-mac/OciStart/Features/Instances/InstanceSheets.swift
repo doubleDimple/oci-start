@@ -82,11 +82,11 @@ struct InstanceSheetHost: View {
             }
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.displayName.isEmpty ? "—" : item.displayName)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(primaryText)
                     .lineLimit(1)
                 Text("\(item.regionName.isEmpty ? "—" : item.regionName) · \(item.stateLabel)")
-                    .font(.system(size: 11))
+                    .font(.system(size: 12))
                     .foregroundColor(mutedText)
                     .lineLimit(1)
             }
@@ -110,7 +110,7 @@ struct InstanceSheetHost: View {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .font(.system(size: 11))
                     Text(err)
-                        .font(.system(size: 12))
+                        .font(.system(size: 14))
                 }
                 .foregroundColor(AppSheetSurface.accentRed(dark))
             }
@@ -156,7 +156,7 @@ struct InstanceSheetHost: View {
             VStack(alignment: .leading, spacing: 14) {
                 instanceHeader(item)
                 Text("当前 \(item.cpuAndMem)")
-                    .font(.system(size: 12))
+                    .font(.system(size: 13))
                     .foregroundColor(mutedText)
                 FormFieldRow(label: "CPU 核心数 (1–24)", required: true) {
                     AppTextField(text: $model.formCpu, placeholder: "CPU", leadingSystemImage: "cpu")
@@ -181,7 +181,7 @@ struct InstanceSheetHost: View {
             VStack(alignment: .leading, spacing: 14) {
                 instanceHeader(item)
                 Text("当前：\(item.bootVolumeSizeInGBs) GB · 仅支持扩容")
-                    .font(.system(size: 12))
+                    .font(.system(size: 13))
                     .foregroundColor(mutedText)
                 FormFieldRow(label: "目标大小 GB（≥47）", required: true) {
                     AppTextField(text: $model.formBootSize, placeholder: "大小", leadingSystemImage: "externaldrive")
@@ -203,13 +203,13 @@ struct InstanceSheetHost: View {
             VStack(alignment: .leading, spacing: 14) {
                 instanceHeader(item)
                 Text("当前 VPU：\(item.vpusPerGB) · 范围 0–120，步长 10")
-                    .font(.system(size: 12))
+                    .font(.system(size: 13))
                     .foregroundColor(mutedText)
                 // 对齐 Web range 滑块
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Text("VPUs / GB")
-                            .font(.system(size: 12, weight: .medium))
+                            .font(.system(size: 14, weight: .medium))
                             .foregroundColor(primaryText)
                         Spacer()
                         Text(model.formVpu)
@@ -229,7 +229,7 @@ struct InstanceSheetHost: View {
                     HStack {
                         ForEach([0, 30, 60, 90, 120], id: \.self) { v in
                             Text("\(v)")
-                                .font(.system(size: 10))
+                                .font(.system(size: 13))
                                 .foregroundColor(mutedText)
                             if v < 120 { Spacer(minLength: 0) }
                         }
@@ -265,13 +265,13 @@ struct InstanceSheetHost: View {
             VStack(alignment: .leading, spacing: 14) {
                 instanceHeader(item)
                 Text("当前 IPv4：\(item.publicIps.isEmpty ? "—" : item.publicIps)")
-                    .font(.system(size: 12))
+                    .font(.system(size: 13))
                     .foregroundColor(mutedText)
 
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Text("目标 CIDR（可选，留空随机）")
-                            .font(.system(size: 12, weight: .medium))
+                            .font(.system(size: 14, weight: .medium))
                             .foregroundColor(primaryText)
                         Spacer()
                         AppButton(title: "添加", systemImage: "plus", kind: .secondary) {
@@ -318,7 +318,7 @@ struct InstanceSheetHost: View {
                             .foregroundColor(Color(hex: "3fb950"))
                         VStack(alignment: .leading, spacing: 2) {
                             Text("IP 切换成功")
-                                .font(.system(size: 12, weight: .semibold))
+                                .font(.system(size: 14, weight: .semibold))
                                 .foregroundColor(primaryText)
                             Text("\(result.oldIp.isEmpty ? "—" : result.oldIp) → \(result.newIp)")
                                 .font(.system(size: 12, design: .monospaced))
@@ -358,7 +358,7 @@ struct InstanceSheetHost: View {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundColor(AppSheetSurface.accentRed(dark))
                     Text("将永久终止云端实例，此操作不可恢复。")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: 14, weight: .medium))
                         .foregroundColor(AppSheetSurface.accentRed(dark))
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -417,10 +417,10 @@ struct InstanceSheetHost: View {
                 }
                 VStack(alignment: .leading, spacing: 6) {
                     Text("注意")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(AppSheetSurface.accentRed(dark))
                     Text("重装将覆盖磁盘数据；依赖 reinstall 脚本，请确保实例已配置 SSH 密码且网络可达。")
-                        .font(.system(size: 11))
+                        .font(.system(size: 13))
                         .foregroundColor(mutedText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -444,7 +444,7 @@ struct InstanceSheetHost: View {
                     HStack(spacing: 8) {
                         ProgressView().scaleEffect(0.7)
                         Text("执行中…")
-                            .font(.system(size: 12))
+                            .font(.system(size: 13))
                             .foregroundColor(mutedText)
                     }
                     Spacer()
@@ -460,7 +460,7 @@ struct InstanceSheetHost: View {
                         ForEach(Array(model.ddLogLines.enumerated()), id: \.offset) { idx, line in
                             Text(line)
                                 .font(.system(size: 11, design: .monospaced))
-                                .foregroundColor(primaryText.opacity(0.9))
+                                .foregroundColor(primaryText)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .id(idx)
                         }

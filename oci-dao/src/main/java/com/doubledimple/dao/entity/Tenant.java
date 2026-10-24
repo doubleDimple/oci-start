@@ -36,6 +36,39 @@ public class Tenant {
     private String tenancy;
     private String region;
     private String keyFile;
+
+    /** null 表示历史导入；managed-v1 表示专用 OCI 用户及云端策略。 */
+    private String permissionMode;
+    @Column(columnDefinition = "TEXT")
+    private String permissionsJson;
+    private String managedUserName;
+    private String managedGroupId;
+    private String managedPolicyId;
+    @Column(columnDefinition = "TEXT")
+    private String accountScopeJson;
+    private String managedDomainId;
+    private String managedDomainUrl;
+    @Column(columnDefinition = "TEXT")
+    private String managedDomainGrantsJson;
+
+    public String getPermissionMode() { return permissionMode; }
+    public void setPermissionMode(String permissionMode) { this.permissionMode = permissionMode; }
+    public String getPermissionsJson() { return permissionsJson; }
+    public void setPermissionsJson(String permissionsJson) { this.permissionsJson = permissionsJson; }
+    public String getManagedUserName() { return managedUserName; }
+    public void setManagedUserName(String managedUserName) { this.managedUserName = managedUserName; }
+    public String getManagedGroupId() { return managedGroupId; }
+    public void setManagedGroupId(String managedGroupId) { this.managedGroupId = managedGroupId; }
+    public String getManagedPolicyId() { return managedPolicyId; }
+    public void setManagedPolicyId(String managedPolicyId) { this.managedPolicyId = managedPolicyId; }
+    public String getAccountScopeJson() { return accountScopeJson; }
+    public void setAccountScopeJson(String accountScopeJson) { this.accountScopeJson = accountScopeJson; }
+    public String getManagedDomainId() { return managedDomainId; }
+    public void setManagedDomainId(String managedDomainId) { this.managedDomainId = managedDomainId; }
+    public String getManagedDomainUrl() { return managedDomainUrl; }
+    public void setManagedDomainUrl(String managedDomainUrl) { this.managedDomainUrl = managedDomainUrl; }
+    public String getManagedDomainGrantsJson() { return managedDomainGrantsJson; }
+    public void setManagedDomainGrantsJson(String managedDomainGrantsJson) { this.managedDomainGrantsJson = managedDomainGrantsJson; }
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createdAt;
 

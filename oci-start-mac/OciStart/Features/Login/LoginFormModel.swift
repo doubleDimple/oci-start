@@ -58,7 +58,7 @@ final class LoginFormModel: ObservableObject {
     @Published var shakeVerify = 0
     @Published var shakeMfa = 0
 
-    // Forgot password modal
+    // Archived forgot-password presentation state; no production entry or network actions.
     @Published var showForgotPassword = false
     @Published var resetStep = 1
     @Published var resetUsername = ""
@@ -141,6 +141,8 @@ final class LoginFormModel: ObservableObject {
         return ok
     }
 
+    /*
+    // 忘记密码已停用，保留旧流程供后续参考。
     func openForgotPassword() {
         resetStep = 1
         resetUsername = username
@@ -157,4 +159,5 @@ final class LoginFormModel: ObservableObject {
         resetBusy = false
         resetMessage = nil
     }
+    */
 }

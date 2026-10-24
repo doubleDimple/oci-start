@@ -9,21 +9,14 @@ import com.doubledimple.ociserver.pojo.response.BootInstanceRes;
 import com.doubledimple.ociserver.pojo.response.InstanceDetailsRes;
 import com.doubledimple.ociserver.service.BootInstanceService;
 import com.doubledimple.ociserver.service.TenantService;
-import com.doubledimple.ociserver.service.impl.system.SystemConfigService;
 import com.doubledimple.ociserver.service.oracle.OracleInstanceService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
-import com.doubledimple.ociserver.config.context.UserContext;
-import org.springframework.web.bind.annotation.ModelAttribute;
-
 import javax.annotation.Resource;
-import java.time.LocalDateTime;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -50,206 +43,17 @@ public class MobileController extends BaseController {
     @Resource
     private BootInstanceRepository bootInstanceRepository;
 
-    @Resource
-    private SystemConfigService systemConfigService;
-
-    // ===================== 公共属性 =====================
-
-    @ModelAttribute("currentUsername")
-    public String currentUsername() {
-        String username = UserContext.getUsername();
-        return username != null ? username : "";
-    }
-
-    // ===================== 页面路由 =====================
+    // ===================== 兼容跳转 =====================
 
     @GetMapping({"", "/"})
     public String home() {
         return "redirect:/m/tenants";
     }
 
-    @GetMapping("/tenants")
-    public String tenantsPage(Model model) {
-        model.addAttribute("activePage", "tenants");
-        return "mobile/tenants";
-    }
-
-    @GetMapping("/boot")
-    public String bootPage(Model model) {
-        model.addAttribute("activePage", "boot");
-        return "mobile/boot";
-    }
-
-    @GetMapping("/instances")
-    public String instancesPage(Model model) {
-        model.addAttribute("activePage", "instances");
-        return "mobile/instances";
-    }
-
-    @GetMapping("/speedtest")
-    public String speedtestPage(Model model) {
-        model.addAttribute("activePage", "speedtest");
-        return "mobile/speedtest";
-    }
-
-    @GetMapping("/monitor")
-    public String monitorPage(Model model) {
-        model.addAttribute("activePage", "monitor");
-        return "mobile/monitor";
-    }
-
+    /** Retired mobile entry: old bookmarks now open the resource list. */
     @GetMapping("/sysHelp")
-    public String sysHelpPage(@RequestParam(required = false) String instanceId, Model model) {
-        if (instanceId == null || instanceId.trim().isEmpty()) {
-            log.warn("移动端系统救援页面：instanceId 为空，重定向到租户页");
-            return "redirect:/m/tenants";
-        }
-        try {
-            com.doubledimple.dao.entity.InstanceDetails instance =
-                    oracleInstanceService.getInstanceById(Long.valueOf(instanceId.trim()));
-            if (instance == null) {
-                return "redirect:/m/tenants";
-            }
-            model.addAttribute("instance", instance);
-            model.addAttribute("instanceId", instanceId);
-            model.addAttribute("activePage", "");
-            return "mobile/sys_help";
-        } catch (Exception e) {
-            log.error("移动端系统救援页面加载失败, instanceId={}", instanceId, e);
-            return "redirect:/m/tenants";
-        }
-    }
-
-    @GetMapping("/vnic/manage")
-    public String vnicManagePage(@RequestParam String instanceId, Model model) {
-        try {
-            com.doubledimple.dao.entity.InstanceDetails instance =
-                    oracleInstanceService.getInstanceByInstanceId(instanceId);
-            model.addAttribute("instanceId", instanceId);
-            model.addAttribute("instanceName", instance != null ? instance.getDisplayName() : "");
-            model.addAttribute("activePage", "");
-            return "mobile/vnic_manage";
-        } catch (Exception e) {
-            log.error("移动端网络管理页面加载失败, instanceId={}", instanceId, e);
-            model.addAttribute("instanceId", instanceId);
-            model.addAttribute("instanceName", "");
-            model.addAttribute("activePage", "");
-            return "mobile/vnic_manage";
-        }
-    }
-
-    @GetMapping("/settings")
-    public String settingsPage(Model model) {
-        model.addAttribute("activePage", "settings");
-        model.addAttribute("githubConfig", systemConfigService.getGithubConfig());
-        model.addAttribute("googleConfig", systemConfigService.getGoogleConfig());
-        model.addAttribute("mfaConfig", systemConfigService.getMfaConfig());
-        return "mobile/settings";
-    }
-
-    @GetMapping("/arm-regions")
-    public String armRegionsPage(Model model) {
-        model.addAttribute("activePage", "arm-regions");
-        return "mobile/arm_regions";
-    }
-
-    @GetMapping("/cloudflare")
-    public String cloudflarePage(Model model) {
-        model.addAttribute("activePage", "cloudflare");
-        model.addAttribute("cloudflareConfig", systemConfigService.getCloudflareConfig());
-        return "mobile/cloudflare";
-    }
-
-    @GetMapping("/ai")
-    public String aiPage(Model model) {
-        model.addAttribute("activePage", "ai");
-        return "mobile/ai";
-    }
-
-    @GetMapping("/notify-settings")
-    public String notifySettingsPage(Model model) {
-        model.addAttribute("activePage", "notify-settings");
-        model.addAttribute("telegramConfig", systemConfigService.getTelegramConfig());
-        model.addAttribute("dingTalkConfig", systemConfigService.getDingTalkConfig());
-        model.addAttribute("barkConfig", systemConfigService.getBarkConfig());
-        model.addAttribute("feishuConfig", systemConfigService.getFeishuConfig());
-        model.addAttribute("proxyConfig", systemConfigService.getProxyConfig());
-        model.addAttribute("taskConfig", systemConfigService.getTaskConfig());
-        return "mobile/notify_settings";
-    }
-
-    @GetMapping("/traffic")
-    public String trafficPage(@RequestParam(required = false) String tenantId, Model model) {
-        model.addAttribute("tenantId", tenantId != null ? tenantId : "");
-        model.addAttribute("activePage", "traffic");
-        return "mobile/traffic";
-    }
-
-    @GetMapping("/cost")
-    public String costPage(@RequestParam(required = false) String tenantId, Model model) {
-        model.addAttribute("tenantId", tenantId != null ? tenantId : "");
-        model.addAttribute("activePage", "cost");
-        return "mobile/cost";
-    }
-
-    @GetMapping("/region-sub")
-    public String regionSubPage(@RequestParam(required = false) String tenantId,
-                                @RequestParam(required = false) String tenantName, Model model) {
-        model.addAttribute("tenantId", tenantId != null ? tenantId : "");
-        model.addAttribute("tenantName", tenantName != null ? tenantName : "");
-        model.addAttribute("activePage", "tenants");
-        return "mobile/region_sub";
-    }
-
-    @GetMapping("/user-mgr")
-    public String userMgrPage(@RequestParam(required = false) String tenantId,
-                              @RequestParam(required = false) String tenantName, Model model) {
-        model.addAttribute("tenantId", tenantId != null ? tenantId : "");
-        model.addAttribute("tenantName", tenantName != null ? tenantName : "");
-        model.addAttribute("activePage", "tenants");
-        return "mobile/user_mgr";
-    }
-
-    @GetMapping("/audit-log")
-    public String auditLogPage(@RequestParam(required = false) String tenantId,
-                               @RequestParam(required = false) String tenantName, Model model) {
-        model.addAttribute("tenantId", tenantId != null ? tenantId : "");
-        model.addAttribute("tenantName", tenantName != null ? tenantName : "");
-        model.addAttribute("activePage", "tenants");
-        return "mobile/audit_log";
-    }
-
-    @GetMapping("/disk-info")
-    public String diskInfoPage(@RequestParam(required = false) String tenantId,
-                               @RequestParam(required = false) String tenantName, Model model) {
-        model.addAttribute("tenantId", tenantId != null ? tenantId : "");
-        model.addAttribute("tenantName", tenantName != null ? tenantName : "");
-        model.addAttribute("activePage", "tenants");
-        return "mobile/disk_info";
-    }
-
-    @GetMapping("/security-rules")
-    public String securityRulesPage(@RequestParam(required = false) String tenantId,
-                                    @RequestParam(required = false) String tenantName, Model model) {
-        model.addAttribute("tenantId", tenantId != null ? tenantId : "");
-        model.addAttribute("tenantName", tenantName != null ? tenantName : "");
-        model.addAttribute("activePage", "tenants");
-        return "mobile/security_rules";
-    }
-
-    @GetMapping("/storage-instances")
-    public String storageInstancesPage(@RequestParam(required = false) String tenantId,
-                                       @RequestParam(required = false) String tenantName, Model model) {
-        model.addAttribute("tenantId", tenantId != null ? tenantId : "");
-        model.addAttribute("tenantName", tenantName != null ? tenantName : "");
-        model.addAttribute("activePage", "tenants");
-        return "mobile/storage_instances";
-    }
-
-    @GetMapping("/memo")
-    public String memoPage(Model model) {
-        model.addAttribute("activePage", "memo");
-        return "mobile/memo";
+    public String sysHelpPage() {
+        return "redirect:/m/instances";
     }
 
     // ===================== 数据 API =====================

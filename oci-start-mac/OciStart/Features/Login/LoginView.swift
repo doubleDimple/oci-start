@@ -1,7 +1,7 @@
 import SwiftUI
 import AppKit
 
-/// Full Web-parity login page (`login_user.ftl` auth-shell + aurora).
+/// Native presentation of the Vue login layout; authentication stays in AppSession.
 struct LoginView: View {
     @EnvironmentObject private var session: AppSession
     @EnvironmentObject private var backend: BackendController
@@ -9,29 +9,23 @@ struct LoginView: View {
 
     @StateObject private var model = LoginFormModel()
     @State private var countdownTask: Task<Void, Never>?
-    @State private var resetCountdownTask: Task<Void, Never>?
+    // 忘记密码已停用。
+    // @State private var resetCountdownTask: Task<Void, Never>?
+    @State private var metaGeneration = 0
 
-    private var dark: Bool { appearance.isDarkEffective }
+    private var dark: Bool { appearance.isShellDark }
 
     var body: some View {
         ZStack {
-            auroraBackground
-
             GeometryReader { geo in
-                let w = min(1240, max(920, geo.size.width - 48))
-                let h = min(760, max(640, geo.size.height - 48))
-
                 HStack(spacing: 0) {
-                    LoginHeroView(
-                        dark: dark,
-                        crying: model.cryHero,
-                        shyMode: model.passwordFocused
-                    )
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-                    Rectangle()
-                        .fill(LoginPalette.divider(dark))
-                        .frame(width: 1)
+                    if geo.size.width >= 820 {
+                        LoginHeroView(dark: dark, locale: model.locale)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        Rectangle()
+                            .fill(LoginPalette.divider(dark))
+                            .frame(width: 1)
+                    }
 
                     LoginRightPanel(
                         model: model,
@@ -43,24 +37,22 @@ struct LoginView: View {
                         onOAuth: { provider in Task { await doOAuth(provider) } },
                         onServerCommit: { applyServerAndLoadMeta() },
                         onDeploymentMode: { mode in Task { await switchDeploymentMode(mode) } },
-                        onForgotPassword: { model.openForgotPassword() },
+                        // onForgotPassword: { model.openForgotPassword() },
                         onLocale: { loc in
-                            UserDefaults.standard.set(loc.rawValue, forKey: "appLocale")
+                            LanguageManager.shared.setLocale(loc)
                         }
                     )
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .frame(width: geo.size.width >= 820 ? max(420, geo.size.width * 0.38) : geo.size.width)
+                    .frame(maxHeight: .infinity)
                 }
-                .frame(width: w, height: h)
-                .background(LoginPalette.shellFill(dark))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 26)
-                        .stroke(LoginPalette.shellBorder(dark), lineWidth: 1)
-                )
-                .cornerRadius(26)
-                .shadow(color: Color.black.opacity(dark ? 0.55 : 0.14), radius: 30, y: 16)
                 .frame(width: geo.size.width, height: geo.size.height)
+                .background(LoginPalette.bg(dark))
+                // .disabled(model.showForgotPassword)
+                // .accessibilityHidden(model.showForgotPassword)
             }
 
+            /*
+            // 服务端已停用忘记密码；弹层与请求入口一并停用。
             if model.showForgotPassword {
                 LoginForgotPasswordSheet(
                     model: model,
@@ -78,9 +70,10 @@ struct LoginView: View {
                 .transition(.opacity)
                 .zIndex(20)
             }
+            */
         }
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
-        .animation(.easeOut(duration: 0.18), value: model.showForgotPassword)
+        // .animation(.easeOut(duration: 0.18), value: model.showForgotPassword)
         .onAppear {
             model.deploymentMode = session.deploymentMode
             model.serverURL = session.serverURL
@@ -88,7 +81,7 @@ struct LoginView: View {
             if !session.username.isEmpty { model.username = session.username }
             if let raw = UserDefaults.standard.string(forKey: "appLocale"),
                let loc = AppLocale(rawValue: raw) {
-                model.locale = loc
+                model.locale = loc == .enUS ? .enUS : .zhCN
             }
             // First install: wait for explicit pick.
             // Already chosen before: restore last mode and start/connect automatically.
@@ -104,64 +97,20 @@ struct LoginView: View {
             }
         }
         .onDisappear {
+            metaGeneration += 1
             countdownTask?.cancel()
-            resetCountdownTask?.cancel()
+            // resetCountdownTask?.cancel()
         }
-    }
-
-    // MARK: - Aurora
-
-    private var auroraBackground: some View {
-        ZStack {
-            LinearGradient(
-                gradient: Gradient(colors: dark
-                    ? [Color(hex: "12151a"), Color(hex: "1a1d21"), Color(hex: "151820")]
-                    : [Color(hex: "eef1f6"), Color(hex: "e8ecf3"), Color(hex: "eef2f8")]),
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            Circle()
-                .fill(Color(hex: dark ? "4d9eff" : "6366f1").opacity(dark ? 0.35 : 0.40))
-                .frame(width: 560, height: 560)
-                .blur(radius: 64)
-                .offset(x: -280, y: -220)
-            Circle()
-                .fill(Color(hex: dark ? "8b5cf6" : "0ea5e9").opacity(dark ? 0.32 : 0.36))
-                .frame(width: 480, height: 480)
-                .blur(radius: 64)
-                .offset(x: 320, y: -40)
-            Circle()
-                .fill(Color(hex: dark ? "38bdf8" : "a78bfa").opacity(dark ? 0.22 : 0.28))
-                .frame(width: 620, height: 620)
-                .blur(radius: 70)
-                .offset(x: -40, y: 320)
-            Circle()
-                .fill(Color(hex: dark ? "22d3ee" : "3b82f6").opacity(dark ? 0.16 : 0.18))
-                .frame(width: 360, height: 360)
-                .blur(radius: 50)
-                .offset(x: 80, y: 40)
-            RadialGradient(
-                gradient: Gradient(colors: [
-                    Color.clear,
-                    Color.black.opacity(dark ? 0.45 : 0.08)
-                ]),
-                center: .center,
-                startRadius: 80,
-                endRadius: 700
-            )
-        }
-        .ignoresSafeArea()
     }
 
     // MARK: - Meta
 
+    @MainActor
     private func loadMeta(force: Bool) async {
-        let activated = await MainActor.run { model.modeActivated }
-        guard activated else { return }
+        guard model.modeActivated else { return }
 
-        let mode = await MainActor.run { model.deploymentMode }
-        let raw = await MainActor.run { model.serverURL }
-        await MainActor.run { session.serverURL = raw }
+        let mode = model.deploymentMode
+        session.serverURL = model.serverURL
         let target = session.serverURL
 
         if mode == .local, !backend.isReadyForLogin {
@@ -173,10 +122,10 @@ struct LoginView: View {
             if host.isEmpty { return }
         }
 
-        let skip = await MainActor.run { () -> Bool in
-            !force && model.metaLoadedURL == target && !model.isLoadingMeta
-        }
+        let skip = !force && model.metaLoadedURL == target && !model.isLoadingMeta
         if skip { return }
+        metaGeneration += 1
+        let generation = metaGeneration
 
         await MainActor.run {
             withAnimation(.easeInOut(duration: 0.2)) {
@@ -188,9 +137,11 @@ struct LoginView: View {
         }
 
         do {
-            let meta = try await session.fetchLoginPageMeta()
-            let factors = await session.fetchLoginFactors()
+            let meta = try await APIClient.shared.fetchLoginPageMeta(baseURL: target)
+            let factors = await APIClient.shared.fetchLoginFactorConfig(baseURL: target)
             await MainActor.run {
+                guard generation == metaGeneration, model.deploymentMode == mode,
+                      AppSession.normalize(model.serverURL) == target, model.modeActivated else { return }
                 withAnimation(.easeInOut(duration: 0.28)) {
                     model.allowRegister = meta.allowRegister
                     model.githubEnabled = meta.githubEnabled
@@ -211,6 +162,8 @@ struct LoginView: View {
             }
         } catch {
             await MainActor.run {
+                guard generation == metaGeneration, model.deploymentMode == mode,
+                      AppSession.normalize(model.serverURL) == target, model.modeActivated else { return }
                 withAnimation(.easeInOut(duration: 0.22)) {
                     model.isLoadingMeta = false
                     model.metaLoadedURL = nil
@@ -233,6 +186,7 @@ struct LoginView: View {
     @MainActor
     private func applyRememberedDeployment() async {
         let mode = session.deploymentMode
+        metaGeneration += 1
         withAnimation(.easeInOut(duration: 0.22)) {
             model.deploymentMode = mode
             model.modeActivated = true
@@ -252,6 +206,7 @@ struct LoginView: View {
             await loadMeta(force: false)
         } else {
             await backend.start()
+            guard model.deploymentMode == mode else { return }
             await loadMeta(force: true)
         }
     }
@@ -261,6 +216,7 @@ struct LoginView: View {
     private func switchDeploymentMode(_ mode: DeploymentMode) async {
         // Ignore only if already active same mode (re-tap after restore / pick).
         if model.modeActivated, model.deploymentMode == mode { return }
+        metaGeneration += 1
 
         withAnimation(.easeInOut(duration: 0.22)) {
             model.deploymentMode = mode
@@ -286,17 +242,26 @@ struct LoginView: View {
             await Task.detached(priority: .userInitiated) {
                 BackendController.shared.stop()
             }.value
+            guard model.deploymentMode == mode else { return }
             // User connects via「连接」when URL ready; auto-try if host already filled.
             await loadMeta(force: false)
         } else {
             await backend.start()
+            guard model.deploymentMode == mode else { return }
             await loadMeta(force: true)
         }
     }
 
     func applyServerAndLoadMeta() {
+        metaGeneration += 1
         let raw = model.serverURL.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !raw.isEmpty else { return }
+        let normalized = AppSession.normalize(raw)
+        guard let host = URL(string: normalized)?.host, !host.isEmpty else {
+            model.isLoadingMeta = false
+            model.errorText = model.locale == .enUS ? "Enter a remote server URL first" : "请先填写完整的服务器地址"
+            return
+        }
 
         // Remote form but user pasted localhost → flip to local smoothly.
         if model.deploymentMode == .remote, AppSession.isLocalServerURL(raw) {
@@ -500,7 +465,8 @@ struct LoginView: View {
         }
     }
 
-    // MARK: - Forgot password
+    /*
+    // MARK: - Forgot password (disabled with the server endpoints)
 
     private func doResetSendCode() async {
         let user = await MainActor.run {
@@ -644,4 +610,5 @@ struct LoginView: View {
             }
         }
     }
+    */
 }

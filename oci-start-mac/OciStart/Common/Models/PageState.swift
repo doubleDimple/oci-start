@@ -21,7 +21,7 @@ struct PageState: Equatable {
     }
 
     mutating func apply(totalElements: Int64, totalPages: Int? = nil) {
-        self.totalElements = totalElements
+        self.totalElements = max(0, totalElements)
         if let totalPages = totalPages {
             self.totalPages = max(totalPages, 0)
         } else if size > 0 {
@@ -29,7 +29,9 @@ struct PageState: Equatable {
         } else {
             self.totalPages = 0
         }
-        if self.totalPages > 0, page >= self.totalPages {
+        if self.totalPages == 0 {
+            page = 0
+        } else if page >= self.totalPages {
             page = self.totalPages - 1
         }
     }
@@ -43,6 +45,7 @@ struct PageState: Equatable {
         page = min(max(0, newPage), totalPages - 1)
     }
     mutating func changeSize(_ newSize: Int) {
+        guard newSize > 0 else { return }
         size = newSize
         page = 0
     }

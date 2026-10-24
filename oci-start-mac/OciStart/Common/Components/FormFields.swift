@@ -1,50 +1,45 @@
 import SwiftUI
 
-// MARK: - Shared input chrome (aligned with login page filled fields)
+// MARK: - Shared Vue console input chrome
 
-/// Global input tokens — match login filled box (soft fill, radius 12, focus glow).
-/// Toolbar/filter height is slightly denser than login form (40 vs 48).
+/// Console inputs match index.scss: pill radius, search fill, inset focus border.
+/// Login has its own independent LoginField and palette.
 enum AppInputStyle {
-    static let height: CGFloat = 40
-    static let radius: CGFloat = 12
-    static let fontSize: CGFloat = 13
-    static let iconSize: CGFloat = 12
+    static let height: CGFloat = 36
+    static let radius: CGFloat = AppTheme.controlRadius
+    static let pillRadius: CGFloat = 999
+    static let fontSize: CGFloat = AppTheme.bodySize
+    static let iconSize: CGFloat = 14
     static let hPad: CGFloat = 12
 
     static func fill(_ dark: Bool, focused: Bool = false) -> Color {
-        if focused {
-            return dark ? Color(hex: "1a1d21") : Color.white
-        }
-        return dark ? Color(hex: "292d32") : Color(hex: "f8f9fa")
+        AppTheme.inputBg(dark)
     }
 
     static func border(_ dark: Bool, focused: Bool = false, hovering: Bool = false) -> Color {
         if focused {
-            return dark ? Color(hex: "4d9eff") : Color(hex: "42b983")
+            return AppTheme.sidebarActive
         }
         if hovering {
-            return dark ? Color(hex: "4d9eff").opacity(0.45) : Color(hex: "42b983").opacity(0.45)
+            return AppTheme.borderStrong(dark)
         }
-        return dark ? Color(hex: "31363d") : Color(hex: "e4e7ed")
+        return AppTheme.border(dark)
     }
 
     static func glow(_ dark: Bool, focused: Bool) -> Color {
-        guard focused else { return .clear }
-        return dark
-            ? Color(hex: "4d9eff").opacity(0.18)
-            : Color(hex: "42b983").opacity(0.14)
+        .clear
     }
 
     static func text(_ dark: Bool) -> Color {
-        dark ? Color(hex: "cdd9e5") : Color(hex: "2c3e50")
+        AppTheme.textPrimary(dark)
     }
 
     static func placeholder(_ dark: Bool) -> Color {
-        dark ? Color(hex: "768390") : Color(hex: "999999")
+        AppTheme.textMuted(dark)
     }
 
     static func icon(_ dark: Bool) -> Color {
-        dark ? Color(hex: "768390") : Color(hex: "6b7280")
+        AppTheme.textSecondary(dark)
     }
 }
 
@@ -58,6 +53,7 @@ struct AppInputChrome<Content: View>: View {
     @ViewBuilder var content: () -> Content
 
     @State private var hovering = false
+    @Environment(\.isEnabled) private var enabled
 
     var body: some View {
         HStack(spacing: 8) {
@@ -72,14 +68,14 @@ struct AppInputChrome<Content: View>: View {
         .padding(.horizontal, AppInputStyle.hPad)
         .frame(height: height)
         .background(
-            RoundedRectangle(cornerRadius: AppInputStyle.radius)
-                .fill(AppInputStyle.fill(dark, focused: focused))
+            RoundedRectangle(cornerRadius: AppInputStyle.pillRadius)
+                .fill(enabled ? AppInputStyle.fill(dark, focused: focused) : AppTheme.hover(dark))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: AppInputStyle.radius)
-                .stroke(
-                    AppInputStyle.border(dark, focused: focused, hovering: hovering),
-                    lineWidth: focused ? 1.5 : 1
+            RoundedRectangle(cornerRadius: AppInputStyle.pillRadius)
+                .strokeBorder(
+                    AppInputStyle.border(dark, focused: focused && enabled, hovering: hovering && enabled),
+                    lineWidth: focused && enabled ? 2 : 1
                 )
         )
         .shadow(
@@ -108,12 +104,12 @@ struct FormFieldRow<Content: View>: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 2) {
                 Text(label)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .font(.system(size: AppTheme.bodySize, weight: .semibold))
+                    .foregroundColor(AppTheme.textSecondary(dark))
                 if required {
                     Text("*")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundColor(Color(hex: "f85149"))
+                        .font(.system(size: AppTheme.bodySize, weight: .bold))
+                        .foregroundColor(AppTheme.danger)
                 }
             }
             content()
@@ -133,6 +129,7 @@ struct AppTextField: View {
 
     @EnvironmentObject private var appearance: AppearanceController
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.isEnabled) private var enabled
     private var dark: Bool { appearance.isDarkEffective || colorScheme == .dark }
 
     @State private var focused = false
@@ -163,7 +160,7 @@ struct AppTextField: View {
                 placeholder: placeholder,
                 secure: secure,
                 dark: dark,
-                enabled: true,
+                enabled: enabled,
                 fontSize: AppInputStyle.fontSize,
                 isFocused: $focused,
                 onCommit: onCommit
@@ -185,6 +182,7 @@ struct AppCompactField: View {
 
     @EnvironmentObject private var appearance: AppearanceController
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.isEnabled) private var enabled
     private var dark: Bool { appearance.isDarkEffective || colorScheme == .dark }
 
     @State private var focused = false
@@ -196,8 +194,8 @@ struct AppCompactField: View {
                 placeholder: placeholder,
                 secure: false,
                 dark: dark,
-                enabled: true,
-                fontSize: 12,
+                enabled: enabled,
+                fontSize: AppTheme.bodySize,
                 isFocused: $focused,
                 onCommit: onCommit
             )
@@ -219,12 +217,12 @@ struct KeyValueRow: View {
     var body: some View {
         HStack(alignment: .top) {
             Text(key)
-                .font(.system(size: 12))
-                .foregroundColor(AppTheme.sidebarText(dark))
+                .font(.system(size: AppTheme.bodySize))
+                .foregroundColor(AppTheme.textSecondary(dark))
                 .frame(width: 120, alignment: .leading)
             Text(value)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
+                .font(.system(size: AppTheme.bodySize, weight: .medium))
+                .foregroundColor(AppTheme.textPrimary(dark))
             Spacer()
         }
         .padding(.vertical, 4)

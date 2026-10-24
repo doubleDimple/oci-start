@@ -2,8 +2,8 @@
 
 # ================= 动态配置区域 =================
 # 这些变量将由 Java 后端动态替换
-SERVER_URL="{{SERVER_URL}}"
-TOKEN="{{TOKEN}}"
+SERVER_URL={{SERVER_URL}}
+TOKEN={{TOKEN}}
 INTERVAL={{INTERVAL}}
 DEBUG=false
 # ===========================================
@@ -150,11 +150,20 @@ EOF
 
 # --- 自动安装 Systemd 服务 (实现开机自启) ---
 if [ "$1" == "install" ]; then
+    set -e
+    if [ "$(id -u)" -ne 0 ]; then
+        echo "安装监控探针需要 root 权限。" >&2
+        exit 1
+    fi
+    if ! command -v systemctl >/dev/null 2>&1 || [ ! -d /run/systemd/system ]; then
+        echo "安装监控探针需要运行中的 systemd。" >&2
+        exit 1
+    fi
     echo "🔧 开始安装监控探针..."
 
     # 1. 移动脚本
     cp "$0" /usr/local/bin/vps-agent.sh
-    chmod +x /usr/local/bin/vps-agent.sh
+    chmod 700 /usr/local/bin/vps-agent.sh
 
     # 2. 写入 Systemd 服务文件
     cat > /etc/systemd/system/vps-agent.service <<EOF
@@ -176,6 +185,10 @@ EOF
     systemctl daemon-reload
     systemctl enable vps-agent
     systemctl restart vps-agent
+    if ! systemctl is-active --quiet vps-agent; then
+        echo "监控服务未进入运行状态，请检查 systemd 日志。" >&2
+        exit 1
+    fi
 
     echo "✅ 安装成功！监控服务已启动。"
     exit 0
@@ -183,12 +196,49 @@ fi
 
 # 卸载逻辑
 if [ "$1" == "uninstall" ]; then
+    set -e
+    if [ "$(id -u)" -ne 0 ]; then
+        echo "卸载监控探针需要 root 权限。" >&2
+        exit 1
+    fi
+    if ! command -v systemctl >/dev/null 2>&1 || [ ! -d /run/systemd/system ]; then
+        echo "卸载监控探针需要运行中的 systemd。" >&2
+        exit 1
+    fi
     echo "🗑️ 正在卸载监控探针..."
-    systemctl stop vps-agent
-    systemctl disable vps-agent
+    # The optional network worker has its own service and credential file.
+    NETWORK_UNIT_STATE=$(systemctl show --property=LoadState --value vps-network-agent.service)
+    if [ -z "$NETWORK_UNIT_STATE" ]; then
+        echo "无法确认网络探针服务状态，未继续卸载。" >&2
+        exit 1
+    fi
+    if [ "$NETWORK_UNIT_STATE" != "not-found" ]; then
+        systemctl stop vps-network-agent.service
+        systemctl disable vps-network-agent.service
+    fi
+    rm -f /etc/systemd/system/vps-network-agent.service
+    rm -f /usr/local/bin/vps-network-agent.py
+    rm -f /etc/vps-network-agent/config.json
+    if [ -d /etc/vps-network-agent ]; then
+        rmdir --ignore-fail-on-non-empty /etc/vps-network-agent
+    fi
+    UNIT_LOAD_STATE=$(systemctl show --property=LoadState --value vps-agent.service)
+    if [ -z "$UNIT_LOAD_STATE" ]; then
+        echo "无法确认监控服务状态，未继续卸载。" >&2
+        exit 1
+    fi
+    if [ "$UNIT_LOAD_STATE" != "not-found" ]; then
+        systemctl stop vps-agent
+        systemctl disable vps-agent
+    fi
     rm -f /etc/systemd/system/vps-agent.service
     rm -f /usr/local/bin/vps-agent.sh
     systemctl daemon-reload
+    UNIT_ACTIVE_STATE=$(systemctl show --property=ActiveState --value vps-agent.service)
+    case "$UNIT_ACTIVE_STATE" in
+        inactive|failed) ;;
+        *) echo "监控服务未停止或状态未知，卸载未完成。" >&2; exit 1 ;;
+    esac
     echo "✅ 卸载完成。"
     exit 0
 fi

@@ -174,6 +174,7 @@
 		EF1D298C370976748D35FBE1 /* WebEmbedViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21082200ACFF7D2DC3C09875 /* WebEmbedViewController.swift */; };
 		EF9329DE9947F7702DE56963 /* BootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E46680B67FA235238448381 /* BootView.swift */; };
 		EFBBD4BF84147F7F2B97BE37 /* CloudflareViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD7BD649A98407462B34F8C4 /* CloudflareViewModel.swift */; };
+		EFD189E1FF7908417E757F64 /* SwiftTerm in Frameworks */ = {isa = PBXBuildFile; productRef = FFE836D1E1EB895E77F042D2 /* SwiftTerm */; };
 		EFD401E41936F040E691A746 /* LoginRightPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53E1ED440D83AB555CFF04A2 /* LoginRightPanel.swift */; };
 		F2660264729C8E35B314B077 /* ModuleSettingsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0C261721BFE3F80E25A8B2E /* ModuleSettingsCard.swift */; };
 		F4D1F50F9CF4E42234A7FCA9 /* RegionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D78203481BAF2C2CEE2D98B7 /* RegionsView.swift */; };
@@ -280,6 +281,7 @@
 		767EED90CE827EB7D186DE5D /* OpenLogsModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenLogsModels.swift; sourceTree = "<group>"; };
 		78423BA6D466522D05A43F53 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		7917A9280F7341BD78F987C8 /* DropdownHostingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DropdownHostingView.swift; sourceTree = "<group>"; };
+		7A149B3BD125473ECB1871C0 /* SwiftTerm */ = {isa = PBXFileReference; lastKnownFileType = folder; name = SwiftTerm; path = Vendor/SwiftTerm; sourceTree = SOURCE_ROOT; };
 		7C0BF3FD147C5D77E73A013C /* LoadingOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadingOverlay.swift; sourceTree = "<group>"; };
 		7D87C168F6ACD632E145C4AA /* StorageSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageSheets.swift; sourceTree = "<group>"; };
 		7E2AE8E2D450EFC5A3F15AB3 /* LoginForgotPasswordSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginForgotPasswordSheet.swift; sourceTree = "<group>"; };
@@ -365,6 +367,17 @@
 		FF7C8043AA68448CE2BC7E73 /* SectionCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectionCard.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
+/* Begin PBXFrameworksBuildPhase section */
+		DC9355F396A35E5848FE28C7 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				EFD189E1FF7908417E757F64 /* SwiftTerm in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
 /* Begin PBXGroup section */
 		03428377284F679B63E6A7B9 /* SystemLogs */ = {
 			isa = PBXGroup;
@@ -448,6 +461,7 @@
 			isa = PBXGroup;
 			children = (
 				FDA1366E259E61244A4414B6 /* OciStart */,
+				C7F58607AFF56F2A96193F9B /* Packages */,
 				EF4A2335C19EBAF423F16893 /* Products */,
 			);
 			indentWidth = 4;
@@ -765,6 +779,14 @@
 			path = Instances;
 			sourceTree = "<group>";
 		};
+		C7F58607AFF56F2A96193F9B /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				7A149B3BD125473ECB1871C0 /* SwiftTerm */,
+			);
+			name = Packages;
+			sourceTree = "<group>";
+		};
 		C972ED3ED5585EA5E2543E34 /* Core */ = {
 			isa = PBXGroup;
 			children = (
@@ -873,6 +895,7 @@
 			buildPhases = (
 				5E4141F305F0EDF0FF620C05 /* Sources */,
 				00B8ABA64DB65D81B6EB1F5E /* Resources */,
+				DC9355F396A35E5848FE28C7 /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -880,6 +903,7 @@
 			);
 			name = OciStart;
 			packageProductDependencies = (
+				FFE836D1E1EB895E77F042D2 /* SwiftTerm */,
 			);
 			productName = OciStart;
 			productReference = 3C1377BD1A0EFAD5A6961399 /* OciStart.app */;
@@ -908,6 +932,9 @@
 			);
 			mainGroup = 3A94B4D6D342EBCB1626995B;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				B5ADF8E37CE5A947B9E65B8C /* XCLocalSwiftPackageReference "Vendor/SwiftTerm" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = EF4A2335C19EBAF423F16893 /* Products */;
 			projectDirPath = "";
@@ -1241,7 +1268,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 13;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = OciStart/Info.plist;
@@ -1267,7 +1294,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 13;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = OciStart/Info.plist;
@@ -1307,6 +1334,20 @@
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		B5ADF8E37CE5A947B9E65B8C /* XCLocalSwiftPackageReference "Vendor/SwiftTerm" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Vendor/SwiftTerm;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		FFE836D1E1EB895E77F042D2 /* SwiftTerm */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SwiftTerm;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 877A08F2E8D33676B4C68BA8 /* Project object */;
 }

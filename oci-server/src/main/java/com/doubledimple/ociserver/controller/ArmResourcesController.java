@@ -7,7 +7,6 @@ import com.doubledimple.ociserver.service.OpenApiService;
 import com.doubledimple.ociserver.service.TenantService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
@@ -88,12 +87,4 @@ public class ArmResourcesController  extends BaseController{
         }
     }
 
-    /**
-     * 原来的页面渲染方法保持不变（如果还需要的话）
-     */
-    @GetMapping("/list")
-    public String listUsers(Model model) {
-        model.addAttribute("activePage", "api-records");
-        return "arm_records";
-    }
 }

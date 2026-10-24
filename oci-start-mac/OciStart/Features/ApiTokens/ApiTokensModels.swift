@@ -4,138 +4,77 @@ struct ApiTokenForm: Equatable {
     var tokenName = ""
     var expirationDays = 30
     var description = ""
-    var allowSwaggerAccess = true
+    var valid: Bool {
+        let name = tokenName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !name.isEmpty && name.utf16.count <= 255 && description.utf16.count <= 1000 && (1...365).contains(expirationDays)
+    }
 }
 
-struct ApiTokenStatus: Equatable {
-    var enabled = false
-    var tokenName = ""
-    var hasToken = false
-    var description = ""
-    var tokenValue = ""
-    var expirationDays = 30
-    var expiresAt = ""
-    var createdAt = ""
-    var daysUntilExpiration = 0
-    var isExpired = false
+/// Metadata never contains the token; material is fetched explicitly against its revision.
+struct ApiTokenStatus: Decodable, Equatable {
+    let revision: String
+    let tokenName: String
+    let description: String
+    let enabled: Bool
+    let hasToken: Bool
+    let isExpired: Bool?
+    let expirationDays: Int
+    let createdAt: String?
+    let expiresAt: String?
+    let daysUntilExpiration: Int?
+    let allowSwaggerAccess: Bool
+    let serverTime: Int64
+    let expiresAtEpochMs: Int64?
+    let serverTimeZone: String
+    var form: ApiTokenForm { ApiTokenForm(tokenName: tokenName, expirationDays: expirationDays, description: description) }
 }
 
-struct ApiTokenGenerateResult: Equatable {
-    var tokenValue = ""
-    var expiresAt = ""
-    var daysUntilExpiration = 0
-    var tokenName = ""
+struct ApiTokenMaterial {
+    let metadata: ApiTokenStatus
+    var tokenValue: String
+}
+
+struct ApiTokenFailure: LocalizedError {
+    let key: String
+    var writeAttempted = false
+    var errorDescription: String? {
+        let messages = ["invalidInput": "请检查名称、描述和有效期", "invalidResponse": "服务器返回的 Token 数据不完整",
+                        "conflict": "Token 配置已变化，请刷新并核对最新版本", "notFound": "Token 已不存在，请刷新",
+                        "unauthorized": "登录已失效", "forbidden": "没有执行此操作的权限", "requestFailed": "Token 请求未完成，请检查连接"]
+        return messages[key] ?? messages["requestFailed"]
+    }
 }
 
 enum ApiTokensJSON {
-    static func parseConfigs(_ data: Data) throws -> (form: ApiTokenForm, status: ApiTokenStatus) {
-        guard let root = obj(data) else {
-            throw APIError.serverMessage("Token 配置解析失败")
-        }
-        if let success = root["success"] as? Bool, success == false {
-            throw APIError.serverMessage(str(root["message"]).isEmpty ? "加载 Token 配置失败" : str(root["message"]))
-        }
-        let payload = (root["data"] as? [String: Any]) ?? root
-        var form = ApiTokenForm()
-        var status = ApiTokenStatus()
+    static func validRevision(_ value: String) -> Bool {
+        value.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil
+    }
 
-        if let c = payload["config"] as? [String: Any] {
-            form.tokenName = str(c["tokenName"])
-            form.expirationDays = int(c["expirationDays"], fallback: 30)
-            if ![7, 30, 90, 180, 365].contains(form.expirationDays) {
-                form.expirationDays = 30
-            }
-            form.description = str(c["description"])
-            form.allowSwaggerAccess = bool(c["allowSwaggerAccess"], fallback: true)
-            status.tokenValue = str(c["tokenValue"])
-            status.expirationDays = form.expirationDays
-        }
-
-        if let s = payload["status"] as? [String: Any] {
-            status.enabled = bool(s["enabled"])
-            status.tokenName = str(s["tokenName"])
-            status.hasToken = bool(s["hasToken"])
-            status.description = str(s["description"])
-            status.expiresAt = formatTime(s["expiresAt"])
-            status.createdAt = formatTime(s["createdAt"])
-            status.daysUntilExpiration = int(s["daysUntilExpiration"])
-            status.isExpired = bool(s["isExpired"])
-            if form.tokenName.isEmpty {
-                form.tokenName = status.tokenName
-            }
-            if form.description.isEmpty {
-                form.description = status.description
+    static func state(_ value: Any?) throws -> ApiTokenStatus {
+        let keys = ["revision", "tokenName", "description", "enabled", "hasToken", "isExpired", "expirationDays",
+                    "createdAt", "expiresAt", "daysUntilExpiration", "allowSwaggerAccess", "serverTime", "expiresAtEpochMs", "serverTimeZone"]
+        guard let row = value as? [String: Any], keys.allSatisfy({ row[$0] != nil }),
+              let data = try? JSONSerialization.data(withJSONObject: row),
+              let state = try? JSONDecoder().decode(ApiTokenStatus.self, from: data),
+              validRevision(state.revision), state.tokenName.utf16.count <= 255, state.description.utf16.count <= 1000,
+              (1...365).contains(state.expirationDays), state.serverTime > 0, state.serverTimeZone.count <= 100,
+              state.daysUntilExpiration == nil || state.daysUntilExpiration! >= 0,
+              state.expiresAtEpochMs == nil || state.expiresAtEpochMs! > 0 else { throw ApiTokenFailure(key: "invalidResponse") }
+        for date in [state.createdAt, state.expiresAt].compactMap({ $0 }) {
+            guard date.range(of: "^\\d{4}-\\d{2}-\\d{2}[ T]\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,9})?$", options: .regularExpression) != nil else {
+                throw ApiTokenFailure(key: "invalidResponse")
             }
         }
-
-        return (form, status)
+        return state
     }
 
-    static func parseGenerate(_ data: Data) throws -> ApiTokenGenerateResult {
-        guard let root = obj(data) else {
-            throw APIError.serverMessage("生成 Token 响应解析失败")
+    static func material(_ value: Any?) throws -> ApiTokenMaterial {
+        guard let row = value as? [String: Any], let token = row["tokenValue"] as? String,
+              !token.isEmpty, token.count <= 4096, token.unicodeScalars.allSatisfy({ (33...126).contains($0.value) }) else {
+            throw ApiTokenFailure(key: "invalidResponse")
         }
-        // 可能直接是 ApiTokenResponse，或包在 data 里
-        let d = (root["data"] as? [String: Any]) ?? root
-        var r = ApiTokenGenerateResult()
-        r.tokenValue = str(d["tokenValue"])
-        r.tokenName = str(d["tokenName"])
-        r.expiresAt = formatTime(d["expiresAt"])
-        r.daysUntilExpiration = int(d["daysUntilExpiration"])
-        if r.tokenValue.isEmpty {
-            throw APIError.serverMessage(str(root["message"]).isEmpty ? "生成 Token 失败" : str(root["message"]))
-        }
-        return r
-    }
-
-    static func ensureOK(_ data: Data, fallback: String) throws {
-        if data.isEmpty { return }
-        if let root = obj(data) {
-            if let success = root["success"] as? Bool, !success {
-                throw APIError.serverMessage(str(root["message"]).isEmpty ? fallback : str(root["message"]))
-            }
-        }
-    }
-
-    static func formatTime(_ v: Any?) -> String {
-        if let s = v as? String { return s }
-        if let arr = v as? [Any] {
-            // LocalDateTime array [y,m,d,h,mi,s]
-            let nums = arr.compactMap { ($0 as? NSNumber)?.intValue ?? Int("\($0)") }
-            if nums.count >= 3 {
-                let y = nums[0], m = nums[1], d = nums[2]
-                let h = nums.count > 3 ? nums[3] : 0
-                let mi = nums.count > 4 ? nums[4] : 0
-                let s = nums.count > 5 ? nums[5] : 0
-                return String(format: "%04d-%02d-%02d %02d:%02d:%02d", y, m, d, h, mi, s)
-            }
-        }
-        return str(v)
-    }
-
-    static func obj(_ data: Data) -> [String: Any]? {
-        (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
-    }
-
-    static func str(_ v: Any?) -> String {
-        if let s = v as? String { return s }
-        if let n = v as? NSNumber { return n.stringValue }
-        return ""
-    }
-
-    static func int(_ v: Any?, fallback: Int = 0) -> Int {
-        if let i = v as? Int { return i }
-        if let n = v as? NSNumber { return n.intValue }
-        if let s = v as? String, let i = Int(s) { return i }
-        return fallback
-    }
-
-    static func bool(_ v: Any?, fallback: Bool = false) -> Bool {
-        if let b = v as? Bool { return b }
-        if let n = v as? NSNumber { return n.boolValue }
-        if let s = v as? String {
-            return s == "1" || s.lowercased() == "true"
-        }
-        return fallback
+        let metadata = try state(row["metadata"])
+        guard metadata.hasToken else { throw ApiTokenFailure(key: "invalidResponse") }
+        return ApiTokenMaterial(metadata: metadata, tokenValue: token)
     }
 }

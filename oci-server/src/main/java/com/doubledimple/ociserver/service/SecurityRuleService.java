@@ -24,6 +24,9 @@ public interface SecurityRuleService {
      */
     public SecurityRuleDTO addSecurityRule(SecurityRuleDTO ruleDTO);
 
+    /** Update the indexed rule using the legacy tenantId_index_direction identifier. */
+    SecurityRuleDTO updateSecurityRule(String id, SecurityRuleDTO ruleDTO);
+
 
     /**
      * 删除规则

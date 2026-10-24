@@ -3,8 +3,10 @@ package com.doubledimple.ociserver.controller.nginx;
 import com.doubledimple.dao.entity.NginxConfig;
 import com.doubledimple.dao.entity.ProxyConfig;
 import com.doubledimple.dao.entity.SslCertificate;
-import com.doubledimple.dao.entity.Tenant;
 import com.doubledimple.ociserver.controller.BaseController;
+import com.doubledimple.ociserver.config.context.UserContext;
+import com.doubledimple.ociserver.service.VerifyService;
+import com.doubledimple.ociserver.service.security.ExportVerificationGuard;
 import com.doubledimple.ociserver.pojo.request.nginx.CertificateDTO;
 import com.doubledimple.ociserver.pojo.request.nginx.ProxyConfigCreateDto;
 import com.doubledimple.ociserver.pojo.request.nginx.ProxyConfigUpdateDto;
@@ -24,7 +26,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -36,13 +37,12 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import javax.servlet.http.HttpServletRequest;
+import javax.annotation.Resource;
 import javax.validation.Valid;
-import java.util.Collections;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import static com.doubledimple.ociserver.utils.DesktopUtils.isMobileRequest;
 
 /**
  * @version 1.0.0
@@ -60,17 +60,7 @@ public class NginxController extends BaseController {
     private final ProxyConfigService proxyConfigService;
     private final SslCertificateService sslCertificateService;
     private final NginxConfigService nginxConfigService;
-
-    /**
-     * SSL管理页面
-     */
-    @GetMapping("/nginx/management")
-    public String managementPage(@RequestParam(required = false) Integer cloudType,
-                                 HttpServletRequest request,
-                                 Model model) {
-        model.addAttribute("activePage", "nginx-management");
-        return "nginx_config";
-    }
+    @Resource private VerifyService verifyService;
 
     // =================== 反向代理配置API ===================
 
@@ -533,14 +523,17 @@ public class NginxController extends BaseController {
      * 下载证书
      */
     @GetMapping("/certificates/{id}/download")
-    public ResponseEntity<byte[]> downloadCertificate(@PathVariable Long id) {
+    public ResponseEntity<byte[]> downloadCertificate(@PathVariable Long id, HttpServletRequest request) {
         try {
+            // The ZIP contains privkey.pem as well as the public certificate.
+            verifyService.checkCodeForExport(UserContext.getUsername(), request.getHeader("X-Verify-Code"));
             Map<String, Object> result = sslCertificateService.downloadCertificate(id);
 
             byte[] content = (byte[]) result.get("content");
             String fileName = (String) result.get("fileName");
 
             HttpHeaders headers = new HttpHeaders();
+            headers.setCacheControl("no-store");
             headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
             headers.setContentDispositionFormData("attachment", fileName);
             headers.setContentLength(content.length);
@@ -549,9 +542,13 @@ public class NginxController extends BaseController {
                     .headers(headers)
                     .body(content);
 
+        } catch (ExportVerificationGuard.ExportVerificationException e) {
+            return ResponseEntity.status(403).header(HttpHeaders.CACHE_CONTROL, "no-store")
+                    .contentType(MediaType.parseMediaType("text/plain;charset=UTF-8"))
+                    .body(e.getMessage().getBytes(StandardCharsets.UTF_8));
         } catch (Exception e) {
-            log.error("证书下载失败", e);
-            return ResponseEntity.badRequest().build();
+            log.warn("证书下载失败，异常类型:{}", e.getClass().getSimpleName());
+            return ResponseEntity.badRequest().header(HttpHeaders.CACHE_CONTROL, "no-store").build();
         }
     }
 
@@ -570,6 +567,5 @@ public class NginxController extends BaseController {
             return ApiResponse.error("获取证书列表失败: " + e.getMessage());
         }
     }
-
 
 }

@@ -50,7 +50,7 @@ struct EmailSheetHost: View {
         Group {
             if let err = model.formError, !err.isEmpty {
                 Text(err)
-                    .font(.system(size: 12))
+                    .font(.system(size: 14))
                     .foregroundColor(AppSheetSurface.accentRed(dark))
             }
         }
@@ -101,18 +101,18 @@ struct EmailSheetHost: View {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Text("收件人")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(AppTheme.sidebarText(dark))
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(AppTheme.textSecondary(dark))
                         Spacer()
                         AppButton(title: "全选", kind: .secondary) { model.selectAllComposeRecipients() }
                         AppButton(title: "清空", kind: .secondary) { model.clearComposeRecipients() }
                         Text("已选 \(model.composeSelectedIds.count) 人")
-                            .font(.system(size: 11))
+                            .font(.system(size: 13))
                             .foregroundColor(mutedText)
                     }
                     if model.composeContacts.isEmpty {
                         Text("暂无收件人，请先添加联系人")
-                            .font(.system(size: 12))
+                            .font(.system(size: 13))
                             .foregroundColor(mutedText)
                             .padding(.vertical, 12)
                     } else {
@@ -145,10 +145,10 @@ struct EmailSheetHost: View {
                     .foregroundColor(on ? AppTheme.sidebarActive : mutedText)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(c.name.isEmpty ? "—" : c.name)
-                        .font(.system(size: 13, weight: .medium))
+                        .font(.system(size: 14, weight: .medium))
                         .foregroundColor(primaryText)
                     Text(c.email)
-                        .font(.system(size: 11))
+                        .font(.system(size: 13))
                         .foregroundColor(mutedText)
                 }
                 Spacer()
@@ -197,7 +197,7 @@ struct EmailSheetHost: View {
         }) {
             VStack(alignment: .leading, spacing: 14) {
                 Text("为「\(tenantName)」配置发件域名")
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.system(size: 14, weight: .medium))
                     .foregroundColor(primaryText)
                 FormFieldRow(label: "邮箱域名", required: true) {
                     AppTextField(
@@ -207,7 +207,7 @@ struct EmailSheetHost: View {
                     )
                 }
                 Text("域名需已在 OCI Email Delivery 中验证。开启后将使用该域名作为发件后缀。")
-                    .font(.system(size: 11))
+                    .font(.system(size: 13))
                     .foregroundColor(mutedText)
                     .fixedSize(horizontal: false, vertical: true)
                 formErrorLine()
@@ -229,7 +229,7 @@ struct EmailSheetHost: View {
                     detailInfo(r)
                 }
                 Text("收件明细")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(primaryText)
                 if model.detailLoading && model.detailRecipients.isEmpty {
                     HStack {
@@ -246,7 +246,7 @@ struct EmailSheetHost: View {
                         ForEach(model.detailRecipients) { row in
                             HStack {
                                 Text(row.receiveEmailAddress.isEmpty ? "—" : row.receiveEmailAddress)
-                                    .font(.system(size: 13))
+                                    .font(.system(size: 14))
                                     .foregroundColor(primaryText)
                                 Spacer()
                                 StatusBadge(text: row.stateLabel, tone: row.stateTone)
@@ -279,10 +279,10 @@ struct EmailSheetHost: View {
             infoLine("发件人", r.senderEmail.isEmpty ? "—" : r.senderEmail)
             infoLine("租户", r.tenantText)
             Text("内容")
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(size: 13, weight: .semibold))
                 .foregroundColor(mutedText)
             Text(r.content.isEmpty ? "（无内容）" : r.content)
-                .font(.system(size: 13))
+                .font(.system(size: 14))
                 .foregroundColor(primaryText)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(10)
@@ -294,10 +294,10 @@ struct EmailSheetHost: View {
     private func infoLine(_ label: String, _ value: String) -> some View {
         HStack(alignment: .top, spacing: 6) {
             Text("\(label)：")
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(size: 13, weight: .semibold))
                 .foregroundColor(mutedText)
             Text(value)
-                .font(.system(size: 12))
+                .font(.system(size: 14))
                 .foregroundColor(primaryText)
             Spacer()
         }

@@ -79,8 +79,8 @@ struct CloudflareDnsSheet: View {
                         }
                         if !isEdit {
                             Text("根域名使用 @")
-                                .font(.system(size: 11))
-                                .foregroundColor(AppTheme.sidebarText(dark))
+                                .font(.system(size: 13))
+                                .foregroundColor(AppTheme.textSecondary(dark))
                         }
 
                         FormFieldRow(label: "记录值", required: true) {
@@ -127,10 +127,10 @@ struct CloudflareDnsSheet: View {
                             )) {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text("Cloudflare 代理")
-                                        .font(.system(size: 13, weight: .medium))
+                                        .font(.system(size: 14, weight: .medium))
                                     Text("橙云代理可隐藏源站 IP")
-                                        .font(.system(size: 11))
-                                        .foregroundColor(AppTheme.sidebarText(dark))
+                                        .font(.system(size: 13))
+                                        .foregroundColor(AppTheme.textSecondary(dark))
                                 }
                             }
                             .toggleStyle(SwitchToggleStyle(tint: Color(hex: "f38020")))
@@ -191,7 +191,7 @@ struct CloudflareConfigSheet: View {
                     VStack(alignment: .leading, spacing: 14) {
                         HStack {
                             Text("启用 Cloudflare")
-                                .font(.system(size: 13, weight: .medium))
+                                .font(.system(size: 14, weight: .medium))
                             Spacer()
                             Toggle("", isOn: Binding(
                                 get: { model.configForm?.enabled ?? false },
@@ -221,8 +221,8 @@ struct CloudflareConfigSheet: View {
                             )
                         }
                         Text("My Profile → API Tokens → Global API Key")
-                            .font(.system(size: 11))
-                            .foregroundColor(AppTheme.sidebarText(dark))
+                            .font(.system(size: 13))
+                            .foregroundColor(AppTheme.textSecondary(dark))
 
                         FormFieldRow(label: "账户邮箱", required: true) {
                             AppTextField(

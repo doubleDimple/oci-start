@@ -1,68 +1,239 @@
 <UserControl x:Class="OciStart.Features.Login.LoginView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:OciStart.Features.Login">
   <Grid Background="{StaticResource BgBrush}">
-    <Border Width="420"
-            VerticalAlignment="Center"
-            HorizontalAlignment="Center"
-            Background="{StaticResource SidebarBgBrush}"
-            BorderBrush="{StaticResource AppBorderBrush}"
-            BorderThickness="1"
-            CornerRadius="14"
-            Padding="28">
-      <StackPanel>
-        <TextBlock Text="OCI-Start"
-                   FontSize="24"
+    <!-- Two Column Split Layout (Responsive) -->
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="*" />
+      <ColumnDefinition Width="1" />
+      <ColumnDefinition Width="420" />
+    </Grid.ColumnDefinitions>
+
+    <!-- LEFT PANEL: Hero Stage with 3D Globe -->
+    <Grid Grid.Column="0" Margin="40,32">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="*" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+      </Grid.RowDefinitions>
+
+      <!-- Brand Header -->
+      <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,24">
+        <TextBlock Text="💧" FontSize="18" Margin="0,0,8,0" VerticalAlignment="Center" />
+        <TextBlock Text="OCI-START"
+                   FontSize="15"
                    FontWeight="SemiBold"
-                   Foreground="{StaticResource TextPrimaryBrush}" />
-        <TextBlock Text="Windows 原生客户端 · 对齐 oci-start-mac"
-                   Margin="0,6,0,20"
+                   Foreground="{StaticResource TextPrimaryBrush}"
+                   VerticalAlignment="Center" />
+        <TextBlock Text=" / 云端工作台"
+                   FontSize="14"
                    Foreground="{StaticResource TextSecondaryBrush}"
-                   FontSize="12" />
-
-        <TextBlock Text="部署方式" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,8" />
-        <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
-          <Button x:Name="LocalModeButton"
-                  Content="本机内嵌"
-                  Style="{StaticResource SecondaryButton}"
-                  Margin="0,0,8,0"
-                  Click="OnLocalMode" />
-          <Button x:Name="RemoteModeButton"
-                  Content="远程服务器"
-                  Style="{StaticResource SecondaryButton}"
-                  Click="OnRemoteMode" />
-        </StackPanel>
-
-        <TextBlock Text="服务器地址" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,6" />
-        <TextBox x:Name="ServerUrlBox"
-                 Style="{StaticResource AppTextBox}"
-                 Margin="0,0,0,12"
-                 IsEnabled="False" />
-
-        <TextBlock Text="用户名" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,6" />
-        <TextBox x:Name="UserBox" Style="{StaticResource AppTextBox}" Margin="0,0,0,12" />
-
-        <TextBlock Text="密码" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,6" />
-        <PasswordBox x:Name="PassBox" Style="{StaticResource AppPasswordBox}" Margin="0,0,0,12" />
-
-        <TextBlock x:Name="StatusText"
-                   TextWrapping="Wrap"
-                   Foreground="{StaticResource TextSecondaryBrush}"
-                   Margin="0,0,0,12"
-                   FontSize="12" />
-
-        <TextBlock x:Name="ErrorText"
-                   TextWrapping="Wrap"
-                   Foreground="{StaticResource DangerBrush}"
-                   Margin="0,0,0,12"
-                   FontSize="12"
-                   Visibility="Collapsed" />
-
-        <Button Content="进入"
-                Style="{StaticResource PrimaryButton}"
-                HorizontalAlignment="Stretch"
-                Click="OnEnter" />
+                   VerticalAlignment="Center" />
       </StackPanel>
+
+      <!-- Main Tagline -->
+      <StackPanel Grid.Row="1" Margin="0,0,0,16">
+        <TextBlock Text="让云端资源，&#10;井然有序。"
+                   FontSize="28"
+                   FontWeight="SemiBold"
+                   LineHeight="36"
+                   Foreground="{StaticResource TextPrimaryBrush}"
+                   Margin="0,0,0,12" />
+        <TextBlock Text="从实例到网络，从监控到运维，&#10;在一个工作台中管理你的云端资源。"
+                   FontSize="13"
+                   LineHeight="20"
+                   Foreground="{StaticResource TextSecondaryBrush}" />
+      </StackPanel>
+
+      <!-- Globe & Region Map Container -->
+      <Grid Grid.Row="2" Margin="0,8">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="*" />
+          <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <DockPanel Grid.Row="0" Margin="0,0,0,8">
+          <TextBlock Text="OCI 公共区域"
+                     FontSize="13"
+                     FontWeight="Medium"
+                     Foreground="{StaticResource TextPrimaryBrush}" />
+          <TextBlock Text="45 个区域"
+                     FontSize="12"
+                     FontFamily="Consolas, Monospace"
+                     HorizontalAlignment="Right"
+                     Foreground="{StaticResource TextSecondaryBrush}" />
+        </DockPanel>
+
+        <!-- 3D Interactive Globe Control -->
+        <local:LoginRegionGlobeControl Grid.Row="1" x:Name="GlobeControl" MinHeight="260" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
+
+        <StackPanel Grid.Row="2" Orientation="Vertical" Margin="0,8,0,0">
+          <Button x:Name="RegionDirectoryButton"
+                  Content="查看区域目录 ↗"
+                  Style="{StaticResource SidebarNavButton}"
+                  Foreground="{StaticResource AccentBrush}"
+                  FontSize="12"
+                  HorizontalAlignment="Left"
+                  Padding="0,4"
+                  Click="OnToggleRegionDirectory" />
+          <TextBlock Text="城市参考位置 · 3D 可交互地球示意"
+                     FontSize="11"
+                     Foreground="{StaticResource TextSecondaryBrush}"
+                     Margin="0,4,0,0" />
+        </StackPanel>
+      </Grid>
+
+      <!-- Footer -->
+      <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="0,16,0,0">
+        <TextBlock Text="© 2026 doubleDimple · " FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" />
+        <TextBlock Text="GitHub" FontSize="12" Foreground="{StaticResource AccentBrush}" Cursor="Hand" MouseDown="OnOpenGithub" />
+        <TextBlock Text=" · " FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" />
+        <TextBlock Text="文档" FontSize="12" Foreground="{StaticResource AccentBrush}" Cursor="Hand" MouseDown="OnOpenDocs" />
+      </StackPanel>
+    </Grid>
+
+    <!-- Center Divider Line -->
+    <Rectangle Grid.Column="1" Fill="{StaticResource AppBorderBrush}" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
+
+    <!-- RIGHT PANEL: Auth Card -->
+    <Border Grid.Column="2" Background="{StaticResource SidebarBgBrush}" Padding="36,32">
+      <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel VerticalAlignment="Center">
+          <!-- Right Header -->
+          <TextBlock Text="OCI-Start"
+                     FontSize="24"
+                     FontWeight="SemiBold"
+                     Foreground="{StaticResource TextPrimaryBrush}" />
+          <TextBlock Text="Windows 原生客户端 · 对齐 oci-start-mac"
+                     Margin="0,6,0,24"
+                     Foreground="{StaticResource TextSecondaryBrush}"
+                     FontSize="12" />
+
+          <!-- Deployment Mode Switcher -->
+          <TextBlock Text="部署方式" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,0,0,8" />
+          <Border Background="{StaticResource CardBgBrush}" CornerRadius="8" Padding="4" Margin="0,0,0,20">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+              <Button x:Name="LocalModeButton"
+                      Grid.Column="0"
+                      Content="本机内嵌"
+                      Style="{StaticResource PrimaryButton}"
+                      Margin="2"
+                      Click="OnLocalMode" />
+              <Button x:Name="RemoteModeButton"
+                      Grid.Column="1"
+                      Content="远程服务器"
+                      Style="{StaticResource SecondaryButton}"
+                      Margin="2"
+                      Click="OnRemoteMode" />
+            </Grid>
+          </Border>
+
+          <!-- Boot Loading Indicator (Local Mode) -->
+          <StackPanel x:Name="BootLoadingPanel" Visibility="Collapsed" Margin="0,12,0,20" HorizontalAlignment="Center">
+            <ProgressBar IsIndeterminate="True" Width="180" Height="4" Margin="0,0,0,12" />
+            <TextBlock Text="正在启动本机服务…" Foreground="{StaticResource TextPrimaryBrush}" FontSize="13" HorizontalAlignment="Center" />
+            <TextBlock Text="也可切换到远程部署，连接已有服务。" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" Margin="0,4,0,0" HorizontalAlignment="Center" />
+          </StackPanel>
+
+          <!-- Boot Failed Panel (Local Mode) -->
+          <StackPanel x:Name="BootFailedPanel" Visibility="Collapsed" Margin="0,12,0,20">
+            <TextBlock Text="⚠️ 服务启动失败" Foreground="{StaticResource DangerBrush}" FontSize="13" FontWeight="Medium" Margin="0,0,0,6" />
+            <TextBlock x:Name="BootFailedErrorText" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,0,0,12" />
+            <Button Content="重新启动" Style="{StaticResource SecondaryButton}" Click="OnRetryStartLocal" />
+          </StackPanel>
+
+          <!-- Form Fields Container -->
+          <StackPanel x:Name="FormFieldsPanel">
+            <!-- Server URL Field -->
+            <TextBlock x:Name="ServerUrlLabel" Text="服务器地址" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,0,0,6" />
+            <TextBox x:Name="ServerUrlBox"
+                     Style="{StaticResource AppTextBox}"
+                     Margin="0,0,0,16"
+                     IsEnabled="False" />
+
+            <!-- User Field -->
+            <TextBlock Text="用户名" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,0,0,6" />
+            <TextBox x:Name="UserBox" Style="{StaticResource AppTextBox}" Margin="0,0,0,16" />
+
+            <!-- Password Field -->
+            <TextBlock Text="密码" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,0,0,6" />
+            <PasswordBox x:Name="PassBox" Style="{StaticResource AppPasswordBox}" Margin="0,0,0,16" />
+
+            <!-- Status & Error Text -->
+            <TextBlock x:Name="StatusText"
+                       TextWrapping="Wrap"
+                       Foreground="{StaticResource TextSecondaryBrush}"
+                       Margin="0,0,0,12"
+                       FontSize="12" />
+
+            <TextBlock x:Name="ErrorText"
+                       TextWrapping="Wrap"
+                       Foreground="{StaticResource DangerBrush}"
+                       Margin="0,0,0,12"
+                       FontSize="12"
+                       Visibility="Collapsed" />
+
+            <!-- Action Button -->
+            <Button x:Name="EnterButton"
+                    Content="进入"
+                    Style="{StaticResource PrimaryButton}"
+                    HorizontalAlignment="Stretch"
+                    Padding="0,10"
+                    Click="OnEnter" />
+          </StackPanel>
+        </StackPanel>
+      </ScrollViewer>
     </Border>
+
+    <!-- REGION DIRECTORY POPOVER MODAL OVERLAY -->
+    <Grid x:Name="RegionDirectoryModal" Grid.ColumnSpan="3" Background="#88000000" Visibility="Collapsed" MouseDown="OnCloseRegionDirectory">
+      <Border Width="440" Height="520" Background="{StaticResource CardBgBrush}" BorderBrush="{StaticResource AppBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="24" HorizontalAlignment="Center" VerticalAlignment="Center" MouseDown="OnModalContentClick">
+        <Grid>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+          </Grid.RowDefinitions>
+
+          <DockPanel Grid.Row="0" Margin="0,0,0,6">
+            <TextBlock Text="OCI 公共商业区域" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+            <Button Content="✕" Style="{StaticResource SecondaryButton}" Padding="6,2" HorizontalAlignment="Right" Click="OnCloseRegionDirectory" />
+          </DockPanel>
+
+          <TextBlock Grid.Row="1" Text="目录核对于 2026-09-15。坐标为城市参考点，并非机房位置。" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,16" />
+
+          <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+            <ItemsControl x:Name="RegionDirectoryItems">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Border BorderBrush="{StaticResource AppBorderBrush}" BorderThickness="0,0,0,1" Padding="0,8">
+                    <StackPanel>
+                      <TextBlock Text="{Binding DisplayTitle}" FontSize="13" FontWeight="Medium" Foreground="{StaticResource TextPrimaryBrush}" />
+                      <TextBlock Text="{Binding Id}" FontSize="11" FontFamily="Consolas, Monospace" Foreground="{StaticResource AccentBrush}" Margin="0,2,0,2" />
+                      <TextBlock Text="{Binding Coordinates}" FontSize="11" FontFamily="Consolas, Monospace" Foreground="{StaticResource TextSecondaryBrush}" />
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+
+          <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,16,0,0">
+            <TextBlock Text="Oracle 区域目录 ↗" FontSize="12" Foreground="{StaticResource AccentBrush}" Cursor="Hand" MouseDown="OnOpenOracleDocs" Margin="0,0,16,0" />
+            <TextBlock Text="GeoNames ↗" FontSize="12" Foreground="{StaticResource AccentBrush}" Cursor="Hand" MouseDown="OnOpenGeoNames" />
+          </StackPanel>
+        </Grid>
+      </Border>
+    </Grid>
+
   </Grid>
 </UserControl>

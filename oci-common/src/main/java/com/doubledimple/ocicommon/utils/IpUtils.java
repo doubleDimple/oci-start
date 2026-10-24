@@ -29,6 +29,9 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 @Component
 public class IpUtils {
 
+    /** Set by the server's client-IP filter, never populated from an HTTP header. */
+    public static final String RESOLVED_CLIENT_IP_ATTRIBUTE = IpUtils.class.getName() + ".clientIp";
+
     // 公网IP缓存
     private static final AtomicReference<String> publicIpCache = new AtomicReference<>();
     // 本地IP缓存
@@ -215,7 +218,8 @@ public class IpUtils {
 
 
     /**
-     * 获取客户端真实IP（支持多级反向代理）
+     * 获取经服务端可信代理策略解析的客户端 IP。
+     * 未经过解析过滤器时只使用连接地址，绝不直接信任请求头。
      *
      * @param request HttpServletRequest
      * @return 客户端真实IP，无法识别时返回 "unknown"
@@ -225,40 +229,16 @@ public class IpUtils {
             return "unknown";
         }
 
-        // 依次检查常见的代理头部
-        String[] headerNames = {
-                "X-Forwarded-For",
-                "Proxy-Client-IP",
-                "WL-Proxy-Client-IP",
-                "HTTP_CLIENT_IP",
-                "HTTP_X_FORWARDED_FOR",
-                "X-Real-IP"
-        };
-
-        String ip = null;
-
-        for (String header : headerNames) {
-            String value = request.getHeader(header);
-            if (StringUtils.hasText(value) && !"unknown".equalsIgnoreCase(value)) {
-                ip = value;
-                break;
-            }
+        Object resolved = request.getAttribute(RESOLVED_CLIENT_IP_ATTRIBUTE);
+        if (resolved instanceof String) {
+            return (String) resolved;
         }
 
-        if (!StringUtils.hasText(ip) || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getRemoteAddr();
-        }
-
-        // X-Forwarded-For 可能有多个IP，第一个才是真实来源
-        if (ip != null && ip.contains(",")) {
-            ip = ip.split(",")[0].trim();
-        }
-
-        // 本地访问的特殊处理
-        if ("0:0:0:0:0:0:0:1".equals(ip)) {
+        String ip = request.getRemoteAddr();
+        if ("0:0:0:0:0:0:0:1".equals(ip) || "::1".equals(ip)) {
             ip = "127.0.0.1";
         }
-        return ip;
+        return StringUtils.hasText(ip) ? ip : "unknown";
     }
 
     /**

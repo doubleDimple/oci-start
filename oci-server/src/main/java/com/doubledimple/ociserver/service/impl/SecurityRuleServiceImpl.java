@@ -7,13 +7,16 @@ import com.doubledimple.ociserver.utils.oracle.OciClassLoader;
 import com.doubledimple.ociserver.pojo.request.SecurityRuleDTO;
 import com.doubledimple.ocicommon.param.ApiResponse;
 import com.doubledimple.ociserver.service.SecurityRuleService;
+import com.doubledimple.ociserver.service.permissions.OciPermissions;
 import com.doubledimple.ociserver.utils.oracle.OciUtils;
 import com.oracle.bmc.auth.SimpleAuthenticationDetailsProvider;
 import com.oracle.bmc.core.VirtualNetworkClient;
 import com.oracle.bmc.core.model.*;
 import com.oracle.bmc.core.requests.ListSecurityListsRequest;
+import com.oracle.bmc.core.requests.GetSecurityListRequest;
 import com.oracle.bmc.core.requests.UpdateSecurityListRequest;
 import com.oracle.bmc.core.responses.ListSecurityListsResponse;
+import com.oracle.bmc.core.responses.GetSecurityListResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,6 +48,7 @@ public class SecurityRuleServiceImpl implements SecurityRuleService {
         // 获取租户信息
         Tenant tenant = tenantRepository.findById(Long.valueOf(tenantId))
                 .orElseThrow(() -> new RuntimeException("Tenant not found"));
+        OciPermissions.require(tenant, "BASIC_READ");
         SimpleAuthenticationDetailsProvider provider = OciUtils.getProvider(tenant);
 
         try(VirtualNetworkClient vcnClient =VirtualNetworkClient.builder().build(provider)) {
@@ -62,17 +66,20 @@ public class SecurityRuleServiceImpl implements SecurityRuleService {
                 if ("ingress".equals(type)) {
                     securityList.getIngressSecurityRules().forEach(rule -> {
                         SecurityRuleDTO dto = convertToDTO(rule, "入站");
+                        dto.setId(ruleSnapshot(securityList.getId(), rule));
                         rules.add(dto);
                     });
                 } else {
                     securityList.getEgressSecurityRules().forEach(rule -> {
                         SecurityRuleDTO dto = convertToDTO(rule, "出站");
+                        dto.setId(ruleSnapshot(securityList.getId(), rule));
                         rules.add(dto);
                     });
                 }
             }
         } catch (RuntimeException e) {
             log.warn("query rule security fail:{}", e.getMessage());
+            throw e;
         }
         return rules;
     }
@@ -87,10 +94,122 @@ public class SecurityRuleServiceImpl implements SecurityRuleService {
         return ruleDTO;
     }
 
+    @Override
+    public SecurityRuleDTO updateSecurityRule(String compositeId, SecurityRuleDTO ruleDTO) {
+        String[] parts = compositeId == null ? new String[0] : compositeId.split("_", -1);
+        if (parts.length != 3 || !parts[0].matches("[1-9][0-9]*") || !parts[1].matches("[0-9]+")
+                || !("ingress".equals(parts[2]) || "egress".equals(parts[2]))) {
+            throw new IllegalArgumentException("Invalid security rule identifier");
+        }
+        long tenantId = Long.parseLong(parts[0]);
+        int index = Integer.parseInt(parts[1]);
+        if (ruleDTO == null || ruleDTO.getTenantId() == null || ruleDTO.getTenantId() != tenantId
+                || !parts[2].equals(ruleDTO.getType()) || ruleDTO.getProtocol() == null
+                || ruleDTO.getSource() == null || ruleDTO.getSource().trim().isEmpty()) {
+            throw new IllegalArgumentException("Security rule tenant, direction, protocol and address are required");
+        }
+        String protocol = getProtocolNumber(ruleDTO.getProtocol().trim().toLowerCase(java.util.Locale.ROOT));
+        if (!"all".equals(protocol) && (!protocol.matches("[0-9]{1,3}") || Integer.parseInt(protocol) > 255)) {
+            throw new IllegalArgumentException("Invalid IP protocol");
+        }
+        String ports = ruleDTO.getPorts();
+        if (("6".equals(protocol) || "17".equals(protocol)) && ports != null && !ports.trim().isEmpty()) {
+            if (!ports.matches("[0-9]{1,5}(-[0-9]{1,5})?")) throw new IllegalArgumentException("Invalid port range");
+            String[] range = ports.split("-");
+            int min = Integer.parseInt(range[0]);
+            int max = range.length == 1 ? min : Integer.parseInt(range[1]);
+            if (min > max || max > 65535) throw new IllegalArgumentException("Ports must be between 0 and 65535");
+        }
+        Tenant tenant = tenantRepository.findById(tenantId)
+                .orElseThrow(() -> new IllegalArgumentException("Tenant not found"));
+        OciPermissions.require(tenant, "NETWORK_MANAGE");
+        SimpleAuthenticationDetailsProvider provider = OciUtils.getProvider(tenant);
+        try (VirtualNetworkClient client = VirtualNetworkClient.builder().build(provider)) {
+            // Use the same flattening/order as the existing GET and DELETE contracts.
+            List<SecurityList> lists = client.listSecurityLists(ListSecurityListsRequest.builder()
+                    .compartmentId(provider.getTenantId()).build()).getItems();
+            int offset = 0;
+            boolean ingress = "ingress".equals(parts[2]);
+            for (SecurityList listed : lists) {
+                int count = ingress ? listed.getIngressSecurityRules().size() : listed.getEgressSecurityRules().size();
+                if (index >= offset + count) { offset += count; continue; }
+                int localIndex = index - offset;
+                GetSecurityListResponse current = client.getSecurityList(GetSecurityListRequest.builder()
+                        .securityListId(listed.getId()).build());
+                SecurityList securityList = current.getSecurityList();
+                if (!Objects.equals(listed.getIngressSecurityRules(), securityList.getIngressSecurityRules())
+                        || !Objects.equals(listed.getEgressSecurityRules(), securityList.getEgressSecurityRules())) {
+                    throw new java.util.ConcurrentModificationException("Security rules changed. Refresh before editing again.");
+                }
+                UpdateSecurityListDetails.Builder update = UpdateSecurityListDetails.builder();
+                if (ingress) {
+                    List<IngressSecurityRule> rules = new ArrayList<>(securityList.getIngressSecurityRules());
+                    IngressSecurityRule old = rules.get(localIndex);
+                    verifyRuleSnapshot(ruleDTO.getId(), securityList.getId(), old);
+                    // Preserve fields the legacy form does not edit, including statelessness,
+                    // description, source type, source ports and existing ICMP options.
+                    IngressSecurityRule replacement = old.toBuilder().protocol(protocol).source(ruleDTO.getSource().trim())
+                            .tcpOptions("6".equals(protocol) ? updatedTcpOptions(old.getTcpOptions(), ports) : null)
+                            .udpOptions("17".equals(protocol) ? updatedUdpOptions(old.getUdpOptions(), ports) : null)
+                            .icmpOptions(updatedIcmpOptions(protocol, old.getProtocol(), old.getIcmpOptions())).build();
+                    rules.set(localIndex, replacement);
+                    update.ingressSecurityRules(rules);
+                } else {
+                    List<EgressSecurityRule> rules = new ArrayList<>(securityList.getEgressSecurityRules());
+                    EgressSecurityRule old = rules.get(localIndex);
+                    verifyRuleSnapshot(ruleDTO.getId(), securityList.getId(), old);
+                    EgressSecurityRule replacement = old.toBuilder().protocol(protocol).destination(ruleDTO.getSource().trim())
+                            .tcpOptions("6".equals(protocol) ? updatedTcpOptions(old.getTcpOptions(), ports) : null)
+                            .udpOptions("17".equals(protocol) ? updatedUdpOptions(old.getUdpOptions(), ports) : null)
+                            .icmpOptions(updatedIcmpOptions(protocol, old.getProtocol(), old.getIcmpOptions())).build();
+                    rules.set(localIndex, replacement);
+                    update.egressSecurityRules(rules);
+                }
+                client.updateSecurityList(UpdateSecurityListRequest.builder().securityListId(securityList.getId())
+                        .ifMatch(current.getEtag()).updateSecurityListDetails(update.build()).build());
+                ruleDTO.setId(compositeId);
+                return ruleDTO;
+            }
+            throw new IllegalArgumentException("Security rule no longer exists. Refresh the list.");
+        }
+    }
+
+    private TcpOptions updatedTcpOptions(TcpOptions old, String ports) {
+        TcpOptions parsed = parseTcpUdpOptions(ports);
+        if (old == null) return parsed;
+        return old.toBuilder().destinationPortRange(parsed == null ? null : parsed.getDestinationPortRange()).build();
+    }
+
+    private String ruleSnapshot(String securityListId, Object rule) {
+        return "snapshot:" + securityListId + ":" + cn.hutool.crypto.digest.DigestUtil.sha256Hex(rule.toString());
+    }
+
+    private void verifyRuleSnapshot(String expected, String securityListId, Object rule) {
+        // Existing FTL callers omit this optional DTO field. Vue sends back the GET
+        // snapshot so an intervening insert/delete cannot redirect an indexed edit.
+        if (expected != null && expected.startsWith("snapshot:") && !expected.equals(ruleSnapshot(securityListId, rule))) {
+            throw new java.util.ConcurrentModificationException("Security rules changed. Refresh before editing again.");
+        }
+    }
+
+    private UdpOptions updatedUdpOptions(UdpOptions old, String ports) {
+        UdpOptions parsed = parseUdpOptions(ports);
+        if (old == null) return parsed;
+        return old.toBuilder().destinationPortRange(parsed == null ? null : parsed.getDestinationPortRange()).build();
+    }
+
+    private IcmpOptions updatedIcmpOptions(String protocol, String previousProtocol, IcmpOptions previous) {
+        if (!"1".equals(protocol) && !"58".equals(protocol)) return null;
+        if (protocol.equals(previousProtocol)) return previous;
+        return IcmpOptions.builder().type("58".equals(protocol) ? 128 : 8).code(0).build();
+    }
+
     /**
      * 添加协议规则 - 自动删除重复规则后重新添加
      */
     public void addSecurityBaseRule(Tenant tenant, SecurityRuleDTO ruleDTO) {
+        tenant = currentTenant(tenant);
+        OciPermissions.require(tenant, "NETWORK_MANAGE");
         SimpleAuthenticationDetailsProvider provider = OciUtils.getProvider(tenant);
 
         try(VirtualNetworkClient vcnClient = VirtualNetworkClient.builder().build(provider)) {
@@ -215,6 +334,7 @@ public class SecurityRuleServiceImpl implements SecurityRuleService {
         // 获取租户信息
         Tenant tenant = tenantRepository.findById(Long.valueOf(tenantId))
                 .orElseThrow(() -> new RuntimeException("Tenant not found"));
+        OciPermissions.require(tenant, "NETWORK_MANAGE");
 
         // 获取安全列表
         SimpleAuthenticationDetailsProvider provider = OciUtils.getProvider(tenant);
@@ -564,6 +684,9 @@ public class SecurityRuleServiceImpl implements SecurityRuleService {
     public ApiResponse batchAllSecurityRule(String protocol) {
         List<Tenant> all = tenantRepository.findAll();
         for (Tenant tenant : all) {
+            if (!OciPermissions.allows(tenant, "NETWORK_MANAGE")) {
+                continue;
+            }
             checkAndEnableRule(tenant);
         }
         return ApiResponse.success();
@@ -571,6 +694,10 @@ public class SecurityRuleServiceImpl implements SecurityRuleService {
 
     @Override
     public ApiResponse checkAndEnableRule(Tenant tenant) {
+        tenant = currentTenant(tenant);
+        if (!OciPermissions.allows(tenant, "NETWORK_MANAGE")) {
+            return ApiResponse.success("已跳过未授权的网络规则自动配置");
+        }
         try {
             // 获取当前租户的入站规则
             List<SecurityRuleDTO> ingressRules = getSecurityRules(String.valueOf(tenant.getId()), "ingress");
@@ -707,6 +834,8 @@ public class SecurityRuleServiceImpl implements SecurityRuleService {
     @Override
     @Transactional
     public ApiResponse singleSecurityAllRule(Tenant tenant) {
+        tenant = currentTenant(tenant);
+        OciPermissions.require(tenant, "NETWORK_MANAGE");
         try {
             List<SecurityRuleDTO.SecurityRuleDTOBuilder> securityRuleDTOBuilders = Arrays.asList(
                     SecurityRuleDTO.builder()
@@ -735,6 +864,8 @@ public class SecurityRuleServiceImpl implements SecurityRuleService {
 
     @Override
     public ApiResponse singleIpv6Rule(Tenant tenant) {
+        tenant = currentTenant(tenant);
+        OciPermissions.require(tenant, "NETWORK_MANAGE");
         try {
             List<SecurityRuleDTO.SecurityRuleDTOBuilder> securityRuleDTOBuilders = Arrays.asList(
                     SecurityRuleDTO.builder()
@@ -761,15 +892,20 @@ public class SecurityRuleServiceImpl implements SecurityRuleService {
         return ApiResponse.success();
     }
 
+    private Tenant currentTenant(Tenant tenant) {
+        if (tenant == null || tenant.getId() == null) {
+            throw new IllegalArgumentException("Tenant not found");
+        }
+        return tenantRepository.findById(tenant.getId())
+                .orElseThrow(() -> new IllegalArgumentException("Tenant not found"));
+    }
+
     private SecurityRuleDTO convertToDTO(IngressSecurityRule rule, String type) {
         SecurityRuleDTO dto = new SecurityRuleDTO();
         dto.setType(type);
         dto.setProtocol(rule.getProtocol());
         dto.setSource(rule.getSource());
-        if (rule.getTcpOptions() != null) {
-            PortRange portRange = rule.getTcpOptions().getDestinationPortRange();
-            dto.setPorts(portRange.getMin() + "-" + portRange.getMax());
-        }
+        dto.setPorts(rulePorts(rule.getTcpOptions(), rule.getUdpOptions()));
 
         // 处理ICMP选项
         if (rule.getIcmpOptions() != null) {
@@ -795,12 +931,18 @@ public class SecurityRuleServiceImpl implements SecurityRuleService {
         dto.setProtocol(rule.getProtocol());
         dto.setSource(rule.getDestination());
 
-        if (rule.getTcpOptions() != null) {
-            PortRange portRange = rule.getTcpOptions().getDestinationPortRange();
-            dto.setPorts(portRange.getMin() + "-" + portRange.getMax());
+        dto.setPorts(rulePorts(rule.getTcpOptions(), rule.getUdpOptions()));
+        if (rule.getIcmpOptions() != null && rule.getIcmpOptions().getType() != null) {
+            dto.setIcmpType(rule.getIcmpOptions().getType() + (rule.getIcmpOptions().getCode() == null
+                    ? "" : ", " + rule.getIcmpOptions().getCode()));
         }
 
         return dto;
+    }
+
+    private String rulePorts(TcpOptions tcp, UdpOptions udp) {
+        PortRange range = tcp != null ? tcp.getDestinationPortRange() : udp != null ? udp.getDestinationPortRange() : null;
+        return range == null ? "" : range.getMin() + "-" + range.getMax();
     }
 
     private EgressSecurityRule createEgressRule(SecurityRuleDTO dto) {

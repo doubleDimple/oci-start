@@ -26,30 +26,20 @@ struct TenantsService {
     func delete(tenantId: Int64) async throws {
         let url = try client.makeURL(baseURL, path: "/tenants/deleteApi", query: ["tenantId": "\(tenantId)"])
         let raw = try await client.getJSON(url)
-        if let r = try? JSONDecoder().decode(TenantBoolMessage.self, from: raw), !r.success {
-            throw APIError.serverMessage(r.message.isEmpty ? "删除失败" : r.message)
-        }
+        try throwIfApiFailed(raw)
     }
 
     /// OCI 同步：后端可能较慢（区域/资源拉取），使用长超时（约 200s，对齐 Web 3 分钟进度窗）
     func syncOci(tenantId: Int64) async throws {
         let url = try client.makeURL(baseURL, path: "/tenants/syncOci", query: ["tenantId": "\(tenantId)"])
         let raw = try await client.getJSON(url, longTimeout: true)
-        if let obj = try? JSONSerialization.jsonObject(with: raw) as? [String: Any] {
-            let status = (obj["status"] as? String ?? "").lowercased()
-            if status == "error" {
-                let msg = (obj["message"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                throw APIError.serverMessage(msg.isEmpty ? "同步失败" : msg)
-            }
-        }
+        try throwIfApiFailed(raw)
     }
 
     func saveTenant(fields: [String: String], keyFileURL: URL) async throws {
         let url = try client.makeURL(baseURL, path: "/tenants/save")
         let raw = try await client.postMultipart(url, fields: fields, fileFieldName: "keyFileStr", fileURL: keyFileURL)
-        if let env = try? JSONDecoder().decode(TenantApiEnvelope.self, from: raw), !env.ok {
-            throw APIError.serverMessage(env.text)
-        }
+        try throwIfApiFailed(raw)
     }
 
     func updateCustomName(tenantId: Int64, defName: String) async throws {
@@ -83,15 +73,18 @@ struct TenantsService {
         var body: [String: Any] = ["tenantId": tenantId, "username": username, "email": email]
         if !groupId.isEmpty { body["groupId"] = groupId }
         let raw = try await client.postJSON(url, body: body)
-        let obj = (try? JSONSerialization.jsonObject(with: raw)) as? [String: Any] ?? [:]
-        var out: [String: String] = [:]
-        for (k, v) in obj { out[k] = "\(v)" }
-        return out
+        guard let obj = try JSONSerialization.jsonObject(with: raw) as? [String: String],
+              obj["username"] == username, obj["email"] == email,
+              let generated = obj["password"], !generated.isEmpty else {
+            throw APIError.serverMessage("创建结果无法确认；请刷新用户列表核对，勿重复创建。")
+        }
+        return obj
     }
 
     func resetPassword(tenantId: Int64, userId: String) async throws -> TenantApiEnvelope {
         let url = try client.makeURL(baseURL, path: "/tenants/oracle-users/resetPassword")
         let raw = try await client.postJSON(url, body: ["tenantId": "\(tenantId)", "userId": userId])
+        try throwIfApiFailed(raw)
         return try JSONDecoder().decode(TenantApiEnvelope.self, from: raw)
     }
 
@@ -119,10 +112,7 @@ struct TenantsService {
             "enablePasswordExpiry": enable,
             "expiryDays": days
         ])
-        if let obj = try? JSONSerialization.jsonObject(with: raw) as? [String: Any],
-           let ok = obj["success"] as? Bool, !ok {
-            throw APIError.serverMessage((obj["message"] as? String) ?? "更新密码策略失败")
-        }
+        try throwIfApiFailed(raw)
     }
 
     // MARK: - MFA / Notification
@@ -136,10 +126,7 @@ struct TenantsService {
     func toggleEmailMFA(tenantId: Int64, enable: Bool) async throws {
         let url = try client.makeURL(baseURL, path: "/tenants/mfa/email")
         let raw = try await client.postJSON(url, body: ["tenantId": "\(tenantId)", "enableEmail": enable])
-        if let obj = try? JSONSerialization.jsonObject(with: raw) as? [String: Any],
-           let ok = obj["success"] as? Bool, !ok {
-            throw APIError.serverMessage((obj["message"] as? String) ?? "MFA 操作失败")
-        }
+        try throwIfApiFailed(raw)
     }
 
     func resetAccountFactor(tenantId: Int64) async throws {
@@ -169,10 +156,7 @@ struct TenantsService {
     func updateNotificationRecipients(tenantId: Int64, emails: [String]) async throws {
         let url = try client.makeURL(baseURL, path: "/tenants/notification/update")
         let raw = try await client.postJSON(url, body: ["tenantId": "\(tenantId)", "emails": emails])
-        if let obj = try? JSONSerialization.jsonObject(with: raw) as? [String: Any],
-           let ok = obj["success"] as? Bool, !ok {
-            throw APIError.serverMessage((obj["message"] as? String) ?? "更新失败")
-        }
+        try throwIfApiFailed(raw)
     }
 
     // MARK: - Traffic / Audit / Volumes
@@ -192,10 +176,7 @@ struct TenantsService {
             "statisticsEnabled": stats,
             "enabled": true
         ])
-        if let obj = try? JSONSerialization.jsonObject(with: raw) as? [String: Any],
-           let ok = obj["success"] as? Bool, !ok {
-            throw APIError.serverMessage((obj["message"] as? String) ?? "保存失败")
-        }
+        try throwIfApiFailed(raw)
     }
 
     /// 审计日志分页。后端：`ApiResponse.data` = `OciPageResult{ data, nextPageToken }`。
@@ -255,19 +236,13 @@ struct TenantsService {
         if let name = name { body["displayName"] = name }
         if let vpus = vpus { body["vpusPerGB"] = vpus }
         let raw = try await client.putJSON(url, body: body)
-        if let obj = try? JSONSerialization.jsonObject(with: raw) as? [String: Any],
-           let ok = obj["success"] as? Bool, !ok {
-            throw APIError.serverMessage((obj["message"] as? String) ?? "更新失败")
-        }
+        try throwIfApiFailed(raw)
     }
 
     func deleteBootVolume(tenantId: Int64, volumeId: String) async throws {
         let url = try client.makeURL(baseURL, path: "/tenants/delete-volume/\(volumeId)")
         let raw = try await client.deleteJSON(url, body: ["tenantId": tenantId])
-        if let obj = try? JSONSerialization.jsonObject(with: raw) as? [String: Any],
-           let ok = obj["success"] as? Bool, !ok {
-            throw APIError.serverMessage((obj["message"] as? String) ?? "删除失败")
-        }
+        try throwIfApiFailed(raw)
     }
 
     // MARK: - Email / Social / Quota
@@ -381,13 +356,19 @@ struct TenantsService {
             "ports": ports
         ]
         let raw = try await client.postJSON(url, body: body)
-        try throwIfApiFailed(raw)
+        guard let saved = try JSONSerialization.jsonObject(with: raw) as? [String: Any],
+              InstanceJSON.string(saved["tenantId"]) == "\(tenantId)",
+              saved["type"] as? String == type, saved["protocol"] as? String == protocolValue,
+              saved["source"] as? String == source, saved["ports"] as? String == ports else {
+            throw APIError.serverMessage("新增规则结果无法确认，请刷新规则核对，勿重复添加。")
+        }
     }
 
     func deleteSecurityRule(compositeId: String) async throws {
         let url = try client.makeURL(baseURL, path: "/tenants/security-rules/\(compositeId)")
         let raw = try await client.deleteJSON(url)
-        try throwIfApiFailed(raw)
+        // This controller explicitly acknowledges deletion with an empty HTTP 200 body.
+        guard raw.isEmpty else { try throwIfApiFailed(raw); return }
     }
 
     func mysqlInfo(tenantId: Int64) async throws -> [TenantMysqlInstance] {
@@ -461,20 +442,7 @@ struct TenantsService {
 
     /// MySQL APIs often return `{ success, message, code }` without always failing HTTP.
     private func throwIfMysqlApiFailed(_ data: Data) throws {
-        if let env = try? JSONDecoder().decode(TenantApiEnvelope.self, from: data) {
-            if env.success != nil || env.code != nil, !env.ok {
-                throw APIError.serverMessage(env.text.isEmpty ? "操作失败" : env.text)
-            }
-            return
-        }
-        if let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-            if let ok = obj["success"] as? Bool, !ok {
-                throw APIError.serverMessage((obj["message"] as? String) ?? "操作失败")
-            }
-            if let code = obj["code"] as? Int, code != 200, code != 0 {
-                throw APIError.serverMessage((obj["message"] as? String) ?? "操作失败")
-            }
-        }
+        try throwIfApiFailed(data)
     }
 
     func quota(tenantId: Int64, service: String, page: Int, pageSize: Int) async throws -> [String: Any] {
@@ -492,7 +460,9 @@ struct TenantsService {
 
     func sendExportCode() async throws {
         let url = try client.makeURL(baseURL, path: "/tenants/verify/sendExportCode")
-        _ = try await client.postJSON(url, body: [:])
+        let raw = try await client.postJSON(url, body: [:])
+        // The verification controller explicitly returns HTTP 200 with no body.
+        guard raw.isEmpty else { try throwIfApiFailed(raw); return }
     }
 
     func exportAll(code: String) async throws -> (Data, String?) {
@@ -520,6 +490,9 @@ struct TenantsService {
         guard (200..<300).contains(http.statusCode) else {
             throw APIError.serverMessage(String(data: resp, encoding: .utf8) ?? "导入失败")
         }
+        guard String(data: resp, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) == "导入成功！" else {
+            throw APIError.serverMessage("导入结果无法确认；请刷新列表核对，勿重复导入。")
+        }
     }
 
     // MARK: - Region detail / subscribe / boot / cost / traffic / AI
@@ -545,13 +518,9 @@ struct TenantsService {
     func subscribeRegions(tenantId: Int64, regionKeys: [String]) async throws -> String {
         let url = try client.makeURL(baseURL, path: "/tenants/subscribe-regions")
         let raw = try await client.postJSON(url, body: ["tenantId": tenantId, "regionKeys": regionKeys])
-        if let obj = try? JSONSerialization.jsonObject(with: raw) as? [String: Any] {
-            if let ok = obj["success"] as? Bool, !ok {
-                throw APIError.serverMessage((obj["message"] as? String) ?? (obj["error"] as? String) ?? "订阅失败")
-            }
-            return (obj["message"] as? String) ?? "订阅完成"
-        }
-        return "订阅完成"
+        let result = InstanceJSON.successMessage(raw, fallback: "订阅完成")
+        guard result.ok else { throw APIError.serverMessage(result.message) }
+        return result.message
     }
 
     func querySystemImages(tenantId: Int64, shapeType: String) async throws -> [TenantImageInfo] {
@@ -654,6 +623,9 @@ struct TenantsService {
         var req = URLRequest(url: url)
         req.setValue("text/event-stream", forHTTPHeaderField: "Accept")
         req.setValue("XMLHttpRequest", forHTTPHeaderField: "X-Requested-With")
+        if let cookie = client.cookieHeader(for: baseURL), !cookie.isEmpty {
+            req.setValue(cookie, forHTTPHeaderField: "Cookie")
+        }
         req.timeoutInterval = 600
         try await TenantSSEClient.shared.stream(request: req, onEvent: onEvent)
     }
@@ -676,15 +648,8 @@ struct TenantsService {
     }
 
     private func throwIfApiFailed(_ raw: Data) throws {
-        if let env = try? JSONDecoder().decode(TenantApiEnvelope.self, from: raw), !env.ok {
-            throw APIError.serverMessage(env.text)
-        }
-        if let r = try? JSONDecoder().decode(TenantBoolMessage.self, from: raw), !r.success, !r.message.isEmpty {
-            // some endpoints only have success when true
-            if r.message.lowercased().contains("fail") || r.message.contains("失败") {
-                throw APIError.serverMessage(r.message)
-            }
-        }
+        let result = InstanceJSON.successMessage(raw)
+        guard result.ok else { throw APIError.serverMessage(result.message) }
     }
 
     private func jsonObject(_ j: AnyCodableJSON) -> Any {

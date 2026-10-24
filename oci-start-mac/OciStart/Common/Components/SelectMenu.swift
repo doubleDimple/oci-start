@@ -112,16 +112,17 @@ private final class SelectMenuPanelState: ObservableObject {
 
 private struct SelectMenuPanelView: View {
     @ObservedObject var state: SelectMenuPanelState
+    @ObservedObject private var appearance = AppearanceController.shared
 
     private var dark: Bool { state.dark }
     private var accent: Color {
-        dark ? Color(hex: "4d9eff") : Color(hex: "2563eb")
+        AppTheme.sidebarActive
     }
     private var panelBg: Color {
-        dark ? Color(hex: "22262b") : Color.white
+        AppTheme.cardBg(dark)
     }
     private var softDivider: Color {
-        dark ? Color(hex: "31363d") : Color(hex: "e8eef5")
+        AppTheme.border(dark)
     }
 
     private var filteredOptions: [SelectOption] {
@@ -159,7 +160,7 @@ private struct SelectMenuPanelView: View {
 
                     if filteredOptions.isEmpty {
                         Text("无匹配项")
-                            .font(.system(size: 12))
+                            .font(.system(size: AppTheme.bodySize))
                             .foregroundColor(AppInputStyle.placeholder(dark))
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)
@@ -184,14 +185,15 @@ private struct SelectMenuPanelView: View {
         }
         .frame(width: state.panelWidth, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: AppInputStyle.radius)
+            RoundedRectangle(cornerRadius: 14)
                 .fill(panelBg)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: AppInputStyle.radius)
-                .stroke(AppInputStyle.border(dark, focused: true).opacity(0.7), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(AppTheme.border(dark), lineWidth: 1)
         )
-        .shadow(color: Color.black.opacity(dark ? 0.45 : 0.14), radius: 14, y: 6)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .shadow(color: AppTheme.cardShadow(dark), radius: AppTheme.cardShadowRadius, y: AppTheme.cardShadowY)
     }
 
     private var searchBar: some View {
@@ -201,7 +203,7 @@ private struct SelectMenuPanelView: View {
                 .foregroundColor(AppInputStyle.icon(dark))
             TextField("搜索…", text: $state.searchText)
                 .textFieldStyle(PlainTextFieldStyle())
-                .font(.system(size: 12))
+                .font(.system(size: AppTheme.bodySize))
                 .foregroundColor(AppInputStyle.text(dark))
             if !state.searchText.isEmpty {
                 Button(action: { state.searchText = "" }) {
@@ -214,7 +216,7 @@ private struct SelectMenuPanelView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        .background(dark ? Color(hex: "292d32") : Color(hex: "f8fafc"))
+        .background(AppTheme.inputBg(dark))
     }
 
     private func row(
@@ -235,8 +237,8 @@ private struct SelectMenuPanelView: View {
         }()
         let bg: Color = {
             guard enabled else { return .clear }
-            if selected { return accent.opacity(dark ? 0.16 : 0.12) }
-            if hovering { return accent.opacity(dark ? 0.10 : 0.07) }
+            if selected { return AppTheme.statusBg(accent, dark) }
+            if hovering { return AppTheme.hover(dark) }
             return .clear
         }()
 
@@ -244,12 +246,12 @@ private struct SelectMenuPanelView: View {
             HStack(spacing: 8) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .font(.system(size: 13, weight: (selected && !muted) ? .semibold : .regular))
+                        .font(.system(size: AppTheme.bodySize, weight: (selected && !muted) ? .semibold : .regular))
                         .foregroundColor(titleColor)
                         .lineLimit(1)
                     if let subtitle = subtitle, !subtitle.isEmpty {
                         Text(subtitle)
-                            .font(.system(size: 11))
+                            .font(.system(size: AppTheme.secondarySize))
                             .foregroundColor(AppInputStyle.placeholder(dark))
                             .lineLimit(1)
                     }
@@ -257,7 +259,7 @@ private struct SelectMenuPanelView: View {
                 Spacer(minLength: 4)
                 if selected && !muted {
                     Image(systemName: "checkmark")
-                        .font(.system(size: 11, weight: .bold))
+                        .font(.system(size: AppTheme.captionSize, weight: .bold))
                         .foregroundColor(accent)
                 }
             }
@@ -487,7 +489,7 @@ struct SelectMenu: View {
     @StateObject private var panelState = SelectMenuPanelState()
 
     private var accent: Color {
-        dark ? Color(hex: "4d9eff") : Color(hex: "2563eb")
+        AppTheme.sidebarActive
     }
 
     private var resolvedWidth: CGFloat { width ?? 160 }
@@ -569,11 +571,11 @@ struct SelectMenu: View {
             .padding(.horizontal, AppInputStyle.hPad)
             .frame(width: resolvedWidth, height: AppInputStyle.height)
             .background(
-                RoundedRectangle(cornerRadius: AppInputStyle.radius)
+                RoundedRectangle(cornerRadius: AppInputStyle.pillRadius)
                     .fill(AppInputStyle.fill(dark, focused: panelState.isOpen))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: AppInputStyle.radius)
+                RoundedRectangle(cornerRadius: AppInputStyle.pillRadius)
                     .stroke(
                         AppInputStyle.border(dark, focused: panelState.isOpen),
                         lineWidth: panelState.isOpen ? 1.5 : 1

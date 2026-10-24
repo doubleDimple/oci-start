@@ -15,6 +15,7 @@ struct KeyConfigView: View {
             title: "密钥配置",
             subtitle: "域名服务商密钥 · Cloudflare / 腾讯云 EdgeOne",
             systemImage: "key.fill",
+            layout: .workspace,
             toolbar: { toolbar },
             content: {
                 ScrollView {
@@ -35,7 +36,7 @@ struct KeyConfigView: View {
                             }
                         }
                     }
-                    .padding(16)
+                    .padding(AppTheme.pagePadding)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -86,8 +87,8 @@ struct KeyConfigView: View {
                 }
             }
             Text("My Profile → API Tokens → Global API Key")
-                .font(.system(size: 11))
-                .foregroundColor(AppTheme.sidebarText(dark))
+                .font(.system(size: 13))
+                .foregroundColor(AppTheme.textSecondary(dark))
 
             FormFieldRow(label: "账户邮箱", required: true) {
                 AppTextField(
@@ -97,8 +98,8 @@ struct KeyConfigView: View {
                 )
             }
             Text("与 API Key 配套的账户邮箱，用于身份校验")
-                .font(.system(size: 11))
-                .foregroundColor(AppTheme.sidebarText(dark))
+                .font(.system(size: 13))
+                .foregroundColor(AppTheme.textSecondary(dark))
         } footer: {
             HStack(spacing: 8) {
                 if model.cloudflare.enabled {
@@ -152,8 +153,8 @@ struct KeyConfigView: View {
                 }
             }
             Text("访问管理 → API 密钥管理")
-                .font(.system(size: 11))
-                .foregroundColor(AppTheme.sidebarText(dark))
+                .font(.system(size: 13))
+                .foregroundColor(AppTheme.textSecondary(dark))
 
             FormFieldRow(label: "SecretKey", required: true) {
                 HStack(spacing: 8) {
@@ -169,8 +170,8 @@ struct KeyConfigView: View {
                 }
             }
             Text("密钥仅保存在服务端，请妥善保管")
-                .font(.system(size: 11))
-                .foregroundColor(AppTheme.sidebarText(dark))
+                .font(.system(size: 13))
+                .foregroundColor(AppTheme.textSecondary(dark))
         } footer: {
             HStack(spacing: 8) {
                 if model.edgeOne.enabled {
@@ -230,10 +231,10 @@ struct KeyConfigView: View {
             VStack(spacing: 10) {
                 Image(systemName: "shippingbox")
                     .font(.system(size: 28, weight: .light))
-                    .foregroundColor(AppTheme.sidebarText(dark).opacity(0.55))
+                    .foregroundColor(AppTheme.textSecondary(dark))
                 Text("后续将支持更多 DNS / CDN 服务商")
-                    .font(.system(size: 12))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .font(.system(size: 13))
+                    .foregroundColor(AppTheme.textSecondary(dark))
                     .multilineTextAlignment(.center)
             }
             .frame(maxWidth: .infinity)
@@ -250,8 +251,8 @@ struct KeyConfigView: View {
                 .foregroundColor(Color(hex: "9b59b6"))
                 .frame(width: 18)
             Text(text)
-                .font(.system(size: 12))
-                .foregroundColor(dark ? Color.white.opacity(0.88) : Color.primary)
+                .font(.system(size: 14))
+                .foregroundColor(AppTheme.textPrimary(dark))
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -279,7 +280,7 @@ struct KeyConfigView: View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundColor(Color(hex: "f85149"))
-            Text(text).font(.system(size: 12))
+            Text(text).font(.system(size: 14))
             Spacer()
             Button("重试") { Task { await model.reload() } }
                 .buttonStyle(PlainButtonStyle())

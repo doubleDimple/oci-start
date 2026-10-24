@@ -156,7 +156,7 @@ public class DynamicDailyTask {
         StringBuilder sb = new StringBuilder();
         int i = 0;
         for (Tenant tenant : all) {
-            Optional<RegisterDetail> byTenantId = registerDetailRepository.findByTenantId(String.valueOf(tenant.getTenantId()));
+            Optional<RegisterDetail> byTenantId = registerDetailRepository.findForTenant(tenant.getId(), tenant.getTenantId());
             if (byTenantId.isPresent()){
                 RegisterDetail registerDetail = byTenantId.get();
                 Subscription.PlanType planType = registerDetail.getPlanType();

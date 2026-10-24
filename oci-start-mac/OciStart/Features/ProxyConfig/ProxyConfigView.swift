@@ -18,18 +18,13 @@ struct ProxyConfigView: View {
             toolbar: { toolbar },
             content: {
                 VStack(spacing: 0) {
-                    if let err = model.errorText, !err.isEmpty {
-                        errorBanner(err)
-                            .padding(.horizontal, 16)
-                            .padding(.top, 12)
-                    }
                     listBody
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
                 .appLoading(model.isLoading && model.items.isEmpty)
             },
             footer: {
-                PaginationBar(state: $model.pageState) {
+                PaginationBar(state: $model.pageState, disabled: model.isLoading) {
                     model.onPageChange()
                 }
             }
@@ -48,6 +43,9 @@ struct ProxyConfigView: View {
 
     private var toolbar: some View {
         HStack(spacing: 8) {
+            if let error = model.errorText, !error.isEmpty {
+                PageErrorIndicator(message: error, retry: { Task { await model.reload() } })
+            }
             AppButton(
                 title: "一键全部测试",
                 systemImage: "network",
@@ -83,7 +81,7 @@ struct ProxyConfigView: View {
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                DataList {
+                DataList(minimumWidth: 1100) {
                     DataListColumnHeader(title: "名称", width: 100)
                     DataListColumnHeader(title: "类型", width: 64)
                     DataListColumnHeader(title: "地址", width: nil)
@@ -190,7 +188,7 @@ struct ProxyConfigView: View {
                                      ? Color(hex: dark ? "e67e22" : "d35400")
                                      : Color(hex: dark ? "1abc9c" : "16a085"))
                 Text(item.forceLabel)
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(item.isForce
                                      ? Color(hex: dark ? "e67e22" : "d35400")
                                      : Color(hex: dark ? "1abc9c" : "16a085"))
@@ -228,12 +226,12 @@ struct ProxyConfigView: View {
             }) {
                 HStack(spacing: 4) {
                     Text(revealed ? item.proxyPassword : "••••••••")
-                        .font(.system(size: 12, design: revealed ? .monospaced : .default))
-                        .foregroundColor(dark ? Color.white.opacity(0.88) : Color(hex: "1e2f42"))
+                        .font(.system(size: 14, design: revealed ? .monospaced : .default))
+                        .foregroundColor(AppTheme.textPrimary(dark))
                         .lineLimit(1)
                     Image(systemName: revealed ? "eye.slash" : "eye")
                         .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(AppTheme.sidebarText(dark))
+                        .foregroundColor(AppTheme.textSecondary(dark))
                 }
                 .frame(width: 80, alignment: .leading)
             }
@@ -244,25 +242,11 @@ struct ProxyConfigView: View {
 
     private func cell(_ text: String, width: CGFloat?, weight: Font.Weight = .regular) -> some View {
         Text(text)
-            .font(.system(size: 12, weight: weight))
-            .foregroundColor(dark ? Color.white.opacity(0.88) : Color(hex: "1e2f42"))
+            .font(.system(size: 14, weight: weight))
+            .foregroundColor(AppTheme.textPrimary(dark))
             .lineLimit(1)
             .frame(width: width, alignment: .leading)
             .frame(maxWidth: width == nil ? .infinity : nil, alignment: .leading)
     }
 
-    private func errorBanner(_ text: String) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundColor(Color(hex: "f85149"))
-            Text(text).font(.system(size: 12))
-            Spacer()
-            Button("重试") { Task { await model.reload() } }
-                .buttonStyle(PlainButtonStyle())
-        }
-        .foregroundColor(Color(hex: "f85149"))
-        .padding(12)
-        .background(Color(hex: "f85149").opacity(0.1))
-        .cornerRadius(8)
-    }
 }

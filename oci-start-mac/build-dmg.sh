@@ -257,7 +257,7 @@ echo " Step 1/6  构建 Spring Boot JAR"
 echo "══════════════════════════════════════════"
 # --also-make 会自动先构建 oci-server 依赖的所有兄弟模块
 cd "$REPO_ROOT"
-mvn "${MVN_SETTINGS_ARGS[@]}" clean install -DskipTests -q --also-make -pl oci-server
+mvn "${MVN_SETTINGS_ARGS[@]}" -Pweb clean install -DskipTests -q --also-make -pl oci-server
 JAR_PATH="$SERVER_DIR/target/${JAR_FINAL_NAME}.jar"
 if [ ! -f "$JAR_PATH" ]; then
     echo "❌ JAR 未找到: $JAR_PATH"
@@ -467,6 +467,7 @@ rm -rf "$ARCHIVE_PATH"
 
 # 支持系统：macOS Big Sur 11.7.11+（deploymentTarget 11.0）
 # 注意：set -e 下必须保留 xcodebuild 的真实退出码，禁止 `|| true` 吞失败
+# 摘要只显示前 40 行，但持续读取输出，避免提前关闭管道中断编译和完整日志。
 set +e
 xcodebuild archive \
     -project  "$MAC_DIR/$APP_NAME.xcodeproj" \
@@ -477,7 +478,7 @@ xcodebuild archive \
     ONLY_ACTIVE_ARCH=NO \
     CODE_SIGN_IDENTITY="-" \
     CODE_SIGNING_REQUIRED=NO \
-    2>&1 | tee "$BUILD_DIR/xcodebuild-archive.log" | grep -E "error:|warning:|SUCCEEDED|FAILED" | head -40
+    2>&1 | tee "$BUILD_DIR/xcodebuild-archive.log" | grep -E "error:|warning:|SUCCEEDED|FAILED" | sed -n '1,40p'
 XCODE_STATUS=${PIPESTATUS[0]}
 set -e
 

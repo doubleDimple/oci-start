@@ -29,6 +29,9 @@ public interface OracleInstanceService {
     */
     Page<InstanceDetailsRes> getAllInstances(int page, int size,String instanceId);
 
+    /** OCI page query; excludes records belonging to other cloud providers. */
+    Page<InstanceDetailsRes> getOciInstances(int page, int size, String tenantId);
+
     /**
     * @Description: 根据tennetid查询
     * @Param: [java.lang.String, int, int]

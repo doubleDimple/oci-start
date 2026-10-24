@@ -50,6 +50,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Menu bar「退出 OCI Start」/ ⌘Q：先关页面，再停后端，最后允许进程退出。
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        if AppSession.shared.isLoggedIn && !NavigationState.shared.canLeaveCurrentPage() { return .terminateCancel }
         Self.log("shouldTerminate — close UI first")
         // 1) Close / hide UI immediately so the user sees the app leave before Java teardown.
         if let window = mainWindowController?.window {

@@ -21,6 +21,10 @@ public interface VpnProxyRecordService {
 
     void delete(VpnProxyRecordRequest vpnProxyRecordRequest);
 
+    String getPassword(Long id);
+
+    void updateForce(Long id, Integer forceProxy);
+
     /**
      * 测试单条代理连通性，结果写入 availableStatus（1=通，0=不通）
      */

@@ -19,13 +19,9 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
 import static com.doubledimple.ocicommon.template.MessageTemplate.LEGACY_MESSAGE_TEMPLATE;
@@ -98,20 +94,20 @@ public class TelegramMessageService implements MessageService {
 
     @Override
     public void sendMessageTemplate(String message) {
-        log.info("发送消息的内容为:{}",message);
+        log.info("发送通知消息");
         doSend(message);
     }
 
     @Override
     public void sendMessageTemplateText(String message) {
-        log.info("发送消息的内容为:{}",message);
+        log.info("发送通知消息");
         doSendHtml(message);
     }
 
     @Override
     public void sendMessageTemplateText(String message, Boolean consoleFlag) {
         if (consoleFlag){
-            log.info("发送消息的内容为:{}",message);
+            log.info("发送通知消息");
         }
         doSendHtml(message);
     }
@@ -138,7 +134,7 @@ public class TelegramMessageService implements MessageService {
 
             int responseCode = connection.getResponseCode();
         }  catch (Exception e) {
-            log.error("消息发送失败:{}",e.getMessage(),e);
+            log.error("消息发送失败，异常类型:{}", e.getClass().getSimpleName());
         }
     }
 
@@ -194,7 +190,7 @@ public class TelegramMessageService implements MessageService {
                         telegramConfig.getBotToken(), telegramConfig.getChatId(), encodedMessage);
                 sendTelegramRequest(urlString, "Markdown");
             }  catch (Exception e) {
-                log.warn("send message error,reason:{}",e.getMessage());
+                log.warn("TG 消息发送失败，异常类型:{}", e.getClass().getSimpleName());
             }
         }
 
@@ -222,7 +218,7 @@ public class TelegramMessageService implements MessageService {
                         telegramConfig.getBotToken(), telegramConfig.getChatId(), encodedMessage);
                 sendTelegramRequest(urlString, "HTML");
             }  catch (Exception e) {
-                log.warn("send message error,reason:{}",e.getMessage());
+                log.warn("TG 消息发送失败，异常类型:{}", e.getClass().getSimpleName());
             }
         }
 
@@ -247,7 +243,7 @@ public class TelegramMessageService implements MessageService {
                         telegramConfig.getBotToken(), telegramConfig.getChatId(), encodedMessage);
                 sendTelegramRequest(urlString, "plain text");
             } catch (Exception e) {
-                log.warn("send message error,reason:{}", e.getMessage());
+                log.warn("TG 消息发送失败，异常类型:{}", e.getClass().getSimpleName());
             }
         }
 
@@ -274,37 +270,18 @@ public class TelegramMessageService implements MessageService {
     private void sendTelegramRequest(String urlString, String mode) throws Exception {
         URL url = new URL(urlString);
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-        connection.setRequestMethod("GET");
-        connection.setConnectTimeout(5000);
-        connection.setReadTimeout(5000);
-        connection.connect();
-
-        int responseCode = connection.getResponseCode();
-        if (responseCode < 200 || responseCode >= 300) {
-            log.warn("TG 消息发送失败, mode:{}, responseCode:{}, response:{}",
-                    mode, responseCode, readResponseBody(connection));
-        }
-    }
-
-    private String readResponseBody(HttpURLConnection connection) {
         try {
-            InputStream inputStream = connection.getErrorStream();
-            if (inputStream == null) {
-                inputStream = connection.getInputStream();
+            connection.setRequestMethod("GET");
+            connection.setConnectTimeout(5000);
+            connection.setReadTimeout(5000);
+            connection.connect();
+            int responseCode = connection.getResponseCode();
+            if (responseCode < 200 || responseCode >= 300) {
+                // Providers may echo notification bodies, including passwords and codes.
+                log.warn("TG 消息发送失败, mode:{}, responseCode:{}", mode, responseCode);
             }
-            if (inputStream == null) {
-                return "";
-            }
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
-                StringBuilder body = new StringBuilder();
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    body.append(line);
-                }
-                return body.toString();
-            }
-        } catch (Exception e) {
-            return "读取 TG 响应失败: " + e.getMessage();
+        } finally {
+            connection.disconnect();
         }
     }
 
@@ -385,7 +362,7 @@ public class TelegramMessageService implements MessageService {
      */
     public void sendVerificationCodeMessage(String userName, String verificationCode) {
         String message = formatVerificationCodeMessage(userName, verificationCode);
-        log.info("发送验证码消息: {}", message);
+        log.info("发送登录验证码通知");
         //doSend(message);  // 调用原来的消息发送方法
         doSendHtml(message);  // 调用原来的消息发送方法
     }

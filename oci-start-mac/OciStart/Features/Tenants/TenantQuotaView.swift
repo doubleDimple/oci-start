@@ -39,20 +39,22 @@ struct TenantQuotaView: View {
     }
 
     private var cardBorder: Color { AppTheme.border(dark) }
-    private var surface: Color { dark ? Color(hex: "1a1d27") : Color.white }
-    private var headerBg: Color { AppTheme.sidebarHover(dark).opacity(0.65) }
-    private var primaryText: Color { dark ? Color.white.opacity(0.9) : Color(hex: "1e293b") }
-    private var secondaryText: Color { AppTheme.sidebarText(dark) }
+    private var surface: Color { AppTheme.cardBg(dark) }
+    private var headerBg: Color { AppTheme.inputBg(dark) }
+    private var primaryText: Color { AppTheme.textPrimary(dark) }
+    private var secondaryText: Color { AppTheme.textSecondary(dark) }
 
     var body: some View {
         PageScaffold(
             title: "账号配额",
             subtitle: tenant.map { $0.displayName },
             systemImage: "chart.bar.fill",
-            toolbar: { toolbar },
+            layout: .workspace,
+            toolbar: { EmptyView() },
             content: {
                 VStack(spacing: 0) {
                     filterBar
+                        .padding(.horizontal, 8)
                     if !model.quotaError.isEmpty {
                         errorBanner(model.quotaError)
                     }
@@ -73,6 +75,13 @@ struct TenantQuotaView: View {
 
     private var toolbar: some View {
         HStack(spacing: 8) {
+            if let selectedTenant = tenant {
+                Text("账号配额 · \(selectedTenant.displayName)")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(AppTheme.textSecondary(dark))
+                    .lineLimit(1)
+                    .frame(maxWidth: 220, alignment: .leading)
+            }
             AppButton(title: "返回列表", systemImage: "chevron.left", kind: .secondary) {
                 model.closeQuota()
             }
@@ -118,6 +127,7 @@ struct TenantQuotaView: View {
                 }
             },
             trailing: {
+                toolbar
                 AppButton(
                     title: "查询",
                     systemImage: "magnifyingglass",
@@ -138,9 +148,9 @@ struct TenantQuotaView: View {
                 .foregroundColor(secondaryText)
             Spacer()
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, AppTheme.pagePadding)
         .padding(.vertical, 8)
-        .background(AppTheme.sidebarHover(dark).opacity(0.35))
+        .background(AppTheme.hover(dark).opacity(0.35))
         .overlay(
             Rectangle().frame(height: 1).foregroundColor(cardBorder.opacity(0.5)),
             alignment: .bottom
@@ -157,7 +167,7 @@ struct TenantQuotaView: View {
     private func errorBanner(_ text: String) -> some View {
         HStack {
             Image(systemName: "exclamationmark.triangle.fill")
-            Text(text).font(.system(size: 12))
+            Text(text).font(.system(size: 14))
             Spacer()
             Button("重试") {
                 Task { await model.queryQuota(page: model.quotaPage) }
@@ -190,31 +200,33 @@ struct TenantQuotaView: View {
             GeometryReader { geo in
                 let typeW = hasTypeColumn ? wType : 0
                 let fixed = typeW + wNum * 3 + wBar + wPct + minName + hPad * 2
-                let totalW = max(geo.size.width - 32, fixed)
+                let totalW = max(geo.size.width, fixed)
                 let wName = minName + max(0, totalW - fixed)
 
-                VStack(spacing: 0) {
-                    headerRow(wName: wName, typeW: typeW, width: totalW)
-                    ScrollView {
-                        LazyVStack(spacing: 0) {
-                            ForEach(Array(model.quotaItems.enumerated()), id: \.element.id) { idx, row in
-                                dataRow(index: idx, row: row, wName: wName, typeW: typeW, width: totalW)
+                NativeHorizontalTable(contentWidth: totalW, viewportWidth: geo.size.width, height: geo.size.height) {
+                    VStack(spacing: 0) {
+                        headerRow(wName: wName, typeW: typeW, width: totalW)
+                        ScrollView {
+                            LazyVStack(spacing: 0) {
+                                ForEach(Array(model.quotaItems.enumerated()), id: \.element.id) { idx, row in
+                                    dataRow(index: idx, row: row, wName: wName, typeW: typeW, width: totalW)
+                                }
                             }
                         }
                     }
+                    .frame(width: totalW, alignment: .topLeading)
                 }
-                .frame(width: totalW, alignment: .topLeading)
                 .background(surface)
                 .overlay(
                     RoundedRectangle(cornerRadius: 10)
                         .stroke(cardBorder, lineWidth: 1)
                 )
                 .cornerRadius(10)
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
-                .padding(.bottom, showPagination ? 4 : 12)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
+            .padding(.horizontal, AppTheme.pagePadding)
+            .padding(.top, 12)
+            .padding(.bottom, showPagination ? 4 : 12)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
@@ -243,7 +255,7 @@ struct TenantQuotaView: View {
 
     private func dataRow(index: Int, row: TenantQuotaItem, wName: CGFloat, typeW: CGFloat, width: CGFloat) -> some View {
         let pct = row.usagePercent
-        let stripe = index % 2 == 1 ? AppTheme.sidebarHover(dark).opacity(0.14) : Color.clear
+        let stripe = index % 2 == 1 ? AppTheme.hover(dark).opacity(0.14) : Color.clear
         return HStack(spacing: 0) {
             // 限额名称 + 状态点
             HStack(alignment: .top, spacing: 8) {
@@ -253,13 +265,13 @@ struct TenantQuotaView: View {
                     .padding(.top, 4)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(row.name.isEmpty ? "—" : row.name)
-                        .font(.system(size: 11, weight: .medium))
+                        .font(.system(size: 14, weight: .medium))
                         .foregroundColor(primaryText)
                         .lineLimit(2)
                         .help(row.name)
                     if !row.scope.isEmpty {
                         Text(row.scope)
-                            .font(.system(size: 10))
+                            .font(.system(size: 13))
                             .foregroundColor(secondaryText)
                             .lineLimit(1)
                             .help(row.scope)
@@ -274,7 +286,7 @@ struct TenantQuotaView: View {
                         typeBadge(row.instanceType)
                     } else {
                         Text("—")
-                            .font(.system(size: 11))
+                            .font(.system(size: 13))
                             .foregroundColor(secondaryText)
                     }
                 }
@@ -291,7 +303,7 @@ struct TenantQuotaView: View {
                 .padding(.trailing, 4)
 
             Text("\(pct)%")
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(pctColor(pct))
                 .frame(width: wPct, alignment: .center)
         }
@@ -322,12 +334,12 @@ struct TenantQuotaView: View {
 
             HStack(spacing: 10) {
                 Text("第 \(model.quotaPage + 1) 页")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: 14, weight: .medium))
                     .foregroundColor(primaryText)
                 Text("|")
                     .foregroundColor(cardBorder)
                 Text("每页")
-                    .font(.system(size: 12))
+                    .font(.system(size: 13))
                     .foregroundColor(secondaryText)
                 SelectMenu(
                     options: [10, 20, 50].map { SelectOption(id: "\($0)", title: "\($0)") },
@@ -345,7 +357,7 @@ struct TenantQuotaView: View {
                     allowClear: false
                 )
                 Text("条")
-                    .font(.system(size: 12))
+                    .font(.system(size: 13))
                     .foregroundColor(secondaryText)
             }
 
@@ -360,7 +372,7 @@ struct TenantQuotaView: View {
                 Task { await model.queryQuota(page: model.quotaPage + 1) }
             }
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, AppTheme.pagePadding)
         .padding(.vertical, 12)
     }
 
@@ -368,14 +380,15 @@ struct TenantQuotaView: View {
 
     private func colHeader(_ title: String, _ w: CGFloat, align: Alignment) -> some View {
         Text(title)
-            .font(.system(size: 10, weight: .bold))
+            .lineLimit(1)
+            .font(.system(size: AppTheme.bodySize, weight: .bold))
             .foregroundColor(secondaryText)
             .frame(width: w, alignment: align)
     }
 
     private func numCell(_ text: String, _ w: CGFloat, color: Color, bold: Bool = false) -> some View {
         Text(text.isEmpty ? "—" : text)
-            .font(.system(size: 12, weight: bold ? .bold : .regular))
+            .font(.system(size: 14, weight: bold ? .bold : .regular))
             .foregroundColor(color)
             .lineLimit(1)
             .frame(width: w, alignment: .center)
@@ -386,7 +399,7 @@ struct TenantQuotaView: View {
             let fill = max(0, min(1, CGFloat(pct) / 100))
             ZStack(alignment: .leading) {
                 RoundedRectangle(cornerRadius: 3)
-                    .fill(AppTheme.sidebarHover(dark).opacity(0.8))
+                    .fill(AppTheme.hover(dark).opacity(0.8))
                     .overlay(
                         RoundedRectangle(cornerRadius: 3)
                             .stroke(cardBorder.opacity(0.6), lineWidth: 1)
@@ -406,7 +419,7 @@ struct TenantQuotaView: View {
             ? "BM·" + String(typeName.dropFirst(4))
             : typeName
         return Text(label)
-            .font(.system(size: 10, weight: .semibold))
+            .font(.system(size: 14, weight: .semibold))
             .foregroundColor(style.fg)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)

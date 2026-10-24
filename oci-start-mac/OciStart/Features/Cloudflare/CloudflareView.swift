@@ -13,24 +13,17 @@ struct CloudflareView: View {
             title: "Cloudflare",
             subtitle: "DNS 解析管理 · 代理状态 · 同步记录",
             systemImage: "cloud.fill",
-            toolbar: { toolbar },
+            toolbar: { EmptyView() },
             content: {
                 VStack(spacing: 0) {
-                    if let err = model.errorText, !err.isEmpty {
-                        errorBanner(err)
-                            .padding(.horizontal, 16)
-                            .padding(.top, 12)
-                    }
                     filterBar
-                        .padding(.horizontal, 16)
-                        .padding(.top, 12)
                     listBody
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
                 .appLoading((model.isLoading || model.isZonesLoading) && model.records.isEmpty && model.zones.isEmpty)
             },
             footer: {
-                PaginationBar(state: $model.pageState) {
+                PaginationBar(state: $model.pageState, disabled: model.isLoading) {
                     model.onPageChange()
                 }
             }
@@ -55,6 +48,9 @@ struct CloudflareView: View {
 
     private var toolbar: some View {
         HStack(spacing: 8) {
+            if let error = model.errorText, !error.isEmpty {
+                PageErrorIndicator(message: error, retry: { Task { await model.reloadRecords() } })
+            }
             AppButton(title: "密钥配置", systemImage: "key", kind: .secondary) {
                 model.openConfig()
             }
@@ -83,11 +79,11 @@ struct CloudflareView: View {
     // MARK: - Filter
 
     private var filterBar: some View {
-        FilterBar {
+        FilterBar(leading: {
             HStack(spacing: 10) {
                 Text("域名")
-                    .font(.system(size: 12))
-                    .foregroundColor(AppTheme.sidebarText(dark))
+                    .font(.system(size: 13))
+                    .foregroundColor(AppTheme.textSecondary(dark))
                 SelectMenu(
                     options: model.zoneOptions,
                     selection: Binding(
@@ -118,7 +114,7 @@ struct CloudflareView: View {
                     }
                 }
             }
-        }
+        }, trailing: { toolbar })
     }
 
     // MARK: - List
@@ -146,7 +142,7 @@ struct CloudflareView: View {
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                DataList {
+                DataList(minimumWidth: 760) {
                     DataListColumnHeader(title: "类型", width: 72)
                     DataListColumnHeader(title: "记录名", width: nil)
                     DataListColumnHeader(title: "记录值", width: nil)
@@ -205,8 +201,8 @@ struct CloudflareView: View {
 
     private func cell(_ text: String, width: CGFloat?) -> some View {
         Text(text.isEmpty ? "—" : text)
-            .font(.system(size: 12))
-            .foregroundColor(dark ? Color.white.opacity(0.9) : Color.primary)
+            .font(.system(size: 14))
+            .foregroundColor(AppTheme.textPrimary(dark))
             .lineLimit(1)
             .truncationMode(.middle)
             .frame(width: width, alignment: .leading)
@@ -226,22 +222,4 @@ struct CloudflareView: View {
         .help(tip)
     }
 
-    private func errorBanner(_ text: String) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundColor(Color(hex: "f85149"))
-            Text(text).font(.system(size: 12))
-            Spacer()
-            Button("密钥配置") { model.openConfig() }
-                .buttonStyle(PlainButtonStyle())
-            Button("重试") {
-                Task { await model.loadZones(selectFirst: true) }
-            }
-            .buttonStyle(PlainButtonStyle())
-        }
-        .foregroundColor(Color(hex: "f85149"))
-        .padding(12)
-        .background(Color(hex: "f85149").opacity(0.1))
-        .cornerRadius(8)
-    }
 }

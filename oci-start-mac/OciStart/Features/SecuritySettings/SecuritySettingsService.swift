@@ -7,13 +7,13 @@ struct SecuritySettingsService {
 
     /// GET `/api/system/securitySettingsConfigs`
     func fetchConfigs() async throws -> SecuritySettingsSnapshot {
-        let url = try client.makeURL(baseURL, path: "/api/system/securitySettingsConfigs")
+        let url = try client.makeURL(baseURL, path: "/api/system/securitySettingsConfigs", query: ["redacted": "true"])
         let raw = try await client.getJSON(url)
         return try SecuritySettingsJSON.parse(raw)
     }
 
     /// POST `/api/system/updatePassword`
-    func updateAccount(currentPassword: String, newUsername: String?, newPassword: String?) async throws {
+    func updateAccount(currentPassword: String, newUsername: String?, newPassword: String?) async throws -> Bool {
         let url = try client.makeURL(baseURL, path: "/api/system/updatePassword")
         var body: [String: Any] = ["currentPassword": currentPassword]
         if let newUsername = newUsername, !newUsername.isEmpty {
@@ -23,7 +23,9 @@ struct SecuritySettingsService {
             body["newPassword"] = newPassword
         }
         let raw = try await client.postJSON(url, body: body)
-        try SecuritySettingsJSON.ensureOK(raw, fallback: "账号更新失败")
+        guard let root = SecuritySettingsJSON.obj(raw), root["success"] as? Bool == true,
+              let body = root["data"] as? [String: Any], let needRelogin = body["needRelogin"] as? Bool else { throw APIError.invalidResponse }
+        return needRelogin
     }
 
     /// POST `/api/system/settings/logo?logoName=`
@@ -34,7 +36,7 @@ struct SecuritySettingsService {
             let msg = String(data: data, encoding: .utf8) ?? "保存 Logo 失败"
             throw APIError.serverMessage(msg.isEmpty ? "保存 Logo 失败" : msg)
         }
-        try SecuritySettingsJSON.ensureOK(data, fallback: "保存 Logo 失败")
+        guard let root = SecuritySettingsJSON.obj(data), root["code"] as? Int == 200, root["msg"] as? String == "success" else { throw APIError.invalidResponse }
     }
 
     /// POST `/api/system/updateGithubConfig`
@@ -42,12 +44,12 @@ struct SecuritySettingsService {
         let url = try client.makeURL(baseURL, path: "/api/system/updateGithubConfig")
         let raw = try await client.postJSON(url, body: [
             "enabled": form.enabled,
-            "userName": form.username,
-            "username": form.username,
-            "githubId": form.githubId,
-            "clientId": form.clientId,
-            "clientSecret": form.clientSecret,
-            "redirectUri": form.redirectUri
+            "userName": form.username.trimmingCharacters(in: .whitespacesAndNewlines),
+            "githubId": form.githubId.trimmingCharacters(in: .whitespacesAndNewlines),
+            "clientId": form.clientId.trimmingCharacters(in: .whitespacesAndNewlines),
+            "keepSecret": form.secretMode == .keep,
+            "clientSecret": form.secretMode.payload(form.clientSecret),
+            "redirectUri": form.redirectUri.trimmingCharacters(in: .whitespacesAndNewlines)
         ])
         try SecuritySettingsJSON.ensureOK(raw, fallback: "GitHub 配置更新失败")
     }
@@ -57,12 +59,27 @@ struct SecuritySettingsService {
         let url = try client.makeURL(baseURL, path: "/api/system/updateGoogleConfig")
         let raw = try await client.postJSON(url, body: [
             "enabled": form.enabled,
-            "email": form.email,
-            "clientId": form.clientId,
-            "clientSecret": form.clientSecret,
-            "redirectUri": form.redirectUri
+            "email": form.email.trimmingCharacters(in: .whitespacesAndNewlines),
+            "clientId": form.clientId.trimmingCharacters(in: .whitespacesAndNewlines),
+            "keepSecret": form.secretMode == .keep,
+            "clientSecret": form.secretMode.payload(form.clientSecret),
+            "redirectUri": form.redirectUri.trimmingCharacters(in: .whitespacesAndNewlines)
         ])
         try SecuritySettingsJSON.ensureOK(raw, fallback: "Google 配置更新失败")
+    }
+
+    /// Explicit reveal only; the settings read never returns enrollment material.
+    func fetchMfaMaterial() async throws -> (secret: String, qrCode: String) {
+        let url = try client.makeURL(baseURL, path: "/api/system/mfaMaterial")
+        let raw = try await client.getJSON(url)
+        guard let root = SecuritySettingsJSON.obj(raw), root["success"] as? Bool == true,
+              let body = root["data"] as? [String: Any] else { throw APIError.invalidResponse }
+        let secret = body["secretKey"] as? String ?? ""
+        let qr = body["qrCode"] as? String ?? ""
+        guard secret.count <= 256, qr.count <= 1_000_000,
+              secret.isEmpty || secret.range(of: #"^[A-Z2-7]+=*$"#, options: .regularExpression) != nil,
+              qr.isEmpty || (qr.hasPrefix("iVBORw0KGgo") && Data(base64Encoded: qr) != nil) else { throw APIError.invalidResponse }
+        return (secret, qr)
     }
 
     /// POST `/api/system/updateMfaConfig`
@@ -101,8 +118,9 @@ struct SecuritySettingsService {
         let url = try client.makeURL(baseURL, path: "/api/system/updateTurnstileConfig")
         let raw = try await client.postJSON(url, body: [
             "enabled": form.enabled,
-            "siteKey": form.siteKey,
-            "secretKey": form.secretKey
+            "siteKey": form.siteKey.trimmingCharacters(in: .whitespacesAndNewlines),
+            "keepSecret": form.secretMode == .keep,
+            "secretKey": form.secretMode.payload(form.secretKey)
         ])
         try SecuritySettingsJSON.ensureOK(raw, fallback: "Turnstile 配置更新失败")
     }
@@ -117,7 +135,9 @@ struct SecuritySettingsService {
     /// Fetch GitHub user id via public API.
     func fetchGithubUserId(username: String) async throws -> (id: String, login: String) {
         let trimmed = username.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { throw APIError.serverMessage("请输入 GitHub 用户名") }
+        guard trimmed.range(of: #"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$"#, options: .regularExpression) != nil else {
+            throw APIError.serverMessage("请输入有效 GitHub 用户名")
+        }
         guard let url = URL(string: "https://api.github.com/users/\(trimmed)") else {
             throw APIError.invalidURL
         }
