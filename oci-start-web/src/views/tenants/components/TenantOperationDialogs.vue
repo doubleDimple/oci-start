@@ -53,7 +53,7 @@ const checkResult = ref<CheckResult | null>(null)
 const checkStatusText = computed(() => localizeMessage(checkMessage.value, { processed: checkProcessed.value, total: checkResult.value?.totalAccounts ?? checkTotal.value }))
 const percentage = computed(() => checkState.value === 'complete' ? 100 : checkTotal.value ? Math.min(100, Math.floor(checkProcessed.value / checkTotal.value * 100)) : 0)
 const unresolvedCount = computed(() => checkResult.value ? Math.max(0, checkResult.value.totalAccounts - checkResult.value.activeAccounts - checkResult.value.inactiveAccounts) : 0)
-const submitDisabled = computed(() => loading.value || readingFile.value || sendingCode.value || loadFailed.value || (props.action === 'import' && !importRecords.value) || (props.action === 'export' && codeSent.value && !/^\d{6}$/.test(verifyCode.value)))
+const submitDisabled = computed(() => loading.value || readingFile.value || sendingCode.value || loadFailed.value || (props.action === 'import' && !importRecords.value) || (props.action === 'export' && codeSent.value && !/^[A-Z0-9]{8}$/.test(verifyCode.value)))
 const submitLabel = computed(() => {
   if (props.action === 'proxy') return t(proxyMode.value === 'create' ? 'tenantOperations.actions.createAndBind' : 'tenantOperations.actions.saveBinding')
   if (props.action === 'import') return t('tenantOperations.actions.import')
@@ -217,6 +217,7 @@ function onDrop(event: DragEvent) {
   void selectFile(event.dataTransfer?.files[0])
 }
 
+function setExportCode(value: string) { verifyCode.value = value.trim().toUpperCase() }
 async function sendCode() {
   if (sendingCode.value || saving.value) return
   const current = generation
@@ -436,11 +437,12 @@ onBeforeUnmount(cleanup)
         <Transition name="operation-swap" mode="out-in">
           <div v-if="codeSent" key="code" class="verification-field">
             <label for="tenant-export-code">{{ t('tenantOperations.export.codeLabel') }}</label>
-            <el-input id="tenant-export-code" v-model="verifyCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" :placeholder="t('tenantOperations.export.codePlaceholder')" :disabled="saving || sendingCode" @keyup.enter="submit" />
+            <el-input id="tenant-export-code" :model-value="verifyCode" inputmode="text" autocapitalize="characters" spellcheck="false" autocomplete="one-time-code" maxlength="8" :placeholder="t('tenantOperations.export.codePlaceholder')" :disabled="saving || sendingCode" @update:model-value="setExportCode" @keyup.enter="submit" />
             <div class="verification-hint"><span>{{ t('tenantOperations.export.codeHint') }}</span><el-button link :loading="sendingCode" :disabled="saving" @click="sendCode">{{ t('tenantOperations.actions.resend') }}</el-button></div>
           </div>
           <p v-else key="intro" class="quiet-note">{{ t('tenantOperations.export.hint') }}</p>
         </Transition>
+        <p class="quiet-note">{{ t('tenantOperations.export.codeLimit') }}</p>
       </div>
 
       <div v-else-if="action === 'batchCheck'" class="check-panel">

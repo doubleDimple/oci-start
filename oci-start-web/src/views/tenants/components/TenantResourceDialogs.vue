@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { describeTenantAccount } from '@/utils/tenantAccount'
 import PageErrorNotice from '@/components/PageErrorNotice.vue'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -45,18 +46,7 @@ function close() {
 }
 
 const detail = computed<Row | null>(() => props.tenant?.registerDetail || null)
-function typeName(value: unknown, plan = false) {
-  const raw = value && typeof value === 'object'
-    ? (value as Row).value ?? (value as Row).code ?? ''
-    : value
-  const text = String(raw || '')
-  const key = text.toUpperCase().replace(/[-_\s]/g, '')
-  const types: Record<string, string> = plan
-    ? { FREETIER: 'free', FREE: 'free', PAID: 'paid', PAYG: 'paid', PAYASYOUGO: 'paid' }
-    : { PERSONAL: 'personal', CORPORATE: 'corporate', CORPORATESUBMITTED: 'corporateSubmitted' }
-  return types[key] ? t(`tenantResources.account.types.${types[key]}`) : text
-}
-const accountPlan = computed(() => [typeName(detail.value?.accountType), typeName(detail.value?.planType, true)].filter(Boolean).join(' · ') || '—')
+const accountSummary = computed(() => describeTenantAccount(props.tenant, key => t(key)))
 const accountAddress = computed(() => [detail.value?.country, detail.value?.city, detail.value?.line1].filter((part) => String(part || '').trim()).join(' · ') || '—')
 const transferAmount = computed(() => {
   const amount = props.tenant?.transferAmount
@@ -285,14 +275,17 @@ onBeforeUnmount(() => {
       <p class="resource-context">{{ tenantName }}<span v-if="tenant?.region"> · {{ tenant.region }}</span></p>
 
       <template v-if="action === 'detail'">
-        <dl v-if="detail" class="account-details">
-          <div class="detail-feature"><dt>{{ t('tenantResources.account.typeAndPlan') }}</dt><dd>{{ accountPlan }}</dd></div>
-          <div><dt>{{ t('tenantResources.account.registeredAt') }}</dt><dd>{{ detail.registerTime || '—' }}</dd></div>
-          <div><dt>{{ t('tenantResources.account.subscriptionNumber') }}</dt><dd>{{ detail.subscriptionPlanNumber || '—' }}</dd></div>
-          <div><dt>{{ t('tenantResources.account.email') }}</dt><dd>{{ detail.emailAddress || '—' }}</dd></div>
-          <div><dt>{{ t('tenantResources.account.address') }}</dt><dd>{{ accountAddress }}</dd></div>
+        <dl class="account-details">
+          <div class="detail-feature"><dt>{{ t(accountSummary.source === 'subscription' ? 'tenantResources.account.typeAndPlan' : accountSummary.source === 'regions' ? 'tenantResources.account.regionClassification' : 'tenantResources.account.localClassification') }}</dt><dd>{{ accountSummary.label }}</dd></div>
+          <div v-if="tenant?.region"><dt>{{ t('tenantResources.account.homeRegion') }}</dt><dd>{{ tenant.region }}</dd></div>
+          <template v-if="detail">
+            <div><dt>{{ t('tenantResources.account.registeredAt') }}</dt><dd>{{ detail.registerTime || '—' }}</dd></div>
+            <div><dt>{{ t('tenantResources.account.subscriptionNumber') }}</dt><dd>{{ detail.subscriptionPlanNumber || '—' }}</dd></div>
+            <div><dt>{{ t('tenantResources.account.email') }}</dt><dd>{{ detail.emailAddress || '—' }}</dd></div>
+            <div><dt>{{ t('tenantResources.account.address') }}</dt><dd>{{ accountAddress }}</dd></div>
+          </template>
         </dl>
-        <el-empty v-else :description="t('tenantResources.account.empty')" :image-size="80" />
+        <p v-if="!detail" class="account-details-note" role="status">{{ t('tenantResources.account.empty') }}</p>
       </template>
 
       <template v-else-if="action === 'transferDetail'">
@@ -394,6 +387,7 @@ onBeforeUnmount(() => {
 :global(.tenant-resource-dialog .el-alert__description), :global(.tenant-resource-dialog .el-form-item__error), :global(.tenant-resource-dialog .el-empty__description p) { font-size: var(--font-size-secondary); }
 .resource-context { margin: -4px 0 24px; color: var(--text-secondary); font-size: var(--font-size-secondary); overflow-wrap: anywhere; }
 .account-details { margin: 0; }
+.account-details-note { color: var(--text-secondary); line-height: 1.65; }
 .account-details > div { display: grid; grid-template-columns: 128px minmax(0, 1fr); gap: 20px; padding: 18px 0; border-bottom: 1px solid var(--border); }
 .account-details > div:last-child { border-bottom: 0; }
 .account-details dt { color: var(--text-secondary); }

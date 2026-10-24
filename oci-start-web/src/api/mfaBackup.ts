@@ -1,5 +1,6 @@
 import { tenantCsrfToken } from './tenant'
 import { checkSession, handleSessionResponse } from '@/utils/session'
+import { ExportVerificationError, isExportCode, normalizeExportCode, readExportResponseError, safeExportMessage } from './exportVerification'
 
 export const MFA_MAX_ENTRIES = 5000
 export const MFA_MAX_BATCH = 100
@@ -85,7 +86,7 @@ async function jsonBody(response: Response, max: number): Promise<unknown> {
   } finally { reader.releaseLock() }
 }
 async function request<T>(path: string, method: 'GET' | 'POST', payload: object | FormData | undefined,
-  parse: (body: Record<string, unknown>) => T, options: { signal?: AbortSignal; write?: boolean; max?: number } = {}): Promise<T> {
+  parse: (body: Record<string, unknown>) => T, options: { signal?: AbortSignal; write?: boolean; max?: number; verificationCode?: string } = {}): Promise<T> {
   const controller = options.write ? undefined : new AbortController()
   let timedOut = false, declaredRejection = false
   const abort = () => controller?.abort()
@@ -94,6 +95,7 @@ async function request<T>(path: string, method: 'GET' | 'POST', payload: object 
   const timer = controller ? window.setTimeout(() => { timedOut = true; controller.abort() }, 30_000) : undefined
   try {
     const headers = new Headers({ Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' })
+    if (options.verificationCode) headers.set('X-Verify-Code', options.verificationCode)
     const token = tenantCsrfToken()
     if (token) headers.set(document.querySelector<HTMLMetaElement>('meta[name="_csrf_header"]')?.content || 'X-CSRF-TOKEN', token)
     if (payload && !(payload instanceof FormData)) headers.set('Content-Type', 'application/json')
@@ -104,6 +106,9 @@ async function request<T>(path: string, method: 'GET' | 'POST', payload: object 
     if (response.type === 'opaqueredirect') void checkSession()
     const url = response.url ? new URL(response.url) : null
     if (response.redirected || response.type === 'opaqueredirect' || !url || url.origin !== window.location.origin || url.pathname !== BASE + path) return invalid()
+    if (options.verificationCode && !response.ok) {
+      throw new MfaApiError(response.status === 401 ? 'unauthorized' : response.status === 403 ? 'forbidden' : 'requestFailed', await readExportResponseError(response))
+    }
     if (response.headers.get('Content-Type')?.split(';')[0]?.trim().toLowerCase() !== 'application/json') {
       throw new MfaApiError(response.status === 401 ? 'unauthorized' : response.status === 403 ? 'forbidden' : 'invalidResponse')
     }
@@ -119,7 +124,7 @@ async function request<T>(path: string, method: 'GET' | 'POST', payload: object 
     return invalid()
   } catch (cause) {
     const error = mfaError(cause)
-    throw new MfaApiError(timedOut ? 'timeout' : error.key, '', !!options.write && !declaredRejection)
+    throw new MfaApiError(timedOut ? 'timeout' : error.key, error.detail, !!options.write && !declaredRejection)
   } finally {
     if (timer !== undefined) window.clearTimeout(timer)
     options.signal?.removeEventListener('abort', abort)
@@ -206,8 +211,9 @@ export async function deleteMfaEntry(id: string, revision: string): Promise<void
     if (!object(body.data) || body.data.id !== id) return invalid()
   }, { write: true, max: 128 * 1024 })
 }
-export async function exportMfaEntries(values: string[], signal?: AbortSignal): Promise<MfaExportEntry[]> {
+export async function exportMfaEntries(values: string[], verificationCode: string, signal?: AbortSignal): Promise<MfaExportEntry[]> {
   const requested = ids(values, MFA_MAX_ENTRIES)
+  if (!isExportCode(verificationCode)) return bad()
   return request('/export', 'POST', { ids: requested }, body => {
     if (!Array.isArray(body.data) || body.data.length !== requested.length) return invalid()
     const rows = new Map<string, MfaExportEntry>()
@@ -218,10 +224,11 @@ export async function exportMfaEntries(values: string[], signal?: AbortSignal): 
       rows.set(id, { id, ...candidate(value) })
     }
     return requested.map(id => rows.get(id)!)
-  }, { signal })
+  }, { signal, verificationCode: normalizeExportCode(verificationCode) })
 }
 export function mfaError(cause: unknown): MfaApiError {
-  if (cause instanceof MfaApiError) return new MfaApiError(cause.key, '', cause.writeAttempted)
+  if (cause instanceof MfaApiError) return new MfaApiError(cause.key, safeExportMessage(cause.detail), cause.writeAttempted)
+  if (cause instanceof ExportVerificationError) return new MfaApiError('requestFailed', safeExportMessage(cause.message))
   if (object(cause) && cause.name === 'AbortError') return new MfaApiError('cancelled')
   return new MfaApiError('requestFailed')
 }

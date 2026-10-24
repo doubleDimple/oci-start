@@ -45,7 +45,7 @@ function size(value: number) {
   const unit = value < 1024 * 1024 ? 'KiB' : 'MiB'
   return `${new Intl.NumberFormat(locale.value, { maximumFractionDigits: 2 }).format(value / (unit === 'KiB' ? 1024 : 1024 * 1024))} ${unit}`
 }
-function errorLabel(problem: { key: string } | null) { return problem ? t(`migration.errors.${problem.key}`) : '' }
+function errorLabel(problem: { key: string; detail?: string } | null) { return problem ? problem.detail || t(`migration.errors.${problem.key}`) : '' }
 function back() { if (window.history.state?.back) router.back(); else void router.push('/boot/dashboard') }
 async function selectSection(section: 'export' | 'import') {
   if (actionLocked.value || contextLocked.value || requiresReview.value || active.value === section) return

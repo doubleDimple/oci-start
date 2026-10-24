@@ -17,6 +17,8 @@ import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * @author doubleDimple
@@ -31,6 +33,23 @@ public class LogServiceImpl implements LogService {
     private Executor sseLogExecutor;
 
     private static final String LOG_RELATIVE_PATH = "logs/application.log"; // 日志相对路径
+    private static final Pattern LOGGER_NAME = Pattern.compile("(?:^|\\s)(?:[\\w$]+\\.)*([\\w$]+)$");
+    private static final Pattern TASK_ID = Pattern.compile(
+            "(?:^|[^A-Za-z0-9_])taskid\\s*[=:：]\\s*[A-Za-z0-9][A-Za-z0-9_-]*", Pattern.CASE_INSENSITIVE);
+
+    /** Both history and live output include task-tagged OCI execution logs already written to the shared file. */
+    private static boolean isBootLogLine(String line) {
+        int separator = line.indexOf(" - ");
+        if (separator < 0) return false;
+        Matcher logger = LOGGER_NAME.matcher(line.substring(0, separator).trim());
+        if (!logger.find()) return false;
+        String name = logger.group(1);
+        if ("OciLogBuilder".equals(name) || "OciErrorBuilder".equals(name)) return true;
+        if (!"OracleCloudService".equals(name) && !"CreateInstanceTaskV2".equals(name)
+                && !"StartBootInstanceTask".equals(name)) return false;
+        // Inspect the message only; another logger mentioning these class names is not a boot event.
+        return TASK_ID.matcher(line.substring(separator + 3)).find();
+    }
 
     @Override
     public List<String> getLatestLogLines(int lineCount, boolean isBootLog) {
@@ -48,7 +67,7 @@ public class LogServiceImpl implements LogService {
             while ((line = reader.readLine()) != null && logLines.size() < lineCount) {
                 currentLogBlock.add(0, line);
                 if (line.matches("^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}.*")) {
-                    if (!isBootLog || currentLogBlock.get(0).contains("OciLogBuilder")) {
+                    if (!isBootLog || isBootLogLine(currentLogBlock.get(0))) {
                         logLines.addAll(0, currentLogBlock);
                     }
                     currentLogBlock.clear();
@@ -87,7 +106,7 @@ public class LogServiceImpl implements LogService {
             public void handle(String line) {
                 if (closed.get()) return;
                 try {
-                    if (!isBootLog || line.contains("OciLogBuilder") || line.contains("OciErrorBuilder")) {
+                    if (!isBootLog || isBootLogLine(line)) {
                         emitter.send(line);
                     }
                 } catch (Exception e) {

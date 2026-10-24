@@ -8,11 +8,13 @@ import com.doubledimple.ociserver.pojo.request.GoogleUser;
 import com.doubledimple.ociserver.service.impl.system.SystemConfigService;
 import com.doubledimple.ociserver.service.login.LoginUserService;
 import com.doubledimple.ociserver.service.login.LoginFailureGuard;
+import com.doubledimple.ociserver.service.login.GlobalLoginGuard;
 import com.doubledimple.ociserver.config.exception.IpBannedException;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import cn.dev33.satoken.stp.StpUtil;
 import org.springframework.http.HttpEntity;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -61,6 +63,8 @@ public class GoogleLoginController extends BaseController {
 
     @Resource
     private LoginFailureGuard loginFailureGuard;
+    @Resource
+    private GlobalLoginGuard globalLoginGuard;
 
     private static final Map<String, Long> STATE_CACHE = new ConcurrentHashMap<>();
 
@@ -73,6 +77,7 @@ public class GoogleLoginController extends BaseController {
     @ResponseBody
     public ResponseEntity<String> getGoogleLoginUrl(@RequestParam(name = "remember-me",required = false) String rememberMe) {
         try {
+            globalLoginGuard.assertAllowed();
             GoogleConfig config = systemConfigService.getGoogleConfig();
             if (!config.isEnabled()) {
                 return ResponseEntity.badRequest().body("Google Sign-in is not enabled.");
@@ -88,7 +93,10 @@ public class GoogleLoginController extends BaseController {
                     URLEncoder.encode(config.getRedirectUri(), StandardCharsets.UTF_8.name()),
                     state
             );
-            return ResponseEntity.ok(url);
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(url);
+        } catch (GlobalLoginGuard.LoginGuardException e) {
+            return ResponseEntity.status(e.isBlocked() ? HttpStatus.FORBIDDEN : HttpStatus.SERVICE_UNAVAILABLE)
+                    .cacheControl(CacheControl.noStore()).body(e.getMessage());
         } catch (Exception e) {
             log.error("获取Google登录URL失败", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -104,7 +112,9 @@ public class GoogleLoginController extends BaseController {
                                @RequestParam String state,
                                HttpServletRequest request,
                                HttpServletResponse response) throws IOException {
+        response.setHeader("Cache-Control", "no-store");
         try {
+            globalLoginGuard.assertAllowed();
             String clientIp = loginFailureGuard.assertAllowed(request);
             log.info("Receiving Google callback. Code len: {}, State: {}", code.length(), state);
             Long expireTime = STATE_CACHE.get(state);
@@ -141,18 +151,20 @@ public class GoogleLoginController extends BaseController {
             );
 
             boolean isRememberMe = state.endsWith("_true") || state.endsWith("_on");
-            StpUtil.login(localUser.getUsername(), isRememberMe);
-            try {
-                loginFailureGuard.loginSucceeded(clientIp);
-            } catch (RuntimeException e) {
-                StpUtil.logout();
-                throw e;
-            }
+            boolean[] sessionAttempted = {false};
+            loginFailureGuard.withLoginLock(clientIp, () -> globalLoginGuard.completeLogin(() -> {
+                loginFailureGuard.loginSucceededInCurrentTransaction(clientIp);
+                sessionAttempted[0] = true;
+                StpUtil.login(localUser.getUsername(), isRememberMe);
+            }, () -> { if (sessionAttempted[0]) StpUtil.logout(); }));
             log.info("Google login success, user={}, rememberMe={}", localUser.getUsername(), isRememberMe);
 
             String redirectUrl = isMobileRequest(request) ? "/m/tenants" : "/index";
             response.sendRedirect(redirectUrl);
 
+        } catch (GlobalLoginGuard.LoginGuardException e) {
+            String loginUrl = isMobileRequest(request) ? "/m/login" : "/login";
+            response.sendRedirect(loginUrl + "?error=" + URLEncoder.encode(e.getMessage(), StandardCharsets.UTF_8.name()));
         } catch (IpBannedException e) {
             throw e;
         } catch (Exception e) {

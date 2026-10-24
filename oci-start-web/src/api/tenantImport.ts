@@ -54,6 +54,9 @@ type ImportErrorKey =
   | 'tenantImport.incompleteGcp'
   | 'tenantImport.invalidResponse'
   | 'tenantImport.requestFailed'
+  | 'tenantImport.invalidDowngradeTenant'
+  | 'tenantImport.backupInvalid'
+  | 'tenantImport.backupRequired'
 
 class TenantImportValidationError extends Error {
   constructor(
@@ -64,6 +67,88 @@ class TenantImportValidationError extends Error {
     super(translationKey)
     this.name = 'TenantImportValidationError'
   }
+}
+
+class TenantImportRejectedError extends Error {}
+
+export interface TenantDowngradeSource {
+  id: string
+  userId: string
+  tenancy: string
+  name: string
+  region: string
+}
+
+export function isLocalTenantId(value: unknown): value is string {
+  return typeof value === 'string' && /^[1-9]\d{0,18}$/.test(value)
+    && (value.length < 19 || value <= '9223372036854775807')
+}
+
+/** Export uses Long IDs. Preserve them before parsing, including regional children. */
+function decodeBackup(raw: unknown): unknown {
+  if (typeof raw !== 'string') return raw
+  try {
+    return JSON.parse(raw.replace(/"(?:\\.|[^"\\])*"|(-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?)/g,
+      (token: string, number?: string) => number && /^-?\d{16,}$/.test(number) ? JSON.stringify(number) : token))
+  } catch { throw new TenantImportValidationError('tenantImport.backupInvalid') }
+}
+
+export async function sendTenantBackupCode(signal?: AbortSignal): Promise<void> {
+  await tenantPost('/tenants/verify/sendExportCode', undefined, { signal })
+}
+
+export async function loadTenantDowngradeBackup(source: TenantDowngradeSource, code: string, signal?: AbortSignal): Promise<Blob> {
+  const verificationCode = code.trim().toUpperCase()
+  if (!isLocalTenantId(source.id) || !nonEmpty(source.userId) || !nonEmpty(source.tenancy) || !/^[A-Z0-9]{8}$/.test(verificationCode)) {
+    throw new TenantImportValidationError('tenantImport.backupInvalid')
+  }
+  const raw = await tenantGet<unknown>('/tenants/exportByTenant', { id: source.id }, {
+    signal, headers: { 'X-Verify-Code': verificationCode }, responseType: 'text', transformResponse: [(value: unknown) => value],
+  })
+  const body = decodeBackup(raw)
+  if (isObject(body) && body.success === false) throw new TenantImportRejectedError(backendMessage(body) || i18n.global.t('tenantImport.requestFailed'))
+  const idOf = (row: Record<string, unknown>) => {
+    const id = row.id
+    return isLocalTenantId(id) ? id : typeof id === 'number' && Number.isSafeInteger(id) && id > 0 ? String(id) : ''
+  }
+  const validRecord = (row: unknown): boolean => isObject(row) && Boolean(idOf(row))
+    && (!nonEmpty(row.id_str) || row.id_str === idOf(row))
+    && row.tenant_id === source.userId && row.tenancy === source.tenancy
+    && nonEmpty(row.fingerprint) && nonEmpty(row.region) && nonEmpty(row.key_file_content)
+    && (row.permission_mode == null || row.permission_mode === '') && Number(row.cloud_type) === 1
+    && (row.children == null || (Array.isArray(row.children) && row.children.every(validRecord)))
+  if (!Array.isArray(body) || body.length !== 1 || !validRecord(body[0]) || idOf(body[0]) !== source.id) {
+    // Never include exported data or private key fragments in an error.
+    throw new TenantImportValidationError('tenantImport.backupInvalid')
+  }
+  return new Blob([typeof raw === 'string' ? raw : JSON.stringify(body, null, 2)], { type: 'application/json' })
+}
+
+export async function downgradeTenantCredentials(
+  tenantId: string, options: RestrictedTenantOptions, backupConfirmed: boolean, signal?: AbortSignal,
+): Promise<string[]> {
+  if (!backupConfirmed) throw new TenantImportValidationError('tenantImport.backupRequired')
+  if (!isLocalTenantId(tenantId) || !options.managedUserName.trim() || !options.permissions.includes('BASIC_READ')) {
+    throw new TenantImportValidationError('tenantImport.invalidDowngradeTenant')
+  }
+  const body = await tenantPost<unknown>('/tenants/restricted/downgrade', {
+    tenantId, managedUserName: options.managedUserName.trim(), permissions: JSON.stringify(options.permissions),
+    accountScope: JSON.stringify(options.accountScope), backupConfirmed: true,
+  }, { signal, timeout: 0 })
+  if (!isObject(body) || body.success !== true) {
+    if (isObject(body) && body.success === false) {
+      throw new TenantImportRejectedError(backendMessage(body) || i18n.global.t('tenantImport.requestFailed'))
+    }
+    throw new TenantImportValidationError('tenantImport.invalidResponse')
+  }
+  const warnings = isObject(body.data) ? body.data.cleanupWarnings : undefined
+  if (warnings === undefined) return []
+  // A confirmed success must stay successful even if warning metadata is malformed.
+  // Read only the documented string list, never stringify response objects or credentials.
+  if (!Array.isArray(warnings) || warnings.some(value => typeof value !== 'string')) {
+    return [i18n.global.t('tenantImport.cleanupWarningsUnavailable')]
+  }
+  return warnings.filter(nonEmpty).map(value => value.trim())
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -231,7 +316,9 @@ export async function saveTenantCredentials(
     timeout: 0,
   })
   if (!isObject(body) || body.success !== true) {
-    if (isObject(body) && nonEmpty(body.error)) throw new Error(body.error)
+    if (isObject(body) && body.success === false) {
+      throw new TenantImportRejectedError(backendMessage(body) || i18n.global.t('tenantImport.requestFailed'))
+    }
     throw new TenantImportValidationError('tenantImport.invalidResponse')
   }
 }
@@ -243,6 +330,24 @@ function backendMessage(body: unknown): string {
     if (nonEmpty(body[key])) return body[key]
   }
   return ''
+}
+
+/** Distinguish an explicit rejection from a write whose response cannot establish its outcome. */
+export function tenantImportOutcomeUnknown(error: unknown): boolean {
+  if (error instanceof TenantImportRejectedError) return false
+  if (error instanceof TenantImportValidationError) return error.translationKey === 'tenantImport.invalidResponse'
+  // The shared Axios interceptor rejects business errors with the original JSON body.
+  if (isObject(error) && error.success === false) return false
+  if (isAxiosError(error)) {
+    const body: unknown = error.response?.data
+    if (isObject(body) && body.success === false) return false
+    const status = error.response?.status
+    if (typeof status === 'number' && status > 0) return status >= 500 || status === 408
+    if (['ECONNABORTED', 'ETIMEDOUT', 'ERR_NETWORK', 'ERR_CANCELED'].includes(error.code || '')) return true
+    // An Axios setup error without a request was rejected before submission.
+    return Boolean(error.request)
+  }
+  return true
 }
 
 export function tenantImportError(error: unknown): string {

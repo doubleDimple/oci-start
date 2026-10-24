@@ -2,6 +2,9 @@ package com.doubledimple.ociserver.controller;
 
 import com.doubledimple.ociserver.service.mfa.MfaBackupService;
 import com.doubledimple.ociserver.service.mfa.MfaImportCodec;
+import com.doubledimple.ociserver.config.context.UserContext;
+import com.doubledimple.ociserver.service.VerifyService;
+import com.doubledimple.ociserver.service.security.ExportVerificationGuard;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -20,6 +23,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.annotation.Resource;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -40,6 +44,7 @@ public class MfaBackupController {
             "notFound", "conflict", "limitExceeded", "requestFailed", "unauthorized", "forbidden"));
     private final MfaBackupService service;
     private final MfaImportCodec codec;
+    @Resource private VerifyService verifyService;
 
     public MfaBackupController(MfaBackupService service, MfaImportCodec codec) { this.service = service; this.codec = codec; }
 
@@ -100,7 +105,20 @@ public class MfaBackupController {
     }
 
     @PostMapping("/export")
-    public Map<String, Object> export(@RequestBody Map<String, Object> body) {
+    @AuditLog(title = "导出 MFA 备份", saveParams = false, saveResponse = false)
+    public Map<String, Object> export(@RequestBody Map<String, Object> body,
+            HttpServletRequest request, HttpServletResponse response) {
+        try {
+            verifyService.checkCodeForExport(UserContext.getUsername(), request.getHeader("X-Verify-Code"));
+        } catch (ExportVerificationGuard.ExportVerificationException exception) {
+            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("success", false);
+            result.put("errorKey", "forbidden");
+            result.put("message", exception.getMessage());
+            result.put("writeAttempted", false);
+            return result;
+        }
         return success(service.exportEntries(ids(body, MfaBackupService.MAX_ENTRIES)));
     }
 

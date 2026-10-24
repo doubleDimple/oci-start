@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.net.InetAddress;
 import java.util.function.Function;
@@ -52,6 +53,25 @@ public class LoginIpTransactions {
         synchronized (lock) {
             return transaction.execute(status -> operation.apply(address));
         }
+    }
+
+    /** Hold the existing IP monitor across a caller-owned transaction without acquiring a connection. */
+    public <T> T withLock(String ip, Function<String, T> operation) {
+        String address = normalizeIp(ip);
+        Object lock = locks[(address.hashCode() & Integer.MAX_VALUE) % locks.length];
+        synchronized (lock) {
+            return operation.apply(address);
+        }
+    }
+
+    /** Only final login completion may join the global transaction, with the IP monitor held until commit. */
+    public <T> T executeInCurrentTransaction(String ip, Function<String, T> operation) {
+        String address = normalizeIp(ip);
+        Object lock = locks[(address.hashCode() & Integer.MAX_VALUE) % locks.length];
+        if (!Thread.holdsLock(lock) || !TransactionSynchronizationManager.isActualTransactionActive()) {
+            throw new IllegalStateException("Login completion requires the IP lock and an active transaction");
+        }
+        return operation.apply(address);
     }
 
     /**

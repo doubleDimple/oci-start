@@ -60,7 +60,7 @@ function dateLabel(value: string | null) {
   const date = new Date(Date.UTC(values[0]!, values[1]! - 1, values[2]!, values[3]!, values[4]!, values[5]!))
   return new Intl.DateTimeFormat(locale.value, { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'UTC' }).format(date)
 }
-function errorLabel(error: MfaApiError | null) { return error ? t(`mfaBackup.errors.${error.key}`) : '' }
+function errorLabel(error: MfaApiError | null) { return error ? error.detail || t(`mfaBackup.errors.${error.key}`) : '' }
 function codeLabel(id: string) {
   const code = page.codeFor(id)
   return code ? `${code.slice(0, 3)} ${code.slice(3)}` : t(page.codeErrorFor(id) ? 'mfaBackup.codeFailed' : codesLoading.value ? 'mfaBackup.codeLoading' : 'mfaBackup.codeExpired')

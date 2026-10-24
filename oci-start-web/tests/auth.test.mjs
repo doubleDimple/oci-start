@@ -8,7 +8,7 @@ const source = await readFile(new URL('../src/api/auth.ts', import.meta.url), 'u
 const { outputText } = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } })
 const auth = await import(`data:text/javascript;base64,${Buffer.from(outputText).toString('base64')}`)
 const config = { siteLogoName: 'OCI', publicKey: 'key', allowRegister: false, githubEnabled: false, googleEnabled: false, turnstileEnabled: false, turnstileSiteKey: '', messageEnabled: false, mfaEnabled: false, locale: 'zh_CN' }
-const values = { username: 'test', password: 'test-password', remember: true, method: 'message', verificationCode: '654321', mfaCode: '123456', turnstileToken: 'challenge-token' }
+const values = { username: 'test', password: 'test-password', remember: true, method: 'message', verificationCode: 'AB12CD34', mfaCode: '123456', turnstileToken: 'challenge-token' }
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 
 function response(t, result) { t.mock.method(globalThis, 'fetch', async () => result) }
@@ -21,6 +21,19 @@ test('all verification configurations submit only the selected enabled factor', 
     assert.equal(body.has('verificationCode'), messageEnabled && method === 'message')
     assert.equal(body.has('mfaCode'), mfaEnabled && method === 'mfa')
   }
+})
+
+test('message login codes accept eight ASCII letters/numbers, normalize lowercase, and leave MFA unchanged', () => {
+  assert.equal(auth.normalizeLoginVerificationCode(' ab12cd34 '), 'AB12CD34')
+  assert.equal(auth.isLoginVerificationCode(' ab12cd34 '), true)
+  for (const code of ['654321', 'ABC1234', 'ABC123456', 'AB12-CD3', 'AB12 CD3', 'ＡＢ１２ＣＤ３４', '中文AB1234']) {
+    assert.equal(auth.isLoginVerificationCode(code), false)
+  }
+  const message = auth.loginPayload({ ...values, verificationCode: ' ab12cd34 ' }, { ...config, messageEnabled: true }, () => 'encrypted')
+  assert.equal(message.get('verificationCode'), 'AB12CD34')
+  const mfa = auth.loginPayload({ ...values, method: 'mfa' }, { ...config, messageEnabled: true, mfaEnabled: true }, () => 'encrypted')
+  assert.equal(mfa.get('mfaCode'), '123456')
+  assert.equal(mfa.has('verificationCode'), false)
 })
 
 test('encryption failure never returns a plaintext payload; challenge token is included only when enabled', () => {
@@ -119,4 +132,32 @@ test('unmount cancellation reaches fetch and retains AbortError instead of repor
 
 test('disabled password recovery has no callable API client exports', () => {
   for (const name of ['sendResetCode', 'verifyResetCode', 'resetPassword']) assert.equal(name in auth, false)
+})
+
+test('bootstrap supports legacy payloads and validates optional server-wide login status fields', async t => {
+  const fetch = t.mock.method(globalThis, 'fetch', async () => json(config))
+  assert.equal((await auth.fetchAuthBootstrap('zh')).loginBlocked, undefined)
+  const locked = { ...config, loginBlocked: true, loginBlockedUntil: '2026-10-25T00:00+08:00', loginBlockedMessage: 'New logins paused' }
+  fetch.mock.mockImplementation(async () => json(locked))
+  assert.deepEqual(await auth.fetchAuthBootstrap('en'), locked)
+  for (const invalid of [{ loginBlocked: 'false' }, { loginBlockedUntil: 123 }, { loginBlockedMessage: {} }]) {
+    fetch.mock.mockImplementation(async () => json({ ...locked, ...invalid }))
+    await assert.rejects(auth.fetchAuthBootstrap('zh'), { key: 'invalidResponse' })
+  }
+})
+
+test('blocked login responses retain the status, deadline and safe message without redirecting', async t => {
+  response(t, json({ success: false, message: 'New logins paused', loginBlocked: true, loginBlockedUntil: '2026-10-25T00:00+08:00' }, 403))
+  await assert.rejects(auth.signIn(new URLSearchParams()), { key: 'failed', detail: 'New logins paused', status: 403, loginBlocked: true, loginBlockedUntil: '2026-10-25T00:00+08:00' })
+})
+
+test('OAuth and code-sending security failures preserve safe server text and HTTP status', async t => {
+  const fetch = t.mock.method(globalThis, 'fetch', async () => new Response('Login state unavailable', { status: 503 }))
+  await assert.rejects(auth.sendLoginCode('existing'), { key: 'failed', detail: 'Login state unavailable', status: 503 })
+  fetch.mock.mockImplementation(async () => new Response('New logins paused', { status: 403 }))
+  await assert.rejects(auth.oauthLoginUrl('google', false), { key: 'failed', detail: 'New logins paused', status: 403 })
+  fetch.mock.mockImplementation(async () => json({ message: 'New logins paused' }, 403))
+  await assert.rejects(auth.oauthLoginUrl('github', false), { key: 'failed', detail: 'New logins paused', status: 403 })
+  fetch.mock.mockImplementation(async () => new Response('<html>Gateway error</html>', { status: 503 }))
+  await assert.rejects(auth.oauthLoginUrl('google', false), { key: 'failed', detail: '', status: 503 })
 })

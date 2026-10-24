@@ -259,7 +259,7 @@ public class TenantServiceImpl implements TenantService {
                 parent.setIdStr(parent.getId().toString());
                 String regionName = RegionEnum.getNameByCode(parent.getRegion());
                 parent.setRegion(regionName);
-                Optional<RegisterDetail> byTenantId = registerDetailRepository.findByTenantId(parent.getTenantId());
+                Optional<RegisterDetail> byTenantId = registerDetailRepository.findForTenant(parent.getId(), parent.getTenantId());
                 if (byTenantId.isPresent()){
                     RegisterDetail registerDetail = byTenantId.get();
                     parent.setRegisterDetail(registerDetail);
@@ -441,7 +441,7 @@ public class TenantServiceImpl implements TenantService {
         parent.setIdStr(parent.getId().toString());
         String regionName = RegionEnum.getNameByCode(parent.getRegion());
         parent.setRegion(regionName);
-        Optional<RegisterDetail> byTenantId = registerDetailRepository.findByTenantId(parent.getTenantId());
+        Optional<RegisterDetail> byTenantId = registerDetailRepository.findForTenant(parent.getId(), parent.getTenantId());
         if (byTenantId.isPresent()){
             RegisterDetail registerDetail = byTenantId.get();
             parent.setRegisterDetail(registerDetail);
@@ -1967,7 +1967,7 @@ public class TenantServiceImpl implements TenantService {
                 String regionName = RegionEnum.getNameByCode(parent.getRegion());
                 parent.setRegion(regionName);
                 parent.setIdStr(String.valueOf(parent.getId()));
-                Optional<RegisterDetail> byTenantId = registerDetailRepository.findByTenantId(parent.getTenantId());
+                Optional<RegisterDetail> byTenantId = registerDetailRepository.findForTenant(parent.getId(), parent.getTenantId());
                 if (byTenantId.isPresent()){
                     RegisterDetail registerDetail = byTenantId.get();
                     parent.setRegisterDetail(registerDetail);
@@ -2100,8 +2100,14 @@ public class TenantServiceImpl implements TenantService {
         Map<String, RegisterDetail> registerDetailMap = registerDetails.stream()
                 .collect(Collectors.toMap(RegisterDetail::getTenantId, detail -> detail, (existing, replacement) -> existing));
 
+        List<Long> localIds = content.stream().map(Tenant::getId).collect(Collectors.toList());
+        Map<Long, RegisterDetail> localRegisterDetails = registerDetailRepository.findByTenantPrvIdIn(localIds).stream()
+                .collect(Collectors.toMap(RegisterDetail::getTenantPrvId, detail -> detail,
+                        (a, b) -> a.getId() >= b.getId() ? a : b));
+
         for (Tenant tenant : content) {
-            RegisterDetail registerDetail = registerDetailMap.get(tenant.getTenantId());
+            RegisterDetail registerDetail = localRegisterDetails.getOrDefault(tenant.getId(),
+                    registerDetailMap.get(tenant.getTenantId()));
 
             if (registerDetail != null) {
                 tenant.setRegisterDetail(registerDetail);

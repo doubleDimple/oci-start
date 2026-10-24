@@ -2,6 +2,8 @@ package com.doubledimple.ociserver.config;
 
 import com.doubledimple.ociserver.config.exception.GlobalExceptionHandler;
 import com.doubledimple.ociserver.config.exception.IpBannedException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -31,7 +33,12 @@ class GlobalExceptionHandlerTest {
         assertEquals(403, response.getStatus());
         assertEquals("no-store", response.getHeader("Cache-Control"));
         assertEquals("application/json;charset=UTF-8", response.getContentType());
-        assertEquals("{\"code\":403,\"message\":\"访问被拒绝\"}", response.getContentAsString());
+        JsonNode body = new ObjectMapper().readTree(response.getContentAsString());
+        assertEquals(403, body.path("code").asInt());
+        assertFalse(body.path("success").asBoolean(true));
+        assertFalse(body.path("message").asText().isEmpty());
+        assertFalse(response.getContentAsString().contains("private ban reason"));
+        assertFalse(response.getContentAsString().contains("192.0.2.1"));
         assertNull(response.getRedirectedUrl());
     }
 

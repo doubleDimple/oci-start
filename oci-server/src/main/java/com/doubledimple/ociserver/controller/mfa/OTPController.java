@@ -4,6 +4,9 @@ import cn.hutool.core.util.StrUtil;
 import com.doubledimple.dao.entity.OTPKey;
 import com.doubledimple.dao.repository.OTPKeyRepository;
 import com.doubledimple.ociserver.controller.BaseController;
+import com.doubledimple.ociserver.config.context.UserContext;
+import com.doubledimple.ociserver.service.VerifyService;
+import com.doubledimple.ociserver.service.security.ExportVerificationGuard;
 import com.doubledimple.ociserver.pojo.request.OtpBatchRequest;
 import com.doubledimple.ociserver.pojo.response.OtpResponse;
 import com.doubledimple.ociserver.pojo.response.OtpResponse2;
@@ -30,6 +33,7 @@ import org.springframework.web.multipart.MultipartFile;
 import javax.annotation.Resource;
 import javax.imageio.ImageIO;
 import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpServletRequest;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -51,6 +55,8 @@ public class OTPController  extends BaseController {
 
     @Resource
     private OTPService otpService;
+    @Resource
+    private VerifyService verifyService;
 
     @Resource
     private QRCodeService qrCodeService;
@@ -248,7 +254,21 @@ public class OTPController  extends BaseController {
     }
 
     @GetMapping("/export-data")
-    public void exportToCSV(HttpServletResponse response) throws IOException {
+    public void exportToCSV(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        response.setHeader("Cache-Control", "no-store");
+        try {
+            verifyService.checkCodeForExport(UserContext.getUsername(), request.getHeader("X-Verify-Code"));
+        } catch (ExportVerificationGuard.ExportVerificationException exception) {
+            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+            response.setContentType("text/plain;charset=UTF-8");
+            response.getWriter().write(exception.getMessage());
+            return;
+        } catch (Exception exception) {
+            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            response.setContentType("text/plain;charset=UTF-8");
+            response.getWriter().write("导出验证未完成，请稍后重试");
+            return;
+        }
         response.setContentType("text/csv;charset=UTF-8");
         response.setHeader("Cache-Control", "no-store");
         response.setHeader("Content-Disposition", "attachment; filename=\"otp_keys.csv\"");

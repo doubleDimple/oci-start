@@ -94,6 +94,22 @@ public class LoginAttemptService {
         });
     }
 
+    public void withLoginLock(String ip, Runnable operation) {
+        transactions.withLock(ip, address -> {
+            operation.run();
+            return null;
+        });
+    }
+
+    /** The caller holds the IP monitor around the entire global-login transaction and its commit. */
+    public void loginSucceededInCurrentTransaction(String ip) {
+        transactions.executeInCurrentTransaction(ip, address -> {
+            assertNotBanned(address);
+            clearFailures(address);
+            return null;
+        });
+    }
+
     public void reset(String ip) {
         transactions.execute(ip, address -> {
             clearFailures(address);

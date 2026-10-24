@@ -3,7 +3,8 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { applyDocumentLocale, LOCALE_STORAGE_KEY } from '@/i18n'
 import { setTheme, theme, type ThemePreference } from '@/composables/useTheme'
-import { AuthError, fetchAuthBootstrap, loginPayload, oauthLoginUrl, registerAccount, sendLoginCode, signIn, type AuthBootstrap } from '@/api/auth'
+import { AuthError, fetchAuthBootstrap, isLoginVerificationCode, loginPayload, normalizeLoginVerificationCode, oauthLoginUrl, registerAccount, sendLoginCode, signIn, type AuthBootstrap } from '@/api/auth'
+import { copyCredentialText, generateInitialCredentials, isReservedRegistrationUsername } from '@/utils/initialCredentials'
 // 忘记密码已停用；恢复时须同步评审后台路由和登录白名单。
 // import { resetPassword, sendResetCode, verifyResetCode } from '@/api/auth'
 import JSEncrypt from './vendor/jsencrypt'
@@ -20,15 +21,24 @@ const root = ref<HTMLElement>()
 const config = ref<AuthBootstrap>()
 const configLoading = ref(true)
 const configError = ref<unknown>()
+const configRefreshing = ref(false)
+const loginStateUnavailable = ref(false)
 const tab = ref<'login' | 'register'>('login')
 const busy = ref(false)
 const oauthBusy = ref<'github' | 'google' | ''>('')
 const showPassword = ref(false)
 const form = reactive({ username: '', password: '', remember: false, method: 'message' as 'message' | 'mfa', verificationCode: '', mfaCode: '', turnstileToken: '' })
 const registration = reactive({ username: '', password: '', confirmation: '' })
+const registrationNotice = ref<{ type: 'success' | 'error'; key: string }>()
+const copyingCredentials = ref(false)
+const showRegistrationPassword = ref(false)
+const reservedRegistrationName = computed(() => isReservedRegistrationUsername(registration.username))
+let registrationInitialized = false
 const notice = ref<{ type: 'success' | 'error'; key?: string; detail?: string }>()
 const challenge = ref<InstanceType<typeof TurnstileChallenge>>()
 const allowed = computed(() => !!config.value && (!config.value.turnstileEnabled || !!form.turnstileToken))
+const loginBlocked = computed(() => config.value?.loginBlocked === true)
+const loginDisabled = computed(() => !allowed.value || loginBlocked.value || loginStateUnavailable.value || configRefreshing.value)
 const messageVisible = computed(() => config.value?.messageEnabled && form.method === 'message')
 const mfaVisible = computed(() => config.value?.mfaEnabled && form.method === 'mfa')
 const sending = ref(false)
@@ -63,6 +73,7 @@ async function loadConfig(blocking = true) {
   bootstrapController?.abort()
   const controller = new AbortController()
   bootstrapController = controller
+  configRefreshing.value = true
   if (blocking) { configLoading.value = true; configError.value = undefined }
   try {
     const loaded = await fetchAuthBootstrap(language.value, controller.signal)
@@ -71,14 +82,32 @@ async function loadConfig(blocking = true) {
       form.method = loaded.messageEnabled ? 'message' : 'mfa'
     }
     config.value = loaded
+    loginStateUnavailable.value = false
     if (!loaded.allowRegister) tab.value = 'login'
   } catch (error) {
     if (!disposed && !controller.signal.aborted) {
+      loginStateUnavailable.value = true
       if (blocking) configError.value = error
       else showError(error)
     }
   }
-  finally { if (!disposed && !controller.signal.aborted) configLoading.value = false }
+  finally { if (!disposed && !controller.signal.aborted) { configLoading.value = false; configRefreshing.value = false } }
+}
+async function refreshLoginStatus() {
+  if (configRefreshing.value) return
+  await loadConfig(false)
+  if (!disposed && !loginStateUnavailable.value && !loginBlocked.value) notice.value = undefined
+}
+async function refreshAfterLoginError(error: unknown) {
+  if (disposed) return
+  if (error instanceof AuthError && error.loginBlocked && config.value) {
+    config.value = { ...config.value, loginBlocked: true, loginBlockedUntil: error.loginBlockedUntil, loginBlockedMessage: error.detail }
+  }
+  if (error instanceof AuthError && error.status === 503) loginStateUnavailable.value = true
+  showError(error)
+  const failureNotice = notice.value
+  await loadConfig(false)
+  if (!disposed) notice.value = failureNotice
 }
 function changeLocale(value: 'zh' | 'en') {
   locale.value = value
@@ -91,12 +120,23 @@ function changeLocale(value: 'zh' | 'en') {
 }
 function toggleAppearance() { setTheme(theme.value === 'dark' ? 'light' : 'dark') }
 function changeMethod(method: 'message' | 'mfa') { form.method = method; form.verificationCode = ''; form.mfaCode = '' }
+function setVerificationCode(event: Event) {
+  const input = event.target as HTMLInputElement
+  form.verificationCode = normalizeLoginVerificationCode(input.value)
+  input.value = form.verificationCode
+}
 function validate(formId: string) {
   const element = root.value?.querySelector<HTMLFormElement>(`#${formId}`)
   return !!element?.reportValidity()
 }
 async function submitLogin() {
-  if (busy.value || !allowed.value || !config.value || !validate('loginForm')) return
+  if (busy.value || loginDisabled.value || !config.value) return
+  if (messageVisible.value && !isLoginVerificationCode(form.verificationCode)) {
+    notice.value = { type: 'error', key: 'login.message.code.invalid' }
+    root.value?.querySelector<HTMLInputElement>('#verificationCode')?.focus()
+    return
+  }
+  if (!validate('loginForm')) return
   busy.value = true
   notice.value = undefined
   try {
@@ -107,33 +147,72 @@ async function submitLogin() {
     if (!disposed) window.location.assign(target)
   } catch (error) {
     if (disposed) return
-    showError(error)
-    const failureNotice = notice.value
     if (config.value.turnstileEnabled) challenge.value?.reset()
     // A timed-out login may have succeeded server-side and consumed its RSA key.
     // Refresh the key in place so a retry can work without losing entered fields.
-    await loadConfig(false)
-    if (!disposed) notice.value = failureNotice
+    await refreshAfterLoginError(error)
   } finally { if (!disposed) busy.value = false }
 }
 async function submitRegistration() {
-  if (busy.value || !config.value?.allowRegister || !validate('registerForm')) return
+  if (busy.value || !config.value?.allowRegister) return
+  if (reservedRegistrationName.value) {
+    registrationNotice.value = { type: 'error', key: 'login.credentials.reservedUsername' }
+    root.value?.querySelector<HTMLInputElement>('#registerUsername')?.focus()
+    return
+  }
+  const username = registration.username.trim()
+  registration.username = username
+  if (!validate('registerForm')) return
   if (registration.password !== registration.confirmation) { notice.value = { type: 'error', key: 'login.notMatch.password' }; return }
   busy.value = true
   notice.value = undefined
   try {
-    await registerAccount(registration.username, registration.password, lifetime.signal)
+    await registerAccount(username, registration.password, lifetime.signal)
     if (disposed) return
-    form.username = registration.username
+    form.username = username
     registration.password = registration.confirmation = ''
+    showRegistrationPassword.value = false
+    registrationNotice.value = undefined
     tab.value = 'login'
     notice.value = { type: 'success', key: 'login.register.success' }
     await loadConfig()
   } catch (error) { showError(error) }
   finally { if (!disposed) busy.value = false }
 }
+function regenerateRegistration() {
+  if (!config.value?.allowRegister || busy.value || copyingCredentials.value) return
+  try {
+    const generated = generateInitialCredentials()
+    Object.assign(registration, generated, { confirmation: generated.password })
+    registrationNotice.value = undefined
+  } catch {
+    registrationNotice.value = { type: 'error', key: 'login.credentials.generateFailed' }
+  }
+}
+async function copyRegistration(field: 'username' | 'password') {
+  if (!config.value?.allowRegister || busy.value || copyingCredentials.value || !registration[field]) return
+  if (field === 'username') registration.username = registration.username.trim()
+  copyingCredentials.value = true
+  try {
+    const copied = await copyCredentialText(registration[field])
+    if (!disposed) registrationNotice.value = { type: copied ? 'success' : 'error', key: copied ? 'login.credentials.copied' : 'login.credentials.copyFailed' }
+  } finally {
+    if (!disposed) copyingCredentials.value = false
+  }
+}
+watch([tab, () => config.value?.allowRegister], ([current, permitted]) => {
+  if (permitted === false) {
+    registration.password = registration.confirmation = ''
+    showRegistrationPassword.value = false
+    registrationNotice.value = undefined
+    return
+  }
+  if (current !== 'register' || !permitted || registrationInitialized) return
+  registrationInitialized = true
+  if (!registration.username && !registration.password && !registration.confirmation) regenerateRegistration()
+})
 async function sendCode() {
-  if (sending.value || countdown.value || !allowed.value) return
+  if (sending.value || countdown.value || loginDisabled.value) return
   if (!form.username.trim()) { notice.value = { type: 'error', key: 'login.username.placeholder' }; root.value?.querySelector<HTMLInputElement>('#username')?.focus(); return }
   sending.value = true
   try {
@@ -142,16 +221,16 @@ async function sendCode() {
     sendUntil.value = Date.now() + 60000
     now.value = Date.now()
     notice.value = { type: 'success', key: 'login.input.code.success' }
-  } catch (error) { showError(error) }
+  } catch (error) { await refreshAfterLoginError(error) }
   finally { if (!disposed) sending.value = false }
 }
 async function oauth(provider: 'github' | 'google') {
-  if (oauthBusy.value || !allowed.value) return
+  if (oauthBusy.value || loginDisabled.value) return
   oauthBusy.value = provider
   try {
     const url = await oauthLoginUrl(provider, form.remember, lifetime.signal)
     if (!disposed) window.location.assign(url)
-  } catch (error) { showError(error) }
+  } catch (error) { await refreshAfterLoginError(error) }
   finally { if (!disposed) oauthBusy.value = '' }
 }
 /* 忘记密码交互及请求调用已停用，保留实现供后续评审。
@@ -249,6 +328,8 @@ onMounted(() => {
 })
 onBeforeUnmount(() => {
   disposed = true
+  registration.password = registration.confirmation = ''
+  registrationNotice.value = undefined
   lifetime.abort()
   bootstrapController?.abort()
   // resetBodyController.value?.abort()
@@ -283,10 +364,16 @@ onBeforeUnmount(() => {
           <h1>{{ copy.welcome }}</h1>
           <p class="lede">{{ copy.lede }}</p>
         </div>
-        <div v-if="notice" id="loginRedirectError" class="message" :class="`${notice.type}-message`" :role="notice.type === 'error' ? 'alert' : 'status'">{{ noticeText(notice) }}</div>
+        <div v-if="notice && !(loginBlocked && notice.type === 'error')" id="loginRedirectError" class="message" :class="`${notice.type}-message`" :role="notice.type === 'error' ? 'alert' : 'status'">{{ noticeText(notice) }}</div>
         <p v-if="configLoading" role="status">{{ copy.loading }}</p>
         <div v-else-if="configError" class="config-error"><p class="message error-message" role="alert">{{ errorText(configError) }}</p><button type="button" class="submit" @click="loadConfig()">{{ copy.retry }}</button></div>
         <template v-else-if="config">
+          <section v-if="loginBlocked || loginStateUnavailable" class="login-access-notice message error-message" role="alert" aria-labelledby="login-access-title">
+            <strong id="login-access-title">{{ t(loginBlocked ? 'login.blocked.title' : 'login.blocked.unavailableTitle') }}</strong>
+            <p>{{ t(loginBlocked ? 'login.blocked.reason' : 'login.blocked.unavailable') }}</p>
+            <p>{{ t('login.blocked.refreshHint') }}</p>
+            <button id="refresh-login-status" type="button" :disabled="configRefreshing || busy || sending || !!oauthBusy" @click="refreshLoginStatus">{{ configRefreshing ? copy.loading : t('login.blocked.refresh') }}</button>
+          </section>
           <div v-if="config.allowRegister" class="tab-group"><button type="button" class="tab" :class="{ active: tab === 'login' }" :aria-pressed="tab === 'login'" :disabled="busy" @click="tab = 'login'">{{ t('login.title') }}</button><button type="button" class="tab" :class="{ active: tab === 'register' }" :aria-pressed="tab === 'register'" :disabled="busy" @click="tab = 'register'">{{ t('login.register') }}</button></div>
           <form v-show="tab === 'login'" id="loginForm" class="auth-form active" novalidate @submit.prevent="submitLogin">
             <div v-if="config.turnstileEnabled" id="turnstileContainer" class="turnstile-container"><TurnstileChallenge ref="challenge" :site-key="config.turnstileSiteKey" :locale="language" :theme="theme" :retry-label="copy.retry" :failure-label="copy.challengeError" @token="form.turnstileToken = $event"/><p v-if="!allowed" id="turnstileHint">{{ copy.challenge }}</p></div>
@@ -314,9 +401,9 @@ onBeforeUnmount(() => {
                 <div class="verification-group">
                   <div class="verification-input has-prefix">
                     <span class="input-icon-prefix" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></span>
-                    <input id="verificationCode" v-model="form.verificationCode" type="text" name="verificationCode" class="form-control" autocomplete="one-time-code" required :placeholder="t('login.verify.code.placeholder')"/>
+                    <input id="verificationCode" :value="form.verificationCode" type="text" name="verificationCode" class="form-control" autocomplete="one-time-code" inputmode="text" autocapitalize="characters" spellcheck="false" pattern="[A-Z0-9]{8}" minlength="8" maxlength="8" required :placeholder="t('login.message.code.placeholder')" @input="setVerificationCode"/>
                   </div>
-                  <button id="sendCodeBtn" type="button" class="btn btn-send-code" :disabled="sending || countdown > 0" @click="sendCode">{{ sending ? t('login.input.sending') : countdown ? countdown + t('login.input.seconds.retry') : t('login.btn.send.code') }}</button>
+                  <button id="sendCodeBtn" type="button" class="btn btn-send-code" :disabled="sending || countdown > 0 || loginDisabled" @click="sendCode">{{ sending ? t('login.input.sending') : countdown ? countdown + t('login.input.seconds.retry') : t('login.btn.send.code') }}</button>
                 </div>
               </div>
               <div v-if="mfaVisible" id="mfaGroup" class="field form-group">
@@ -328,25 +415,28 @@ onBeforeUnmount(() => {
               </div>
               <div v-if="config.messageEnabled && config.mfaEnabled" id="verificationChoice" class="field form-group"><label>{{ t('login.verify.method') }}</label><div class="tab-group"><button id="messageTab" type="button" class="tab" :class="{ active: form.method === 'message' }" :aria-pressed="form.method === 'message'" @click="changeMethod('message')"><i class="i-mdi-email-outline" aria-hidden="true"/>{{ t('login.verify.method.msg') }}</button><button id="mfaTab" type="button" class="tab" :class="{ active: form.method === 'mfa' }" :aria-pressed="form.method === 'mfa'" @click="changeMethod('mfa')"><i class="i-mdi-shield-check-outline" aria-hidden="true"/>{{ t('login.verify.method.mfa') }}</button></div></div>
               <div class="aux form-meta"><label class="check remember-me"><input v-model="form.remember" type="checkbox" name="remember-me" value="true"/><span>{{ t('login.remember.me') }}</span></label><!-- 忘记密码入口已停用：<a href="#" class="link forgot-password-link" @click.prevent="openReset">{{ t('login.forgot.password') }}</a> --></div>
-              <button id="loginButton" type="submit" class="submit btn btn-primary" :class="{ busy }" :disabled="busy || !allowed"><span class="spin" aria-hidden="true"/><span class="txt">{{ busy ? t('login.input.login.loading') : t('login.btn.login') }}</span></button><p class="msg" aria-hidden="true"/>
+              <button id="loginButton" type="submit" class="submit btn btn-primary" :class="{ busy }" :disabled="busy || loginDisabled"><span class="spin" aria-hidden="true"/><span class="txt">{{ busy ? t('login.input.login.loading') : t('login.btn.login') }}</span></button><p class="msg" aria-hidden="true"/>
               <div v-if="config.githubEnabled || config.googleEnabled" class="auth-divider"><span>{{ copy.orThirdParty }}</span></div>
-              <div v-if="config.githubEnabled || config.googleEnabled" class="oauth-row"><button v-if="config.githubEnabled" id="githubLoginBtn" type="button" class="btn btn-github btn-oauth" :disabled="!!oauthBusy || busy" @click="oauth('github')"><i class="i-mdi-github" aria-hidden="true"/><span>{{ oauthBusy === 'github' ? t('login.input.step.next') : t('login.btn.github') }}</span></button><button v-if="config.googleEnabled" id="googleLoginBtn" type="button" class="btn btn-google btn-oauth" :disabled="!!oauthBusy || busy" @click="oauth('google')"><i class="i-mdi-google" aria-hidden="true"/><span>{{ oauthBusy === 'google' ? t('login.input.step.next') : t('login.btn.google') }}</span></button></div>
+              <div v-if="config.githubEnabled || config.googleEnabled" class="oauth-row"><button v-if="config.githubEnabled" id="githubLoginBtn" type="button" class="btn btn-github btn-oauth" :disabled="!!oauthBusy || busy || loginDisabled" @click="oauth('github')"><i class="i-mdi-github" aria-hidden="true"/><span>{{ oauthBusy === 'github' ? t('login.input.step.next') : t('login.btn.github') }}</span></button><button v-if="config.googleEnabled" id="googleLoginBtn" type="button" class="btn btn-google btn-oauth" :disabled="!!oauthBusy || busy || loginDisabled" @click="oauth('google')"><i class="i-mdi-google" aria-hidden="true"/><span>{{ oauthBusy === 'google' ? t('login.input.step.next') : t('login.btn.google') }}</span></button></div>
               <div class="enterprise-trust-badge" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg><span>{{ copy.securityBadge }}</span></div>
             </div>
           </form>
           <form v-if="config.allowRegister" v-show="tab === 'register'" id="registerForm" class="auth-form" novalidate @submit.prevent="submitRegistration">
+            <div class="registration-tools"><p>{{ t('login.credentials.hint') }}</p><button type="button" :disabled="busy || copyingCredentials" @click="regenerateRegistration">{{ t('login.credentials.regenerate') }}</button></div>
+            <p v-if="registrationNotice" class="registration-feedback" :class="{ 'is-error': registrationNotice.type === 'error' }" role="status">{{ t(registrationNotice.key) }}</p>
             <div class="field form-group">
-              <label for="registerUsername">{{ t('login.username') }}</label>
+              <div class="registration-field-label"><label for="registerUsername">{{ t('login.username') }}</label><button type="button" :disabled="busy || copyingCredentials || !registration.username" @click="copyRegistration('username')">{{ t('login.credentials.copyUsername') }}</button></div>
               <div class="ctrl input-container has-prefix">
                 <span class="input-icon-prefix" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
-                <input id="registerUsername" v-model="registration.username" type="text" name="username" class="form-control" autocomplete="username" autocapitalize="none" spellcheck="false" required :placeholder="t('login.username.placeholder')"/>
+                <input id="registerUsername" v-model="registration.username" type="text" name="username" class="form-control" autocomplete="username" autocapitalize="none" spellcheck="false" required :aria-invalid="reservedRegistrationName" :aria-describedby="reservedRegistrationName ? 'register-username-error' : undefined" :placeholder="t('login.username.placeholder')"/>
               </div>
+              <p v-if="reservedRegistrationName" id="register-username-error" class="registration-feedback is-error" role="alert">{{ t('login.credentials.reservedUsername') }}</p>
             </div>
             <div class="field form-group">
-              <label for="registerPassword">{{ t('login.password') }}</label>
+              <div class="registration-field-label"><label for="registerPassword">{{ t('login.password') }}</label><button type="button" :disabled="busy" :aria-pressed="showRegistrationPassword" @click="showRegistrationPassword = !showRegistrationPassword">{{ showRegistrationPassword ? copy.hidePassword : copy.showPassword }}</button><button type="button" :disabled="busy || copyingCredentials || !registration.password" @click="copyRegistration('password')">{{ t('login.credentials.copyPassword') }}</button></div>
               <div class="ctrl input-container has-prefix">
                 <span class="input-icon-prefix" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
-                <input id="registerPassword" v-model="registration.password" type="password" name="password" class="form-control" autocomplete="new-password" required :placeholder="t('login.password.placeholder')"/>
+                <input id="registerPassword" v-model="registration.password" :type="showRegistrationPassword ? 'text' : 'password'" name="password" class="form-control" autocomplete="new-password" required :placeholder="t('login.password.placeholder')"/>
               </div>
             </div>
             <div class="field form-group">
@@ -356,7 +446,7 @@ onBeforeUnmount(() => {
                 <input id="confirmPassword" v-model="registration.confirmation" type="password" name="confirmPassword" class="form-control" autocomplete="new-password" required :placeholder="t('login.confirm.password.placeholder')"/>
               </div>
             </div>
-            <button type="submit" class="submit btn btn-primary" :disabled="busy">{{ busy ? t('login.input.sending') : t('login.register') }}</button>
+            <button type="submit" class="submit btn btn-primary" :disabled="busy || reservedRegistrationName">{{ busy ? t('login.input.sending') : t('login.register') }}</button>
             <div class="enterprise-trust-badge" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg><span>{{ copy.securityBadge }}</span></div>
           </form>
         </template>

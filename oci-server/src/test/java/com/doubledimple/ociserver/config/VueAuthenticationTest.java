@@ -1,11 +1,13 @@
 package com.doubledimple.ociserver.config;
 
 import com.doubledimple.dao.entity.LoginUser;
+import com.doubledimple.ocicommon.utils.IpUtils;
 import com.doubledimple.ocicommon.utils.RsaUtils;
 import com.doubledimple.ociserver.config.filter.RsaDecryptionFilter;
 import com.doubledimple.ociserver.controller.LoginController;
 import com.doubledimple.ociserver.service.VerifyService;
 import com.doubledimple.ociserver.service.impl.system.SystemConfigService;
+import com.doubledimple.ociserver.service.login.LoginFailureGuard;
 import com.doubledimple.ociserver.service.login.LoginUserService;
 import com.doubledimple.ociserver.service.mfa.OTPService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -50,6 +52,10 @@ class VueAuthenticationTest {
         otp = mock(OTPService.class);
         ReflectionTestUtils.setField(controller, "systemConfigService", settings);
         ReflectionTestUtils.setField(controller, "loginUserService", users);
+        LoginFailureGuard failureGuard = mock(LoginFailureGuard.class);
+        when(failureGuard.assertAllowed(any())).thenAnswer(invocation ->
+                IpUtils.getClientIpAddress(invocation.getArgument(0)));
+        ReflectionTestUtils.setField(controller, "loginFailureGuard", failureGuard);
         ReflectionTestUtils.setField(controller, "verifyService", verification);
         ReflectionTestUtils.setField(controller, "otpService", otp);
         ReflectionTestUtils.setField(controller, "objectMapper", json);

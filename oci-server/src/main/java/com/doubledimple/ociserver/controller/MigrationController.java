@@ -4,6 +4,9 @@ import com.doubledimple.ociserver.config.datamigration.DatabaseExportService;
 import com.doubledimple.ociserver.config.datamigration.DatabaseImportService;
 import com.doubledimple.ociserver.config.datamigration.MigrationImportException;
 import com.doubledimple.ociserver.config.datamigration.MigrationImportResult;
+import com.doubledimple.ociserver.config.context.UserContext;
+import com.doubledimple.ociserver.service.VerifyService;
+import com.doubledimple.ociserver.service.security.ExportVerificationGuard;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -36,17 +39,24 @@ public class MigrationController extends BaseController {
     private DatabaseExportService databaseExportService;
     @Resource
     private DatabaseImportService databaseImportService;
+    @Resource
+    private VerifyService verifyService;
 
     /** Legacy plain backup endpoint. The Vue page only exposes encrypted backups. */
     @GetMapping("/export")
     public ResponseEntity<byte[]> exportDatabase(HttpServletRequest request) {
         SystemSettingsApiController.guardSecurityWrite(request);
         try {
+            verifyService.checkCodeForExport(UserContext.getUsername(), request.getHeader("X-Verify-Code"));
             ByteArrayOutputStream output = databaseExportService.exportDatabaseToStream();
             if (output.size() > MAX_FILE_BYTES) throw new IllegalStateException("migration.limitExceeded");
             return ResponseEntity.ok().header(HttpHeaders.CACHE_CONTROL, "no-store")
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"oci-start_backup_" + System.currentTimeMillis() + ".sql\"")
                     .contentType(MediaType.APPLICATION_OCTET_STREAM).body(output.toByteArray());
+        } catch (ExportVerificationGuard.ExportVerificationException exception) {
+            return ResponseEntity.status(403).header(HttpHeaders.CACHE_CONTROL, "no-store")
+                    .contentType(MediaType.parseMediaType("text/plain;charset=UTF-8"))
+                    .body(exception.getMessage().getBytes(StandardCharsets.UTF_8));
         } catch (Exception exception) {
             // SQL exception messages and causes can contain the data being exported.
             log.warn("数据库备份导出未完成");
@@ -60,7 +70,13 @@ public class MigrationController extends BaseController {
         response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
         SystemSettingsApiController.guardSecurityWrite(request);
         try {
+            verifyService.checkCodeForExport(UserContext.getUsername(), request.getHeader("X-Verify-Code"));
             databaseExportService.exportEncryptedBackup(response);
+        } catch (ExportVerificationGuard.ExportVerificationException exception) {
+            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+            response.setContentType("text/plain;charset=UTF-8");
+            try { response.getWriter().write(exception.getMessage()); }
+            catch (Exception ignored) { /* Client disconnected; no backup has been generated. */ }
         } catch (Exception exception) {
             log.warn("加密备份导出未完成");
             if (response.isCommitted()) return;

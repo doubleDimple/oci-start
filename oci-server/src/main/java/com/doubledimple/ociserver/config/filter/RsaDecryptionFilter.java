@@ -23,6 +23,8 @@ import javax.servlet.http.HttpSession;
 import java.io.IOException;
 import java.util.Map;
 
+import static com.doubledimple.ocicommon.utils.IpUtils.getClientIpAddress;
+
 import static com.doubledimple.ocicommon.constant.Constants.RSA_PRIVATE_KEY;
 import static com.doubledimple.ocicommon.constant.Constants.RSA_PUBLIC_KEY;
 
@@ -74,12 +76,12 @@ public class RsaDecryptionFilter extends OncePerRequestFilter {
                     }
                 } catch (Exception e) {
                     log.warn("【降级登录告警】解密失败，回退至明文验证,请尽快升级到最新版本。IP: {}, User-Agent: {}, 异常类型: {}",
-                            request.getRemoteAddr(), request.getHeader("User-Agent"), e.getClass().getSimpleName());
+                            getClientIpAddress(request), request.getHeader("User-Agent"), e.getClass().getSimpleName());
                 }
             } else {
                 if (encryptedPassword != null) {
                     log.warn("【异常登录告警】未获取到RSA私钥，回退至明文验证,请尽快升级到最新版本。IP: {}, User-Agent: {}",
-                            request.getRemoteAddr(), request.getHeader("User-Agent"));
+                            getClientIpAddress(request), request.getHeader("User-Agent"));
                 }
             }
         }
@@ -101,13 +103,13 @@ public class RsaDecryptionFilter extends OncePerRequestFilter {
 
             String token = request.getParameter(TURNSTILE_RESPONSE_PARAM);
             if (StringUtils.isBlank(token)) {
-                log.warn("Turnstile 验证失败: 未提供 token，IP={}", request.getRemoteAddr());
+                log.warn("Turnstile 验证失败: 未提供 token，IP={}", getClientIpAddress(request));
                 return rejectChallenge(request, response, HttpServletResponse.SC_FORBIDDEN);
             }
 
-            boolean verified = callTurnstileApi(token, config.getSecretKey(), request.getRemoteAddr());
+            boolean verified = callTurnstileApi(token, config.getSecretKey(), getClientIpAddress(request));
             if (!verified) {
-                log.warn("Turnstile 验证失败: token 无效，IP={}", request.getRemoteAddr());
+                log.warn("Turnstile 验证失败: token 无效，IP={}", getClientIpAddress(request));
                 return rejectChallenge(request, response, HttpServletResponse.SC_FORBIDDEN);
             }
         } catch (Exception e) {
@@ -142,7 +144,7 @@ public class RsaDecryptionFilter extends OncePerRequestFilter {
             MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
             body.add("secret", secretKey);
             body.add("response", token);
-            if (StringUtils.isNotBlank(remoteIp)) {
+            if (StringUtils.isNotBlank(remoteIp) && !"unknown".equals(remoteIp)) {
                 body.add("remoteip", remoteIp);
             }
 

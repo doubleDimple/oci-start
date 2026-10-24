@@ -60,9 +60,14 @@ spring:
   profiles:
     active: release
 server:
-  #forward-headers-strategy: native
+  # 保留真实连接地址；转发头只由 ClientIpResolver 按可信代理策略解析。
+  forward-headers-strategy: none
   max-http-header-size: 81920
   port: 9856
+
+client-ip:
+  # 默认不信任代理。与本机 Nginx 并用时配置 127.0.0.1/32,::1/128，详见 README。
+  trusted-proxies: ${CLIENT_IP_TRUSTED_PROXIES:}
 
 # 日志配置
 logging:

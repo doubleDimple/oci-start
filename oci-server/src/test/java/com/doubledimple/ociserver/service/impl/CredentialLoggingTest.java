@@ -12,6 +12,9 @@ import com.doubledimple.ociserver.pojo.request.BarkConfig;
 import com.doubledimple.ociserver.pojo.request.TelegramConfig;
 import com.doubledimple.ociserver.service.impl.system.SystemConfigService;
 import com.doubledimple.ociserver.service.login.LoginUserService;
+import com.doubledimple.ociserver.service.login.LoginFailureGuard;
+import com.doubledimple.ociserver.service.login.GlobalLoginGuard;
+import com.doubledimple.ociserver.service.security.ExportVerificationGuard;
 import com.doubledimple.ociserver.service.message.DingDingMessageService;
 import com.doubledimple.ociserver.service.message.FeishuService;
 import com.doubledimple.ociserver.service.message.MessageService;
@@ -26,6 +29,10 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Optional;
+import java.util.function.BiPredicate;
+import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -53,6 +60,7 @@ class CredentialLoggingTest {
         users = mock(LoginUserService.class);
         LoginUserRepository repository = mock(LoginUserRepository.class);
         LoginUser user = new LoginUser();
+        user.setId(37L);
         user.setUsername(USER);
         user.setPassword("stored-password-hash-must-stay-private");
         when(repository.findByUsername(USER)).thenReturn(Optional.of(user));
@@ -62,6 +70,22 @@ class CredentialLoggingTest {
         ReflectionTestUtils.setField(service, "loginUserService", users);
         ReflectionTestUtils.setField(service, "messageFactory", factory);
         ReflectionTestUtils.setField(service, "systemConfigService", mock(SystemConfigService.class));
+        LoginFailureGuard loginGuard = mock(LoginFailureGuard.class);
+        when(loginGuard.assertAllowed(any())).thenReturn("198.51.100.42");
+        ReflectionTestUtils.setField(service, "loginFailureGuard", loginGuard);
+        ReflectionTestUtils.setField(service, "globalLoginGuard", mock(GlobalLoginGuard.class));
+        ExportVerificationGuard exportGuard = mock(ExportVerificationGuard.class);
+        when(exportGuard.issueCode(eq(USER), any())).thenAnswer(call -> {
+            Function<Long, ?> issue = call.getArgument(1);
+            return issue.apply(37L);
+        });
+        doAnswer(call -> {
+            Function<Long, String> read = call.getArgument(2);
+            BiPredicate<Long, String> consume = call.getArgument(3);
+            assertTrue(consume.test(37L, read.apply(37L)));
+            return null;
+        }).when(exportGuard).verify(eq(USER), anyString(), any(), any());
+        ReflectionTestUtils.setField(service, "exportVerificationGuard", exportGuard);
         doReturn(CODE).when(service).generateVerificationCode();
         service.init();
     }
@@ -77,19 +101,25 @@ class CredentialLoggingTest {
     void verificationAndResetStillDeliverSecretsWithoutWritingThemToLogs() {
         MockHttpServletRequest request = new MockHttpServletRequest();
         service.sendVerificationCodeForLogin(USER, request);
-        service.checkCodeForLogin(USER, CODE);
+        ArgumentCaptor<String> loginCode = ArgumentCaptor.forClass(String.class);
+        verify(notifications).sendVerificationCodeMessage(eq(USER), loginCode.capture());
+        service.checkCodeForLogin(USER, loginCode.getValue());
         service.sendVerificationCodeForPasswordReset(USER, request);
         String token = service.verifyCodeForPasswordReset(USER, CODE, request);
         service.resetPassword(USER, token);
         service.sendVerifyCodeForExport(USER, request);
-        service.checkCodeForExport(USER, CODE);
+        ArgumentCaptor<String> exportMessage = ArgumentCaptor.forClass(String.class);
+        verify(notifications).sendMessageTemplateText(exportMessage.capture(), eq(Boolean.FALSE));
+        Matcher exportCode = Pattern.compile("(?m)^([A-Z0-9]{8})$").matcher(exportMessage.getValue());
+        assertTrue(exportCode.find());
+        service.checkCodeForExport(USER, exportCode.group(1));
 
         ArgumentCaptor<String> newPassword = ArgumentCaptor.forClass(String.class);
         verify(users).updateUser(eq(USER), eq(USER), newPassword.capture());
         assertFalse(newPassword.getValue().isEmpty());
-        verify(notifications).sendVerificationCodeMessage(USER, CODE);
         verify(notifications).sendMessageTemplate(contains(newPassword.getValue()));
-        assertSecretsAbsent(CODE, token, newPassword.getValue(), "stored-password-hash-must-stay-private");
+        assertSecretsAbsent(CODE, loginCode.getValue(), exportCode.group(1), token, newPassword.getValue(),
+                "stored-password-hash-must-stay-private");
     }
 
     @Test

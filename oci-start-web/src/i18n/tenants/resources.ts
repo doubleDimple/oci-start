@@ -19,12 +19,12 @@ export default {
     pageNumber: '第 {page} 页',
     transferAmount: '成交金额',
     account: {
-      typeAndPlan: '账号类型与方案',
+      typeAndPlan: '账号类型与方案', localClassification: '本地账号分类', regionClassification: '本地区域情况', homeRegion: '主区域',
       registeredAt: '注册时间',
       subscriptionNumber: '订阅编号',
       email: '电子邮箱',
       address: '注册地址',
-      empty: '暂无账号注册详情，可先从租户操作中更新账号信息。',
+      empty: '当前未获取到云端订阅资料；以上为本地已保存信息。注册时间、订阅编号及联系资料暂不可用。',
       types: {
         free: '永久免费',
         paid: '按量付费',
@@ -154,12 +154,12 @@ export default {
     pageNumber: 'Page {page}',
     transferAmount: 'Sale amount',
     account: {
-      typeAndPlan: 'Account type and plan',
+      typeAndPlan: 'Account type and plan', localClassification: 'Saved account classification', regionClassification: 'Saved region information', homeRegion: 'Home region',
       registeredAt: 'Registered',
       subscriptionNumber: 'Subscription ID',
       email: 'Email',
       address: 'Registered address',
-      empty: 'No registration details yet. Update the account from the tenant actions first.',
+      empty: 'Cloud subscription details are unavailable. The information above is saved locally. Registration date, subscription number and contact details are not available.',
       types: {
         free: 'Always Free',
         paid: 'Pay as you go',

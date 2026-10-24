@@ -3,6 +3,8 @@ import PageErrorNotice from '@/components/PageErrorNotice.vue'
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { tenantError, tenantGet } from '@/api/tenant'
+import { exportErrorMessage } from '@/api/exportVerification'
+import { requestExportVerification } from '@/composables/useExportVerification'
 import GhostBtn from '@/components/GhostBtn.vue'
 
 const emit = defineEmits<{ close: [] }>()
@@ -25,8 +27,10 @@ async function download() {
   errorKey.value = ''
   errorText.value = ''
   try {
-    // /oci/export always includes every tenant; it has no filter or verification-code parameters.
-    const file = await tenantGet<Blob>('/oci/export', undefined, { responseType: 'blob', signal: controller.signal, timeout: 120000 })
+    const verificationCode = await requestExportVerification(controller.signal)
+    if (disposed || verificationCode === null) return
+    // The code travels with the real export; the file continues to include every tenant.
+    const file = await tenantGet<Blob>('/oci/export', undefined, { responseType: 'blob', signal: controller.signal, timeout: 120000, headers: { 'X-Verify-Code': verificationCode } })
     if (disposed) return
     if (!(file instanceof Blob) || !file.size || !file.type.toLowerCase().startsWith('text/plain')) {
       errorKey.value = 'format'
@@ -47,7 +51,10 @@ async function download() {
   } catch (cause) {
     if (disposed) return
     const response = cause as { response?: { data?: unknown } }
-    if (response?.response?.data instanceof Blob) errorKey.value = 'failed'
+    const message = await exportErrorMessage(cause)
+    if (disposed) return
+    if (message) errorText.value = message
+    else if (response?.response?.data instanceof Blob) errorKey.value = 'failed'
     else errorText.value = tenantError(cause)
   } finally {
     if (!disposed) busy.value = false

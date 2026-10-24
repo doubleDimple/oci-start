@@ -11,10 +11,14 @@ export interface AuthBootstrap {
   messageEnabled: boolean
   mfaEnabled: boolean
   locale: string
+  loginBlocked?: boolean
+  loginBlockedUntil?: string | null
+  loginBlockedMessage?: string | null
 }
 
 export class AuthError extends Error {
-  constructor(public readonly key: 'network' | 'invalidResponse' | 'failed' | 'encryption', public readonly detail = '') {
+  constructor(public readonly key: 'network' | 'invalidResponse' | 'failed' | 'encryption', public readonly detail = '',
+    public readonly status?: number, public readonly loginBlocked = false, public readonly loginBlockedUntil: string | null = null) {
     super(detail || key)
   }
 }
@@ -51,7 +55,8 @@ async function authRequest(path: string, init: RequestInit = {}, allowEmpty = fa
   if (!response.ok || (record(body) && (body.success === false || (body.code != null && !['0', '200'].includes(String(body.code)))))) {
     const detail = record(body) && typeof body.message === 'string' ? body.message
       : !text.trimStart().startsWith('<') && text.length < 2000 ? text : ''
-    throw new AuthError('failed', detail)
+    throw new AuthError('failed', detail, response.status, record(body) && body.loginBlocked === true,
+      record(body) && typeof body.loginBlockedUntil === 'string' ? body.loginBlockedUntil : null)
   }
   if (record(body)) return body
   if (allowEmpty && !text.trim()) return {}
@@ -64,6 +69,9 @@ export async function fetchAuthBootstrap(locale: string, signal?: AbortSignal): 
   const flags = ['allowRegister', 'githubEnabled', 'googleEnabled', 'turnstileEnabled', 'messageEnabled', 'mfaEnabled']
   if (typeof body.publicKey !== 'string' || !body.publicKey || flags.some(key => typeof body[key] !== 'boolean')
     || typeof body.turnstileSiteKey !== 'string' || (body.turnstileEnabled && !body.turnstileSiteKey)) throw new AuthError('invalidResponse')
+  if ((body.loginBlocked !== undefined && typeof body.loginBlocked !== 'boolean')
+    || (body.loginBlockedUntil != null && typeof body.loginBlockedUntil !== 'string')
+    || (body.loginBlockedMessage != null && typeof body.loginBlockedMessage !== 'string')) throw new AuthError('invalidResponse')
   return body as unknown as AuthBootstrap
 }
 
@@ -77,12 +85,20 @@ export interface LoginValues {
   turnstileToken: string
 }
 
+export function normalizeLoginVerificationCode(value: string): string {
+  return value.trim().toUpperCase()
+}
+
+export function isLoginVerificationCode(value: string): boolean {
+  return /^[A-Z0-9]{8}$/.test(normalizeLoginVerificationCode(value))
+}
+
 export function loginPayload(values: LoginValues, config: AuthBootstrap, encrypt: (value: string) => string | false): URLSearchParams {
   const password = encrypt(values.password)
   if (!password) throw new AuthError('encryption')
   const body = new URLSearchParams({ username: values.username, password })
   if (values.remember) body.set('remember-me', 'true')
-  if (values.method === 'message' && config.messageEnabled) body.set('verificationCode', values.verificationCode)
+  if (values.method === 'message' && config.messageEnabled) body.set('verificationCode', normalizeLoginVerificationCode(values.verificationCode))
   if (values.method === 'mfa' && config.mfaEnabled) body.set('mfaCode', values.mfaCode)
   if (config.turnstileEnabled) body.set('cf-turnstile-response', values.turnstileToken)
   return body
@@ -125,7 +141,13 @@ export const resetPassword = (username: string, resetToken: string, signal?: Abo
 
 export async function oauthLoginUrl(provider: 'github' | 'google', remember: boolean, signal?: AbortSignal): Promise<string> {
   const { response, text } = await requestText(`/api/${provider}/login/url${remember ? '?remember-me=on' : ''}`, { signal, headers: { Accept: 'text/plain' } })
-  if (!response.ok) throw new AuthError('failed')
+  if (!response.ok) {
+    let body: unknown
+    try { body = JSON.parse(text) } catch { /* The OAuth guard also returns plain text. */ }
+    const detail = record(body) && typeof body.message === 'string' ? body.message
+      : !text.trimStart().startsWith('<') && text.length < 2000 ? text : ''
+    throw new AuthError('failed', detail, response.status)
+  }
   const value = text.trim()
   try {
     const url = new URL(value)

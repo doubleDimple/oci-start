@@ -1,4 +1,5 @@
 import { computed, onBeforeUnmount, ref, shallowRef } from 'vue'
+import { requestExportVerification } from '@/composables/useExportVerification'
 import {
   MigrationApiError, exportEncryptedBackup, importEncryptedBackup, migrationError,
   normalizeMigrationKey, validateMigrationFile, type MigrationExportArtifact,
@@ -49,7 +50,9 @@ export function useMigration() {
     exportController = controller; exportState.value = { pending: true, problem: null }
     const current = () => !disposed && sequence === exportSequence && exportController === controller && !controller.signal.aborted
     try {
-      const result = await exportEncryptedBackup(controller.signal)
+      const verificationCode = await requestExportVerification(controller.signal)
+      if (!current() || verificationCode === null) return false
+      const result = await exportEncryptedBackup(verificationCode, controller.signal)
       if (!current()) return false
       artifact.value = result; exportSaved.value = false
       return true

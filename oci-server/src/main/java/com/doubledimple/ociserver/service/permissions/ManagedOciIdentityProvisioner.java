@@ -74,21 +74,31 @@ public class ManagedOciIdentityProvisioner {
             try {
                 return reconcile(adminProvider, tenancyId, adminUserId, targetUserName,
                         statementsForGroupId, existing, owner, selected, scope);
-            } catch (ProvisioningException e) {
-                throw e;
-            } catch (BmcException e) {
-                // SDK exception bodies and request data must not escape this boundary.
-                if (e.getStatusCode() == 401 || e.getStatusCode() == 403 || e.getStatusCode() == 404) {
-                    throw new ProvisioningException("无法完成 OCI 授权校验。请提供可读取租户全部策略、身份域及管理专用用户的管理凭证后重试。");
-                }
-                if (e.getStatusCode() == 409 || e.getStatusCode() == 412 || e.getStatusCode() == 429) {
-                    throw new ProvisioningException("OCI 资源正在同步、被并发修改或请求过于频繁，请稍后以相同用户名重试。");
-                }
-                throw new ProvisioningException("OCI 专用身份配置未完成，请稍后以相同用户名重试；原用户及原 API 密钥未修改。");
             } catch (Exception e) {
-                throw new ProvisioningException("专用身份配置未完成，请检查管理凭证和网络后重试；不会改用原管理凭证导入。");
+                throw safeFailure(e);
             }
         }
+    }
+
+    static IllegalArgumentException safeFailure(Exception exception) {
+        if (exception instanceof ProvisioningException
+                || exception instanceof ManagedDomainRoleService.DomainRoleException) {
+            // Domain audit/synchronization errors already contain locally authored, safe instructions.
+            // Do not replace them with a misleading generic credential/network error.
+            return (IllegalArgumentException) exception;
+        }
+        ManagedImportDiagnostics.failed(ManagedImportDiagnostics.Stage.IDENTITY_PROVISION, exception);
+        if (exception instanceof BmcException) {
+            int status = ((BmcException) exception).getStatusCode();
+            if (status == 401 || status == 403 || status == 404) {
+                return new ProvisioningException("无法完成 OCI 授权校验。请提供可读取租户全部策略、身份域及管理专用用户的管理凭证后重试。");
+            }
+            if (status == 409 || status == 412 || status == 429) {
+                return new ProvisioningException("OCI 资源正在同步、被并发修改或请求过于频繁，请稍后以相同用户名重试。");
+            }
+            return new ProvisioningException("OCI 专用身份配置未完成，请稍后以相同用户名重试；原用户及原 API 密钥未修改。");
+        }
+        return new ProvisioningException("专用身份配置未完成，请检查管理凭证和网络后重试；不会改用原管理凭证导入。");
     }
 
     private Result reconcile(SimpleAuthenticationDetailsProvider admin, String tenancyId,

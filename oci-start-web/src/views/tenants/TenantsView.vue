@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { hasTenantPermission, isManagedTenant, type TenantPermission } from '@/utils/tenantPermissions'
+import { accountActiveDays, describeTenantAccount } from '@/utils/tenantAccount'
 import PageErrorNotice from '@/components/PageErrorNotice.vue'
 import PageBackButton from '@/components/PageBackButton.vue'
 import MobileRecordList from '@/components/MobileRecordList.vue'
@@ -183,35 +184,11 @@ function createdAt(row: TenantRow) {
   return date.toLocaleString(locale.value === 'en' ? 'en-US' : 'zh-CN', options)
 }
 function accountType(row: TenantRow) {
-  const labels: Record<string, string> = {
-    PERSONAL: 'personal', CORPORATE: 'corporate', CORPORATE_SUBMITTED: 'corporateSubmitted',
-    FREE_TIER: 'freeTier', PAYG: 'payg', UNKNOWN_ENUM_VALUE: 'unknown',
-  }
-  const detail = row.registerDetail
-  const values = [detail?.accountType, detail?.planType]
-    .map((value) => typeof value === 'object' && value ? value.value ?? value.code : value)
-    .filter((value) => value)
-  if (values.length) return values.map((value) => {
-    const key = labels[String(value).toUpperCase()]
-    return key ? t(`tenant.account.${key}`) : String(value)
-  }).join(' · ')
-  // Older responses expose only the enum's Chinese display name.
-  const legacy: Record<string, string> = {
-    '个人': 'personal', '公司': 'corporate', '正在审核中的企业': 'corporateSubmitted',
-    '免费账号': 'freeTier', '升级账号': 'payg',
-  }
-  const raw = String(row.accountTypeName || '')
-  if (raw === '未知' || raw === '未知类型') return t('tenant.account.unknown')
-  if (raw === '多区域账号') return t('tenant.account.multiRegion')
-  if (raw) {
-    for (const account of ['', '个人', '公司', '正在审核中的企业']) {
-      for (const plan of ['', '免费账号', '升级账号']) {
-        if (account + plan === raw) return [account, plan].filter(Boolean).map((label) => t(`tenant.account.${legacy[label]}`)).join(' · ')
-      }
-    }
-    return raw
-  }
-  return t(row.hasChildren ? 'tenant.account.multiRegion' : 'tenant.account.unknown')
+  return describeTenantAccount(row, key => t(key)).label
+}
+function activeDaysText(row: TenantRow) {
+  const days = accountActiveDays(row.activeDays)
+  return days === null ? t('tenant.list.activeDaysUnknown') : t('tenant.list.activeDays', { days: numberFormat.value.format(days) }, days)
 }
 function proxyLabel(row: TenantRow) {
   return row.proxyForce
@@ -388,6 +365,14 @@ interface RowAction {
   danger?: boolean
   divided?: boolean
 }
+function apiMode(row: TenantRow): 'ordinary' | 'restricted' | 'unknown' {
+  if (row.permissionMode == null || row.permissionMode === '') return 'ordinary'
+  return row.permissionMode === 'managed-v1' ? 'restricted' : 'unknown'
+}
+function canDowngrade(row: TenantRow): boolean {
+  return Number(row.cloudType ?? shell.cloudType) === 1 && Number(row.transferStatus || 0) !== 1
+    && apiMode(row) === 'ordinary'
+}
 function rowActions(row: TenantRow): RowAction[] {
   const items: RowAction[] = []
   if (
@@ -454,8 +439,11 @@ function rowActions(row: TenantRow): RowAction[] {
     danger: true,
     divided: true,
   })
-  if (isManagedTenant(row)) items.unshift({
+  if (row.permissionMode === 'managed-v1') items.unshift({
     id: 'permissions', label: t('tenant.actions.permissions'), icon: 'i-mdi-shield-key-outline',
+  })
+  if (canDowngrade(row)) items.unshift({
+    id: 'downgrade', label: t('tenant.actions.downgrade'), icon: 'i-mdi-shield-key-outline',
   })
   const permissions: Record<string, TenantPermission> = {
     update: 'BASIC_READ', regions: 'BASIC_READ', subscribe: 'REGION_SUBSCRIBE',
@@ -469,6 +457,10 @@ function rowActions(row: TenantRow): RowAction[] {
 }
 function runAction(item: RowAction, row: TenantRow) {
   if (!rowActions(row).some(allowed => allowed.id === item.id)) return
+  if (item.id === 'downgrade') {
+    void router.push({ path: '/tenants/addSpeed', query: { cloudType: '1', downgradeTenantId: row.id } })
+    return
+  }
   if (item.id === 'permissions') {
     void router.push({ path: '/tenants/addSpeed', query: { cloudType: '1', managedTenantId: row.id } })
     return
@@ -699,6 +691,7 @@ onBeforeUnmount(() => {
                 <RouterLink class="tenant-summary-link" :data-tenant-id="row.id" :to="mobileDetailLocation(row)" :aria-label="t('tenant.mobile.openDetails', { name: mobileTenantName(row) })">
                   <span class="tenant-summary-text">
                     <span class="tenant-summary-name">{{ mobileTenantName(row) }}</span>
+                    <span v-if="Number(row.cloudType ?? shell.cloudType) === 1" class="tenant-api-mode" :class="`is-${apiMode(row)}`">{{ t(`tenant.apiMode.${apiMode(row)}`) }}</span>
                     <span class="tenant-summary-meta"><span v-if="row.defName">{{ nameVisible(row) ? row.tenancyName || t('tenant.common.unnamed') : maskName(row.tenancyName) }}</span><span>{{ row.region || t('tenant.common.unrecorded') }}</span></span>
                   </span>
                   <span class="tenant-status" :class="isActive(row) ? 'status-active' : 'status-inactive'"><span />{{ t(isActive(row) ? 'tenant.list.active' : 'tenant.list.inactive') }}</span>
@@ -708,7 +701,7 @@ onBeforeUnmount(() => {
             </ul>
             <p v-if="loading && !loaded" class="mobile-record-loading" role="status">{{ t('tenant.list.loading') }}</p>
           </div>
-          <table v-else class="tenant-table">
+          <table v-else class="tenant-table" :class="{ 'has-api-column': shell.cloudType === 1 }">
             <thead>
               <tr>
                 <th scope="col" class="identity-column">{{ t('tenant.list.columns.tenant') }}</th>
@@ -716,6 +709,7 @@ onBeforeUnmount(() => {
                 <th scope="col">{{ t('tenant.list.columns.region') }}</th>
                 <th scope="col">{{ t('tenant.list.columns.boot') }}</th>
                 <th scope="col">{{ t('tenant.list.columns.type') }}</th>
+                <th v-if="shell.cloudType === 1" scope="col" class="api-type-column">{{ t('tenant.list.columns.apiType') }}</th>
                 <th scope="col">{{ t('tenant.list.columns.created') }}</th>
                 <th scope="col">{{ t('tenant.list.columns.status') }}</th>
                 <th scope="col" class="row-actions-column">{{ t('tenant.list.columns.actions') }}</th>
@@ -723,7 +717,7 @@ onBeforeUnmount(() => {
             </thead>
             <tbody v-if="!loaded && loading" aria-hidden="true">
               <tr v-for="n in 6" :key="n" class="skeleton-row">
-                <td v-for="c in 8" :key="c">
+                <td v-for="c in (shell.cloudType === 1 ? 9 : 8)" :key="c">
                   <span
                     class="skeleton"
                     :class="{ 'skeleton-name': c === 1 }"
@@ -801,7 +795,7 @@ onBeforeUnmount(() => {
                     {{ row.accountCost || t('tenant.common.unset')
                     }}<i class="i-mdi-pencil-outline" /></button
                   ><small class="cell-secondary"
-                    >{{ t('tenant.list.activeDays', { days: numberFormat.format(Number(row.activeDays) || 0) }, Number(row.activeDays) || 0) }}</small
+                    >{{ activeDaysText(row) }}</small
                   >
                 </td>
                 <td>
@@ -832,6 +826,9 @@ onBeforeUnmount(() => {
                       accountType(row)
                     }}<i class="i-mdi-chevron-right" />
                   </button>
+                </td>
+                <td v-if="shell.cloudType === 1" class="api-type-column">
+                  <span class="tenant-api-mode" :class="`is-${apiMode(row)}`">{{ t(`tenant.apiMode.${apiMode(row)}`) }}</span>
                 </td>
                 <td>
                   <time class="created-at">{{ createdAt(row) }}</time>
@@ -966,9 +963,10 @@ onBeforeUnmount(() => {
                 </el-dropdown>
               </template>
               <dl class="mobile-record-fields">
+                <div v-if="Number(row.cloudType ?? shell.cloudType) === 1"><dt>{{ t('tenant.list.columns.apiType') }}</dt><dd><span class="tenant-api-mode" :class="`is-${apiMode(row)}`">{{ t(`tenant.apiMode.${apiMode(row)}`) }}</span></dd></div>
                 <div><dt>{{ t('tenant.list.columns.region') }}</dt><dd>{{ row.region || t('tenant.common.unrecorded') }}<span class="mobile-record-subtitle">{{ t(isMultiRegion(row) ? 'tenant.list.multiRegion' : 'tenant.list.singleRegion') }}</span></dd></div>
                 <div><dt>{{ t('tenant.list.columns.status') }}</dt><dd><span class="tenant-status" :class="isActive(row) ? 'status-active' : 'status-inactive'"><span />{{ t(isActive(row) ? 'tenant.list.active' : 'tenant.list.inactive') }}</span></dd></div>
-                <div><dt>{{ t('tenant.list.columns.cost') }}</dt><dd><button class="cell-link cost-link" :aria-label="t('tenant.list.editCost')" @click="openAction('cost', row)">{{ row.accountCost || t('tenant.common.unset') }}<i class="i-mdi-pencil-outline" aria-hidden="true" /></button><span class="mobile-record-subtitle">{{ t('tenant.list.activeDays', { days: numberFormat.format(Number(row.activeDays) || 0) }, Number(row.activeDays) || 0) }}</span></dd></div>
+                <div><dt>{{ t('tenant.list.columns.cost') }}</dt><dd><button class="cell-link cost-link" :aria-label="t('tenant.list.editCost')" @click="openAction('cost', row)">{{ row.accountCost || t('tenant.common.unset') }}<i class="i-mdi-pencil-outline" aria-hidden="true" /></button><span class="mobile-record-subtitle">{{ activeDaysText(row) }}</span></dd></div>
                 <div><dt>{{ t('tenant.list.columns.type') }}</dt><dd><button class="cell-link account-type" @click="openAction('detail', row)">{{ accountType(row) }}<i class="i-mdi-chevron-right" aria-hidden="true" /></button></dd></div>
                 <div><dt>{{ t('tenant.list.columns.boot') }}</dt><dd><span class="task-state" :class="{ 'task-running': row.openBootFlag }"><span v-if="row.openBootFlag" class="live-dot" />{{ t(row.openBootFlag ? 'tenant.list.bootRunning' : 'tenant.list.noTask') }}</span></dd></div>
                 <div><dt>{{ t('tenant.list.columns.created') }}</dt><dd>{{ createdAt(row) }}</dd></div>

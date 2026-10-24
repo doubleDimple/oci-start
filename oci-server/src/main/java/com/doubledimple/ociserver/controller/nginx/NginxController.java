@@ -4,6 +4,9 @@ import com.doubledimple.dao.entity.NginxConfig;
 import com.doubledimple.dao.entity.ProxyConfig;
 import com.doubledimple.dao.entity.SslCertificate;
 import com.doubledimple.ociserver.controller.BaseController;
+import com.doubledimple.ociserver.config.context.UserContext;
+import com.doubledimple.ociserver.service.VerifyService;
+import com.doubledimple.ociserver.service.security.ExportVerificationGuard;
 import com.doubledimple.ociserver.pojo.request.nginx.CertificateDTO;
 import com.doubledimple.ociserver.pojo.request.nginx.ProxyConfigCreateDto;
 import com.doubledimple.ociserver.pojo.request.nginx.ProxyConfigUpdateDto;
@@ -34,7 +37,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import javax.servlet.http.HttpServletRequest;
+import javax.annotation.Resource;
 import javax.validation.Valid;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -55,6 +60,7 @@ public class NginxController extends BaseController {
     private final ProxyConfigService proxyConfigService;
     private final SslCertificateService sslCertificateService;
     private final NginxConfigService nginxConfigService;
+    @Resource private VerifyService verifyService;
 
     // =================== 反向代理配置API ===================
 
@@ -517,14 +523,17 @@ public class NginxController extends BaseController {
      * 下载证书
      */
     @GetMapping("/certificates/{id}/download")
-    public ResponseEntity<byte[]> downloadCertificate(@PathVariable Long id) {
+    public ResponseEntity<byte[]> downloadCertificate(@PathVariable Long id, HttpServletRequest request) {
         try {
+            // The ZIP contains privkey.pem as well as the public certificate.
+            verifyService.checkCodeForExport(UserContext.getUsername(), request.getHeader("X-Verify-Code"));
             Map<String, Object> result = sslCertificateService.downloadCertificate(id);
 
             byte[] content = (byte[]) result.get("content");
             String fileName = (String) result.get("fileName");
 
             HttpHeaders headers = new HttpHeaders();
+            headers.setCacheControl("no-store");
             headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
             headers.setContentDispositionFormData("attachment", fileName);
             headers.setContentLength(content.length);
@@ -533,9 +542,13 @@ public class NginxController extends BaseController {
                     .headers(headers)
                     .body(content);
 
+        } catch (ExportVerificationGuard.ExportVerificationException e) {
+            return ResponseEntity.status(403).header(HttpHeaders.CACHE_CONTROL, "no-store")
+                    .contentType(MediaType.parseMediaType("text/plain;charset=UTF-8"))
+                    .body(e.getMessage().getBytes(StandardCharsets.UTF_8));
         } catch (Exception e) {
-            log.error("证书下载失败", e);
-            return ResponseEntity.badRequest().build();
+            log.warn("证书下载失败，异常类型:{}", e.getClass().getSimpleName());
+            return ResponseEntity.badRequest().header(HttpHeaders.CACHE_CONTROL, "no-store").build();
         }
     }
 

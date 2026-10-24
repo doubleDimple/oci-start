@@ -9,6 +9,8 @@ import com.doubledimple.ociserver.service.VerifyService;
 import com.doubledimple.ociserver.service.impl.system.SystemConfigService;
 import com.doubledimple.ociserver.service.login.LoginUserService;
 import com.doubledimple.ociserver.service.login.LoginFailureGuard;
+import com.doubledimple.ociserver.service.login.GlobalLoginGuard;
+import com.doubledimple.ociserver.service.security.ExportVerificationGuard;
 import com.doubledimple.ociserver.config.annotations.CheckIpBan;
 import com.doubledimple.ociserver.config.exception.IpBannedException;
 import com.doubledimple.ociserver.service.mfa.OTPService;
@@ -56,6 +58,12 @@ public class LoginController {
     private LoginFailureGuard loginFailureGuard;
 
     @Resource
+    private ExportVerificationGuard exportVerificationGuard;
+
+    @Resource
+    private GlobalLoginGuard globalLoginGuard;
+
+    @Resource
     private SystemConfigService systemConfigService;
 
     @Resource
@@ -72,6 +80,7 @@ public class LoginController {
     @ResponseBody
     public ResponseEntity<Map<String, Object>> bootstrap(HttpServletRequest request) {
         try {
+            GlobalLoginGuard.LoginStatus loginStatus = globalLoginGuard.status();
             HttpSession session = request.getSession();
             String publicKey;
             // Reloads and concurrent tabs must keep the key used by in-flight login requests.
@@ -97,6 +106,9 @@ public class LoginController {
             config.put("messageEnabled", verifyService.isMessageEnabled());
             config.put("mfaEnabled", mfa != null && mfa.isEnabled());
             config.put("locale", LocaleContextHolder.getLocale().toLanguageTag());
+            config.put("loginBlocked", loginStatus.isBlocked());
+            config.put("loginBlockedUntil", loginStatus.getBlockedUntil());
+            config.put("loginBlockedMessage", loginStatus.getMessage());
             return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(config);
         } catch (Exception e) {
             log.error("登录页面初始化失败", e);
@@ -118,6 +130,7 @@ public class LoginController {
         boolean mobile = isMobileRequest(request);
 
         try {
+            globalLoginGuard.assertAllowed();
             String clientIp = loginFailureGuard.assertAllowed(request);
             if (!StringUtils.hasText(username) || !StringUtils.hasText(password)) {
                 redirectError(response, request, isAjax, mobile, "用户名或密码不能为空");
@@ -129,7 +142,27 @@ public class LoginController {
             try {
                 user = loginUserService.validateCredentials(username, password);
             } catch (LoginUserService.CredentialValidationException e) {
-                loginFailureGuard.failed(clientIp, username, e.isUnknownUsername());
+                GlobalLoginGuard.LoginGuardException globalFailure = null;
+                try {
+                    globalLoginGuard.recordCredentialFailure();
+                } catch (GlobalLoginGuard.LoginGuardException failure) {
+                    globalFailure = failure;
+                }
+                if (!e.isUnknownUsername()) {
+                    try {
+                        exportVerificationGuard.recordPasswordFailure(username);
+                    } catch (RuntimeException failure) {
+                        // Never expose storage errors, or replace the existing generic credential rejection.
+                        log.warn("登录密码错误的导出限制记录未完成，异常类型：{}", failure.getClass().getSimpleName());
+                    }
+                }
+                try {
+                    loginFailureGuard.failed(clientIp, username, e.isUnknownUsername());
+                } catch (IpBannedException failure) {
+                    if (globalFailure != null) throw globalFailure;
+                    throw failure;
+                }
+                if (globalFailure != null) throw globalFailure;
                 throw e;
             }
 
@@ -141,14 +174,13 @@ public class LoginController {
             }
 
             // 登录成功，写入 Sa-Token session
-            StpUtil.login(user.getUsername(), rememberMe);
-            try {
+            boolean[] sessionAttempted = {false};
+            loginFailureGuard.withLoginLock(clientIp, () -> globalLoginGuard.completeLogin(() -> {
                 // Only a complete login clears failures; a concurrent ban still wins.
-                loginFailureGuard.loginSucceeded(clientIp);
-            } catch (RuntimeException e) {
-                StpUtil.logout();
-                throw e;
-            }
+                loginFailureGuard.loginSucceededInCurrentTransaction(clientIp);
+                sessionAttempted[0] = true;
+                StpUtil.login(user.getUsername(), rememberMe);
+            }, () -> { if (sessionAttempted[0]) StpUtil.logout(); }));
             log.info("用户 [{}] 登录成功，rememberMe={}", username, rememberMe);
 
             // 登录成功后清除 RSA 密钥，防止重复使用
@@ -164,6 +196,20 @@ public class LoginController {
                 response.getWriter().write("{\"success\":true,\"redirectUrl\":\"" + targetUrl + "\"}");
             } else {
                 response.sendRedirect(targetUrl);
+            }
+        } catch (GlobalLoginGuard.LoginGuardException e) {
+            response.setHeader("Cache-Control", "no-store");
+            if (isAjax) {
+                response.setContentType("application/json;charset=utf-8");
+                response.setStatus(e.isBlocked() ? HttpServletResponse.SC_FORBIDDEN : HttpServletResponse.SC_SERVICE_UNAVAILABLE);
+                Map<String, Object> error = new LinkedHashMap<>();
+                error.put("success", false);
+                error.put("message", e.getMessage());
+                error.put("loginBlocked", e.isBlocked());
+                error.put("loginBlockedUntil", e.getBlockedUntil());
+                objectMapper.writeValue(response.getWriter(), error);
+            } else {
+                redirectError(response, request, false, mobile, e.getMessage());
             }
         } catch (IpBannedException e) {
             throw e;

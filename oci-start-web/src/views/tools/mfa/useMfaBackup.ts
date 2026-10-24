@@ -1,4 +1,5 @@
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch, type Ref } from 'vue'
+import { requestExportVerification } from '@/composables/useExportVerification'
 import {
   MfaApiError, deleteMfaEntry, exportMfaEntries, getMfaCodes, getMfaMaterial, importMfaEntries,
   isMfaId, isMfaRevision, listMfaEntries, mfaError, normalizeMfaCandidate, previewMfa,
@@ -186,7 +187,9 @@ export function useMfaBackup(paused?: Readonly<Ref<boolean>>) {
     let entries: MfaExportEntry[] = [], url: string | undefined, anchor: HTMLAnchorElement | undefined
     const current = () => !disposed && !hidden.value && sequence === exportSequence && exportController === controller && !controller.signal.aborted
     try {
-      entries = await exportMfaEntries(requested, controller.signal)
+      const verificationCode = await requestExportVerification(controller.signal)
+      if (!current() || verificationCode === null) return false
+      entries = await exportMfaEntries(requested, verificationCode, controller.signal)
       if (!current()) return false
       const text = '\uFEFF' + [headers.map(csvCell).join(','), ...entries.map(row =>
         [row.keyName, row.issuer, row.secretKey].map(csvCell).join(','))].join('\r\n') + '\r\n'

@@ -1,5 +1,6 @@
 export default {
   zh: {
+    apiMode: { ordinary: '普通 API', restricted: '受限 API', unknown: '未知 API 模式（受限）' },
     common: {
       unnamed: '未命名', unrecorded: '未记录', unset: '未设置',
       cancel: '取消', close: '关闭', save: '保存', saving: '保存中',
@@ -15,9 +16,9 @@ export default {
       clearFilter: '清除筛选', refreshFailed: '暂时无法刷新',
       loadFailed: '未能读取租户列表，请重新登录或重试',
       tableLabel: '租户表格，可横向滚动',
-      columns: { tenant: '租户', cost: '成本 / 存活', region: '主区域', boot: '开机任务', type: '账号类型', created: '创建时间', status: '状态', actions: '操作' },
+      columns: { tenant: '租户', cost: '成本 / 存活', region: '主区域', boot: '开机任务', type: '账号类型', apiType: 'API 类型', created: '创建时间', status: '状态', actions: '操作' },
       editName: '编辑自定义名称', addName: '添加备注名称', hideName: '隐藏此租户名称', showName: '显示此租户名称',
-      editCost: '编辑账号成本', activeDays: '已存活 {days} 天', multiRegion: '多区域', singleRegion: '单区域',
+      editCost: '编辑账号成本', activeDays: '已存活 {days} 天', activeDaysUnknown: '存活天数未记录', multiRegion: '多区域', singleRegion: '单区域',
       bootRunning: '开机中', noTask: '暂无任务', active: '有效', inactive: '失效', actions: '租户操作',
       noMatches: '没有找到匹配的租户', noTenants: '从你的第一个账号开始',
       noMatchesHint: '试试其他名称，或清除搜索查看全部租户。',
@@ -31,7 +32,7 @@ export default {
     },
     proxy: { forced: '强制代理', bound: '已绑定代理', configure: '配置代理' },
     actions: {
-      permissions: '更新云端权限',
+      permissions: '更新云端权限', downgrade: '一键降权',
       chat: 'AI 对话', boot: '添加开机', update: '更新账号', regions: '租户详情', subscribe: '区域订阅',
       users: '用户管理', traffic: '流量预警', monitor: '流量查询', audit: '审计日志', costs: '费用查询',
       export: '导出租户', email: '邮件服务', social: '社媒配置', quota: '查看配额',
@@ -39,7 +40,7 @@ export default {
     },
     account: {
       personal: '个人', corporate: '公司', corporateSubmitted: '正在审核中的企业',
-      freeTier: '免费账号', payg: '升级账号', multiRegion: '多区域账号', unknown: '未知类型',
+      freeTier: '免费账号', trial: '试用期账号', payg: '升级账号', multiRegion: '多区域账号', unknown: '未知类型',
     },
     delete: {
       description: '删除后，这个租户将从管理列表中移除。请确认已选中正确的账号。',
@@ -59,6 +60,7 @@ export default {
     },
   },
   en: {
+    apiMode: { ordinary: 'Standard API', restricted: 'Restricted API', unknown: 'Unknown API mode (restricted)' },
     common: {
       unnamed: 'Unnamed', unrecorded: 'Not recorded', unset: 'Not set',
       cancel: 'Cancel', close: 'Close', save: 'Save', saving: 'Saving',
@@ -74,9 +76,9 @@ export default {
       clearFilter: 'Clear filter', refreshFailed: 'Unable to refresh',
       loadFailed: 'Unable to load tenants. Please sign in again or retry.',
       tableLabel: 'Tenant table, scroll horizontally for more columns',
-      columns: { tenant: 'Tenant', cost: 'Cost / Age', region: 'Home region', boot: 'Launch tasks', type: 'Account type', created: 'Created', status: 'Status', actions: 'Actions' },
+      columns: { tenant: 'Tenant', cost: 'Cost / Age', region: 'Home region', boot: 'Launch tasks', type: 'Account type', apiType: 'API type', created: 'Created', status: 'Status', actions: 'Actions' },
       editName: 'Edit display name', addName: 'Add display name', hideName: 'Hide this tenant name', showName: 'Show this tenant name',
-      editCost: 'Edit account cost', activeDays: 'Active for {days} days | Active for {days} day | Active for {days} days',
+      editCost: 'Edit account cost', activeDays: 'Active for {days} days | Active for {days} day | Active for {days} days', activeDaysUnknown: 'Account age unavailable',
       multiRegion: 'Multiple regions', singleRegion: 'Single region',
       bootRunning: 'Launching', noTask: 'No tasks', active: 'Valid', inactive: 'Invalid', actions: 'Tenant actions',
       noMatches: 'No matching tenants', noTenants: 'Add your first account',
@@ -91,7 +93,7 @@ export default {
     },
     proxy: { forced: 'Proxy required', bound: 'Proxy assigned', configure: 'Configure proxy' },
     actions: {
-      permissions: 'Update cloud permissions',
+      permissions: 'Update cloud permissions', downgrade: 'Restrict API access',
       chat: 'AI chat', boot: 'Add launch task', update: 'Update account', regions: 'Tenant details', subscribe: 'Region subscriptions',
       users: 'User management', traffic: 'Traffic alerts', monitor: 'Traffic usage', audit: 'Audit logs', costs: 'Cost explorer',
       export: 'Export tenant', email: 'Email service', social: 'Social settings', quota: 'View quotas',
@@ -99,7 +101,7 @@ export default {
     },
     account: {
       personal: 'Personal', corporate: 'Corporate', corporateSubmitted: 'Corporate (under review)',
-      freeTier: 'Free Tier', payg: 'Pay As You Go', multiRegion: 'Multi-region account', unknown: 'Unknown type',
+      freeTier: 'Free Tier', trial: 'Trial account', payg: 'Pay As You Go', multiRegion: 'Multi-region account', unknown: 'Unknown type',
     },
     delete: {
       description: 'This tenant will be removed from the management list. Make sure you have selected the correct account.',

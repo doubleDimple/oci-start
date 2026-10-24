@@ -135,6 +135,8 @@
   .tenant-detail-toolbar h2 { flex: 1; min-width: 0; margin: 0; font-size: var(--font-size-body); font-weight: 600; }
   .tenant-detail-records { min-height: 0; overflow: auto; overscroll-behavior: contain; }
   .tenant-table { width: 100%; min-width: 1090px; border-spacing: 0; border-collapse: separate; text-align: left; font-size: var(--font-size-body); }
+  .tenant-table.has-api-column { min-width: 1200px; }
+  .api-type-column { width: 112px; min-width: 112px; }
   .tenant-table th {
     position: sticky;
     top: 0;
@@ -200,8 +202,8 @@
   .task-running { color: var(--brand); }
   .account-type { display: inline-block; max-width: 160px; color: var(--text-primary); font-size: var(--font-size-body); line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .created-at { color: var(--text-secondary); font-size: var(--font-size-body); font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .tenant-status { display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px; border-radius: var(--r-pill); font-size: var(--font-size-caption); font-weight: 500; white-space: nowrap; }
-  .tenant-status::before { content: ''; width: 5px; height: 5px; flex-shrink: 0; border-radius: 50%; background: currentColor; }
+  .tenant-status, .tenant-api-mode { display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px; border-radius: var(--r-pill); font-size: var(--font-size-caption); font-weight: 500; white-space: nowrap; }
+  .tenant-status::before, .tenant-api-mode::before { content: ''; width: 5px; height: 5px; flex-shrink: 0; border-radius: 50%; background: currentColor; }
   .status-active { background: var(--status-ok-bg); color: var(--status-ok); }
   .status-inactive { background: var(--status-danger-bg); color: var(--status-danger); }
   .row-actions-column {
@@ -525,3 +527,8 @@
 @keyframes tenant-refresh { from { transform: translateX(-110%); } to { transform: translateX(380%); } }
 @keyframes tenant-skeleton-pulse { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
 @keyframes tenant-row-saved { from { background: var(--status-ok-bg); } to { background: var(--bg-card); } }
+
+.tenants-page .tenant-api-mode { align-self: flex-start; width: fit-content; max-width: 100%; border: 1px solid color-mix(in srgb, currentColor 22%, transparent); line-height: 1.5; white-space: normal; }
+.tenants-page .tenant-api-mode.is-ordinary { color: var(--status-info); background: var(--status-info-bg); }
+.tenants-page .tenant-api-mode.is-restricted { color: var(--status-ok); background: var(--status-ok-bg); }
+.tenants-page .tenant-api-mode.is-unknown { color: var(--text-secondary); background: color-mix(in srgb, var(--text-secondary) 12%, var(--bg-card)); }

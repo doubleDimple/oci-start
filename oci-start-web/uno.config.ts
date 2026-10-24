@@ -25,6 +25,7 @@ export default defineConfig({
     'i-mdi-nginx',
     'i-mdi-format-list-bulleted',
     'i-mdi-shield-check-outline',
+    'i-mdi-shield-lock-outline',
     'i-mdi-file-document-outline',
     'i-mdi-tune',
     'i-mdi-swap-horizontal',

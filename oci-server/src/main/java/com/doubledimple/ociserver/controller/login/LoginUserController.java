@@ -46,8 +46,10 @@ public class LoginUserController  extends BaseController {
         try {
             loginUserService.registerFirstUser(request.getUsername(), request.getPassword());
             return ResponseEntity.ok().build();
-        } catch (Exception e) {
+        } catch (LoginUserService.FirstRegistrationException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("首次注册未完成，请稍后重试；如已存在账号，请使用已有账号登录");
         }
     }
 

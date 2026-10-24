@@ -13,6 +13,8 @@ import com.doubledimple.ociserver.pojo.request.MfaConfig;
 import com.doubledimple.ociserver.pojo.request.MfaConfigRequest;
 import com.doubledimple.ociserver.service.login.LoginUserService;
 import com.doubledimple.ociserver.service.login.LoginFailureGuard;
+import com.doubledimple.ociserver.service.security.ExportVerificationGuard;
+import com.doubledimple.ociserver.service.login.GlobalLoginGuard;
 import com.doubledimple.ociserver.service.message.factory.MessageFactory;
 import com.doubledimple.ociserver.pojo.request.DingTalkConfig;
 import com.doubledimple.ociserver.pojo.request.TelegramConfig;
@@ -27,6 +29,8 @@ import org.springframework.stereotype.Service;
 import javax.annotation.PostConstruct;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
+import java.security.SecureRandom;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
@@ -50,6 +54,9 @@ public class VerifyServiceImpl implements VerifyService {
 
     private static final String VERIFICATION_CODE_PREFIX = "terminate_verify_";
     private static final String VERIFICATION_CODE_LOGIN_PREFIX = "terminate_verify_login_";
+    private static final String ALPHANUMERIC_CODE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    private static final int ALPHANUMERIC_CODE_LENGTH = 8;
+    private static final SecureRandom ALPHANUMERIC_CODE_RANDOM = new SecureRandom();
 
     // 密码重置验证码前缀
     private static final String VERIFICATION_CODE_RESET_PREFIX = "reset_verify_";
@@ -90,6 +97,12 @@ public class VerifyServiceImpl implements VerifyService {
     @Resource
     private LoginFailureGuard loginFailureGuard;
 
+    @Resource
+    private ExportVerificationGuard exportVerificationGuard;
+
+    @Resource
+    private GlobalLoginGuard globalLoginGuard;
+
     @PostConstruct
     public void init() {
         // 初始化Guava Cache，设置5分钟过期时间
@@ -116,6 +129,22 @@ public class VerifyServiceImpl implements VerifyService {
             code.append(random.nextInt(10));
         }
         return code.toString();
+    }
+
+    private static String generateAlphanumericVerificationCode() {
+        // Rejection sampling keeps all eight-character codes containing both classes equally likely.
+        while (true) {
+            char[] code = new char[ALPHANUMERIC_CODE_LENGTH];
+            boolean hasLetter = false;
+            boolean hasDigit = false;
+            for (int i = 0; i < code.length; i++) {
+                char value = ALPHANUMERIC_CODE_ALPHABET.charAt(ALPHANUMERIC_CODE_RANDOM.nextInt(ALPHANUMERIC_CODE_ALPHABET.length()));
+                code[i] = value;
+                hasLetter |= value >= 'A' && value <= 'Z';
+                hasDigit |= value >= '0' && value <= '9';
+            }
+            if (hasLetter && hasDigit) return new String(code);
+        }
     }
 
     @Override
@@ -185,14 +214,15 @@ public class VerifyServiceImpl implements VerifyService {
 
     @Override
     public void sendVerificationCodeForLogin(String username,HttpServletRequest  request) {
+        globalLoginGuard.assertAllowed();
         String clientIp = loginFailureGuard.assertAllowed(request);
         Optional<LoginUser> loginUserOptional = loginUserRepository.findByUsername(username);
         if (!loginUserOptional.isPresent()){
             loginFailureGuard.failed(clientIp, username, true);
             throw new IllegalStateException("用户名或密码错误");
         }
-        // 生成6位随机验证码
-        String verificationCode = generateVerificationCode();
+        // 登录及敏感导出使用八位大写字母和数字；MFA、密码重置等用途保留原格式。
+        String verificationCode = generateAlphanumericVerificationCode();
         log.info("用户:{} 已生成登录验证码", username);
         // 将验证码存入Guava Cache
         String cacheKey = VERIFICATION_CODE_LOGIN_PREFIX + username;
@@ -215,7 +245,8 @@ public class VerifyServiceImpl implements VerifyService {
             throw new IllegalStateException("验证码已过期，请重新获取");
         }
 
-        if (!savedCode.equals(verificationCode)) {
+        String normalizedCode = verificationCode == null ? "" : verificationCode.trim().toUpperCase(Locale.ROOT);
+        if (!normalizedCode.matches("[A-Z0-9]{8}") || !savedCode.equals(normalizedCode)) {
             throw new IllegalStateException("验证码错误");
         }
         // 验证通过后立即删除验证码
@@ -348,32 +379,22 @@ public class VerifyServiceImpl implements VerifyService {
 
     @Override
     public void sendVerifyCodeForExport(String username, HttpServletRequest request) {
-        // 1. 检查用户是否存在（安全性检查）
-        Optional<LoginUser> loginUserOptional = loginUserRepository.findByUsername(username);
-        if (!loginUserOptional.isPresent()) {
-            final String clientIpAddress = getClientIpAddress(request).replace('.', '_');
-            messageFactory.getType(MessageEnum.TELEGRAM).sendMessageTemplateText(String.format(MESSAGE_MALICIOUS_LOGIN_TEMPLATE_V_2,
-                    getCurrentPublicIpAndAddress(request), username, clientIpAddress, clientIpAddress));
-            throw new IllegalStateException("用户不存在，非法导出操作");
-        }
+        // The stable account ID also keys the code, so changing a username cannot reset the daily limit.
+        ExportCode issued = exportVerificationGuard.issueCode(username, userId -> {
+            String code = generateAlphanumericVerificationCode();
+            String cacheKey = VERIFICATION_CODE_EXPORT_PREFIX + userId;
+            verificationCodeCache.put(cacheKey, code);
+            return new ExportCode(cacheKey, code);
+        });
 
-        log.info("用户:{} 请求导出数据验证码", username);
-
-        // 2. 生成6位随机验证码
-        String verificationCode = generateVerificationCode();
-
-        // 3. 将验证码存入 Guava Cache (复用已有的 5分钟过期配置)
-        String cacheKey = VERIFICATION_CODE_EXPORT_PREFIX + username;
-        verificationCodeCache.put(cacheKey, verificationCode);
-
-        // 4. 发送通知
+        // Notification I/O happens after the account transaction releases its lock.
         try {
-            // 你可以在 MessageTemplate 中定义专门的导出模板，或者复用类似的逻辑
-            String message = String.format(MESSAGE_DATA_EXPORT_CODE_TEMPLATE, username, verificationCode);
+            String message = String.format(MESSAGE_DATA_EXPORT_CODE_TEMPLATE, username, issued.code);
             messageFactory.getType(MessageEnum.TELEGRAM).sendMessageTemplateText(message,Boolean.FALSE);
-
             log.info("用户:{} 导出验证码已发送", username);
         } catch (Exception e) {
+            // Do not erase a newer code if another request issued one while this notification was pending.
+            verificationCodeCache.asMap().remove(issued.cacheKey, issued.code);
             log.error("导出验证码发送失败，异常类型:{}", e.getClass().getSimpleName());
             throw new IllegalStateException("验证码发送失败，请稍后重试");
         }
@@ -381,22 +402,20 @@ public class VerifyServiceImpl implements VerifyService {
 
     @Override
     public void checkCodeForExport(String username, String verificationCode) {
-        // 1. 从缓存获取
-        String cacheKey = VERIFICATION_CODE_EXPORT_PREFIX + username;
-        String savedCode = verificationCodeCache.getIfPresent(cacheKey);
-
-        if (savedCode == null) {
-            throw new IllegalStateException("验证码已过期，请重新获取");
-        }
-
-        // 2. 校验
-        if (!savedCode.equals(verificationCode)) {
-            throw new IllegalStateException("验证码错误");
-        }
-
-        // 3. 验证成功后立即作废，防止验证码被二次使用
-        verificationCodeCache.invalidate(cacheKey);
+        exportVerificationGuard.verify(username, verificationCode,
+                userId -> verificationCodeCache.getIfPresent(VERIFICATION_CODE_EXPORT_PREFIX + userId),
+                (userId, savedCode) -> verificationCodeCache.asMap().remove(VERIFICATION_CODE_EXPORT_PREFIX + userId, savedCode));
         log.info("用户:{} 导出验证码校验通过", username);
+    }
+
+    private static final class ExportCode {
+        private final String cacheKey;
+        private final String code;
+
+        private ExportCode(String cacheKey, String code) {
+            this.cacheKey = cacheKey;
+            this.code = code;
+        }
     }
 
     /**

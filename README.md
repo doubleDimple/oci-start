@@ -137,7 +137,39 @@ server:
 
 ### Nginx 反向代理
 
-如需通过域名访问,Nginx 需配置 WebSocket 转发(用于 VNC 控制台):
+客户端 IP 默认取实际连接来源,忽略所有代理请求头。仅使用公网 `IP:9856` 直连时,保持 `client-ip.trusted-proxies` 为空即可。
+
+如果同时使用公网端口直连和同机 Nginx / 宝塔反向代理,在应用配置中加入以下内容并重启应用:
+
+```yaml
+server:
+  port: 9856
+  forward-headers-strategy: none
+client-ip:
+  trusted-proxies: "127.0.0.1/32,::1/128"
+```
+
+也可用环境变量 `CLIENT_IP_TRUSTED_PROXIES` 设置逗号分隔的可信代理 IP / CIDR,默认值为空。`server.forward-headers-strategy` 必须为 `none`,同时不能设置 `server.tomcat.remoteip.remote-ip-header` 或 `server.tomcat.remoteip.protocol-header`;冲突配置会阻止应用启动,以免容器提前改写连接来源。
+
+在 Nginx / 宝塔站点的 `server` 块内配置应用转发,确保 `/perform_login` 等登录路径也使用这些请求头,检查配置后重载 Nginx:
+
+```nginx
+location / {
+    proxy_pass http://127.0.0.1:9856;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+此示例适用于 Nginx 直接接收公网请求的单层代理,会覆盖客户端自行填写的 IP 头。公网端口直连请求仍使用真实连接 IP,只有来自已配置代理的请求才读取 `X-Forwarded-For`;应用从右向左剥离可信代理,取第一个不受信任的地址。其他 IP 头不用于登录封禁。可信代理请求缺少 `X-Forwarded-For`、可信链路段包含非法地址或无法确定客户端地址时,受 IP 保护的接口会拒绝访问。若前面还有 CDN / 负载均衡,应按实际链路配置可信代理和入口头部清洗,不要直接套用单层代理示例。
+
+Docker 部署中,应用看到的代理连接来源可能是网桥地址而非 `127.0.0.1`,应只配置实际代理的单个 IP 或必要的最小 CIDR。先确认公网直连和反代请求的连接来源能够区分;如果两者都被 NAT 成同一个地址,需调整网络或隔离入口后再信任该地址。不要信任整个内网,也不要配置 `0.0.0.0/0` 或 `::/0`。
+
+修复前产生的 `127.0.0.1` 等误封记录不会自动解除。核对历史日志后,按需在封禁管理中手动解封,不要批量解除所有封禁。
+
+VNC 控制台还需要以下 WebSocket 转发配置:
 
 ```nginx
 location ~ ^/websockify/(\d+)$ {
@@ -152,7 +184,7 @@ location ~ ^/websockify/(\d+)$ {
 }
 ```
 
-> 旧版本升级时,除 `security` 配置需完全删除外,其他配置项保持不变即可。
+> 旧版本升级时,删除旧 `security` 配置,并按上述要求检查可信代理及 `server.forward-headers-strategy` 配置。
 
 ---
 

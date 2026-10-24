@@ -16,6 +16,7 @@ import com.doubledimple.ociserver.service.MetricsService;
 import com.doubledimple.ociserver.service.VerifyService;
 import com.doubledimple.ociserver.service.impl.system.SystemConfigService;
 import com.doubledimple.ociserver.service.mfa.OTPService;
+import com.doubledimple.ociserver.service.login.GlobalLoginGuard;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.http.HttpStatus;
@@ -167,7 +168,10 @@ public class ApiController  extends BaseController{
     public ResponseEntity<String> sendVerificationCode(@RequestBody @Valid UsernameRequest request, HttpServletRequest  httpServletRequest) {
         try {
             verifyService.sendVerificationCodeForLogin(request.getUsername(),httpServletRequest);
-            return ResponseEntity.ok().build();
+            return ResponseEntity.ok().header("Cache-Control", "no-store").build();
+        } catch (GlobalLoginGuard.LoginGuardException e) {
+            return ResponseEntity.status(e.isBlocked() ? HttpStatus.FORBIDDEN : HttpStatus.SERVICE_UNAVAILABLE)
+                    .header("Cache-Control", "no-store").body(e.getMessage());
         } catch (IpBannedException e) {
             throw e;
         } catch (RateLimitException e) {

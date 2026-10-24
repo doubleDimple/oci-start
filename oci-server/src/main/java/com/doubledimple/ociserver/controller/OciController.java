@@ -19,6 +19,8 @@ import com.doubledimple.ocicommon.param.ApiResponse;
 import com.doubledimple.ociserver.pojo.response.InstanceDetailsRes;
 import com.doubledimple.ociserver.service.MetricsService;
 import com.doubledimple.ociserver.service.VerifyService;
+import com.doubledimple.ociserver.config.context.UserContext;
+import com.doubledimple.ociserver.service.security.ExportVerificationGuard;
 import com.oracle.bmc.core.ComputeClient;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -31,6 +33,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
@@ -88,7 +91,18 @@ public class OciController  extends BaseController{
      */
     @GetMapping("/export")
     @ResponseBody
-    public ResponseEntity<byte[]> exportInstances() {
+    public ResponseEntity<byte[]> exportInstances(HttpServletRequest request) {
+        try {
+            verifyService.checkCodeForExport(UserContext.getUsername(), request.getHeader("X-Verify-Code"));
+        } catch (ExportVerificationGuard.ExportVerificationException exception) {
+            return ResponseEntity.status(403).header(HttpHeaders.CACHE_CONTROL, "no-store")
+                    .contentType(MediaType.parseMediaType("text/plain;charset=UTF-8"))
+                    .body(exception.getMessage().getBytes(StandardCharsets.UTF_8));
+        } catch (Exception exception) {
+            return ResponseEntity.status(500).header(HttpHeaders.CACHE_CONTROL, "no-store")
+                    .contentType(MediaType.parseMediaType("text/plain;charset=UTF-8"))
+                    .body("导出验证未完成，请稍后重试".getBytes(StandardCharsets.UTF_8));
+        }
         Map<Long, Tenant> tenantMap = new HashMap<>();
         for (Tenant t : tenantRepository.findAll()) {
             tenantMap.put(t.getId(), t);
@@ -163,6 +177,7 @@ public class OciController  extends BaseController{
         String filename = "oci-instances-" + fts.format(now) + ".txt";
 
         HttpHeaders headers = new HttpHeaders();
+        headers.setCacheControl("no-store");
         headers.setContentType(MediaType.parseMediaType("text/plain; charset=utf-8"));
         headers.setContentDispositionFormData("attachment", filename);
         headers.setContentLength(body.length);

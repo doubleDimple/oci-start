@@ -1,5 +1,6 @@
 import { tenantCsrfToken } from './tenant'
 import { checkSession, handleSessionResponse } from '@/utils/session'
+import { ExportVerificationError, isExportCode, normalizeExportCode, readExportResponseError, safeExportMessage } from './exportVerification'
 
 export const MAX_BACKUP_BYTES = 10 * 1024 * 1024
 export interface MigrationExportArtifact { blob: Blob; masterKey: string; filename: string }
@@ -108,13 +109,17 @@ function validResponseUrl(response: Response, path: string): boolean {
 function statusError(status: number): MigrationErrorKey {
   return status === 401 ? 'unauthorized' : status === 403 ? 'forbidden' : 'requestFailed'
 }
-export async function exportEncryptedBackup(signal?: AbortSignal): Promise<MigrationExportArtifact> {
+export async function exportEncryptedBackup(verificationCode: string, signal?: AbortSignal): Promise<MigrationExportArtifact> {
   try {
+    if (!isExportCode(verificationCode)) return fail('requestFailed')
+    const exportHeaders = headers('application/octet-stream')
+    exportHeaders.set('X-Verify-Code', normalizeExportCode(verificationCode))
     const response = await fetch(EXPORT_PATH, { method: 'GET', credentials: 'same-origin', redirect: 'manual',
-      cache: 'no-store', headers: headers('application/octet-stream'), signal })
+      cache: 'no-store', headers: exportHeaders, signal })
     handleSessionResponse({ status: response.status, url: response.url })
     if (response.type === 'opaqueredirect') void checkSession()
     if (!validResponseUrl(response, EXPORT_PATH)) return fail('invalidResponse')
+    if (!response.ok) throw new MigrationApiError(statusError(response.status), await readExportResponseError(response))
     if (response.headers.get('Content-Type')?.split(';')[0]?.trim().toLowerCase() === 'application/json') {
       // Only inspect a bounded JSON error, never decode the backup as JSON.
       try {
@@ -123,7 +128,6 @@ export async function exportEncryptedBackup(signal?: AbortSignal): Promise<Migra
         handleSessionResponse({ body })
       } catch { /* Preserve the export's original response validation below. */ }
     }
-    if (!response.ok) return fail(statusError(response.status))
     if (response.headers.get('Content-Type')?.split(';')[0]?.trim().toLowerCase() !== 'application/octet-stream') return fail('invalidResponse')
     let masterKey: string
     try { masterKey = normalizeMigrationKey(response.headers.get('X-MASTER-KEY') || '') }
@@ -195,7 +199,8 @@ export async function importEncryptedBackup(file: File, masterKey: string): Prom
   } finally { form.delete('masterKey'); form.delete('file') }
 }
 export function migrationError(cause: unknown): MigrationApiError {
-  if (cause instanceof MigrationApiError) return new MigrationApiError(cause.key, '', cause.outcome)
+  if (cause instanceof MigrationApiError) return new MigrationApiError(cause.key, safeExportMessage(cause.detail), cause.outcome)
+  if (cause instanceof ExportVerificationError) return new MigrationApiError('requestFailed', safeExportMessage(cause.message))
   if (object(cause) && cause.name === 'AbortError') return new MigrationApiError('cancelled')
   return new MigrationApiError('requestFailed')
 }

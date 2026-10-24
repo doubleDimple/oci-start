@@ -9,6 +9,7 @@ import com.oracle.bmc.http.internal.ClientCall;
 import com.oracle.bmc.identitydomains.IdentityDomainsClient;
 import com.oracle.bmc.requests.BmcRequest;
 import com.oracle.bmc.responses.BmcResponse;
+import org.slf4j.helpers.NOPLogger;
 
 import java.util.List;
 import java.util.Map;
@@ -36,6 +37,9 @@ final class ManagedDomainGrantClient extends IdentityDomainsClient {
         RawRequest request = new RawRequest(body);
         ClientCall<RawRequest, RawResponse, RawResponse.Builder> call =
                 clientCall(request, RawResponse.Builder::new)
+                        // ClientCall requires a logger even when logging is disabled. Its DEBUG/TRACE
+                        // logs include request URIs and SDK errors, so keep this credentialed transport quiet.
+                        .logger(NOPLogger.NOP_LOGGER, "ManagedDomainGrant")
                         .serviceDetails("IdentityDomains", "ManagedDomainGrant", "")
                         .method(method)
                         .requestBuilder(RawRequest.Builder::new)

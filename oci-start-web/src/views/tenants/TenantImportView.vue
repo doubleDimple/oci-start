@@ -12,8 +12,9 @@ import { usePageMotion } from '@/composables/usePageMotion'
 import { isManagedTenant, loadTenantPermissionContext } from '@/utils/tenantPermissions'
 import { REGION_COORDINATES, regionCityName } from '@/views/regions/regionCoords'
 import {
-  parseOciConfig, parseGcpConfig, saveTenantCredentials, tenantImportError, getTenantPermissionCatalog,
-  type ImportProvider, type TenantImportFields, type OciProfile, type TenantPermissionOption,
+  parseOciConfig, parseGcpConfig, saveTenantCredentials, tenantImportError, tenantImportOutcomeUnknown, getTenantPermissionCatalog,
+  downgradeTenantCredentials, isLocalTenantId, loadTenantDowngradeBackup, sendTenantBackupCode,
+  type ImportProvider, type TenantImportFields, type OciProfile, type TenantPermissionOption, type TenantDowngradeSource,
 } from '@/api/tenantImport'
 
 type Field = keyof TenantImportFields
@@ -29,7 +30,9 @@ const keyPicker = ref<HTMLInputElement | null>(null)
 const keyButton = ref<HTMLButtonElement | null>(null)
 usePageMotion(root)
 const providerOptions: ImportProvider[] = [1]
+const downgradingTenant = computed(() => route.query.downgradeTenantId !== undefined)
 const provider = computed<ImportProvider | null>(() => {
+  if (downgradingTenant.value) return 1
   const value = route.query.cloudType ?? String(shell.cloudType)
   const parsed = value === '1' ? 1 : value === '2' ? 2 : null
   if (parsed && !providerOptions.includes(parsed)) return 1
@@ -41,6 +44,15 @@ const defaultManagedUserName = 'oci-start-operator'
 const managedUserName = ref(defaultManagedUserName)
 const managedNameInvalid = ref(false)
 const updatingManagedTenant = computed(() => typeof route.query.managedTenantId === 'string' && Boolean(route.query.managedTenantId))
+const downgradeSource = shallowRef<TenantDowngradeSource | null>(null)
+const backupConfirmed = ref(false)
+const backupConfirmationInvalid = ref(false)
+const backupCode = ref('')
+const backupCodeSent = ref(false)
+const backupBusy = ref(false)
+const backupError = ref('')
+const backupDownloaded = ref(false)
+let backupController: AbortController | undefined
 const restrictedMode = ref(false)
 const passwordResetUsers = ref('')
 const userManagementGroups = ref('')
@@ -48,7 +60,7 @@ const invalidScopeFields = ref(new Set<string>())
 const parseScopeIds = (value: string) => [...new Set(value.split(/[\s,;，；]+/).filter(Boolean))]
 const configHintKey = computed(() => provider.value === 2 ? 'configHintGcp' : restrictedMode.value ? 'configHintOci' : 'directConfigHint')
 const keyHintKey = computed(() => provider.value === 2 ? 'keyFileHintGcp' : restrictedMode.value ? 'keyFileHintOci' : 'directKeyHint')
-const saveHintKey = computed(() => provider.value === 2 ? 'gcpSaveHint' : restrictedMode.value ? 'ociSaveHint' : 'directSaveHint')
+const saveHintKey = computed(() => downgradingTenant.value ? 'downgradeSaveHint' : provider.value === 2 ? 'gcpSaveHint' : restrictedMode.value ? 'ociSaveHint' : 'directSaveHint')
 const permissionCatalog = ref<TenantPermissionOption[]>([])
 const selectedPermissions = ref<string[]>([])
 const catalogLoading = ref(false)
@@ -91,6 +103,23 @@ async function loadPermissionCatalog() {
     if (controller.signal.aborted) return
     permissionCatalog.value = catalog
     selectedPermissions.value = catalog.filter(item => item.supported && (item.required || item.defaultEnabled)).map(item => item.code)
+    if (downgradingTenant.value) {
+      downgradeSource.value = null
+      const sourceId = route.query.downgradeTenantId
+      if (!isLocalTenantId(sourceId) || updatingManagedTenant.value) throw new Error(t('tenantImport.invalidDowngradeTenant'))
+      const source = await loadTenantPermissionContext(sourceId, controller.signal)
+      if (controller.signal.aborted) return
+      if ((source.permissionMode != null && source.permissionMode !== '') || Number(source.cloudType) !== 1 || Number(source.transferStatus || 0) === 1
+        || typeof source.tenantId !== 'string' || !source.tenantId.trim()
+        || typeof source.tenancy !== 'string' || !source.tenancy.trim()) throw new Error(t('tenantImport.invalidDowngradeTenant'))
+      // Retain display/identity metadata only. Bootstrap credentials stay on the server.
+      downgradeSource.value = {
+        id: sourceId, userId: source.tenantId, tenancy: source.tenancy,
+        name: source.defName || source.tenancyName || source.userName || sourceId,
+        region: source.regionEn || source.region || '',
+      }
+      return
+    }
     const existingId = route.query.managedTenantId
     if (updatingManagedTenant.value && (typeof existingId !== 'string' || !/^[1-9]\d*$/.test(existingId))) {
       throw new Error(t('tenantImport.invalidManagedTenant'))
@@ -117,7 +146,7 @@ async function loadPermissionCatalog() {
   }
 }
 function chooseImportMode(restricted: boolean) {
-  if (saving.value || saved.value || updatingManagedTenant.value || restrictedMode.value === restricted) return
+  if (saving.value || saved.value || updatingManagedTenant.value || downgradingTenant.value || restrictedMode.value === restricted) return
   restrictedMode.value = restricted
   saveError.value = null
   managedNameInvalid.value = false
@@ -191,6 +220,8 @@ const parseNote = ref('')
 const fileErrorKey = ref('')
 const invalidFields = ref(new Set<Field>())
 const saveError = shallowRef<unknown>(null)
+const cleanupWarnings = ref<string[]>([])
+const saveOutcomeUnknown = computed(() => Boolean(saveError.value) && tenantImportOutcomeUnknown(saveError.value))
 const locked = computed(() => saving.value || saved.value || (provider.value === 1 && restrictedMode.value && catalogLoading.value))
 const configDirty = computed(() => Boolean(configText.value.trim()) && configText.value !== parsedText.value)
 const fileSize = computed(() => {
@@ -217,6 +248,16 @@ function stopInputWork() {
 }
 function resetInputs() {
   stopInputWork()
+  backupController?.abort()
+  backupController = undefined
+  downgradeSource.value = null
+  backupConfirmed.value = false
+  backupConfirmationInvalid.value = false
+  backupCode.value = ''
+  backupCodeSent.value = false
+  backupBusy.value = false
+  backupError.value = ''
+  backupDownloaded.value = false
   Object.assign(form, emptyFields())
   managedUserName.value = defaultManagedUserName
   managedNameInvalid.value = false
@@ -235,6 +276,7 @@ function resetInputs() {
   fileErrorKey.value = ''
   invalidFields.value = new Set()
   saveError.value = null
+  cleanupWarnings.value = []
   saved.value = false
   dragging.value = false
   dragDepth = 0
@@ -242,18 +284,70 @@ function resetInputs() {
   if (keyPicker.value) keyPicker.value.value = ''
 }
 async function clearForm() {
-  if (saving.value || catalogLoading.value) return
+  if (saving.value || saved.value || catalogLoading.value) return
   resetInputs()
-  if (provider.value === 1 && typeof route.query.managedTenantId === 'string') await loadPermissionCatalog()
+  if (provider.value === 1 && (updatingManagedTenant.value || downgradingTenant.value)) await loadPermissionCatalog()
   void nextTick(() => configInput.value?.focus())
 }
 function changeProvider(next: ImportProvider) {
-  if (saving.value || next === provider.value) return
+  if (saving.value || downgradingTenant.value || next === provider.value) return
   shell.setCloud(next)
   void router.replace({ path: '/tenants/addSpeed', query: { cloudType: String(next) } })
 }
 function goBack() {
   void router.push({ path: '/tenants/list', query: { cloudType: String(provider.value || 1) } })
+}
+async function sendBackupCode() {
+  if (!downgradeSource.value || backupBusy.value || locked.value) return
+  const controller = new AbortController()
+  backupController = controller
+  backupBusy.value = true
+  backupError.value = ''
+  try {
+    await sendTenantBackupCode(controller.signal)
+    if (controller.signal.aborted) return
+    backupCodeSent.value = true
+    backupCode.value = ''
+  } catch (error) {
+    if (!controller.signal.aborted) backupError.value = tenantImportError(error)
+  } finally {
+    if (!controller.signal.aborted) { backupBusy.value = false; backupController = undefined }
+  }
+}
+function setBackupCode(event: Event) {
+  const input = event.target as HTMLInputElement
+  backupCode.value = input.value.trim().toUpperCase()
+  input.value = backupCode.value
+}
+async function downloadBackup() {
+  if (!downgradeSource.value || backupBusy.value || locked.value || !/^[A-Z0-9]{8}$/.test(backupCode.value)) return
+  const controller = new AbortController()
+  backupController = controller
+  backupBusy.value = true
+  backupError.value = ''
+  backupDownloaded.value = false
+  try {
+    const source = downgradeSource.value
+    const blob = await loadTenantDowngradeBackup(source, backupCode.value, controller.signal)
+    if (controller.signal.aborted) return
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    try {
+      anchor.href = url
+      anchor.download = `tenant_${source.id}_original_api.json`
+      document.body.appendChild(anchor)
+      anchor.click()
+      backupDownloaded.value = true
+      backupCode.value = ''
+    } finally {
+      anchor.remove()
+      URL.revokeObjectURL(url)
+    }
+  } catch (error) {
+    if (!controller.signal.aborted) backupError.value = tenantImportError(error)
+  } finally {
+    if (!controller.signal.aborted) { backupBusy.value = false; backupController = undefined }
+  }
 }
 function editField(field: Field) {
   const next = new Set(invalidFields.value)
@@ -430,7 +524,12 @@ async function focusInvalid() {
   else keyButton.value?.focus()
 }
 async function submit() {
-  if (!provider.value || locked.value || reading.value) return
+  if (!provider.value || locked.value || reading.value || backupBusy.value) return
+  if (downgradingTenant.value) {
+    if (!downgradeSource.value) return
+    backupConfirmationInvalid.value = !backupConfirmed.value
+    if (!backupConfirmed.value) { root.value?.querySelector<HTMLInputElement>('#downgrade-backup-confirmed')?.focus(); return }
+  }
   if (provider.value === 1 && restrictedMode.value) {
     managedNameInvalid.value = !managedUserName.value.trim()
     if (managedNameInvalid.value) {
@@ -454,16 +553,18 @@ async function submit() {
       return
     }
   }
-  if (configDirty.value && !parseConfig()) { await focusInvalid(); return }
-  const missing = new Set<Field>()
-  for (const field of fieldDefinitions.value) if (!form[field.id].trim()) missing.add(field.id)
-  if (provider.value === 1 && !form.region.trim()) missing.add('region')
-  invalidFields.value = missing
-  fileErrorKey.value = !keyFile.value ? 'requiredFile' : !keyFile.value.size ? 'emptyFile' : fileErrorKey.value
-  // Authentication reads the JSON identity; the target project remains editable
-  // for service accounts authorized to manage resources in another project.
-  if (gcpMismatch.value) fileErrorKey.value = 'fileMismatch'
-  if (missing.size || fileErrorKey.value || parseError.value || !keyFile.value) { await focusInvalid(); return }
+  if (!downgradingTenant.value) {
+    if (configDirty.value && !parseConfig()) { await focusInvalid(); return }
+    const missing = new Set<Field>()
+    for (const field of fieldDefinitions.value) if (!form[field.id].trim()) missing.add(field.id)
+    if (provider.value === 1 && !form.region.trim()) missing.add('region')
+    invalidFields.value = missing
+    fileErrorKey.value = !keyFile.value ? 'requiredFile' : !keyFile.value.size ? 'emptyFile' : fileErrorKey.value
+    // Authentication reads the JSON identity; the target project remains editable
+    // for service accounts authorized to manage resources in another project.
+    if (gcpMismatch.value) fileErrorKey.value = 'fileMismatch'
+    if (missing.size || fileErrorKey.value || parseError.value || !keyFile.value) { await focusInvalid(); return }
+  }
   const cloud = provider.value
   const file = keyFile.value
   const fields = { ...form }
@@ -473,15 +574,23 @@ async function submit() {
   saveController = controller
   saving.value = true
   saveError.value = null
+  cleanupWarnings.value = []
   try {
-    await saveTenantCredentials(cloud, fields, file, controller.signal, cloud === 1 && restrictedMode.value
+    let warnings: string[] = []
+    const options = cloud === 1 && restrictedMode.value
       ? { managedUserName: managedUserName.value, permissions: selectedPermissions.value, accountScope: {
         allUsers: false,
         passwordResetUserIds: selectedPermissions.value.includes('USER_PASSWORD_RESET') ? parseScopeIds(passwordResetUsers.value) : [],
         userManagementGroupIds: selectedPermissions.value.includes('DOMAIN_USER_MANAGE') ? parseScopeIds(userManagementGroups.value) : [],
       } }
-      : undefined)
+      : undefined
+    if (downgradingTenant.value && downgradeSource.value && options) {
+      warnings = await downgradeTenantCredentials(downgradeSource.value.id, options, backupConfirmed.value, controller.signal)
+    } else {
+      await saveTenantCredentials(cloud, fields, file!, controller.signal, options)
+    }
     if (version !== pageVersion || controller.signal.aborted) return
+    cleanupWarnings.value = warnings
     saved.value = true
     // Drop the bootstrap identity immediately after success, even if navigation fails.
     keyFile.value = null
@@ -490,25 +599,25 @@ async function submit() {
     profiles.value = []
     form.tenantId = ''
     form.fingerprint = ''
-    ElMessage.success(t('tenantImport.saveSuccess'))
+    ElMessage.success(t(downgradingTenant.value ? 'tenantImport.downgradeSuccess' : 'tenantImport.saveSuccess'))
   } catch (error) {
     if (version === pageVersion && !controller.signal.aborted) saveError.value = error
   } finally {
     if (version === pageVersion && !controller.signal.aborted) { saving.value = false; saveController = undefined }
   }
-  if (saved.value && version === pageVersion) {
+  if (saved.value && version === pageVersion && !cleanupWarnings.value.length) {
     shell.setCloud(cloud)
     // Saving and navigation have separate outcomes. Keep the saved state if navigation fails.
     void router.push({ path: '/tenants/list', query: { cloudType: String(cloud) } }).catch(() => {})
   }
 }
-watch([provider, () => route.query.managedTenantId], ([cloud]) => {
+watch([provider, () => route.query.managedTenantId, () => route.query.downgradeTenantId], ([cloud]) => {
   pageVersion += 1
   saveController?.abort()
   saveController = undefined
   saving.value = false
   resetInputs()
-  restrictedMode.value = cloud === 1 && updatingManagedTenant.value
+  restrictedMode.value = cloud === 1 && (updatingManagedTenant.value || downgradingTenant.value)
   if (restrictedMode.value) void loadPermissionCatalog()
   else {
     catalogController?.abort()
@@ -538,25 +647,53 @@ onBeforeUnmount(() => {
       <div class="import-toolbar">
         <PageBackButton :disabled="saving" :title="t('tenantImport.back')" @click="goBack" />
         <div class="provider-switch" role="group" :aria-label="t('tenantImport.providerLabel')">
-          <button v-for="cloud in providerOptions" :key="cloud" type="button" :aria-pressed="provider === cloud" :disabled="saving" @click="changeProvider(cloud)">
+          <button v-for="cloud in providerOptions" :key="cloud" type="button" :aria-pressed="provider === cloud" :disabled="saving || downgradingTenant" @click="changeProvider(cloud)">
             <img :src="cloud === 1 ? '/images/oracle.png' : '/images/google.png'" alt="" />{{ t(`tenantImport.${cloud === 1 ? 'ociProvider' : 'gcpProvider'}`) }}
           </button>
         </div>
         <div class="import-toolbar-actions" data-page-error-anchor>
-          <GhostBtn :disabled="saving || catalogLoading || !provider" @click="clearForm">{{ t('tenantImport.clear') }}</GhostBtn>
-          <PrimaryBtn type="submit" :loading="saving" :disabled="!provider || reading || saved || (provider === 1 && restrictedMode && (catalogLoading || !!catalogError || !permissionCatalog.length))"><i v-if="!saving" class="i-mdi-check" aria-hidden="true" />{{ t(`tenantImport.${saving ? 'saving' : 'save'}`) }}</PrimaryBtn>
+          <GhostBtn :disabled="saving || saved || catalogLoading || !provider" @click="clearForm">{{ t('tenantImport.clear') }}</GhostBtn>
+          <PrimaryBtn type="submit" :loading="saving" :disabled="!provider || reading || saved || backupBusy || (downgradingTenant && (!downgradeSource || !backupConfirmed)) || (provider === 1 && restrictedMode && (catalogLoading || !!catalogError || !permissionCatalog.length))"><i v-if="!saving" class="i-mdi-check" aria-hidden="true" />{{ t(`tenantImport.${saving ? 'saving' : downgradingTenant ? 'downgradeSubmit' : 'save'}`) }}</PrimaryBtn>
         </div>
       </div>
 
       <div v-if="!provider" class="unsupported-provider" role="status"><i class="i-mdi-cloud-outline" aria-hidden="true" /><p>{{ t('tenantImport.unsupportedProvider') }}</p></div>
       <template v-else>
-        <div v-if="saving" class="save-notice" role="status"><i class="i-mdi-loading import-spin" aria-hidden="true" /><span>{{ t('tenantImport.savePending') }}</span></div>
-        <PageErrorNotice v-if="saveError"><strong>{{ t('tenantImport.saveFailed') }}</strong><p>{{ tenantImportError(saveError) }}</p></PageErrorNotice>
-        <div v-if="saveError" class="save-notice is-warning" role="alert"><span>{{ t('tenantImport.saveUnknown') }}</span><button type="button" @click="goBack">{{ t('tenantImport.checkList') }}</button></div>
-        <div v-if="saved" class="save-notice" role="status"><i class="i-mdi-check-circle-outline" aria-hidden="true" /><span>{{ t('tenantImport.saveSuccess') }}</span><button type="button" @click="goBack">{{ t('tenantImport.checkList') }}</button></div>
+        <div v-if="saving" class="save-notice" role="status"><i class="i-mdi-loading import-spin" aria-hidden="true" /><span>{{ t(downgradingTenant ? 'tenantImport.downgradePending' : 'tenantImport.savePending') }}</span></div>
+        <div v-if="saveError" class="save-notice is-error" role="alert"><div><strong>{{ t(saveOutcomeUnknown ? 'tenantImport.saveUnconfirmed' : 'tenantImport.saveFailed') }}</strong><p>{{ tenantImportError(saveError) }}</p></div></div>
+        <div v-if="saveOutcomeUnknown" class="save-notice is-warning" role="status"><span>{{ t(downgradingTenant ? 'tenantImport.downgradeUnknown' : 'tenantImport.saveUnknown') }}</span><button type="button" @click="goBack">{{ t('tenantImport.checkList') }}</button></div>
+        <div v-if="saved" class="save-notice" role="status"><i class="i-mdi-check-circle-outline" aria-hidden="true" /><span>{{ t(downgradingTenant ? 'tenantImport.downgradeSuccess' : 'tenantImport.saveSuccess') }}</span><button v-if="!cleanupWarnings.length" type="button" @click="goBack">{{ t('tenantImport.checkList') }}</button></div>
+        <div v-if="saved && cleanupWarnings.length" class="save-notice is-warning cleanup-warning" role="alert">
+          <div><strong>{{ t('tenantImport.cleanupWarningsTitle') }}</strong><ul><li v-for="(warning, index) in cleanupWarnings" :key="index">{{ warning }}</li></ul><button type="button" @click="goBack">{{ t('tenantImport.checkList') }}</button></div>
+        </div>
 
         <div class="import-scroll">
-          <section v-if="provider === 1" class="import-mode-section" :aria-label="t('tenantImport.importMode')">
+          <section v-if="downgradingTenant" class="downgrade-section" aria-labelledby="downgrade-title">
+            <h2 id="downgrade-title">{{ t('tenantImport.downgradeTitle') }}</h2>
+            <p v-if="downgradeSource" class="downgrade-account"><strong>{{ downgradeSource.name }}</strong><span>{{ downgradeSource.region }}</span><span>{{ t('tenantImport.downgradeSourceId', { id: downgradeSource.id }) }}</span></p>
+            <p class="section-hint">{{ t('tenantImport.downgradeDescription') }}</p>
+            <div class="downgrade-backup" role="note" aria-labelledby="downgrade-backup-title">
+              <h3 id="downgrade-backup-title">{{ t('tenantImport.backupTitle') }}</h3>
+              <p>{{ t('tenantImport.backupWarning') }}</p>
+              <p>{{ t('tenantImport.backupPrivacy') }}</p>
+              <p>{{ t('tenantImport.backupCodeLimit') }}</p>
+              <div class="backup-actions">
+                <button type="button" class="text-button" :disabled="locked || backupBusy || !downgradeSource" @click="sendBackupCode">{{ t(backupCodeSent ? 'tenantImport.backupResendCode' : 'tenantImport.backupSendCode') }}</button>
+                <template v-if="backupCodeSent">
+                  <label for="downgrade-backup-code">{{ t('tenantImport.backupCode') }}</label>
+                  <input id="downgrade-backup-code" :value="backupCode" type="text" inputmode="text" autocapitalize="characters" spellcheck="false" autocomplete="one-time-code" pattern="[A-Z0-9]{8}" maxlength="8" :placeholder="t('tenantImport.backupCodePlaceholder')" :disabled="locked || backupBusy" @input="setBackupCode" @keydown.enter.prevent="downloadBackup" />
+                  <button type="button" class="text-button" :disabled="locked || backupBusy || !/^[A-Z0-9]{8}$/.test(backupCode)" @click="downloadBackup">{{ t('tenantImport.backupDownload') }}</button>
+                </template>
+              </div>
+              <p v-if="backupBusy" role="status">{{ t('tenantImport.backupWorking') }}</p>
+              <p v-else-if="backupDownloaded" role="status">{{ t('tenantImport.backupDownloaded') }}</p>
+              <p v-else-if="backupCodeSent" role="status">{{ t('tenantImport.backupCodeSent') }}</p>
+              <p v-if="backupError" class="field-error" role="alert">{{ backupError }}</p>
+              <label class="backup-confirmation"><input id="downgrade-backup-confirmed" v-model="backupConfirmed" type="checkbox" :disabled="locked || backupBusy || !downgradeSource" :aria-invalid="backupConfirmationInvalid" @change="backupConfirmationInvalid = false" /><span>{{ t('tenantImport.backupConfirmation') }}</span></label>
+              <p v-if="backupConfirmationInvalid" class="field-error" role="alert">{{ t('tenantImport.backupRequired') }}</p>
+            </div>
+          </section>
+          <section v-if="provider === 1 && !downgradingTenant" class="import-mode-section" :aria-label="t('tenantImport.importMode')">
             <h2>{{ t('tenantImport.importMode') }}</h2>
             <div class="import-mode-options">
               <label class="import-mode-option" :class="{ 'is-selected': !restrictedMode }">
@@ -569,7 +706,7 @@ onBeforeUnmount(() => {
               </label>
             </div>
           </section>
-          <div class="import-columns">
+          <div v-if="!downgradingTenant" class="import-columns">
             <section class="config-section" aria-labelledby="import-config-label">
               <div class="section-label-row"><label id="import-config-label" for="import-config">{{ t('tenantImport.configLabel') }}</label><button type="button" class="text-button" :disabled="locked || reading" @click="chooseConfigFile"><i class="i-mdi-file-upload-outline" aria-hidden="true" />{{ t('tenantImport.chooseFile') }}</button></div>
               <p id="import-config-hint" class="section-hint">{{ t(`tenantImport.${configHintKey}`) }}</p>
@@ -641,6 +778,7 @@ onBeforeUnmount(() => {
               <p v-if="managedNameInvalid" id="import-managed-user-error" class="field-error">{{ t('tenantImport.requiredField', { field: t('tenantImport.managedUserName') }) }}</p>
             </div>
             <p v-if="catalogLoading" class="permission-loading" role="status"><i class="i-mdi-loading import-spin" aria-hidden="true" />{{ t('tenantImport.permissionsLoading') }}</p>
+            <div v-else-if="catalogError && downgradingTenant" class="save-notice is-error" role="alert">{{ tenantImportError(catalogError) }} <button type="button" class="text-button" @click="loadPermissionCatalog">{{ t('tenantImport.retryPermissions') }}</button></div>
             <PageErrorNotice v-else-if="catalogError">{{ tenantImportError(catalogError) }} <button type="button" class="text-button" @click="loadPermissionCatalog">{{ t('tenantImport.retryPermissions') }}</button></PageErrorNotice>
             <template v-else>
               <div class="permission-toolbar">
@@ -649,7 +787,7 @@ onBeforeUnmount(() => {
                   <el-popover trigger="click" :width="340" placement="top" popper-class="permission-info-popover">
                     <template #reference><button type="button" class="permission-info-button" :aria-label="t('tenantImport.permissionNotesTitle')" @click.stop.prevent><i class="i-mdi-alert-circle-outline" aria-hidden="true" /></button></template>
                     <div class="permission-info-content">
-                      <p>{{ t('tenantImport.provisionHint') }}</p>
+                      <p>{{ t(downgradingTenant ? 'tenantImport.downgradeSaveHint' : 'tenantImport.provisionHint') }}</p>
                       <p>{{ t('tenantImport.permissionDefaultsHint') }}</p>
                       <p>{{ t('tenantImport.permissionAccountHint') }}</p>
                       <p v-if="selectedPermissions.includes('INSTANCE_DELETE')">{{ t('tenantImport.permissionDeleteHint') }}</p>

@@ -42,6 +42,14 @@ public class LoginFailureGuard {
         loginAttemptService.loginSucceeded(ip);
     }
 
+    public void withLoginLock(String ip, Runnable operation) {
+        loginAttemptService.withLoginLock(ip, operation);
+    }
+
+    public void loginSucceededInCurrentTransaction(String ip) {
+        loginAttemptService.loginSucceededInCurrentTransaction(ip);
+    }
+
     public void failed(String ip, String username, boolean unknownUsername) {
         // This call commits independently before a credential exception is returned.
         LoginAttemptService.FailureResult result = loginAttemptService.recordFailure(ip, unknownUsername);

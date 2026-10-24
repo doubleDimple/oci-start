@@ -11,6 +11,7 @@ import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.Table;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
@@ -47,6 +48,12 @@ public class LoginUser {
     @Column(name = "last_login_at")
     private LocalDateTime lastLoginAt;
 
+    /** Daily sensitive-export failures belong to this stable account ID, including after a rename. */
+    @Column(name = "export_verification_date")
+    private LocalDate exportVerificationDate;
+
+    @Column(name = "export_verification_wrong_count")
+    private Integer exportVerificationWrongCount = 0;
 
 
 }

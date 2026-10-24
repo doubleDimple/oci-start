@@ -39,7 +39,7 @@ public class ManagedDomainRoleService {
 
     public Result audit(SimpleAuthenticationDetailsProvider admin, DomainSummary domain,
                         String tenancyId, String userOcid, String groupOcid, String ownerToken) {
-        return safe(() -> {
+        return safe(ManagedImportDiagnostics.Stage.DOMAIN_AUDIT, () -> {
             Context context = context(admin, domain, tenancyId, userOcid, groupOcid, ownerToken);
             if (context == null) {
                 return new Result();
@@ -65,7 +65,7 @@ public class ManagedDomainRoleService {
                             String tenancyId, String userOcid, String groupOcid, String ownerToken,
                             boolean securityAdminEnabled, boolean userManagerEnabled,
                             boolean allUsers, Collection<String> userManagementGroupOcids) {
-        return safe(() -> {
+        return safe(ManagedImportDiagnostics.Stage.DOMAIN_RECONCILE, () -> {
             Context context = context(admin, domain, tenancyId, userOcid, groupOcid, ownerToken);
             if (context == null) {
                 if (securityAdminEnabled || userManagerEnabled) {
@@ -761,23 +761,27 @@ public class ManagedDomainRoleService {
         return new DomainRoleException(message);
     }
 
-    private static Result safe(Supplier<Result> operation) {
+    static Result safe(ManagedImportDiagnostics.Stage stage, Supplier<Result> operation) {
         try {
             return operation.get();
         } catch (DomainRoleException e) {
+            ManagedImportDiagnostics.failed(stage, e);
             throw e;
         } catch (BmcException e) {
+            ManagedImportDiagnostics.failed(stage, e);
             if (e.getStatusCode() == 409 || e.getStatusCode() == 412 || e.getStatusCode() == 429) {
                 throw failure("身份域授权正在同步或被并发修改，请稍后以相同用户名重试。");
             }
             throw failure("无法完成身份域角色授权或审计，请检查源凭证的身份域管理权限后重试。");
         } catch (Exception e) {
+            ManagedImportDiagnostics.failed(stage, e);
             throw failure("身份域角色配置未完成；受管资源保留供重试，不会改用源管理 API。");
         }
     }
 
-    private static final class DomainRoleException extends IllegalArgumentException {
-        private DomainRoleException(String message) {
+    // Only this locally generated exception carries a safe business message across the provisioning boundary.
+    static final class DomainRoleException extends IllegalArgumentException {
+        DomainRoleException(String message) {
             super(message);
         }
     }

@@ -12,6 +12,7 @@ import com.doubledimple.ociserver.pojo.request.ImageInfoReq;
 import com.doubledimple.ociserver.pojo.request.ResetOciPassRequest;
 import com.doubledimple.ociserver.pojo.request.UpdateOciUserStateRequest;
 import com.doubledimple.ociserver.service.permissions.ManagedAccountAccessService;
+import com.doubledimple.ociserver.service.security.ExportVerificationGuard;
 import com.doubledimple.ociserver.pojo.request.UpdateCustomNameRequest;
 import com.doubledimple.ociserver.pojo.request.UpdatePasswordPolicyRequest;
 import com.doubledimple.ociserver.pojo.response.PasswordPolicyDetail;
@@ -46,6 +47,7 @@ import com.oracle.bmc.identity.model.RegionSubscription;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import com.doubledimple.ociserver.config.context.UserContext;
@@ -727,6 +729,7 @@ public class TenantController extends BaseController{
      * 导出租户数据（增加验证逻辑）
      */
     @GetMapping("/export")
+    @AuditLog(title = "导出租户资料", saveParams = false, saveResponse = false)
     public ResponseEntity<?> exportData(HttpServletRequest request) {
         // 1. 从自定义 Header 获取验证码
         String code = request.getHeader("X-Verify-Code");
@@ -737,10 +740,13 @@ public class TenantController extends BaseController{
             verifyService.checkCodeForExport(username, code);
 
             // 3. 校验通过，执行原有的导出逻辑
-            return tenantService.exportData();
-        } catch (IllegalStateException e) {
+            return exportResponse(tenantService.exportData());
+        } catch (ExportVerificationGuard.ExportVerificationException e) {
             // 4. 验证码错误或过期，返回 403 状态码
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).cacheControl(CacheControl.noStore()).body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).cacheControl(CacheControl.noStore())
+                    .body("导出未完成，请稍后重新获取验证码后重试");
         }
     }
 
@@ -748,28 +754,45 @@ public class TenantController extends BaseController{
      * 导出某个租户数据（增加验证逻辑）
      */
     @GetMapping("/exportByTenant")
+    @AuditLog(title = "导出租户资料", saveParams = false, saveResponse = false)
     public ResponseEntity<?> exportByTenant(@RequestParam String id, HttpServletRequest request) {
         String code = request.getHeader("X-Verify-Code");
         String username = UserContext.getUsername();
 
         try {
             verifyService.checkCodeForExport(username, code);
-            return tenantService.exportData(Long.valueOf(id));
-        } catch (IllegalStateException e) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+            return exportResponse(tenantService.exportData(Long.valueOf(id)));
+        } catch (ExportVerificationGuard.ExportVerificationException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).cacheControl(CacheControl.noStore()).body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).cacheControl(CacheControl.noStore())
+                    .body("导出未完成，请稍后重新获取验证码后重试");
         }
     }
 
     @PostMapping("/verify/sendExportCode")
+    @AuditLog(title = "发送资料导出验证码", saveParams = false, saveResponse = false)
     @ResponseBody
     public ResponseEntity<?> sendExportCode(HttpServletRequest request) {
         String username = UserContext.getUsername();
         try {
             verifyService.sendVerifyCodeForExport(username, request);
-            return ResponseEntity.ok().build();
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore()).build();
+        } catch (ExportVerificationGuard.ExportVerificationException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).cacheControl(CacheControl.noStore()).body(e.getMessage());
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).cacheControl(CacheControl.noStore())
+                    .body("导出验证码发送失败，请稍后重试");
         }
+    }
+
+    private ResponseEntity<?> exportResponse(ResponseEntity<?> result) {
+        if (!result.getStatusCode().is2xxSuccessful()) {
+            return ResponseEntity.status(result.getStatusCode()).cacheControl(CacheControl.noStore())
+                    .body("导出未完成，请稍后重新获取验证码后重试");
+        }
+        return ResponseEntity.status(result.getStatusCode()).headers(result.getHeaders())
+                .cacheControl(CacheControl.noStore()).body(result.getBody());
     }
 
     /**
