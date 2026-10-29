@@ -1,8 +1,8 @@
 import type { RegionGlobePoint } from './globeTypes'
-import { REGION_SCENE_ERROR_EVENT, type RegionScene, type RegionSceneOptions } from './sceneTypes'
+import { REGION_SCENE_ERROR_EVENT, type RegionScene, type RegionSceneColors, type RegionSceneOptions } from './sceneTypes'
 
 // Simplified silhouettes from design/dot-world-map.html, retained as supplied.
-// These are dot-pattern artwork, not political boundaries.
+// These are geographic artwork, not political boundaries.
 type Coordinate = readonly [number, number]
 const LAND: readonly (readonly Coordinate[])[] = [
   [[-168,65],[-165,60],[-158,57],[-152,58],[-146,60],[-138,59],[-131,53],[-125,49],[-124,42],[-120,34],[-117,32],[-110,24],[-105,20],[-97,16],[-92,15],[-88,16],[-87,21],[-91,21],[-95,19],[-97,23],[-97,26],[-94,29],[-89,29],[-84,30],[-81,25],[-80,32],[-76,35],[-70,42],[-67,45],[-60,47],[-56,51],[-56,54],[-64,60],[-78,62],[-78,55],[-82,55],[-86,66],[-95,68],[-105,68],[-115,70],[-125,70],[-135,69],[-145,70],[-156,71],[-166,68]],
@@ -34,7 +34,7 @@ const LAT_SPAN = LAT_TOP - LAT_BOTTOM
 const DOT_STEP = 5
 const DOT_RADIUS = 1.1
 const TAU = Math.PI * 2
-const FONT = '11px -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif'
+const FONT = '500 12px -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif'
 
 interface MapPoint {
   data: RegionGlobePoint
@@ -76,15 +76,7 @@ export function createDotWorldScene(host: HTMLElement, labelHost: HTMLElement, o
   if (!context || !baseContext) throw new Error('Canvas 2D is unavailable')
   const ctx: CanvasRenderingContext2D = context
   const baseCtx: CanvasRenderingContext2D = baseContext
-  const colors = {
-    surface: options.colors.surface || '#0a1420',
-    land: options.colors.land || '#22506b',
-    arm: options.colors.arm || '#e5b45c',
-    mine: options.colors.mine || '#4fe3c1',
-    text: options.colors.text || '#dcecf3',
-    muted: options.colors.muted || '#6f93a8',
-    grid: options.colors.grid || '#16293c',
-  }
+  const colors: RegionSceneColors = { ...options.colors }
 
   const originalPosition = host.style.position
   const changedPosition = view.getComputedStyle(host).position === 'static'
@@ -106,8 +98,8 @@ export function createDotWorldScene(host: HTMLElement, labelHost: HTMLElement, o
     maxWidth: '260px', padding: '6px 9px', borderRadius: '6px',
     font: '12px -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif',
     lineHeight: '1.45', whiteSpace: 'normal', overflowWrap: 'anywhere',
-    background: colors.surface, color: colors.text, border: '1px solid ' + colors.grid,
-    boxShadow: '0 2px 10px rgba(0,0,0,.25)',
+    background: colors.panel, color: colors.text, border: '1px solid ' + colors.coast,
+    boxShadow: '0 4px 16px rgba(0,0,0,.12)',
   })
   const tooltipName = doc.createElement('strong')
   tooltipName.style.fontWeight = '500'
@@ -166,9 +158,10 @@ export function createDotWorldScene(host: HTMLElement, labelHost: HTMLElement, o
         for (const toLeft of [point.x > width - labelWidth - 18, point.x <= width - labelWidth - 18]) {
           const x = point.x + (toLeft ? -labelWidth - 8 : 8)
           const y = point.y + yOffset
-          const candidate = { x, y, width: labelWidth, height: 13, point }
-          if (x < 4 || y < 4 || x + labelWidth > width - 4 || y + 13 > height - 4) continue
-          if (!labelBoxes.some(box => x < box.x + box.width + 4 && x + labelWidth + 4 > box.x && y < box.y + box.height + 2 && y + 15 > box.y)) {
+          const candidate = { x, y, width: labelWidth, height: 16, point }
+          if (x < 6 || y < 6 || x + labelWidth > width - 6 || y + 16 > height - 6) continue
+          const overlapsMarker = points.some(other => other !== point && other.x > x - 7 && other.x < x + labelWidth + 7 && other.y > y - 7 && other.y < y + 23)
+          if (!overlapsMarker && !labelBoxes.some(box => x < box.x + box.width + 8 && x + labelWidth + 8 > box.x && y < box.y + box.height + 4 && y + 20 > box.y)) {
             found = candidate
             break
           }
@@ -176,7 +169,7 @@ export function createDotWorldScene(host: HTMLElement, labelHost: HTMLElement, o
         if (found) break
       }
       if (found) labelBoxes.push(found)
-      else if (on) labelBoxes.push({ x: Math.max(4, Math.min(width - labelWidth - 4, point.x + 8)), y: Math.max(4, point.y - 13), width: labelWidth, height: 13, point })
+      else if (on) labelBoxes.push({ x: Math.max(6, Math.min(width - labelWidth - 6, point.x + 8)), y: Math.max(6, Math.min(height - 22, point.y - 16)), width: labelWidth, height: 16, point })
     }
   }
   function buildBase() {
@@ -184,6 +177,38 @@ export function createDotWorldScene(host: HTMLElement, labelHost: HTMLElement, o
     base.height = Math.max(1, Math.round(height * pixelRatio))
     baseCtx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0)
     baseCtx.clearRect(0, 0, width, height)
+    // Cache the graticule and continent silhouettes together with the dot texture.
+    // They are rebuilt only when the viewport or palette changes, never per frame.
+    const xAt = (lng: number) => width / 2 + (lng - centerLng) * scale
+    const yAt = (lat: number) => height / 2 + (centerLat - lat) * scale
+    baseCtx.strokeStyle = colors.grid
+    baseCtx.lineWidth = .7
+    baseCtx.setLineDash([2, 5])
+    baseCtx.beginPath()
+    for (let lng = -180; lng <= 180; lng += 30) {
+      baseCtx.moveTo(xAt(lng), yAt(LAT_TOP))
+      baseCtx.lineTo(xAt(lng), yAt(LAT_BOTTOM))
+    }
+    for (let lat = -30; lat <= 60; lat += 30) {
+      baseCtx.moveTo(xAt(-180), yAt(lat))
+      baseCtx.lineTo(xAt(180), yAt(lat))
+    }
+    baseCtx.stroke()
+    baseCtx.setLineDash([])
+    baseCtx.beginPath()
+    for (const polygon of LAND) {
+      polygon.forEach(([lng, lat], i) => {
+        if (i === 0) baseCtx.moveTo(xAt(lng), yAt(lat))
+        else baseCtx.lineTo(xAt(lng), yAt(lat))
+      })
+      baseCtx.closePath()
+    }
+    baseCtx.fillStyle = colors.landFill
+    baseCtx.fill()
+    baseCtx.strokeStyle = colors.coast
+    baseCtx.lineWidth = .8
+    baseCtx.lineJoin = 'round'
+    baseCtx.stroke()
     baseCtx.fillStyle = colors.land
     // Pixel sampling stays at the reference's 5px / 1.1px, even after zooming.
     baseCtx.beginPath()
@@ -297,19 +322,31 @@ export function createDotWorldScene(host: HTMLElement, labelHost: HTMLElement, o
       ctx.arc(point.x, point.y, radius, 0, TAU)
       ctx.fill()
       ctx.globalAlpha = 1
-      if (both) drawRing(point, on ? 6.8 : 5.5, colors.arm, .95, 1.5)
-      else if (on) drawRing(point, 6.6, color, .8, 1)
+      // A solid separation ring keeps markers clear on land and crossing links.
+      ctx.fillStyle = colors.panel
+      ctx.beginPath()
+      ctx.arc(point.x, point.y, on ? 6 : 4.8, 0, TAU)
+      ctx.fill()
+      if (both) drawRing(point, on ? 7.2 : 6, colors.arm, 1, 1.8)
+      else if (on) drawRing(point, 7.2, color, .9, 1.5)
       ctx.fillStyle = color
       ctx.beginPath()
-      ctx.arc(point.x, point.y, on ? 3.4 : 2.6, 0, TAU)
+      ctx.arc(point.x, point.y, on ? 4 : 3.2, 0, TAU)
       ctx.fill()
     }
     ctx.font = FONT
     ctx.textAlign = 'left'
     ctx.textBaseline = 'middle'
     for (const box of labelBoxes) {
-      ctx.fillStyle = box.point.data.regionCode === selected || box.point.data.regionCode === hovered ? colors.text : colors.muted
-      ctx.fillText(box.point.label, box.x, box.y + 6.5, 140)
+      const on = box.point.data.regionCode === selected || box.point.data.regionCode === hovered
+      ctx.fillStyle = on ? colors.panel : colors.surface
+      ctx.globalAlpha = .94
+      ctx.beginPath()
+      ctx.roundRect(box.x - 4, box.y - 2, box.width + 8, box.height + 4, 4)
+      ctx.fill()
+      ctx.globalAlpha = 1
+      ctx.fillStyle = on ? colors.text : colors.muted
+      ctx.fillText(box.point.label, box.x, box.y + 8, 140)
     }
   }
   function canAnimate() { return !disposed && !failed && active && !doc.hidden && !reduced && ((pulse && points.length > 0) || (links && linkPairs.length > 0)) && width > 0 && height > 0 }
@@ -461,6 +498,15 @@ export function createDotWorldScene(host: HTMLElement, labelHost: HTMLElement, o
   } else view.addEventListener('resize', resize)
 
   const api: RegionScene = {
+    setColors(next) {
+      if (disposed || failed) return
+      Object.assign(colors, next)
+      Object.assign(tooltip.style, { background: colors.panel, color: colors.text, borderColor: colors.coast })
+      tooltipCoordinates.style.color = colors.muted
+      for (const point of points) if (doc.activeElement === point.button) point.button.style.outlineColor = colors.text
+      buildBase()
+      redraw()
+    },
     setPoints,
     setSelected(code) {
       if (disposed) return

@@ -29,7 +29,7 @@ const {
   loadZones, refresh, selectZone, applySearch, clearSearch, changePage, changeSize,
   operation, operationPending, operationOutcome, operationResult, operationProblem,
   openCreate, openEdit, openDelete, openSync, submitOperation, closeOperation,
-  requiresReview, reviewZone, reviewReady, acknowledgeReview, contextLocked, canOperate,
+  requiresReview, reviewZone, reviewReady, acknowledgeReview, contextLocked, canCreate, canOperate,
 } = useCloudflarePage(credentialsOpen)
 const columns = ['type', 'name', 'content', 'ttl', 'proxy', 'actions'] as const
 const pageSizes = [10, 20, 30, 50]
@@ -95,7 +95,7 @@ onBeforeRouteUpdate(() => !credentialsBusy.value)
         <GhostBtn :disabled="contextLocked" @click="openCredentials"><i class="i-mdi-key-outline" aria-hidden="true" />{{ t('cloudflareDns.credentials.title') }}</GhostBtn>
         <GhostBtn :disabled="!canOperate" @click="openSync"><i class="i-mdi-sync" aria-hidden="true" />{{ t('cloudflareDns.sync') }}</GhostBtn>
         <GhostBtn :loading="loading" :disabled="contextLocked || !selectedZone" @click="refresh"><i class="i-mdi-refresh" aria-hidden="true" />{{ t('cloudflareDns.refreshRecords') }}</GhostBtn>
-        <PrimaryBtn :disabled="!canOperate" @click="openCreate"><i class="i-mdi-plus" aria-hidden="true" />{{ t('cloudflareDns.add') }}</PrimaryBtn>
+        <PrimaryBtn :disabled="!canCreate" @click="openCreate"><i class="i-mdi-plus" aria-hidden="true" />{{ t('cloudflareDns.add') }}</PrimaryBtn>
       </div>
     </header>
     <form class="cloudflare-filters" @submit.prevent="applySearch">

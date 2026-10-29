@@ -10,6 +10,8 @@ import tenantAudit from './tenants/audit'
 import ociCost from './cost/oci'
 import tenantTraffic from './monitor/traffic'
 import metrics from './monitor/metrics'
+import dashboardMonitor from './monitor/dashboard'
+import dashboardBusiness from './monitor/business'
 import domainProviders from './settings/domainProviders'
 import cloudflareDns from './dns/cloudflare'
 import edgeoneDns from './dns/edgeone'
@@ -56,8 +58,12 @@ import { auditLogsZh } from './auditLogs'
 import { mobileTenantToolsMessages } from './mobileTenantTools'
 import { mobileShellMessages } from './mobileShell'
 import { mobileRecordsMessages } from './mobileRecords'
+import { pageLayoutMessages } from './pageLayout'
 
 export default {
+  dashboardMonitor: dashboardMonitor.zh,
+  dashboardBusiness: dashboardBusiness.zh,
+  pageLayout: pageLayoutMessages.zh,
   auditLogs: auditLogsZh,
   mobileRecords: mobileRecordsMessages.zh,
   mobileTenantTools: mobileTenantToolsMessages.zh,
@@ -152,17 +158,18 @@ export default {
     resetTip: '已恢复默认外观设置',
     customPicker: '自定义取色',
     customHint: '智能色彩引擎将自动为卡片、容器、输入框与边框计算协调层级，告别卡片融为一体或灰暗无对比的问题',
+    sidebarConsole: '控制台深色',
     sidebarObsidian: '经典暗黑',
     sidebarBlack: '曜石纯黑',
     sidebarForest: 'OCI 墨绿',
     sidebarNavy: '科技深蓝',
     sidebarEspresso: '沉稳深咖',
     sidebarLight: '极简素白',
-    presetSlate: '经典冷灰',
+    presetSlate: '控制台浅色',
     presetPure: '极简纯雪',
     presetAzure: '科技蓝灰',
     presetIvory: '温润暖米',
-    presetMidnight: '暗夜极客',
+    presetMidnight: '控制台深色',
     presetOnyx: '曜石极黑',
     presetAurora: '极光墨夜',
     presetCustom: '自定义皮肤',
@@ -173,6 +180,8 @@ export default {
   dashboard: {
     yearUnit: '年', dayUnit: '天', hourUnit: '时', minuteUnit: '分',
     pageTitle: '系统监控',
+    pageDescription: '查看主机资源使用情况、网络流量与开机任务统计。',
+    updatedAt: '最近更新：{time}',
     loading: '加载中...',
     apiTotal: '总API数',
     bootInstances: '总Boot实例数',

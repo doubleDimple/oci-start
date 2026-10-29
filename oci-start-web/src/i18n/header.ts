@@ -1,4 +1,5 @@
 export const headerZh = {
+  breadcrumbs: '当前位置',
   expandNav: '展开导航', collapseNav: '收起导航', navigation: '主导航', home: '返回首页',
   userMenu: '账号菜单', user: '当前用户', loading: '加载中…', userFailed: '用户信息读取失败', retryUser: '重新读取用户信息',
   assets: 'OCI 资产报告', auditLogs: '审计日志', signOutBusy: '正在退出…', logoutFailed: '退出未完成，请重试。',
@@ -16,6 +17,7 @@ export const headerZh = {
 }
 
 export const headerEn = {
+  breadcrumbs: 'Breadcrumbs',
   expandNav: 'Expand navigation', collapseNav: 'Collapse navigation', navigation: 'Main navigation', home: 'Back to home',
   userMenu: 'Account menu', user: 'Current user', loading: 'Loading…', userFailed: 'Could not load user information', retryUser: 'Reload user information',
   assets: 'OCI asset report', auditLogs: 'Audit Logs', signOutBusy: 'Signing out…', logoutFailed: 'Sign-out was not completed. Please try again.',

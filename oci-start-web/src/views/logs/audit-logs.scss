@@ -73,20 +73,20 @@
     white-space: nowrap;
 
     &.get {
-      background: rgba(59, 130, 246, 0.12);
-      color: #2563eb;
+      background: var(--status-info-bg);
+      color: var(--status-info);
     }
     &.post {
-      background: rgba(16, 185, 129, 0.12);
-      color: #059669;
+      background: var(--status-ok-bg);
+      color: var(--status-ok);
     }
     &.put {
-      background: rgba(245, 158, 11, 0.12);
-      color: #d97706;
+      background: var(--status-warn-bg);
+      color: var(--status-warn);
     }
     &.delete {
-      background: rgba(239, 68, 68, 0.12);
-      color: #dc2626;
+      background: var(--status-danger-bg);
+      color: var(--status-danger);
     }
   }
 

@@ -137,7 +137,6 @@ const ElTableColumn = BaseTableColumn<BootTaskDetail>
         </div>
         <div class="header-text">
           <h3 class="dialog-title">{{ t('bootTasks.detailsTitle') }}</h3>
-          <p class="dialog-subtitle">{{ t('bootTasks.detailsHint') }}</p>
         </div>
       </div>
     </template>
@@ -458,11 +457,6 @@ const ElTableColumn = BaseTableColumn<BootTaskDetail>
   font-size: var(--font-size-dialog-title, 18px);
   font-weight: 600;
   color: var(--text-primary);
-}
-.dialog-subtitle {
-  margin: 0;
-  font-size: var(--font-size-secondary, 13px);
-  color: var(--text-secondary);
 }
 
 /* 概览信息卡片 */

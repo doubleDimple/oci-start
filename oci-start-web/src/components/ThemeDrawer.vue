@@ -88,7 +88,6 @@ function onReset() {
         </div>
         <div>
           <h3 class="header-title">{{ t('chrome.title') }}</h3>
-          <p class="header-sub">{{ t('chrome.subtitle') }}</p>
         </div>
       </div>
     </template>
@@ -155,7 +154,6 @@ function onReset() {
           <i class="i-mdi-view-dashboard-variant-outline section-icon" />
           <div>
             <h4 class="section-title">{{ t('chrome.contentTitle') }}</h4>
-            <p class="section-sub">{{ t('chrome.contentDesc') }}</p>
           </div>
         </div>
 
@@ -191,7 +189,7 @@ function onReset() {
                     borderColor: preset.border,
                   }"
                 >
-                  <span class="mini-dot" :style="{ background: 'var(--brand)' }" />
+                  <span class="mini-dot" :style="{ background: 'var(--brand-solid)' }" />
                   <span class="mini-line w-50" :style="{ background: preset.textMuted }" />
                 </div>
               </div>
@@ -271,7 +269,7 @@ function onReset() {
   width: 38px;
   height: 38px;
   border-radius: 10px;
-  background: var(--status-ok-bg);
+  background: var(--brand-subtle);
   color: var(--brand);
   display: grid;
   place-items: center;
@@ -282,11 +280,6 @@ function onReset() {
   font-size: var(--font-size-section);
   font-weight: 600;
   color: var(--text-primary);
-}
-.header-sub {
-  margin: 3px 0 0;
-  font-size: var(--font-size-secondary);
-  color: var(--text-secondary);
 }
 
 .drawer-body {
@@ -317,11 +310,6 @@ function onReset() {
   font-weight: 600;
   color: var(--text-primary);
 }
-.section-sub {
-  margin: 2px 0 0;
-  font-size: var(--font-size-secondary);
-  color: var(--text-secondary);
-}
 
 /* Mode grid */
 .mode-grid {
@@ -349,7 +337,7 @@ function onReset() {
 }
 .mode-card.active {
   border-color: var(--brand);
-  background: var(--status-ok-bg);
+  background: var(--brand-subtle);
   color: var(--brand);
 }
 .mode-icon {
@@ -393,7 +381,7 @@ function onReset() {
 }
 .sidebar-pill.active {
   border-color: var(--brand);
-  background: var(--status-ok-bg);
+  background: var(--brand-subtle);
 }
 .color-dot {
   width: 18px;
@@ -627,14 +615,14 @@ function onReset() {
   padding: 8px 20px;
   border: 0;
   border-radius: 10px;
-  background: var(--brand);
-  color: #ffffff;
+  background: var(--brand-solid);
+  color: var(--text-on-solid);
   font-size: var(--font-size-body);
   font-weight: 600;
   cursor: pointer;
   transition: background-color 160ms ease;
 }
 .btn-done:hover {
-  background: var(--brand-hover);
+  background: var(--brand-solid-hover);
 }
 </style>

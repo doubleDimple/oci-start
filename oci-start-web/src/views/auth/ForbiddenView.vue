@@ -25,5 +25,5 @@ section { max-width: 440px; padding: 32px; border-radius: var(--r-card); backgro
 i { display: inline-block; width: 40px; height: 40px; color: var(--brand); }
 h1 { margin: 18px 0 12px; font-size: 24px; }
 p { line-height: 1.7; }
-a { display: inline-flex; margin-top: 12px; padding: 11px 20px; border-radius: var(--r-pill); background: var(--brand); color: #fff; text-decoration: none; }
+a { display: inline-flex; margin-top: 12px; padding: 11px 20px; border-radius: var(--r-btn); background: var(--brand-solid); color: var(--text-on-solid); text-decoration: none; }
 </style>

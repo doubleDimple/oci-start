@@ -10,6 +10,7 @@
 .card {
   background: var(--bg-card);
   border-radius: var(--r-card);
+  border: 1px solid var(--border);
   box-shadow: var(--shadow-card);
   overflow: hidden;
   display: flex;
@@ -18,14 +19,16 @@
 }
 .toolbar {
   display: flex;
-  gap: 10px;
+  gap: var(--space-s);
   align-items: center;
   flex-wrap: wrap;
-  padding: 16px 18px 0;
+  padding: var(--space-m) var(--space-l);
+  border-bottom: 1px solid var(--border);
 }
-.body { padding: 12px 18px 8px; overflow: auto; }
+.body { padding: var(--space-m) var(--space-l); overflow: auto; }
 .footer {
-  padding: 12px 18px 16px;
+  padding: var(--space-s) var(--space-l);
+  border-top: 1px solid var(--border);
   display: flex;
   justify-content: flex-end;
 }

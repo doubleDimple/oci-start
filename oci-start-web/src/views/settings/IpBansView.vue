@@ -91,7 +91,6 @@ onBeforeUnmount(() => { disposed = true; ++sequence; controller?.abort(); window
   <section class="ip-bans-page">
     <header class="ip-bans-toolbar">
       <PageBackButton :disabled="locked" @click="router.push('/system/settings')" />
-      <h1>{{ t('ipBans.title') }}</h1>
       <form class="ip-bans-filters" @submit.prevent="applyFilter">
         <input v-model="search" class="ip-bans-search" type="search" maxlength="64" :disabled="locked" :aria-label="t('ipBans.ip')" :placeholder="t('ipBans.searchPlaceholder')" />
         <el-select class="ip-bans-status-filter" :model-value="status" :disabled="locked" :aria-label="t('ipBans.status')" :placeholder="t('ipBans.all')" @change="changeStatus"><el-option value="" :label="t('ipBans.all')" /><el-option :value="1" :label="t('ipBans.active')" /><el-option :value="0" :label="t('ipBans.released')" /></el-select>

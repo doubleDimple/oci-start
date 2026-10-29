@@ -1,0 +1,82 @@
+// Shared workspace roles keep independently loaded Vue pages on the same scale.
+html:root {
+  .region-toolbar, .boot-toolbar, .import-toolbar, .email-toolbar, .storage-toolbar,
+  .ai-models-toolbar, .cloudflare-toolbar, .cloudflare-filters, .edgeone-toolbar, .edgeone-filters,
+  .domain-providers-toolbar, .vps-toolbar, .vnic-toolbar, .tenant-instances-toolbar,
+  .security-toolbar, .notification-toolbar, .memos-toolbar, .mfa-toolbar, .migration-toolbar,
+  .api-tokens-toolbar, .metrics-toolbar, .vpn-toolbar, .ip-bans-toolbar,
+  .system-logs-toolbar, .open-logs-toolbar, .chat-toolbar {
+    padding: var(--space-m) var(--space-l);
+    gap: 12px;
+  }
+
+  .vps-search, .metrics-search, .metrics-status-filter, .nq-search, .nq-selection-search,
+  .system-logs-search, .memos-search, .mfa-search, .email-search {
+    border-radius: var(--r-sm);
+    border-color: var(--border-strong);
+    background: var(--bg-search);
+    &:focus-within { border-color: var(--brand); box-shadow: 0 0 0 1px var(--brand); }
+  }
+
+  .cloudflare-table th, .edgeone-table th, .nq-task-table th {
+    background: var(--bg-card-subtle);
+    color: var(--text-secondary);
+    font-weight: 600;
+  }
+
+  // Selection is an interactive state, separate from success/warning status.
+  .security-nav button.is-active, .notification-nav button.is-active,
+  .migration-tabs button.is-active, .mfa-input-tabs button.is-active,
+  .vps-view-tab.is-active, .oci-filter-tab.is-active,
+  .nq-tabs > button.is-active, .nq-periods > button[aria-pressed='true'],
+  .edgeone-mode-switch > button[aria-pressed='true'],
+  .boot-mode-switch > button[aria-pressed='true'] {
+    color: var(--brand);
+    background: var(--brand-subtle);
+    box-shadow: inset 0 -2px var(--brand);
+    font-weight: 600;
+  }
+  .security-nav button.is-active, .notification-nav button.is-active {
+    box-shadow: none;
+  }
+  .storage-bucket-row.selected {
+    border-color: var(--brand);
+    background: var(--brand-subtle);
+    .storage-bucket-name { color: var(--brand); }
+  }
+
+  // Inline destructive actions stay legible without dominating every table row.
+  .email-icon-button.danger, .email-text-button.danger, .storage-icon-button.danger,
+  .ai-models-icon.danger, .memos-row-actions button.is-danger, .row-actions .danger-btn {
+    color: var(--status-danger) !important;
+    background: var(--bg-card) !important;
+    border-color: var(--border-strong) !important;
+    box-shadow: none !important;
+    &:hover:not(:disabled) {
+      color: var(--status-danger) !important;
+      background: var(--status-danger-bg) !important;
+      border-color: var(--status-danger) !important;
+      box-shadow: none !important;
+    }
+  }
+
+
+  @media (max-width: 760px) {
+    // Filters can wrap to several rows. Let the complete DNS workspace scroll
+    // instead of squeezing its record list to zero on shorter phone screens.
+    .route-workspace > .cloudflare-page, .route-workspace > .edgeone-page {
+      height: auto;
+      min-height: 100%;
+      overflow: hidden;
+    }
+    .cloudflare-body, .edgeone-body { flex: 1 0 auto; min-height: 160px; }
+    .route-workspace > .oci-boot-page { height: auto; min-height: 100%; }
+    .oci-boot-page .boot-scroll { flex: none; overflow: visible; }
+    .region-toolbar, .boot-toolbar, .import-toolbar, .email-toolbar, .storage-toolbar,
+    .ai-models-toolbar, .cloudflare-toolbar, .cloudflare-filters, .edgeone-toolbar, .edgeone-filters,
+    .domain-providers-toolbar, .vps-toolbar, .vnic-toolbar, .tenant-instances-toolbar,
+    .security-toolbar, .notification-toolbar, .memos-toolbar, .mfa-toolbar, .migration-toolbar,
+    .api-tokens-toolbar, .metrics-toolbar, .vpn-toolbar, .ip-bans-toolbar,
+    .system-logs-toolbar, .open-logs-toolbar, .chat-toolbar { padding: 12px; }
+  }
+}

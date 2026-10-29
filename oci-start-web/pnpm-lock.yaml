@@ -11,6 +11,9 @@ importers:
 
   .:
     dependencies:
+      '@cloudscape-design/design-tokens':
+        specifier: 3.0.116
+        version: 3.0.116
       axios:
         specifier: ^1.7.7
         version: 1.20.0
@@ -110,6 +113,9 @@ packages:
   '@babel/types@7.29.8':
     resolution: {integrity: sha512-Vj1jF3cPfxg7OAfoI7QnVKLoILlm2JF9pnVHrX8qx7AHMiYWT+NDAA7jChlNgRS4WTLc/fD1lXLmPixluj+3Gg==}
     engines: {node: '>=6.9.0'}
+
+  '@cloudscape-design/design-tokens@3.0.116':
+    resolution: {integrity: sha512-fMoHEgvJtePAr9IopKfjS7o7lSiYpbCM5KdBUiwYhAO1py2+wyGKL+mr7DFDk7UTGaxIq6C3vLe3a0Q/yiedvA==}
 
   '@ctrl/tinycolor@4.2.1':
     resolution: {integrity: sha512-Vh5uy9Y1JBMId6J1f68TMXnZrTCvNdo9Fu2k0d1YnJngR+sM5kWTKl441c/3TFs+cG0NWOjRWgQ/iaWhbYx+7A==}
@@ -1394,6 +1400,8 @@ snapshots:
     dependencies:
       '@babel/helper-string-parser': 7.29.7
       '@babel/helper-validator-identifier': 7.29.7
+
+  '@cloudscape-design/design-tokens@3.0.116': {}
 
   '@ctrl/tinycolor@4.2.1': {}
 

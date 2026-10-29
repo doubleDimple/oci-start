@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { chromeRevision, getCurrentContentPalette } from '@/composables/useChrome'
 import type { RegionGlobePoint } from '../globeTypes'
 import type { RegionScene, RegionSceneColors, RegionSceneOptions } from '../sceneTypes'
 import { REGION_SCENE_ERROR_EVENT } from '../sceneTypes'
@@ -12,7 +13,12 @@ const { t, locale } = useI18n()
 const root = ref<HTMLElement | null>(null)
 const sceneHost = ref<HTMLElement | null>(null)
 const labelHost = ref<HTMLElement | null>(null)
-const mapTheme = ref<'dark' | 'light'>('dark')
+const mapThemePreference = ref<'auto' | 'dark' | 'light'>('auto')
+const pageTheme = computed(() => {
+  void chromeRevision.value
+  return getCurrentContentPalette().mode
+})
+const mapTheme = computed(() => mapThemePreference.value === 'auto' ? pageTheme.value : mapThemePreference.value)
 const pickerOpen = ref(false)
 const linksEnabled = ref(true)
 const labelsEnabled = ref(true)
@@ -42,11 +48,14 @@ const legend = computed(() => [
 ])
 const mapStyle = computed<Record<string, string>>(() => ({
   '--map-surface': `var(--region-map-${mapTheme.value}-surface)`,
+  '--map-panel': `var(--region-map-${mapTheme.value}-panel)`,
   '--map-land': `var(--region-map-${mapTheme.value}-land)`,
+  '--map-border': `var(--region-map-${mapTheme.value}-coast)`,
   '--map-text': `var(--region-map-${mapTheme.value}-text)`,
   '--map-muted': `var(--region-map-${mapTheme.value}-muted)`,
-  '--map-arm': mapTheme.value === 'dark' ? 'var(--region-map-arm)' : 'var(--status-warn)',
-  '--map-mine': mapTheme.value === 'dark' ? 'var(--region-map-mine)' : 'var(--brand)',
+  '--map-arm': `var(--region-map-${mapTheme.value}-arm)`,
+  '--map-mine': `var(--region-map-${mapTheme.value}-mine)`,
+  'color-scheme': mapTheme.value,
 }))
 let scene: RegionScene | null = null
 let generation = 0
@@ -54,7 +63,6 @@ let disposed = false
 let resizeFrame = 0
 let resizeObserver: ResizeObserver | null = null
 let intersectionObserver: IntersectionObserver | null = null
-let themeObserver: MutationObserver | null = null
 let motionQuery: MediaQueryList | null = null
 
 function cityName(point: RegionGlobePoint) { return regionCityName(point.regionCode, locale.value) }
@@ -77,10 +85,9 @@ function readColors(): RegionSceneColors {
   const prefix = `--region-map-${mapTheme.value}`
   return {
     surface: token(`${prefix}-surface`), land: token(`${prefix}-land`),
+    panel: token(`${prefix}-panel`), landFill: token(`${prefix}-land-fill`), coast: token(`${prefix}-coast`),
     text: token(`${prefix}-text`), muted: token(`${prefix}-muted`),
-    grid: token('--region-map-grid'),
-    arm: token(mapTheme.value === 'dark' ? '--region-map-arm' : '--status-warn'),
-    mine: token(mapTheme.value === 'dark' ? '--region-map-mine' : '--brand'),
+    grid: token(`${prefix}-grid`), arm: token(`${prefix}-arm`), mine: token(`${prefix}-mine`),
   }
 }
 function releaseScene() {
@@ -117,7 +124,6 @@ function selectFromList(value: unknown) {
 }
 function onPickerVisibilityChange(visible: boolean) { pickerOpen.value = visible }
 function clearSelection() { emit('select', null) }
-function toggleTheme() { mapTheme.value = mapTheme.value === 'dark' ? 'light' : 'dark' }
 function toggleLinks() { linksEnabled.value = !linksEnabled.value }
 function toggleLabels() { labelsEnabled.value = !labelsEnabled.value }
 function togglePulse() { if (!reducedMotion.value) pulseEnabled.value = !pulseEnabled.value }
@@ -188,7 +194,8 @@ function onMotionChange() {
   })
 }
 watch(canRender, syncActivity)
-watch(mapTheme, restartScene, { flush: 'post' })
+// Recolor the existing scene so switching appearance preserves zoom and selection.
+watch([mapTheme, chromeRevision], () => withScene(instance => instance.setColors(readColors())), { flush: 'post' })
 watch(pointList, () => withScene(instance => {
   instance.setPoints(pointList.value)
   instance.setSelected(selected.value?.regionCode ?? null)
@@ -213,15 +220,12 @@ onMounted(() => {
     intersectionObserver = new IntersectionObserver(entries => { inViewport.value = entries.some(entry => entry.isIntersecting) }, { threshold: 0.01 })
     intersectionObserver.observe(root.value)
   } else inViewport.value = true
-  themeObserver = new MutationObserver(() => { if (scene) restartScene() })
-  themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'style', 'class'] })
 })
 onBeforeUnmount(() => {
   disposed = true
   generation += 1
   resizeObserver?.disconnect()
   intersectionObserver?.disconnect()
-  themeObserver?.disconnect()
   motionQuery?.removeEventListener('change', onMotionChange)
   document.removeEventListener('visibilitychange', onVisibilityChange)
   window.removeEventListener('resize', scheduleResize)
@@ -231,7 +235,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section ref="root" class="region-globe" :style="mapStyle" :aria-label="t('regionGlobe.title')">
+  <section ref="root" class="region-globe" :data-map-theme="mapTheme" :style="mapStyle" :aria-label="t('regionGlobe.title')">
     <div class="scene-toolbar">
       <div class="region-picker">
         <label :for="selectId" class="sr-only">{{ t('regionGlobe.chooseRegion') }}</label>
@@ -244,10 +248,6 @@ onBeforeUnmount(() => {
           value-on-clear=""
           :teleported="true"
           :fit-input-width="true"
-          :show-arrow="false"
-          :effect="mapTheme"
-          :popper-class="`region-map-select-popper region-map-select-${mapTheme}`"
-          :popper-style="mapStyle"
           :placeholder="t('regionGlobe.searchRegion')"
           :aria-label="t('regionGlobe.searchRegion')"
           :no-match-text="t('regionGlobe.noMatchingRegion')"
@@ -256,21 +256,24 @@ onBeforeUnmount(() => {
           @visible-change="onPickerVisibilityChange"
         >
           <template #prefix><span class="i-mdi-magnify picker-search-icon" aria-hidden="true" /></template>
-          <el-option v-for="point in pointList" :key="point.regionCode" :value="point.regionCode" :label="regionOptionLabel(point)">
-            <span class="region-map-option-copy"><span class="region-map-option-name">{{ cityName(point) }}</span><span class="region-map-option-code">{{ point.regionCode }}</span></span>
-            <span class="i-mdi-check region-map-option-check" :class="{ 'is-selected': selected?.regionCode === point.regionCode }" aria-hidden="true" />
-          </el-option>
+          <el-option v-for="point in pointList" :key="point.regionCode" :value="point.regionCode" :label="regionOptionLabel(point)" />
         </el-select>
       </div>
       <div class="scene-controls">
         <button type="button" :aria-pressed="linksEnabled" :title="t('regionGlobe.linksAria')" :aria-label="t('regionGlobe.linksAria')" @click="toggleLinks"><span class="i-mdi-vector-curve" aria-hidden="true" /><span class="control-text">{{ t('regionGlobe.links') }}</span></button>
         <button type="button" :aria-pressed="labelsEnabled" :title="t('regionGlobe.labels')" :aria-label="t('regionGlobe.labels')" @click="toggleLabels"><span class="i-mdi-label-outline" aria-hidden="true" /><span class="control-text">{{ t('regionGlobe.labels') }}</span></button>
         <button type="button" :disabled="reducedMotion" :aria-pressed="pulseEnabled && !reducedMotion" :title="t(reducedMotion ? 'regionGlobe.motionDisabled' : 'regionGlobe.pulse')" :aria-label="t('regionGlobe.pulse')" @click="togglePulse"><span class="i-mdi-radio-tower" aria-hidden="true" /><span class="control-text">{{ t('regionGlobe.pulse') }}</span></button>
-        <button type="button" :title="t(mapTheme === 'dark' ? 'regionGlobe.lightTheme' : 'regionGlobe.darkTheme')" :aria-label="t(mapTheme === 'dark' ? 'regionGlobe.lightTheme' : 'regionGlobe.darkTheme')" @click="toggleTheme"><span :class="mapTheme === 'dark' ? 'i-mdi-white-balance-sunny' : 'i-mdi-weather-night'" aria-hidden="true" /></button>
-        <span class="control-divider" aria-hidden="true" />
-        <button type="button" :disabled="!ready" :title="t('regionGlobe.zoomIn')" :aria-label="t('regionGlobe.zoomIn')" @click="zoomIn"><span class="i-mdi-plus" aria-hidden="true" /></button>
-        <button type="button" :disabled="!ready" :title="t('regionGlobe.zoomOut')" :aria-label="t('regionGlobe.zoomOut')" @click="zoomOut"><span class="i-mdi-minus" aria-hidden="true" /></button>
-        <button type="button" :disabled="!ready" :title="t('regionGlobe.reset')" :aria-label="t('regionGlobe.reset')" @click="resetView"><span class="i-mdi-backup-restore" aria-hidden="true" /></button>
+        <el-select v-model="mapThemePreference" class="map-theme-control" :aria-label="t('regionGlobe.appearance')" @visible-change="onPickerVisibilityChange">
+          <el-option value="auto" :label="t('regionGlobe.followAppearance')" />
+          <el-option value="light" :label="t('regionGlobe.lightAppearance')" />
+          <el-option value="dark" :label="t('regionGlobe.darkAppearance')" />
+        </el-select>
+        <div class="scene-zoom">
+          <span class="control-divider" aria-hidden="true" />
+          <button type="button" :disabled="!ready" :title="t('regionGlobe.zoomIn')" :aria-label="t('regionGlobe.zoomIn')" @click="zoomIn"><span class="i-mdi-plus" aria-hidden="true" /></button>
+          <button type="button" :disabled="!ready" :title="t('regionGlobe.zoomOut')" :aria-label="t('regionGlobe.zoomOut')" @click="zoomOut"><span class="i-mdi-minus" aria-hidden="true" /></button>
+          <button type="button" :disabled="!ready" :title="t('regionGlobe.reset')" :aria-label="t('regionGlobe.reset')" @click="resetView"><span class="i-mdi-backup-restore" aria-hidden="true" /></button>
+        </div>
       </div>
     </div>
 
@@ -313,25 +316,20 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .region-globe { display: flex; flex-direction: column; position: relative; width: 100%; min-height: 340px; isolation: isolate; overflow: hidden; border-radius: var(--r-card); background: var(--map-surface); color: var(--map-text); font-family: var(--sans); font-size: var(--font-size-body); container-type: inline-size; }
-.scene-toolbar { position: relative; z-index: 3; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 12px 14px 8px; }
+.scene-toolbar { --map-panel: var(--bg-card); --map-text: var(--text-primary); --map-muted: var(--text-secondary); --map-arm: var(--brand); --map-mine: var(--brand); --map-border: var(--border); color-scheme: normal; position: relative; z-index: 3; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 12px 14px; background: var(--map-panel); border-bottom: 1px solid color-mix(in srgb, var(--map-border) 40%, transparent); }
 .scene-controls button, .fallback-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-width: 30px; min-height: 30px; padding: 5px 9px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--map-muted); font: var(--font-size-body) var(--sans); line-height: 1.3; cursor: pointer; transition: background-color 140ms ease, color 140ms ease; }
 .scene-controls button:hover:not(:disabled) { color: var(--map-text); background: color-mix(in srgb, var(--map-land) 24%, transparent); }
 .region-picker { position: relative; flex: 1 1 160px; min-width: 0; max-width: 250px; }
-.region-picker :deep(.el-select) { width: 100%; --el-color-primary: var(--map-mine); --el-select-input-color: var(--map-muted); --el-select-close-hover-color: var(--map-text); }
-.region-picker :deep(.el-select__wrapper) { min-height: 36px; padding: 7px 10px; border-radius: 8px; background: var(--map-surface); color: var(--map-text); box-shadow: 0 0 0 1px color-mix(in srgb, var(--map-land) 65%, transparent) inset; font: var(--font-size-body) var(--sans); }
-.region-picker :deep(.el-select__wrapper.is-hovering) { box-shadow: 0 0 0 1px var(--map-muted) inset; }
-.region-picker :deep(.el-select__wrapper.is-focused) { box-shadow: 0 0 0 1px var(--map-mine) inset, 0 0 0 3px color-mix(in srgb, var(--map-mine) 12%, transparent); }
-.region-picker :deep(.el-select__selected-item), .region-picker :deep(.el-select__placeholder), .region-picker :deep(.el-select__input) { color: var(--map-text); font: var(--font-size-body) var(--sans); }
-.region-picker :deep(.el-select__placeholder.is-transparent), .region-picker :deep(.el-select__input::placeholder), .region-picker :deep(.el-select__caret) { color: var(--map-muted); }
-.region-picker :deep(.el-select__input) { caret-color: var(--map-mine); }
-.region-picker :deep(.el-select__clear:hover) { color: var(--map-text); }
+.region-picker :deep(.el-select) { width: 100%; }
 .picker-search-icon { width: 15px; height: 15px; color: var(--map-muted); }
 .scene-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; margin-left: auto; }
 .scene-controls button { padding: 5px 6px; }
 .scene-controls button > span:not(.control-text) { width: 16px; height: 16px; flex-shrink: 0; }
-.scene-controls button[aria-pressed="true"] { color: var(--map-mine); }
+.scene-controls button[aria-pressed="true"] { color: var(--map-arm); background: color-mix(in srgb, var(--map-arm) 8%, transparent); }
 .scene-controls button:disabled { opacity: .38; cursor: default; }
 .control-divider { height: 16px; width: 1px; margin: 0 4px; background: color-mix(in srgb, var(--map-land) 65%, transparent); }
+.map-theme-control { width: 120px; margin-left: 6px; }
+.scene-zoom { display: flex; align-items: center; gap: 2px; margin-left: auto; }
 /* Size the world from its available width; leave a little vertical room for markers. */
 .scene-area { position: relative; flex: 1 0 auto; width: 100%; aspect-ratio: 360 / 150; min-height: 180px; overflow: hidden; }
 .scene-host, .scene-labels { position: absolute; inset: 0; }
@@ -348,7 +346,7 @@ onBeforeUnmount(() => {
 .fallback-actions button { margin-top: 4px; border-color: var(--map-land); color: var(--map-text); pointer-events: auto; }
 .loading-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--map-mine); }
 .empty-notice { position: absolute; top: 8px; inset-inline: 16px; margin: 0; text-align: center; color: var(--map-muted); font-size: var(--font-size-secondary); pointer-events: none; }
-.scene-footer { position: relative; z-index: 3; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 7px 16px; padding: 9px 16px 13px; }
+.scene-footer { position: relative; z-index: 3; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 7px 16px; padding: 11px 16px; border-top: 1px solid color-mix(in srgb, var(--map-border) 40%, transparent); background: var(--map-panel); }
 .scene-legend { display: flex; flex-wrap: wrap; gap: 7px 14px; color: var(--map-text); font-size: var(--font-size-secondary); }
 .scene-legend > span { display: inline-flex; align-items: center; gap: 6px; }
 .scene-legend i { display: inline-block; flex-shrink: 0; width: 8px; height: 8px; border-radius: 50%; }
@@ -356,7 +354,7 @@ onBeforeUnmount(() => {
 .legend-arm { background: var(--map-arm); }
 .legend-both { background: linear-gradient(135deg, var(--map-mine) 50%, var(--map-arm) 50%); }
 .scene-footer > p { margin: 0; color: var(--map-muted); font-size: var(--font-size-secondary); }
-.region-details { position: absolute; z-index: 4; right: 14px; bottom: 12px; width: 270px; max-width: calc(100% - 28px); max-height: calc(100% - 24px); box-sizing: border-box; overflow: auto; padding: 14px; border: 1px solid color-mix(in srgb, var(--map-land) 80%, transparent); border-radius: 10px; background: color-mix(in srgb, var(--map-surface) 97%, transparent); color: var(--map-text); box-shadow: var(--shadow-card); overscroll-behavior: contain; }
+.region-details { position: absolute; z-index: 4; right: 14px; bottom: 12px; width: 270px; max-width: calc(100% - 28px); max-height: calc(100% - 24px); box-sizing: border-box; overflow: auto; padding: 14px; border: 1px solid var(--map-border); border-radius: 10px; background: var(--map-panel); color: var(--map-text); box-shadow: 0 6px 24px color-mix(in srgb, var(--map-text) 10%, transparent); overscroll-behavior: contain; }
 .region-details.details-left { right: auto; left: 14px; }
 .detail-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
 .detail-heading > div { min-width: 0; }
@@ -375,9 +373,9 @@ onBeforeUnmount(() => {
 .region-globe :deep(.region-scene-pin:focus-visible) { outline: 2px solid var(--map-mine); outline-offset: 4px; }
 .region-globe button:focus-visible { outline: 2px solid var(--map-mine); outline-offset: 2px; }
 @container (max-width: 680px) {
-  .scene-toolbar { padding: 10px 10px 6px; gap: 6px; }
+  .scene-toolbar { padding: 10px; gap: 8px; }
   .region-picker { max-width: none; }
-  .scene-controls { gap: 2px; }
+  .scene-controls { gap: 3px; }
   .scene-controls .control-text { display: none; }
   .region-details, .region-details.details-left { right: 10px; left: 10px; bottom: 8px; width: auto; max-width: none; padding: 11px; max-height: 36%; }
   .region-details.details-top { top: 8px; bottom: auto; }
@@ -389,42 +387,4 @@ onBeforeUnmount(() => {
 @media (prefers-reduced-motion: reduce) {
   .scene-controls button, .fallback-actions button { transition: none; }
 }
-</style>
-
-<style>
-/* Teleported options keep the map's local palette, independent of the app theme. */
-body .el-popper.region-map-select-popper {
-  --el-bg-color-overlay: var(--map-surface);
-  --el-fill-color-light: color-mix(in srgb, var(--map-land) 24%, transparent);
-  --el-text-color-primary: var(--map-text);
-  --el-text-color-regular: var(--map-text);
-  --el-text-color-secondary: var(--map-muted);
-  --el-text-color-placeholder: var(--map-muted);
-  --el-color-primary: var(--map-mine);
-  --el-border-color-light: color-mix(in srgb, var(--map-land) 75%, transparent);
-  --el-scrollbar-bg-color: var(--map-muted);
-  --el-scrollbar-hover-bg-color: var(--map-text);
-  max-width: calc(100vw - 24px);
-  padding: 0;
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 10px;
-  background: var(--map-surface);
-  color: var(--map-text);
-  box-shadow: 0 10px 32px color-mix(in srgb, var(--region-map-dark-surface) 26%, transparent);
-  font-family: var(--sans);
-  font-size: var(--font-size-body);
-}
-.region-map-select-popper.region-map-select-dark { color-scheme: dark; }
-.region-map-select-popper.region-map-select-light { color-scheme: light; }
-.region-map-select-popper .el-select-dropdown__list { padding: 5px 0; }
-.region-map-select-popper .el-select-dropdown__item { display: flex; align-items: center; gap: 10px; min-height: 48px; height: auto; margin: 2px 6px; padding: 8px 10px; border-radius: 6px; color: var(--map-text); font-size: var(--font-size-body); line-height: 1.3; }
-.region-map-select-popper .el-select-dropdown__item.is-hovering { background: color-mix(in srgb, var(--map-land) 24%, transparent); }
-.region-map-select-popper .el-select-dropdown__item.is-selected { color: var(--map-mine); background: color-mix(in srgb, var(--map-mine) 10%, transparent); font-weight: 500; }
-.region-map-select-popper .el-select-dropdown__item.is-selected.is-hovering { background: color-mix(in srgb, var(--map-mine) 17%, transparent); }
-.region-map-select-popper .region-map-option-copy { display: grid; flex: 1; min-width: 0; gap: 4px; }
-.region-map-select-popper .region-map-option-name { overflow: hidden; text-overflow: ellipsis; font-size: var(--font-size-body); font-weight: 500; }
-.region-map-select-popper .region-map-option-code { overflow: hidden; text-overflow: ellipsis; color: var(--map-muted); font: var(--font-size-secondary) var(--mono); }
-.region-map-select-popper .region-map-option-check { width: 16px; height: 16px; flex-shrink: 0; color: var(--map-mine); visibility: hidden; }
-.region-map-select-popper .region-map-option-check.is-selected { visibility: visible; }
-.region-map-select-popper .el-select-dropdown__empty { padding: 22px 14px; color: var(--map-muted); font: var(--font-size-secondary) var(--sans); line-height: 1.5; }
 </style>

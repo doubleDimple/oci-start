@@ -43,9 +43,9 @@
 
     &:hover:not(:disabled) {
       border-color: var(--brand);
-      background: var(--color-ok-bg);
+      background: var(--brand-subtle);
       color: var(--brand);
-      transform: translateY(-1px);
+      transform: none;
       box-shadow: 0 3px 6px rgba(0, 0, 0, 0.08);
     }
     &:active:not(:disabled) {
@@ -85,9 +85,9 @@
 
     &:not(:disabled):hover {
       border-color: var(--brand);
-      background: var(--color-ok-bg);
+      background: var(--brand-subtle);
       color: var(--brand);
-      transform: translateY(-1px);
+      transform: none;
       box-shadow: 0 3px 6px rgba(0, 0, 0, 0.08);
     }
     &:not(:disabled):active { transform: scale(0.94); }
@@ -122,7 +122,7 @@
 .subscription-status-unknown { background: var(--bg-search); color: var(--text-secondary); }
 .region-details {
   margin: 0;
-  > div { display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 16px; padding: 13px 0; border-bottom: 1px solid color-mix(in srgb, var(--border) 40%, transparent); }
+  > div { display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 16px; padding: 13px 0; border-bottom: 1px solid var(--border); }
   > div:last-child { border: 0; }
   dt { color: var(--text-secondary); font-size: var(--font-size-body); }
   dd { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; color: var(--text-primary); font-size: var(--font-size-body); overflow-wrap: anywhere; }
@@ -133,8 +133,8 @@
 .dialog-error { padding: 10px 12px; border-radius: 9px; background: var(--status-danger-bg); color: var(--status-danger); font-size: var(--font-size-secondary); line-height: 1.6; overflow-wrap: anywhere; }
 .subscription-targets, .subscription-results {
   max-height: min(330px, 42vh); margin: 0; padding: 0; overflow: auto; overscroll-behavior: contain; list-style: none;
-  border: 1px solid color-mix(in srgb, var(--border) 50%, transparent); border-radius: 12px;
-  li { padding: 12px 14px; border-bottom: 1px solid color-mix(in srgb, var(--border) 35%, transparent); font-size: var(--font-size-body); }
+  border: 1px solid var(--border); border-radius: 12px;
+  li { padding: 12px 14px; border-bottom: 1px solid var(--border); font-size: var(--font-size-body); }
   li:last-child { border-bottom: 0; }
 }
 .subscription-targets li { display: flex; align-items: baseline; gap: 12px; overflow-wrap: anywhere; }

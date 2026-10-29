@@ -389,8 +389,8 @@ onBeforeUnmount(() => { disposed = true; listGeneration++; filterGeneration++; r
 .icon-button i, .row-actions i { width: 16px; height: 16px; font-size: 16px; }
 .row-actions { display: inline-flex; justify-content: flex-start; align-items: center; gap: 7px; flex-wrap: nowrap; }
 .icon-button:hover:not(:disabled), .row-actions button:hover:not(:disabled) {
-  border-color: var(--brand); background: var(--color-ok-bg, var(--bg-hover)); color: var(--brand);
-  transform: translateY(-1px); box-shadow: 0 3px 6px rgba(0, 0, 0, 0.08);
+  border-color: var(--brand); background: var(--brand-subtle); color: var(--brand);
+  transform: none; box-shadow: 0 3px 6px rgba(0, 0, 0, 0.08);
 }
 .icon-button:active:not(:disabled), .row-actions button:active:not(:disabled) { transform: scale(0.94); }
 .row-actions button:disabled { opacity: .45; cursor: not-allowed; }
@@ -398,12 +398,12 @@ onBeforeUnmount(() => { disposed = true; listGeneration++; filterGeneration++; r
 .row-actions .danger-btn {
   background: var(--status-danger) !important;
   border-color: var(--status-danger) !important;
-  color: #ffffff !important;
+  color: var(--text-on-brand) !important;
 }
 .row-actions .danger-btn:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--status-danger) 85%, black) !important;
-  border-color: color-mix(in srgb, var(--status-danger) 85%, black) !important;
-  color: #ffffff !important;
+  background: color-mix(in srgb, var(--status-danger) 85%, var(--text-primary)) !important;
+  border-color: color-mix(in srgb, var(--status-danger) 85%, var(--text-primary)) !important;
+  color: var(--text-on-brand) !important;
   box-shadow: 0 2px 8px color-mix(in srgb, var(--status-danger) 25%, transparent) !important;
 }
 .is-spinning { animation: boot-spin 1s linear infinite; }

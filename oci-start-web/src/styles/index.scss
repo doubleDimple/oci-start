@@ -1,3 +1,5 @@
+@use './console';
+
 /* Element Plus 贴到当前 token：圆角、字色、表格在亮/暗下都可读 */
 
 // Teleported dialogs and drawers must fit the same phone viewport as the console.
@@ -33,11 +35,32 @@ html:root[data-content-theme] {
     font-size: var(--font-size-body);
   }
   .el-button--primary:not(.is-plain):not(.is-text):not(.is-link):not(.is-dashed) {
-    --el-button-bg-color: var(--brand);
-    --el-button-border-color: var(--brand);
-    --el-button-hover-bg-color: var(--brand-hover);
-    --el-button-hover-border-color: var(--brand-hover);
+    --el-button-bg-color: var(--brand-solid);
+    --el-button-border-color: var(--brand-solid);
+    --el-button-hover-bg-color: var(--brand-solid-hover);
+    --el-button-hover-border-color: var(--brand-solid-hover);
+    --el-button-active-bg-color: var(--brand-solid-hover);
+    --el-button-active-border-color: var(--brand-solid-hover);
+    --el-button-disabled-bg-color: color-mix(in srgb, var(--brand-solid) 50%, var(--bg-card));
+    --el-button-disabled-border-color: var(--el-button-disabled-bg-color);
+    --el-button-text-color: var(--text-on-solid);
+    --el-button-hover-text-color: var(--text-on-solid);
+    --el-button-active-text-color: var(--text-on-solid);
+    --el-button-disabled-text-color: var(--text-on-solid);
   }
+  .el-button--success, .el-button--warning, .el-button--danger {
+    &:not(.is-plain):not(.is-text):not(.is-link):not(.is-dashed) {
+      --el-button-text-color: var(--text-on-brand);
+      --el-button-hover-text-color: var(--text-on-brand);
+      --el-button-active-text-color: var(--text-on-brand);
+      --el-button-disabled-text-color: var(--text-on-brand);
+      --el-button-hover-bg-color: color-mix(in srgb, var(--el-button-bg-color) 85%, var(--text-primary));
+      --el-button-hover-border-color: var(--el-button-hover-bg-color);
+    }
+  }
+  .el-radio-button { --el-radio-button-checked-text-color: var(--text-on-brand); }
+  .el-checkbox { --el-checkbox-checked-icon-color: var(--text-on-brand); }
+  .el-radio__input.is-checked .el-radio__inner::after { background: var(--text-on-brand); }
 
   .el-card {
     border-radius: var(--r-card);
@@ -69,9 +92,9 @@ html:root[data-content-theme] {
   .el-select__wrapper {
     // The wrapper owns the single control frame; its editable child never draws a second one.
     border: 0 !important;
-    border-radius: var(--r-pill);
+    border-radius: var(--r-sm);
     background: var(--bg-search);
-    box-shadow: 0 0 0 1px var(--border) inset;
+    box-shadow: 0 0 0 1px var(--border-strong) inset;
     color: var(--text-primary);
   }
   :where(.el-input:not(.is-disabled)) .el-input__wrapper:hover,
@@ -81,11 +104,14 @@ html:root[data-content-theme] {
   .el-input__wrapper.is-focus,
   .el-input__wrapper:focus-within,
   .el-select__wrapper.is-focused,
-  .el-select__wrapper:focus-within {
+  .el-select__wrapper:focus-within,
+  .el-textarea__inner:focus {
     box-shadow: 0 0 0 2px var(--brand) inset;
   }
   .el-form-item.is-error .el-input__wrapper,
   .el-form-item.is-error .el-select__wrapper,
+  .el-form-item.is-error .el-textarea__inner,
+  .el-textarea__inner[aria-invalid='true'],
   .el-input[aria-invalid='true'] .el-input__wrapper,
   .el-select[aria-invalid='true'] .el-select__wrapper {
     box-shadow: 0 0 0 1px var(--status-danger) inset;
@@ -131,7 +157,7 @@ html:root[data-content-theme] {
   }
 
   .el-dropdown-menu {
-    border-radius: 14px;
+    border-radius: var(--r-sm);
     border: 1px solid var(--border);
     box-shadow: var(--shadow-card);
     padding: 6px;
@@ -165,11 +191,14 @@ html:root[data-content-theme] {
     --el-pagination-button-disabled-bg-color: var(--bg-card);
     --el-text-color-primary: var(--text-primary);
   }
+  .el-pagination.is-background .el-pager li.is-active {
+    color: var(--text-on-brand);
+  }
 
   .el-table {
     --el-table-bg-color: var(--bg-card);
     --el-table-tr-bg-color: var(--bg-card);
-    --el-table-header-bg-color: var(--bg-card);
+    --el-table-header-bg-color: var(--bg-card-subtle);
     --el-table-row-hover-bg-color: var(--bg-hover);
     --el-table-text-color: var(--text-primary);
     --el-table-header-text-color: var(--text-secondary);
@@ -182,6 +211,13 @@ html:root[data-content-theme] {
   .el-table th.el-table__cell {
     font-weight: 600;
     color: var(--text-secondary);
+  }
+  .el-table th.el-table__cell { padding-block: 12px; }
+  .el-table .el-table__row td.el-table__cell { padding-block: 12px; }
+  .el-textarea__inner {
+    border-radius: var(--r-sm);
+    background: var(--bg-search);
+    box-shadow: 0 0 0 1px var(--border-strong) inset;
   }
   .el-table .el-table__cell {
     color: var(--text-primary);

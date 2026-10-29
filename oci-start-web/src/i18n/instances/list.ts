@@ -1,5 +1,6 @@
 export default {
   zh: {
+    pageDescription: '按租户和区域查看云实例，管理计算资源、网络与运行状态。',
     tenant: '租户', region: '区域', name: '实例名称', resources: 'CPU / 内存', architecture: '架构',
     volume: '引导卷 / VPU', ipv4: '公网 IPv4', ipv6: 'IPv6', created: '入库日期', actions: '操作',
     selectTenant: '选择租户', selectRegion: '选择区域', view: '查看实例', reset: '重置筛选',
@@ -21,6 +22,7 @@ export default {
     states: { RUNNING: '运行中', STOPPED: '已停止', STARTING: '启动中', STOPPING: '停止中', TERMINATING: '终止中', TERMINATED: '已终止', PROVISIONING: '创建中', UNKNOWN: '未知状态' },
   },
   en: {
+    pageDescription: 'View instances by tenant and region, and manage compute, networking and lifecycle.',
     tenant: 'Tenant', region: 'Region', name: 'Instance name', resources: 'CPU / Memory', architecture: 'Architecture',
     volume: 'Boot volume / VPU', ipv4: 'Public IPv4', ipv6: 'IPv6', created: 'Added on', actions: 'Actions',
     selectTenant: 'Select tenant', selectRegion: 'Select region', view: 'View instances', reset: 'Reset filters',

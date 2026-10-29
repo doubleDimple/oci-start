@@ -80,12 +80,6 @@ watch(() => route.query.tab, val => {
   if (val === 'tasks') tasksDialogOpen.value = true
   else if (val === 'analytics') qualityDialogOpen.value = true
 }, { immediate: true })
-watch(() => route.query.instanceId, id => {
-  if (typeof id === 'string' && id) {
-    selectedInstanceId.value = id
-    qualityDialogOpen.value = true
-  }
-}, { immediate: true })
 
 // Instances filtering & search
 const query = ref('')
@@ -142,6 +136,10 @@ const filteredTasks = computed(() => {
 const taskPage = ref(1)
 const taskSize = ref(20)
 const visibleTasks = computed(() => filteredTasks.value.slice((taskPage.value - 1) * taskSize.value, taskPage.value * taskSize.value))
+watch([taskQuery, taskOperator, taskSize], () => { taskPage.value = 1 })
+watch(() => filteredTasks.value.length, total => {
+  taskPage.value = Math.min(taskPage.value, Math.max(1, Math.ceil(total / taskSize.value)))
+})
 
 const taskEditor = ref<{ task: NetworkQualityTask | null; instanceId?: string } | null>(null)
 type NqConfirmation = { kind: 'run' | 'delete' | 'toggle'; task: NetworkQualityTask; instanceIds?: string[] } | { kind: 'install'; agent: NetworkQualityAgent }
@@ -201,6 +199,12 @@ const nqReceipt = computed(() => {
 
 // Analytics state & historical data
 const selectedInstanceId = ref<string>(typeof route.query.instanceId === 'string' ? route.query.instanceId : '')
+watch(() => route.query.instanceId, id => {
+  if (typeof id === 'string' && id) {
+    selectedInstanceId.value = id
+    qualityDialogOpen.value = true
+  }
+}, { immediate: true })
 watch(rows, list => {
   if (!selectedInstanceId.value && list.length > 0) {
     selectedInstanceId.value = list[0].id
@@ -679,8 +683,8 @@ onBeforeUnmount(() => {
     <el-dialog
       v-model="tasksDialogOpen"
       append-to-body
-      width="min(1160px, calc(100vw - 32px))"
-      class="nq-dialog"
+      width="min(1440px, calc(100vw - 32px))"
+      class="nq-dialog nq-tasks-dialog"
       :title="t('networkQuality.tasks')"
       :close-on-click-modal="false"
       align-center
@@ -711,7 +715,7 @@ onBeforeUnmount(() => {
           </PrimaryBtn>
         </div>
       </div>
-      <div class="nq-table-wrap" :aria-busy="nqLoading">
+      <div class="nq-table-wrap" :aria-busy="nqLoading" tabindex="0" :aria-label="t('networkQuality.tasks')">
         <table class="nq-table nq-task-table" :aria-label="t('networkQuality.tasks')">
           <thead>
             <tr>
@@ -783,7 +787,7 @@ onBeforeUnmount(() => {
           <p>{{ taskQuery || taskOperator ? t('networkQuality.noMatches') : t('networkQuality.emptyTasks') }}</p>
         </div>
       </div>
-      <PagePagination :current-page="taskPage" :page-size="taskSize" :total="filteredTasks.length" :page-sizes="pageSizes" :disabled="nqLocked" @current-change="v => taskPage = v">
+      <PagePagination v-model:current-page="taskPage" v-model:page-size="taskSize" :total="filteredTasks.length" :page-sizes="pageSizes" :disabled="nqLocked">
         <span>{{ t('networkQuality.total', { count: number(filteredTasks.length, 0) }) }}</span>
       </PagePagination>
       <template #footer>

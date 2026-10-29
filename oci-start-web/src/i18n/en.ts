@@ -10,6 +10,8 @@ import tenantAudit from './tenants/audit'
 import ociCost from './cost/oci'
 import tenantTraffic from './monitor/traffic'
 import metrics from './monitor/metrics'
+import dashboardMonitor from './monitor/dashboard'
+import dashboardBusiness from './monitor/business'
 import domainProviders from './settings/domainProviders'
 import cloudflareDns from './dns/cloudflare'
 import edgeoneDns from './dns/edgeone'
@@ -56,8 +58,12 @@ import { auditLogsEn } from './auditLogs'
 import { mobileTenantToolsMessages } from './mobileTenantTools'
 import { mobileShellMessages } from './mobileShell'
 import { mobileRecordsMessages } from './mobileRecords'
+import { pageLayoutMessages } from './pageLayout'
 
 export default {
+  dashboardMonitor: dashboardMonitor.en,
+  dashboardBusiness: dashboardBusiness.en,
+  pageLayout: pageLayoutMessages.en,
   auditLogs: auditLogsEn,
   mobileRecords: mobileRecordsMessages.en,
   mobileTenantTools: mobileTenantToolsMessages.en,
@@ -152,17 +158,18 @@ export default {
     resetTip: 'Restored default theme settings',
     customPicker: 'Custom Color',
     customHint: 'Smart color engine derives harmonized cards, inputs, and borders for clear visual contrast',
+    sidebarConsole: 'Console dark',
     sidebarObsidian: 'Obsidian Dark',
     sidebarBlack: 'Pure Black',
     sidebarForest: 'OCI Forest',
     sidebarNavy: 'Navy Blue',
     sidebarEspresso: 'Espresso',
     sidebarLight: 'Clean Light',
-    presetSlate: 'Classic Slate',
+    presetSlate: 'Console light',
     presetPure: 'Pure Snow',
     presetAzure: 'Cloud Azure',
     presetIvory: 'Warm Ivory',
-    presetMidnight: 'Midnight Slate',
+    presetMidnight: 'Console dark',
     presetOnyx: 'Onyx Black',
     presetAurora: 'Aurora Forest',
     presetCustom: 'Custom Palette',
@@ -173,6 +180,8 @@ export default {
   dashboard: {
     yearUnit: 'y', dayUnit: 'd', hourUnit: 'h', minuteUnit: 'm',
     pageTitle: 'System monitor',
+    pageDescription: 'Monitor host resources, network throughput and instance launch activity.',
+    updatedAt: 'Last updated: {time}',
     loading: 'Loading...',
     apiTotal: 'API calls',
     bootInstances: 'Boot instances',

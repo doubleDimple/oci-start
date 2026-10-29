@@ -12,6 +12,7 @@
     "type-check": "vue-tsc --noEmit"
   },
   "dependencies": {
+    "@cloudscape-design/design-tokens": "3.0.116",
     "axios": "^1.7.7",
     "dompurify": "^3.4.15",
     "echarts": "^6.0.0",

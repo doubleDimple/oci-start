@@ -10,13 +10,13 @@ withDefaults(defineProps<{ loading?: boolean; disabled?: boolean; type?: 'button
 <style scoped>
 .btn {
   border: 0;
-  background: var(--brand);
-  color: var(--nav-active-fg);
+  background: var(--brand-solid);
+  color: var(--text-on-solid);
   font: inherit;
   font-size: var(--font-size-body);
   font-weight: 600;
   border-radius: var(--r-pill);
-  padding: 10px 16px;
+  padding: 8px 20px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -27,7 +27,7 @@ withDefaults(defineProps<{ loading?: boolean; disabled?: boolean; type?: 'button
   touch-action: manipulation;
   transition: transform 180ms cubic-bezier(.22, 1, .36, 1), background-color 180ms ease, box-shadow 180ms ease;
 }
-.btn:not(:disabled):hover { background: var(--brand-hover); box-shadow: 0 4px 12px color-mix(in srgb, var(--brand) 18%, transparent); }
+.btn:not(:disabled):hover { background: var(--brand-solid-hover); }
 .btn:not(:disabled):active { transform: scale(.97); }
 .btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
 .btn:disabled { opacity: 0.6; cursor: default; }

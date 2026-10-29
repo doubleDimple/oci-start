@@ -8,6 +8,8 @@ export interface ChartTheme {
   border: string
   brand: string
   info: string
+  tertiary: string
+  danger: string
   warning: string
   fontFamily: string
   bodySize: number
@@ -16,8 +18,9 @@ export interface ChartTheme {
 
 const colorTokens = {
   text: '--text-primary', secondary: '--text-secondary', muted: '--text-muted',
-  surface: '--bg-card', border: '--border', brand: '--brand',
-  info: '--status-info', warning: '--status-warn',
+  // Keep upload and download distinct across every content palette.
+  surface: '--bg-card', border: '--border', brand: '--chart-primary',
+  info: '--chart-secondary', tertiary: '--chart-tertiary', danger: '--status-danger', warning: '--status-warn',
 } as const
 type ColorKey = keyof typeof colorTokens
 let cachedRevision = -1
@@ -43,7 +46,7 @@ export function readChartTheme(): Readonly<ChartTheme> {
     ...(mode === 'dark'
       ? { text: '#f5f5f7', secondary: '#d2d2d7', muted: '#b5b5bd', surface: '#1d1d1f', border: '#424245' }
       : { text: '#000000', secondary: '#000000', muted: '#000000', surface: '#ffffff', border: '#d2d2d7' }),
-    brand: '#1b8a6a', info: '#0071e3', warning: '#b45309',
+    brand: '#d77b33', info: '#087e8b', tertiary: '#8867b1', danger: '#db0000', warning: '#855900',
   }
   const canvas = document.createElement('canvas')
   canvas.width = canvas.height = 1

@@ -1,5 +1,6 @@
 import { computed, reactive, ref } from 'vue'
 import type { ThemeName } from './useTheme'
+import { cloudscapeContent, cloudscapeVariables } from '@/styles/cloudscape'
 
 const STORAGE_KEY = 'oci_chrome_theme_v2'
 const LEGACY_KEY = 'oci_chrome_colors'
@@ -29,6 +30,7 @@ export interface SidebarTheme {
 }
 
 export const SIDEBAR_PRESETS: SidebarTheme[] = [
+  { id: 'console', nameKey: 'chrome.sidebarConsole', color: '#161d26', isLight: false },
   { id: 'obsidian', nameKey: 'chrome.sidebarObsidian', color: '#18181b', isLight: false },
   { id: 'black', nameKey: 'chrome.sidebarBlack', color: '#000000', isLight: false },
   { id: 'forest', nameKey: 'chrome.sidebarForest', color: '#0d4d3f', isLight: false },
@@ -37,22 +39,11 @@ export const SIDEBAR_PRESETS: SidebarTheme[] = [
   { id: 'light', nameKey: 'chrome.sidebarLight', color: '#ffffff', isLight: true },
 ]
 
-export const CONTENT_PRESETS: ContentPalette[] = [
+export const CONTENT_PRESETS: ContentPalette[] = ([
   {
     id: 'slate',
     nameKey: 'chrome.presetSlate',
-    mode: 'light',
-    page: '#f1f5f9',
-    card: '#ffffff',
-    cardSubtle: '#f8fafc',
-    search: '#e2e8f0',
-    hover: '#f1f5f9',
-    border: '#cbd5e1',
-    borderStrong: '#94a3b8',
-    textPrimary: '#0f172a',
-    textSecondary: '#475569',
-    textMuted: '#94a3b8',
-    shadowCard: '0 1px 3px rgba(0, 0, 0, 0.06), 0 4px 12px -2px rgba(0, 0, 0, 0.05)',
+    ...cloudscapeContent('light'),
   },
   {
     id: 'pure',
@@ -105,18 +96,7 @@ export const CONTENT_PRESETS: ContentPalette[] = [
   {
     id: 'midnight',
     nameKey: 'chrome.presetMidnight',
-    mode: 'dark',
-    page: '#0b0f19',
-    card: '#131b2e',
-    cardSubtle: '#19233c',
-    search: '#1c2742',
-    hover: '#243254',
-    border: '#243356',
-    borderStrong: '#3b5288',
-    textPrimary: '#f8fafc',
-    textSecondary: '#cbd5e1',
-    textMuted: '#8193b2',
-    shadowCard: '0 4px 20px rgba(0, 0, 0, 0.45)',
+    ...cloudscapeContent('dark'),
   },
   {
     id: 'onyx',
@@ -150,7 +130,7 @@ export const CONTENT_PRESETS: ContentPalette[] = [
     textMuted: '#6ee7b7',
     shadowCard: '0 4px 20px rgba(6, 26, 20, 0.5)',
   },
-]
+] satisfies ContentPalette[]).map(readablePalette)
 
 export const SIDEBAR_SWATCHES = SIDEBAR_PRESETS.map(s => s.color)
 export const PAGE_SWATCHES = CONTENT_PRESETS.map(p => p.page)
@@ -165,17 +145,17 @@ export interface ChromePreference {
 type ChromeStore = Record<ThemeName, ChromePreference>
 
 const DEFAULT_LIGHT: ChromePreference = {
-  sidebar: '#18181b',
-  page: '#f1f5f9',
+  sidebar: '#ffffff',
+  page: cloudscapeContent('light').page,
   preset: 'slate',
-  sidebarPreset: 'obsidian',
+  sidebarPreset: 'light',
 }
 
 const DEFAULT_DARK: ChromePreference = {
-  sidebar: '#18181b',
-  page: '#0b0f19',
+  sidebar: '#161d26',
+  page: cloudscapeContent('dark').page,
   preset: 'midnight',
-  sidebarPreset: 'obsidian',
+  sidebarPreset: 'console',
 }
 
 let sessionStore: ChromeStore | undefined
@@ -267,13 +247,42 @@ export function getLuminance(hex: string): number {
 }
 
 export function isLightColor(hex: string): boolean {
-  return getLuminance(hex) >= 0.42
+  // At this luminance, black and white have the same contrast. HSL lightness
+  // alone misclassifies saturated colors and medium grays.
+  return getLuminance(hex) >= Math.sqrt(0.05 * 1.05) - 0.05
 }
 
-/**
- * Enterprise smart color derivation engine:
- * Derives a complete, coordinated surface hierarchy from any arbitrary canvas hex.
- */
+function readableColor(foreground: string, backgrounds: string[], mode: ContentPalette['mode']): string {
+  const rgb = hexToRgb(foreground)!
+  const target = mode === 'light' ? 0 : 255
+  for (let step = 0; step <= 100; step++) {
+    const amount = step / 100
+    const candidate = '#' + [rgb.r, rgb.g, rgb.b]
+      .map(channel => Math.round(channel + (target - channel) * amount).toString(16).padStart(2, '0')).join('')
+    const luminance = getLuminance(candidate)
+    if (backgrounds.every(background => {
+      const other = getLuminance(background)
+      return (Math.max(luminance, other) + 0.05) / (Math.min(luminance, other) + 0.05) >= 4.5
+    })) return candidate
+  }
+  return mode === 'light' ? '#000000' : '#ffffff'
+}
+
+function paletteSurfaces(palette: ContentPalette): string[] {
+  return [palette.page, palette.card, palette.cardSubtle, palette.search, palette.hover]
+}
+
+function readablePalette(palette: ContentPalette): ContentPalette {
+  const surfaces = paletteSurfaces(palette)
+  return {
+    ...palette,
+    textPrimary: readableColor(palette.textPrimary, surfaces, palette.mode),
+    textSecondary: readableColor(palette.textSecondary, surfaces, palette.mode),
+    textMuted: readableColor(palette.textMuted, surfaces, palette.mode),
+  }
+}
+
+/** Keep the chosen canvas color, with readable controls and container surfaces. */
 export function deriveCustomPalette(hex: string): ContentPalette {
   const normHex = norm(hex) || '#f1f5f9'
   const rgb = hexToRgb(normHex) || { r: 241, g: 245, b: 249 }
@@ -281,9 +290,9 @@ export function deriveCustomPalette(hex: string): ContentPalette {
   const isLight = isLightColor(normHex)
 
   if (isLight) {
-    // Pure or near pure white canvas (L >= 99% or #ffffff): Card gets a subtle surface and clear border so it never blends into the white canvas
+    // Separate near-white canvases from their cards.
     if (normHex === '#ffffff' || hsl.l >= 99) {
-      return {
+      return readablePalette({
         id: 'custom',
         nameKey: 'chrome.presetCustom',
         mode: 'light',
@@ -298,35 +307,36 @@ export function deriveCustomPalette(hex: string): ContentPalette {
         textSecondary: '#475569',
         textMuted: '#94a3b8',
         shadowCard: '0 1px 3px rgba(0, 0, 0, 0.04)',
-      }
+      })
     }
     // Standard light: Card floats cleanly as #ffffff on top of the tinted/gray canvas
-    return {
+    return readablePalette({
       id: 'custom',
       nameKey: 'chrome.presetCustom',
       mode: 'light',
       page: normHex,
       card: '#ffffff',
       cardSubtle: hslToHex(hsl.h, Math.min(hsl.s, 18), 97),
-      search: hslToHex(hsl.h, hsl.s, Math.max(0, hsl.l - 7)),
-      hover: hslToHex(hsl.h, hsl.s, Math.max(0, hsl.l - 4)),
-      border: hslToHex(hsl.h, Math.min(hsl.s, 25), Math.max(0, hsl.l - 15)),
-      borderStrong: hslToHex(hsl.h, Math.min(hsl.s, 30), Math.max(0, hsl.l - 26)),
+      search: hslToHex(hsl.h, Math.min(hsl.s, 18), 96),
+      hover: hslToHex(hsl.h, Math.min(hsl.s, 18), 94),
+      border: hslToHex(hsl.h, Math.min(hsl.s, 15), 78),
+      borderStrong: hslToHex(hsl.h, Math.min(hsl.s, 15), 58),
       textPrimary: '#0f172a',
       textSecondary: '#475569',
       textMuted: '#94a3b8',
       shadowCard: '0 2px 10px rgba(0, 0, 0, 0.05)',
-    }
+    })
   }
 
-  // Dark mode: Cards are elevated layers (+10% lightness) with matching hue
-  const cardLightness = Math.min(80, hsl.l + 10)
-  const searchLightness = Math.min(85, hsl.l + 13)
-  const hoverLightness = Math.min(88, hsl.l + 17)
-  const borderLightness = Math.min(90, hsl.l + 20)
-  const borderStrongLightness = Math.min(92, hsl.l + 28)
+  // Cap elevated surfaces: medium-gray and saturated canvases must not turn
+  // their cards pale while retaining white foregrounds.
+  const cardLightness = Math.min(18, hsl.l + 8)
+  const searchLightness = Math.min(23, hsl.l + 12)
+  const hoverLightness = Math.min(27, hsl.l + 16)
+  const borderLightness = Math.min(35, hsl.l + 24)
+  const borderStrongLightness = Math.min(48, hsl.l + 36)
 
-  return {
+  return readablePalette({
     id: 'custom',
     nameKey: 'chrome.presetCustom',
     mode: 'dark',
@@ -341,7 +351,7 @@ export function deriveCustomPalette(hex: string): ContentPalette {
     textSecondary: '#cbd5e1',
     textMuted: '#94a3b8',
     shadowCard: '0 4px 20px rgba(0, 0, 0, 0.45)',
-  }
+  })
 }
 
 function readStore(): ChromeStore {
@@ -374,14 +384,14 @@ function readStore(): ChromeStore {
         light: {
           sidebar: norm(parsed?.light?.sidebar) || DEFAULT_LIGHT.sidebar,
           page: norm(parsed?.light?.page) || DEFAULT_LIGHT.page,
-          preset: DEFAULT_LIGHT.preset,
-          sidebarPreset: DEFAULT_LIGHT.sidebarPreset,
+          preset: norm(parsed?.light?.page) ? 'custom' : DEFAULT_LIGHT.preset,
+          sidebarPreset: norm(parsed?.light?.sidebar) ? 'custom' : DEFAULT_LIGHT.sidebarPreset,
         },
         dark: {
           sidebar: norm(parsed?.dark?.sidebar) || DEFAULT_DARK.sidebar,
           page: norm(parsed?.dark?.page) || DEFAULT_DARK.page,
-          preset: DEFAULT_DARK.preset,
-          sidebarPreset: DEFAULT_DARK.sidebarPreset,
+          preset: norm(parsed?.dark?.page) ? 'custom' : DEFAULT_DARK.preset,
+          sidebarPreset: norm(parsed?.dark?.sidebar) ? 'custom' : DEFAULT_DARK.sidebarPreset,
         },
       }
       return sessionStore
@@ -433,7 +443,7 @@ export function applyChrome() {
   const palette = getCurrentContentPalette()
 
   chrome.sidebar = current.sidebar
-  chrome.page = current.page || palette.page
+  chrome.page = palette.page
   chrome.preset = current.preset || palette.id
   chrome.sidebarPreset = current.sidebarPreset || 'custom'
 
@@ -441,6 +451,14 @@ export function applyChrome() {
   root.setAttribute('data-content-theme', palette.mode)
   root.setAttribute('data-content-custom', 'true')
   root.classList.toggle('dark', palette.mode === 'dark')
+
+  const variables = cloudscapeVariables(palette.mode)
+  const surfaces = [...paletteSurfaces(palette), variables['--brand-subtle']]
+  for (const name of ['--brand', '--brand-hover', '--brand-deep']) {
+    variables[name] = readableColor(variables[name], surfaces, palette.mode)
+  }
+  for (const [name, value] of Object.entries(variables)) setVar(name, value)
+  setVar('--text-heading', palette.textPrimary)
 
   // Set all core layout & content surface tokens
   setVar('--bg-app', palette.page)
@@ -475,15 +493,15 @@ export function applyChrome() {
   setVar('--el-text-color-placeholder', palette.textMuted)
 
   // Synchronize sidebar tokens
-  const sidebarColor = current.sidebar || (mode === 'dark' ? '#18181b' : '#1d1d1f')
+  const sidebarColor = current.sidebar || (mode === 'dark' ? DEFAULT_DARK.sidebar : DEFAULT_LIGHT.sidebar)
+  const sidebarMode = isLightColor(sidebarColor) ? 'light' : 'dark'
+  const sidebarAccent = cloudscapeVariables(sidebarMode)
   setVar('--bg-sidebar', sidebarColor)
-  if (isLightColor(sidebarColor)) {
-    setVar('--text-on-dark', '#0f172a')
-    setVar('--text-on-dark-muted', '#64748b')
-  } else {
-    setVar('--text-on-dark', '#f5f5f7')
-    setVar('--text-on-dark-muted', '#a1a1a6')
-  }
+  setVar('--bg-sidebar-hover', cloudscapeContent(sidebarMode).hover)
+  setVar('--text-on-dark', readableColor(sidebarMode === 'light' ? '#0f141a' : '#ebebf0', [sidebarColor], sidebarMode))
+  setVar('--text-on-dark-muted', readableColor(sidebarMode === 'light' ? '#424650' : '#c6c6cd', [sidebarColor], sidebarMode))
+  setVar('--nav-selected-bg', sidebarAccent['--brand-subtle'])
+  setVar('--nav-selected-fg', sidebarAccent['--brand'])
 
   chromeRevision.value += 1
 }

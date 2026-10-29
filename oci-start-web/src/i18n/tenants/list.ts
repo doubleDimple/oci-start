@@ -8,7 +8,7 @@ export default {
       requestFailed: '暂时无法完成操作，请重试',
     },
     list: {
-      label: '租户列表', searchLabel: '搜索租户名称', searchPlaceholder: '搜索租户名称…',
+      label: '租户列表', pageDescription: '管理云账号、区域与访问权限，查看租户状态和开机任务。', searchLabel: '搜索租户名称', searchPlaceholder: '搜索租户名称…',
       clearSearch: '清除搜索', hideNames: '隐藏全部租户名称', showNames: '显示全部租户名称',
       refreshLabel: '刷新租户列表', refreshedAt: '刷新，上次更新 {time}',
       moreLabel: '更多租户操作', more: '更多操作', import: '恢复备份', exportAll: '导出全部',
@@ -68,7 +68,7 @@ export default {
       requestFailed: 'Unable to complete this action. Please try again.',
     },
     list: {
-      label: 'Tenant list', searchLabel: 'Search tenant names', searchPlaceholder: 'Search tenant names…',
+      label: 'Tenant list', pageDescription: 'Manage cloud accounts, regions and permissions, and review tenant health and launch tasks.', searchLabel: 'Search tenant names', searchPlaceholder: 'Search tenant names…',
       clearSearch: 'Clear search', hideNames: 'Hide all tenant names', showNames: 'Show all tenant names',
       refreshLabel: 'Refresh tenant list', refreshedAt: 'Refresh, last updated at {time}',
       moreLabel: 'More tenant actions', more: 'More actions', import: 'Restore backup', exportAll: 'Export all',

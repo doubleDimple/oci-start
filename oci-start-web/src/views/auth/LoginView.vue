@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { applyDocumentLocale, LOCALE_STORAGE_KEY } from '@/i18n'
 import { setTheme, theme, type ThemePreference } from '@/composables/useTheme'
+import { cloudscapeContent, cloudscapeVariables } from '@/styles/cloudscape'
 import { AuthError, fetchAuthBootstrap, isLoginVerificationCode, loginPayload, normalizeLoginVerificationCode, oauthLoginUrl, registerAccount, sendLoginCode, signIn, type AuthBootstrap } from '@/api/auth'
 import { copyCredentialText, generateInitialCredentials, isReservedRegistrationUsername } from '@/utils/initialCredentials'
 // 忘记密码已停用；恢复时须同步评审后台路由和登录白名单。
@@ -16,6 +17,18 @@ import TurnstileChallenge from './TurnstileChallenge.vue'
 const { locale } = useI18n()
 const language = computed(() => locale.value === 'en' ? 'en' : 'zh')
 const copy = computed(() => authCopy[language.value])
+const authPalette = computed(() => {
+  const content = cloudscapeContent(theme.value)
+  const variables = cloudscapeVariables(theme.value)
+  return {
+    ...variables,
+    '--bg': content.page, '--surface': content.card, '--raise': content.cardSubtle,
+    '--text': content.textPrimary, '--muted': content.textSecondary, '--faint': content.textMuted,
+    '--line': content.border, '--line-2': content.borderStrong,
+    '--brand-hi': variables['--brand-deep'], '--brand-soft': variables['--brand-subtle'],
+    '--node': variables['--brand'], '--danger': variables['--status-danger'],
+  }
+})
 const t = (key: string) => authMessages[language.value][key] || key
 const root = ref<HTMLElement>()
 const config = ref<AuthBootstrap>()
@@ -340,13 +353,13 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <main ref="root" class="auth-page" :data-theme="theme">
+  <main ref="root" class="auth-page" :data-theme="theme" :style="authPalette">
     <section class="stage" aria-labelledby="heroBrandName">
       <div class="brand">
         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2.5c0 0 6.8 7.4 6.8 12.1A6.8 6.8 0 0 1 12 21.4a6.8 6.8 0 0 1-6.8-6.8C5.2 9.9 12 2.5 12 2.5z" stroke="var(--brand-hi)" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 17.6a3 3 0 0 1-3-3c0-1.6 3-5 3-5s3 3.4 3 5a3 3 0 0 1-3 3z" fill="var(--brand-hi)"/></svg>
         <span id="heroBrandName" class="nm">{{ config?.siteLogoName || 'OCI-START' }} <em>/ {{ copy.workspace }}</em></span>
       </div>
-      <div class="pitch"><h2>{{ copy.pitch }}</h2><p>{{ copy.description }}</p></div>
+      <div class="pitch"><h2>{{ copy.pitch }}</h2></div>
       <div class="login-map-heading"><h3 id="loginMapHeading">{{ copy.regions }}</h3><span><b id="loginMapRegionCount">—</b> {{ copy.regionUnit }}</span></div>
       <div class="mapbox login-mapbox"><canvas id="loginRegionMap" role="img" aria-labelledby="loginMapHeading" aria-describedby="loginMapNote"/><div id="loginMapTooltip" role="presentation"><strong/><span/></div></div>
       <details id="loginRegionDirectory" class="login-region-directory">
@@ -362,7 +375,6 @@ onBeforeUnmount(() => {
         <div class="mobile-auth-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2.5c0 0 6.8 7.4 6.8 12.1A6.8 6.8 0 0 1 12 21.4a6.8 6.8 0 0 1-6.8-6.8C5.2 9.9 12 2.5 12 2.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M12 17.6a3 3 0 0 1-3-3c0-1.6 3-5 3-5s3 3.4 3 5a3 3 0 0 1-3 3z" fill="currentColor"/></svg></div>
         <div class="auth-header">
           <h1>{{ copy.welcome }}</h1>
-          <p class="lede">{{ copy.lede }}</p>
         </div>
         <div v-if="notice && !(loginBlocked && notice.type === 'error')" id="loginRedirectError" class="message" :class="`${notice.type}-message`" :role="notice.type === 'error' ? 'alert' : 'status'">{{ noticeText(notice) }}</div>
         <p v-if="configLoading" role="status">{{ copy.loading }}</p>

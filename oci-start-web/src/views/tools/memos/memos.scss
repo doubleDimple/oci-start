@@ -62,9 +62,9 @@
   }
   button:hover:not(:disabled) {
     border-color: var(--brand);
-    background: var(--color-ok-bg);
+    background: var(--brand-subtle);
     color: var(--brand);
-    transform: translateY(-1px);
+    transform: none;
     box-shadow: 0 3px 6px rgba(0, 0, 0, 0.08);
   }
   button:active:not(:disabled) {
@@ -75,14 +75,14 @@
   button.is-danger {
     border-color: var(--status-danger) !important;
     background: var(--status-danger) !important;
-    color: #ffffff !important;
-    box-shadow: 0 2px 5px color-mix(in srgb, var(--status-danger) 35%, transparent);
+    color: var(--text-on-brand) !important;
+    box-shadow: none;
 
     &:hover:not(:disabled) {
-      border-color: color-mix(in srgb, var(--status-danger) 85%, black) !important;
-      background: color-mix(in srgb, var(--status-danger) 85%, black) !important;
-      color: #ffffff !important;
-      box-shadow: 0 3px 8px color-mix(in srgb, var(--status-danger) 45%, transparent);
+      border-color: color-mix(in srgb, var(--status-danger) 85%, var(--text-primary)) !important;
+      background: color-mix(in srgb, var(--status-danger) 85%, var(--text-primary)) !important;
+      color: var(--text-on-brand) !important;
+      box-shadow: none;
     }
   }
 }

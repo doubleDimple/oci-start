@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { MENU, type NavItem } from '@/nav/menu'
+import { pagesWithOwnLayout } from '@/nav/pageLayout'
 import { useShellStore } from '@/stores/shell'
 import { useUserStore } from '@/stores/user'
 import { theme, themeMode, setTheme } from '@/composables/useTheme'
@@ -80,13 +81,19 @@ function canonicalPath(path: string) {
 }
 const currentPath = computed(() => canonicalPath(route.path))
 const mobilePageTitle = computed(() => {
+  if (typeof route.meta.titleKey === 'string') return t(route.meta.titleKey)
+  if (currentPath.value === '/dns/cloudflare') return t('cloudflareDns.title')
+  if (currentPath.value === '/dns/edgeone') return t('edgeoneDns.title')
+  if (currentPath.value === '/oci/sysHelp') return t('pageLayout.rescueTitle')
+  if (currentPath.value === '/ssl/nginx/management') return t('pageLayout.nginxTitle')
   const detail = pageTitleKeys[currentPath.value] || pageTitleKeys[route.path]
   if (detail) return t(`mobileShell.titles.${detail}`)
   if (currentPath.value.startsWith('/oci/console/terminal')) return t('mobileShell.titles.console')
   const items = MENU.flatMap(group => group.children)
   const item = items.find(item => item.href === currentPath.value) || items.find(item => item.id === route.meta.id)
-  return item ? t(item.labelKey) : t('mobileShell.console')
+  return item ? t(item.labelKey) : String(route.meta.title || t('mobileShell.console'))
 })
+const wrapWorkspace = computed(() => !!route.meta.mobileTenantTool || !pagesWithOwnLayout.has(currentPath.value))
 const activeMobileTab = computed(() => {
   const path = canonicalPath(navigationTargetPath.value || route.path)
   if (path === '/delayTest') return 'speed'
@@ -191,6 +198,10 @@ const visibleGroups = computed(() => menuGroups.value.map(g => ({
 const currentGroupId = computed(() => menuGroups.value.find(g =>
   g.children.some(it => canonicalPath(it.href) === currentPath.value || it.id === route.meta.id),
 )?.id ?? null)
+const currentGroupLabel = computed(() => {
+  const group = menuGroups.value.find(item => item.id === currentGroupId.value)
+  return group ? t(group.labelKey) : ''
+})
 const expandedGroupId = ref<string | null>(null)
 
 watch([() => route.path, currentGroupId], () => {
@@ -263,7 +274,6 @@ function retryNavigation() {
         </button>
         <RouterLink :to="compactViewport ? '/m/monitor' : '/boot/dashboard'" class="brand-text" :title="t('header.home')" :aria-label="t('header.home')" :tabindex="sidebarCollapsed ? -1 : undefined">
           <strong>{{ siteLogoName || t('brand') }}</strong>
-          <small>{{ t('brandSub') }}</small>
         </RouterLink>
       </div>
 
@@ -328,8 +338,13 @@ function retryNavigation() {
       <header class="top">
         <div class="mobile-heading">
           <button ref="mobileSidebarToggle" class="icon-btn mobile-menu-toggle" type="button" :aria-label="t('header.expandNav')" :aria-expanded="mobileNavOpen" aria-controls="primary-navigation" @click="toggleSidebar"><i class="i-mdi-menu" aria-hidden="true" /></button>
-          <span class="mobile-page-title" :title="mobilePageTitle">{{ mobilePageTitle }}</span>
+          <span class="mobile-page-title" :title="mobilePageTitle"><span>{{ mobilePageTitle }}</span></span>
         </div>
+        <nav v-if="!compactViewport" class="breadcrumbs" :aria-label="t('header.breadcrumbs')">
+          <RouterLink to="/boot/dashboard">{{ siteLogoName || t('brand') }}</RouterLink>
+          <template v-if="currentGroupLabel"><i class="breadcrumb-group-separator i-mdi-chevron-right" aria-hidden="true" /><span class="breadcrumb-group">{{ currentGroupLabel }}</span></template>
+          <i class="i-mdi-chevron-right" aria-hidden="true" /><span aria-current="page">{{ mobilePageTitle }}</span>
+        </nav>
         <div class="desktop-search"><HeaderSearch /></div>
         <div class="top-right">
           <div class="desktop-tools">
@@ -395,9 +410,10 @@ function retryNavigation() {
       </header>
 
       <div class="content-stage" :aria-busy="navigationPending || undefined">
-        <section ref="content" class="content" :inert="navigationLoading && route.path !== navigationTargetPath || undefined">
+        <section ref="content" class="content" :aria-label="mobilePageTitle" :class="{ 'content-with-workspace': wrapWorkspace }" :inert="navigationLoading && route.path !== navigationTargetPath || undefined">
           <RouterView v-slot="{ Component, route: currentRoute }">
-            <component :is="Component" :key="currentRoute.path" />
+            <div v-if="wrapWorkspace" :key="currentRoute.path" class="route-workspace"><component :is="Component" /></div>
+            <component v-else :is="Component" :key="currentRoute.path" />
           </RouterView>
         </section>
         <PageLoading :visible="navigationLoadingVisible" />
@@ -435,10 +451,10 @@ function retryNavigation() {
   color: var(--text-on-dark);
   display: flex;
   flex-direction: column;
-  padding: 22px 14px 16px;
+  padding: 16px 12px;
   position: relative;
   overflow: hidden;
-  border-right: 1px solid color-mix(in srgb, var(--border) 40%, transparent);
+  border-right: 0;
   transition: width 0.32s cubic-bezier(0.22, 1, 0.36, 1),
               padding 0.32s cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -450,7 +466,7 @@ function retryNavigation() {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 0 8px 18px;
+  padding: 0 8px 20px;
   overflow: hidden;
   transition: padding 0.32s cubic-bezier(0.22, 1, 0.36, 1),
               gap 0.32s cubic-bezier(0.22, 1, 0.36, 1);
@@ -466,15 +482,15 @@ function retryNavigation() {
   flex-shrink: 0;
   border: 0;
   border-radius: 10px;
-  background: var(--brand);
-  color: var(--nav-active-fg);
+  background: var(--brand-solid);
+  color: var(--text-on-solid);
   display: grid;
   place-items: center;
   font-size: 18px;
   cursor: pointer;
   transition: transform 180ms cubic-bezier(.22, 1, .36, 1), background-color 180ms ease;
 }
-.leaf:hover { background: var(--brand-hover); }
+.leaf:hover { background: var(--brand-solid-hover); }
 .leaf:active { transform: scale(.94); }
 .leaf:focus-visible { outline: 2px solid var(--text-on-dark); outline-offset: 3px; }
 .brand-text {
@@ -517,13 +533,13 @@ function retryNavigation() {
   gap: 8px;
   width: 100%;
   min-height: 32px;
-  margin: 10px 0 6px;
+  margin: 12px 0 4px;
   padding: 6px 10px;
   border: 0;
   border-radius: 8px;
   background: transparent;
   font-family: inherit;
-  font-size: var(--font-size-section);
+  font-size: var(--font-size-body);
   font-weight: 600;
   text-align: left;
   letter-spacing: 0;
@@ -539,16 +555,17 @@ function retryNavigation() {
 }
 .group-label.expanded i { transform: rotate(0); }
 .group-label.is-current { color: var(--text-on-dark); }
-.group-label:enabled:hover { background: color-mix(in srgb, var(--text-on-dark) 8%, transparent); color: var(--text-on-dark); }
+.group-label:enabled:hover { background: var(--bg-sidebar-hover); color: var(--text-on-dark); }
 .group-label:focus-visible { outline: 2px solid var(--text-on-dark); outline-offset: -2px; }
 .group-label:disabled { cursor: default; }
 .nav-item {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 9px 12px;
-  margin-bottom: 4px;
-  border-radius: 12px;
+  padding: 8px 12px;
+  min-height: 36px;
+  margin-bottom: 2px;
+  border-radius: var(--r-sm);
   color: var(--text-on-dark-muted);
   text-decoration: none;
   font-size: var(--font-size-body);
@@ -560,7 +577,9 @@ function retryNavigation() {
 }
 .nav-item i { font-size: 18px; flex-shrink: 0; }
 .nav-item span {
+  min-width: 0;
   overflow: hidden;
+  text-overflow: ellipsis;
   max-width: 160px;
   opacity: 1;
   transition: opacity 0.18s ease 0.05s, max-width 0.28s cubic-bezier(0.22, 1, 0.36, 1);
@@ -575,23 +594,22 @@ function retryNavigation() {
   max-width: 0;
   transition: opacity 0.1s ease, max-width 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
-.nav-item:hover { background: color-mix(in srgb, var(--text-on-dark) 8%, transparent); color: var(--text-on-dark); }
+.nav-item:hover { background: var(--bg-sidebar-hover); color: var(--text-on-dark); }
 .nav-item:focus-visible { outline: 2px solid var(--text-on-dark); outline-offset: -2px; }
 .nav-item.active {
-  background: linear-gradient(90deg, var(--brand) 0%, var(--brand-deep) 140%);
-  color: var(--nav-active-fg);
-  box-shadow: 0 8px 18px rgba(27, 138, 106, 0.28);
+  background: var(--nav-selected-bg);
+  color: var(--nav-selected-fg);
+  box-shadow: none;
+  font-weight: 600;
 }
 .empty { color: var(--text-on-dark-muted); font-size: var(--font-size-secondary); padding: 12px; }
 .quote {
   margin: 12px 8px;
-  padding: 16px 14px;
-  border-radius: 16px;
-  background: color-mix(in srgb, var(--brand) 22%, transparent);
-  color: var(--text-on-dark);
-  font-size: var(--font-size-body);
+  padding: 4px 0;
+  color: var(--text-on-dark-muted);
+  font-size: var(--font-size-caption);
   line-height: 1.45;
-  font-weight: 600;
+  font-weight: 400;
   overflow: hidden;
   max-height: 140px;
   opacity: 1;
@@ -613,7 +631,7 @@ function retryNavigation() {
   align-items: center;
   gap: 10px;
   padding: 10px 8px 4px;
-  border-top: 1px solid rgba(255,255,255,0.06);
+  border-top: 1px solid color-mix(in srgb, var(--text-on-dark) 16%, transparent);
   overflow: hidden;
   transition: padding 0.28s cubic-bezier(0.22, 1, 0.36, 1),
               gap 0.28s cubic-bezier(0.22, 1, 0.36, 1);
@@ -670,16 +688,24 @@ function retryNavigation() {
   padding: 0 24px;
   gap: 16px;
   flex-shrink: 0;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
 }
+.breadcrumbs { display: flex; align-items: center; flex: 1; min-width: 0; gap: 6px; color: var(--text-secondary); font-size: var(--font-size-secondary); }
+.breadcrumbs a { flex: 0 1 auto; max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--brand); text-decoration: none; }
+.breadcrumb-group { white-space: nowrap; }
+.breadcrumbs a:hover { text-decoration: underline; }
+.breadcrumbs a:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+.breadcrumbs > i { flex: none; font-size: 16px; color: var(--text-muted); }
+.breadcrumbs [aria-current] { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .top-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-.desktop-search { display: contents; }
+.desktop-search { display: flex; flex: 0 1 280px; min-width: 140px; }
 .desktop-tools { display: flex; align-items: center; gap: 8px; }
 .mobile-heading, .mobile-tabs { display: none; }
 .icon-btn {
-  width: 38px; height: 38px; border: 0; border-radius: 50%;
-  background: var(--bg-card); color: var(--text-secondary);
+  width: 36px; height: 36px; border: 0; border-radius: var(--r-sm);
+  background: transparent; color: var(--text-secondary);
   display: grid; place-items: center; cursor: pointer;
-  box-shadow: var(--shadow-card);
   flex-shrink: 0;
   transition: transform 160ms cubic-bezier(.22, 1, .36, 1), background-color 160ms ease;
 }
@@ -690,9 +716,9 @@ function retryNavigation() {
 .icon-btn > i { font-size: 18px; }
 .user-chip {
   display: flex; align-items: center; gap: 8px;
-  border: 0; background: var(--bg-card); border-radius: var(--r-pill);
+  border: 0; background: transparent; border-radius: var(--r-sm);
   padding: 4px 10px 4px 4px; cursor: pointer;
-  box-shadow: var(--shadow-card); color: var(--text-primary);
+  color: var(--text-primary);
 }
 .user-chip span { text-align: left; line-height: 1.15; max-width: 160px; overflow: hidden; }
 .user-chip b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -702,12 +728,14 @@ function retryNavigation() {
   flex: 1;
   min-width: 0;
   min-height: 0;
-  padding: 8px 24px 24px;
+  padding: 20px var(--page-padding) var(--page-padding);
   overflow: auto;
   overscroll-behavior: contain;
 }
+.content-with-workspace { display: flex; flex-direction: column; }
+.route-workspace { flex: 1; min-width: 0; min-height: 0; overflow: auto; overscroll-behavior: contain; }
 .content :deep(.el-table) {
-  --el-table-header-bg-color: transparent;
+  --el-table-header-bg-color: var(--bg-card-subtle);
   --el-table-tr-bg-color: var(--bg-card);
   --el-table-row-hover-bg-color: var(--bg-hover);
   --el-table-text-color: var(--text-primary);
@@ -744,6 +772,7 @@ function retryNavigation() {
   .top { height: calc(60px + env(safe-area-inset-top)); padding: env(safe-area-inset-top) max(12px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left)); gap: 8px; box-sizing: border-box; flex-wrap: nowrap; }
   .mobile-heading { display: flex; flex: 1; align-items: center; gap: 10px; min-width: 0; }
   .mobile-page-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-primary); font-size: var(--font-size-body); font-weight: 600; }
+  .mobile-page-title > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .desktop-search, .desktop-tools { display: none; }
   .top-right { gap: 8px; flex-wrap: nowrap; }
   .top .icon-btn, .top :deep(.message-trigger) { width: 44px; height: 44px; }
@@ -756,9 +785,19 @@ function retryNavigation() {
   .mobile-tabs a { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-width: 0; min-height: 52px; margin-inline: 2px; padding: 4px 0; border-radius: 12px; color: var(--text-primary); text-decoration: none; font: var(--font-size-body)/1.35 var(--sans); }
   .mobile-tabs a > i { flex: none; width: 22px; height: 22px; font-size: 22px; }
   .mobile-tabs a > span { max-width: 100%; white-space: nowrap; text-align: center; }
-  .mobile-tabs a.active { color: var(--brand); background: var(--status-ok-bg); font-weight: 600; }
+  .mobile-tabs a.active { color: var(--brand); background: var(--brand-subtle); font-weight: 600; }
   .mobile-tabs a:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
   .mobile-nav-backdrop { position: fixed; }
+}
+@media (min-width: 761px) and (max-width: 1150px) {
+  .breadcrumbs .breadcrumb-group, .breadcrumbs .breadcrumb-group-separator { display: none; }
+  .desktop-search { flex-basis: 200px; }
+  .top { gap: 10px; padding-inline: 16px; }
+  .user-chip { width: 36px; padding: 0; justify-content: center; }
+  .user-chip > span, .user-chip > i { display: none; }
+}
+@media (min-width: 761px) and (max-width: 900px) {
+  .desktop-search { flex-basis: 140px; min-width: 120px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .icon-btn, .leaf, .group-label i, .navigation-shade-enter-active, .navigation-shade-leave-active { transition: none; }
@@ -779,7 +818,7 @@ function retryNavigation() {
 .mobile-preferences legend { padding: 0; margin-bottom: 10px; color: var(--text-primary); font-weight: 600; }
 .mobile-preference-options { display: flex; flex-wrap: wrap; gap: 8px; }
 .mobile-preference-options button { display: flex; flex: 1; align-items: center; justify-content: center; gap: 5px; min-height: 44px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-card); color: var(--text-primary); font: var(--font-size-body)/1.4 var(--sans); cursor: pointer; }
-.mobile-preference-options button[aria-pressed='true'] { border-color: var(--brand); background: var(--status-ok-bg); }
+.mobile-preference-options button[aria-pressed='true'] { border-color: var(--brand); background: var(--brand-subtle); }
 .mobile-preference-options button:disabled { opacity: .6; cursor: wait; }
 .mobile-preference-options button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 </style>

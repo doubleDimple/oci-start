@@ -43,9 +43,9 @@
 
     &:hover:not(:disabled) {
       border-color: var(--brand);
-      background: var(--color-ok-bg);
+      background: var(--brand-subtle);
       color: var(--brand);
-      transform: translateY(-1px);
+      transform: none;
       box-shadow: 0 3px 6px rgba(0, 0, 0, 0.08);
     }
     &:active:not(:disabled) {
@@ -81,9 +81,9 @@
 
       &:hover:not(:disabled) {
         border-color: var(--brand);
-        background: var(--color-ok-bg);
+        background: var(--brand-subtle);
         color: var(--brand);
-        transform: translateY(-1px);
+        transform: none;
         box-shadow: 0 3px 6px rgba(0, 0, 0, 0.08);
       }
       &:active:not(:disabled) {

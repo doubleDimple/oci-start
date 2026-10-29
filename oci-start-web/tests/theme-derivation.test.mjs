@@ -1,10 +1,22 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import test from 'node:test'
 import ts from 'typescript'
 
+// Exercise the actual Cloudscape palette as well as the custom color derivation.
+const require = createRequire(import.meta.url)
+const { tokens } = JSON.parse(await readFile(require.resolve('@cloudscape-design/design-tokens/index-visual-refresh.json'), 'utf8'))
+const paletteSource = (await readFile(new URL('../src/styles/cloudscape.ts', import.meta.url), 'utf8'))
+  .replace(/import\s*\{\s*tokens\s*\}\s*from\s*['"][^'"]+['"]/, () => `const tokens = ${JSON.stringify(tokens)}`)
+const paletteOutput = ts.transpileModule(paletteSource, {
+  compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+}).outputText
+const paletteModuleUrl = `data:text/javascript;base64,${Buffer.from(paletteOutput).toString('base64')}`
+
 const source = await readFile(new URL('../src/composables/useChrome.ts', import.meta.url), 'utf8')
 let transpiledSource = source
+  .replace("'@/styles/cloudscape'", () => JSON.stringify(paletteModuleUrl))
   .replace(/import\s*\{[^}]*\}\s*from\s*['"]vue['"]/g, `
     const reactive = v => v;
     const ref = v => ({ value: v });

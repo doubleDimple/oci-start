@@ -2,7 +2,10 @@ import type { RegionGlobePoint } from './globeTypes'
 
 export interface RegionSceneColors {
   surface: string
+  panel: string
   land: string
+  landFill: string
+  coast: string
   grid: string
   arm: string
   mine: string
@@ -25,6 +28,7 @@ export interface RegionSceneOptions {
 }
 
 export interface RegionScene {
+  setColors(colors: RegionSceneColors): void
   setPoints(points: RegionGlobePoint[]): void
   setSelected(code: string | null): void
   setReducedMotion(value: boolean): void

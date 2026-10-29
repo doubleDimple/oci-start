@@ -26,7 +26,7 @@
   .vnic-id.subnet { font-size: var(--font-size-body); }
   .vnic-id:hover { text-decoration: underline; text-underline-offset: 3px; }
   .vnic-type { display: inline-flex; align-items: center; max-width: 100%; padding: 2px 8px; border: 1px solid var(--border); border-radius: var(--r-pill); background: var(--bg-search); color: var(--text-primary); font-size: var(--font-size-caption); white-space: nowrap; }
-  .vnic-type.primary { border-color: color-mix(in srgb, var(--brand) 35%, var(--border)); background: var(--status-ok-bg); }
+  .vnic-type.primary { border-color: color-mix(in srgb, var(--brand) 35%, var(--border)); background: var(--brand-subtle); }
   .vnic-state { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
   .vnic-state > i { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--text-muted); }
   .vnic-state > i.attached { background: var(--status-ok); }
@@ -60,9 +60,9 @@
 
     &:not(:disabled):hover {
       border-color: var(--brand);
-      background: var(--color-ok-bg);
+      background: var(--brand-subtle);
       color: var(--brand);
-      transform: translateY(-1px);
+      transform: none;
       box-shadow: 0 3px 6px rgba(0, 0, 0, 0.08);
     }
     &:not(:disabled):active {

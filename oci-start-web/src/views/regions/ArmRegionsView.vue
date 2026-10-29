@@ -446,13 +446,13 @@ const ElTableColumn = BaseTableColumn<RegionRow>
 .region-workspace.map-collapsed .region-list-pane { height: max(480px, calc(100dvh - 220px)); }
 .region-table-area { flex: 1; min-height: 0; overflow: hidden; }
 .region-table-area.is-compact { overflow: auto; overscroll-behavior: contain; }
-.region-mobile-selected { background: var(--status-ok-bg); box-shadow: inset 3px 0 var(--brand); }
+.region-mobile-selected { background: var(--brand-subtle); box-shadow: inset 3px 0 var(--brand); }
 .region-mobile-empty { padding: 20px 14px; color: var(--text-secondary); }
 .region-table { font-family: var(--sans); font-size: var(--font-size-body); }
 .region-table :deep(th.el-table__cell) { height: 36px; padding: 6px 0; background: transparent; color: var(--text-secondary); font-size: var(--font-size-body); font-weight: 500; }
 .region-table :deep(td.el-table__cell) { height: 48px; padding: 7px 0; font-size: var(--font-size-body); font-variant-numeric: tabular-nums; }
 .region-table :deep(.el-table__inner-wrapper::before) { display: none; }
-.region-table :deep(.region-selected-row td.el-table__cell) { background: var(--status-ok-bg); }
+.region-table :deep(.region-selected-row td.el-table__cell) { background: var(--brand-subtle); }
 .region-table :deep(.region-selected-row td.el-table__cell:first-child) { box-shadow: inset 3px 0 var(--brand); }
 .region-status { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: var(--r-pill); font-size: var(--font-size-caption); white-space: nowrap; }
 .region-status::before { content: ''; width: 4px; height: 4px; border-radius: 50%; background: currentColor; }

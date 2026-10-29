@@ -126,7 +126,7 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .header-search { flex: 1; max-width: 520px; min-width: 0; position: relative; font: var(--font-size-body)/1.47 var(--sans); }
-.search-field { display: flex; align-items: center; gap: 8px; background: var(--bg-search); border: 1px solid transparent; border-radius: var(--r-pill); padding: 0 12px; height: 38px; color: var(--text-muted); transition: border-color 160ms ease, box-shadow 160ms ease; }
+.search-field { display: flex; align-items: center; gap: 8px; background: var(--bg-search); border: 1px solid var(--border-strong); border-radius: var(--r-sm); padding: 0 12px; height: 36px; color: var(--text-muted); transition: border-color 160ms ease, box-shadow 160ms ease; }
 .search-field:focus-within { border-color: var(--brand); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 10%, transparent); }
 .search-field > i { font-size: 18px; flex-shrink: 0; }
 input { border: 0; outline: 0; background: transparent; width: 100%; min-width: 0; font: inherit; color: var(--text-primary); }

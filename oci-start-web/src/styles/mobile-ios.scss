@@ -65,16 +65,15 @@
 
   /* The feature drawer follows the same grouped-list language. */
   html:root .shell .side {
-    background: var(--bg-page);
-    color: var(--text-primary);
+    background: var(--bg-sidebar);
+    color: var(--text-on-dark);
     border-radius: 0 22px 22px 0;
     padding-inline: 16px;
-    --text-on-dark: var(--text-primary);
-    --text-on-dark-muted: var(--text-secondary);
+    --mobile-separator: color-mix(in srgb, var(--text-on-dark) 16%, transparent);
   }
-  html:root .shell .side .leaf { background: transparent; color: var(--brand); }
+  html:root .shell .side .leaf { background: transparent; color: var(--text-on-dark); }
   html:root .shell .side .brand { gap: 6px; }
-  html:root .shell .mobile-menu-search { border: 0; border-radius: 10px; background: var(--bg-search); }
+  html:root .shell .mobile-menu-search { border: 0; border-radius: 10px; background: var(--bg-sidebar-hover); }
   html:root .shell .mobile-menu-search input { font-size: 16px; }
   html:root .shell .side .nav { padding-right: 0; }
   html:root .shell .side .group-label { margin: 22px 0 8px; padding-inline: 14px; letter-spacing: 0; font-size: var(--font-size-section); font-weight: 600; }
@@ -84,27 +83,28 @@
     padding: 11px 14px;
     border-radius: 0;
     border-bottom: 0.5px solid var(--mobile-separator);
-    background: var(--bg-card);
-    color: var(--text-primary);
+    background: transparent;
+    color: var(--text-on-dark);
     font-size: 15px;
     font-weight: 400;
     box-shadow: none;
   }
-  html:root .shell .side .nav-item > i { color: var(--brand); font-size: 21px; }
+  html:root .shell .side .nav-item > i { color: inherit; font-size: 21px; }
   html:root .shell .side .nav-item::after {
     content: '';
     width: 6px;
     height: 6px;
     margin-left: auto;
-    border-top: 1.5px solid var(--border-strong);
-    border-right: 1.5px solid var(--border-strong);
+    border-top: 1.5px solid var(--text-on-dark-muted);
+    border-right: 1.5px solid var(--text-on-dark-muted);
     transform: rotate(45deg);
     flex: none;
   }
   html:root .shell .side .nav-group .nav-item:first-child { border-radius: 12px 12px 0 0; }
   html:root .shell .side .nav-group .nav-item:last-child { border-radius: 0 0 12px 12px; border-bottom: 0; }
   html:root .shell .side .nav-group .nav-item:only-child { border-radius: 12px; }
-  html:root .shell .side .nav-item.active { color: var(--brand); background: var(--status-ok-bg); }
+  html:root .shell .side .nav-item.active { color: var(--nav-selected-fg); background: var(--nav-selected-bg); box-shadow: none; }
+  html:root .shell .side .nav-item.active::after { border-color: var(--nav-selected-fg); }
   html:root .shell .side-user { margin-top: 12px; border-top-color: var(--mobile-separator); }
 
   html:root :is(.tenant-card, .mobile-record-card) { box-shadow: none; border-color: transparent; }

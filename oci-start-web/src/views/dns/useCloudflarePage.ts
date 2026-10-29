@@ -55,9 +55,10 @@ export function useCloudflarePage(dialogOpen: Ref<boolean>) {
   const snapshotZoneId = ref('')
   const canDismissOperation = computed(() => !operationPending.value)
   const contextLocked = computed(() => dialogOpen.value || !!operation.value || operationPending.value)
-  const canOperate = computed(() => !!selectedZone.value && zonesLoaded.value && !zonesLoading.value
-    && !zonesProblem.value && !loading.value && loaded.value && !readProblem.value
-    && snapshotZoneId.value === zoneId.value && !contextLocked.value && !requiresReview.value)
+  const canCreate = computed(() => !!selectedZone.value && zonesLoaded.value && !zonesLoading.value
+    && !zonesProblem.value && !contextLocked.value && !requiresReview.value)
+  const canOperate = computed(() => canCreate.value && !loading.value && loaded.value && !readProblem.value
+    && snapshotZoneId.value === zoneId.value)
   const reviewReady = computed(() => requiresReview.value && !loading.value && !zonesLoading.value
     && !readProblem.value && !zonesProblem.value && !!selectedZone.value
     && zoneId.value === reviewZoneId.value && snapshotZoneId.value === reviewZoneId.value
@@ -205,7 +206,7 @@ export function useCloudflarePage(dialogOpen: Ref<boolean>) {
   }
 
   function openOperation(kind: CloudflareOperation['kind'], row?: CloudflareRecord): void {
-    if (!canOperate.value || !selectedZone.value) return
+    if (!(kind === 'create' ? canCreate.value : canOperate.value) || !selectedZone.value) return
     let record: CloudflareRecord | null = null
     if (kind === 'edit' || kind === 'delete') {
       if (!row || snapshotZoneId.value !== zoneId.value) return
@@ -213,7 +214,9 @@ export function useCloudflarePage(dialogOpen: Ref<boolean>) {
       if (!current || (kind === 'edit' && !cloudflareCanEdit(current.type))) return
       record = { ...current }
     }
-    cancelRecords()
+    // Creating a record only needs a validated zone. Let its initial record read
+    // finish while the form is open; submitting still cancels any pending read.
+    if (kind !== 'create') cancelRecords()
     operation.value = { kind, zone: { ...selectedZone.value }, record }
     operationOutcome.value = 'idle'
     operationResult.value = null
@@ -237,6 +240,7 @@ export function useCloudflarePage(dialogOpen: Ref<boolean>) {
     operationPending.value = true
     operationProblem.value = null
     operationResult.value = null
+    const interruptedQuery = loading.value ? currentQuery() : null
     cancelRecords()
     let attempted = false
     try {
@@ -275,6 +279,8 @@ export function useCloudflarePage(dialogOpen: Ref<boolean>) {
         // Keep the mutation receipt even if the subsequent read fails. Reads may
         // correct an empty last page; no read failure ever resubmits the write.
         if (attempted && zoneId.value === target.zone.id) await readRecords(currentQuery())
+        // Local validation must not strand the initial list read cancelled above.
+        else if (interruptedQuery && zoneId.value === interruptedQuery.zoneId) await readRecords(interruptedQuery)
       }
     }
   }
@@ -361,6 +367,6 @@ export function useCloudflarePage(dialogOpen: Ref<boolean>) {
     loadZones, refresh, selectZone, applySearch, clearSearch, changePage, changeSize,
     operation, operationPending, operationOutcome, operationResult, operationProblem,
     openCreate, openEdit, openDelete, openSync, submitOperation, closeOperation, canDismissOperation,
-    contextLocked, canOperate, requiresReview, reviewZoneId, reviewZone, reviewReady, acknowledgeReview,
+    contextLocked, canCreate, canOperate, requiresReview, reviewZoneId, reviewZone, reviewReady, acknowledgeReview,
   }
 }

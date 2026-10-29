@@ -6,9 +6,9 @@ defineProps<{ danger?: boolean; loading?: boolean; disabled?: boolean }>()
 </template>
 <style scoped>
 .btn {
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--brand);
   background: var(--bg-card);
-  color: var(--text-primary);
+  color: var(--brand);
   font: inherit;
   font-size: var(--font-size-body);
   font-weight: 600;

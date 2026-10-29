@@ -1,0 +1,140 @@
+.business-scope { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.oci-badge { display: inline-flex; align-items: center; gap: 8px; color: var(--brand); font-size: 13px; font-weight: 650; }
+.oci-badge i { font-size: 21px; }
+.business-sync { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-secondary); }
+.business-sync .live-dot { background: var(--status-ok); }
+.business-sync.failed { color: var(--status-danger); }
+.business-sync.failed .live-dot { background: currentColor; }
+.business-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.business-kpi { display: block; min-width: 0; padding: 18px 20px; text-decoration: none; background: var(--bg-card); border: 1px solid var(--monitor-border); border-radius: var(--r-card); box-shadow: var(--shadow-card); color: var(--text-primary); transition: border-color .2s, box-shadow .2s, transform .2s; }
+.business-kpi:hover { border-color: color-mix(in srgb, var(--brand) 45%, var(--monitor-border)); box-shadow: 0 4px 18px color-mix(in srgb, var(--text-primary) 6%, transparent); transform: translateY(-2px); }
+.business-kpi-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--text-secondary); font-size: 12px; }
+.business-kpi-heading i { font-size: 23px; }
+.business-kpi-value { display: flex; align-items: center; justify-content: space-between; margin: 10px 0 12px; font-weight: 650; font-size: 36px; line-height: 1.2; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+.business-kpi-value > i { color: var(--text-muted); font-size: 16px; opacity: .5; transition: transform .2s; }
+.business-kpi:hover .business-kpi-value > i { transform: translate(2px, -2px); color: var(--brand); opacity: 1; }
+.business-kpi-details { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px 10px; font-size: 11px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.business-kpi-details > span:last-child { color: var(--text-muted); }
+.business-capacities { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin: 12px 0 20px; }
+.capacity-card { --capacity-accent: var(--brand); position: relative; min-width: 0; padding: 15px 70px 15px 18px; border: 1px solid var(--monitor-border); border-radius: 12px; background: var(--bg-card); box-shadow: var(--shadow-card); transition: border-color .2s, background-color .2s; }
+.capacity-card[data-capacity='memory'] { --capacity-accent: var(--chart-secondary); }
+.capacity-card[data-capacity='volumes'] { --capacity-accent: var(--chart-tertiary); }
+.capacity-card:hover { border-color: color-mix(in srgb, var(--capacity-accent) 30%, var(--monitor-border)); }
+.capacity-card dt { color: var(--text-secondary); font-size: 12px; line-height: 18px; }
+.capacity-icon { position: absolute; top: 50%; right: 16px; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 11px; transform: translateY(-50%); background: color-mix(in srgb, var(--capacity-accent) 10%, var(--bg-card)); color: var(--capacity-accent); }
+.capacity-icon i { font-size: 23px; }
+.capacity-value { display: flex; align-items: baseline; flex-wrap: wrap; gap: 5px; margin: 5px 0 0; color: var(--text-primary); font-size: 26px; font-weight: 650; line-height: 1.2; letter-spacing: -.025em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.capacity-unit { color: var(--text-secondary); font-size: 11px; font-weight: 400; letter-spacing: 0; }
+.capacity-partial { padding: 2px 5px; border-radius: 4px; background: var(--bg-card-subtle); color: var(--text-secondary); font-size: 9px; font-weight: 400; letter-spacing: 0; white-space: nowrap; }
+.business-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.distribution-panel { grid-column: 1; grid-row: 1; }
+.regionRanking { grid-column: 2; grid-row: 1; }
+.account-panel { grid-column: 1; grid-row: 2; }
+.tenantRanking { grid-column: 2; grid-row: 2; }
+.business-grid .monitor-panel { display: flex; flex-direction: column; }
+.business-tag { color: var(--text-muted); font-size: 10px; font-weight: 500; letter-spacing: .025em; white-space: nowrap; }
+.distribution-switch { display: flex; align-self: flex-start; gap: 3px; padding: 3px; border-radius: 7px; background: var(--bg-card-subtle); }
+.distribution-switch button { border: 0; border-radius: 5px; padding: 4px 10px; background: transparent; color: var(--text-secondary); font-size: 11px; transition: background .18s, color .18s; }
+.distribution-switch button[aria-pressed='true'] { color: var(--brand); background: var(--brand-subtle); }
+.business-donut-layout, .business-account-layout { display: flex; align-items: center; gap: 22px; min-width: 0; flex: 1; padding: 10px 0; }
+.business-ring { position: relative; flex: 0 0 43%; width: 43%; height: 190px; max-width: 204px; }
+.business-ring .ring-label strong { font-size: 31px; font-variant-numeric: tabular-nums; }
+.business-ring .ring-label > span { font-size: 11px; }
+.business-legend { list-style: none; margin: 0; padding: 0; flex: 1; min-width: 0; }
+.business-legend li { display: flex; align-items: center; gap: 10px; padding: 10px 0; color: var(--text-secondary); font-size: 12px; font-variant-numeric: tabular-nums; }
+.business-legend li + li { border-top: 1px solid var(--monitor-border); }
+.business-legend li > span { display: inline-flex; align-items: center; gap: 7px; flex: 1; min-width: 0; }
+.business-legend strong { color: var(--text-primary); font-size: 14px; font-weight: 600; }
+.business-legend small { color: var(--text-muted); font-size: 11px; min-width: 38px; text-align: right; }
+.business-health-ring { position: relative; height: 178px; width: 47%; max-width: 235px; flex: 0 0 47%; }
+.business-health-ring .ring-label { padding-top: 33px; }
+.business-health-ring .ring-label strong { font-size: 29px; font-variant-numeric: tabular-nums; }
+.business-panel-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 9px; padding-top: 12px; min-height: 31px; border-top: 1px solid var(--monitor-border); font-size: 11px; color: var(--text-muted); }
+.business-panel-footer > span { min-width: 0; }
+.business-panel-footer a, .business-text-link { display: inline-flex; align-items: center; gap: 5px; color: var(--brand); font-size: 11px; text-decoration: none; flex: none; }
+.business-panel-footer a:hover, .business-text-link:hover { text-decoration: underline; }
+.business-panel-footer > strong { color: var(--text-primary); font-size: 15px; font-weight: 600; }
+.business-rank-chart { height: 220px; position: relative; flex: 1; min-height: 220px; }
+.business-chart-empty { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 12px; font-size: 12px; color: var(--text-secondary); pointer-events: none; }
+.business-trend-summary { display: flex; align-items: flex-end; gap: 30px; margin-top: 6px; }
+.business-trend-summary > div > span { display: block; color: var(--text-secondary); font-size: 11px; }
+.business-trend-summary strong { display: block; margin-top: 4px; color: var(--text-primary); font-size: 25px; font-weight: 600; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.business-trend-summary > div:nth-child(2) strong { color: var(--brand); font-size: 20px; }
+.business-trend-summary > .business-tag { margin-left: auto; margin-bottom: 3px; }
+.business-trend-chart { position: relative; height: 205px; margin-top: 6px; }
+.business-trend-legend { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding-top: 14px; border-top: 1px solid var(--monitor-border); }
+.business-trend-legend > span { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-secondary); }
+.business-trend-legend strong { color: var(--text-primary); font-weight: 600; margin-left: 2px; font-variant-numeric: tabular-nums; }
+.business-attention { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 18px; padding: 14px 17px; margin-top: 18px; background: var(--bg-card); border: 1px solid var(--monitor-border); border-radius: 10px; font-size: 11px; }
+.business-attention > span { display: flex; align-items: center; gap: 6px; color: var(--status-warn); font-weight: 600; }
+.business-attention a { display: flex; align-items: center; gap: 4px; color: var(--text-secondary); text-decoration: none; }
+.business-attention a:hover { color: var(--brand); }
+.business-footer { display: flex; flex-wrap: wrap; gap: 5px 16px; margin-top: 15px; padding: 0 2px; color: var(--text-muted); font-size: 10px; }
+.business-footer time { margin-left: auto; font-variant-numeric: tabular-nums; }
+.sr-only { position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+@container (max-width: 1000px) {
+  .business-kpi { padding: 16px; }
+  .business-kpi-details { flex-direction: column; align-items: flex-start; }
+  .business-grid { gap: 16px; }
+  .business-donut-layout, .business-account-layout { gap: 12px; }
+  .business-ring { height: 175px; flex-basis: 42%; }
+  .business-legend li { gap: 6px; font-size: 11px; }
+  .business-legend small { min-width: 34px; font-size: 10px; }
+  .capacity-card { padding: 14px 54px 14px 14px; }
+  .capacity-icon { right: 12px; width: 30px; height: 30px; border-radius: 9px; }
+  .capacity-icon i { font-size: 20px; }
+  .capacity-value { font-size: 24px; }
+}
+@container (max-width: 760px) {
+  .business-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .business-kpi-details { flex-direction: row; }
+  .business-grid { grid-template-columns: minmax(0, 1fr); }
+  .distribution-panel, .regionRanking, .account-panel, .tenantRanking { grid-column: auto; grid-row: auto; }
+  .distribution-panel { order: 0; } .regionRanking { order: 1; } .account-panel { order: 2; } .tenantRanking { order: 3; }
+  .business-trend-panel { order: 4; } .launch-panel { order: 5; }
+  .business-controls { width: auto; }
+  .business-ring { height: 190px; }
+  .business-donut-layout, .business-account-layout { gap: 24px; }
+  .business-legend li { font-size: 12px; }
+  .business-capacities { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
+  .capacity-card { padding: 14px 62px 14px 16px; }
+  .capacity-icon { width: 34px; height: 34px; right: 14px; }
+}
+@container (max-width: 420px) {
+  .business-scope { gap: 10px; }
+  .business-sync { font-size: 10px; }
+  .business-kpis { gap: 10px; }
+  .business-kpi { padding: 14px 12px; border-radius: 12px; }
+  .business-kpi-heading { font-size: 11px; }
+  .business-kpi-heading i { font-size: 18px; }
+  .business-kpi-value { font-size: 29px; margin: 9px 0; }
+  .business-kpi-details { font-size: 10px; flex-direction: column; align-items: flex-start; }
+  .business-capacities { gap: 10px; margin: 10px 0 16px; }
+  .capacity-card { padding: 11px 12px 12px; }
+  .capacity-card dt { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 28px; font-size: 11px; }
+  .capacity-icon { position: static; flex: none; transform: none; width: 28px; height: 28px; border-radius: 8px; }
+  .capacity-icon i { font-size: 18px; }
+  .capacity-value { font-size: 23px; margin-top: 7px; }
+  .capacity-unit { font-size: 10px; }
+  .business-donut-layout, .business-account-layout { gap: 12px; }
+  .business-ring { height: 150px; flex-basis: 42%; }
+  .business-ring .ring-label strong { font-size: 24px; }
+  .business-ring .ring-label > span { font-size: 9px; }
+  .business-legend li { font-size: 10px; gap: 5px; padding: 9px 0; }
+  .business-legend small { font-size: 9px; min-width: 30px; }
+  .business-legend strong { font-size: 12px; }
+  .business-legend li > span { gap: 5px; }
+  .business-health-ring { height: 145px; flex-basis: 43%; }
+  .business-health-ring .ring-label strong { font-size: 23px; }
+  .business-health-ring .ring-label > span { font-size: 10px; }
+  .business-trend-summary { gap: 20px; }
+  .business-trend-summary strong { font-size: 23px; }
+  .business-trend-summary > div:nth-child(2) strong { font-size: 19px; }
+  .business-trend-legend { gap: 8px; }
+  .business-trend-legend > span { font-size: 10px; }
+  .business-attention { gap: 10px; }
+  .business-attention > span { width: 100%; }
+  .business-footer time { margin-left: 0; }
+  .business-text-link, .business-panel-footer a { font-size: 10px; }
+}
+@media (prefers-reduced-motion: reduce) { .business-kpi, .business-kpi-value > i, .capacity-card, .distribution-switch button { transition: none; } .business-kpi:hover { transform: none; } }
