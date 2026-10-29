@@ -270,7 +270,7 @@ export function createDotWorldScene(host: HTMLElement, labelHost: HTMLElement, o
       const controlX = (start.x + end.x) / 2 - dy * .22
       const controlY = (start.y + end.y) / 2 + dx * .22
       if (Math.max(start.x, end.x, controlX) < 0 || Math.min(start.x, end.x, controlX) > width || Math.max(start.y, end.y, controlY) < 0 || Math.min(start.y, end.y, controlY) > height) continue
-      ctx.strokeStyle = colors.mine
+      ctx.strokeStyle = colors.marker
       ctx.globalAlpha = .35
       ctx.lineWidth = 1
       ctx.beginPath()
@@ -284,7 +284,7 @@ export function createDotWorldScene(host: HTMLElement, labelHost: HTMLElement, o
       const remaining = 1 - progress
       const x = remaining * remaining * start.x + 2 * remaining * progress * controlX + progress * progress * end.x
       const y = remaining * remaining * start.y + 2 * remaining * progress * controlY + progress * progress * end.y
-      ctx.fillStyle = colors.mine
+      ctx.fillStyle = colors.marker
       ctx.globalAlpha = Math.sin(Math.PI * progress)
       ctx.beginPath()
       ctx.arc(x, y, 1.8, 0, TAU)
@@ -304,13 +304,12 @@ export function createDotWorldScene(host: HTMLElement, labelHost: HTMLElement, o
     for (const point of points) {
       if (!isVisible(point, 32)) continue
       const on = point.data.regionCode === selected || point.data.regionCode === hovered
-      const both = point.data.isOpen && point.data.isMine
-      const color = point.data.isMine ? colors.mine : colors.arm
+      const color = colors.marker
       if (moving) {
         const age = now - point.born
         if (age >= 0 && age < 900) drawRing(point, 4 + age / 900 * 26, color, (1 - age / 900) * .9, 2)
         const phase = ((now + point.phase) % 2200) / 2200
-        drawRing(point, 3 + phase * (on ? 16 : 11), both ? colors.arm : color, (1 - phase) * (on ? .75 : .45))
+        drawRing(point, 3 + phase * (on ? 16 : 11), color, (1 - phase) * (on ? .75 : .45))
       }
       const radius = on ? 13 : 9
       const glow = ctx.createRadialGradient(point.x, point.y, 0, point.x, point.y, radius)
@@ -327,8 +326,7 @@ export function createDotWorldScene(host: HTMLElement, labelHost: HTMLElement, o
       ctx.beginPath()
       ctx.arc(point.x, point.y, on ? 6 : 4.8, 0, TAU)
       ctx.fill()
-      if (both) drawRing(point, on ? 7.2 : 6, colors.arm, 1, 1.8)
-      else if (on) drawRing(point, 7.2, color, .9, 1.5)
+      if (on) drawRing(point, 7.2, color, .9, 1.5)
       ctx.fillStyle = color
       ctx.beginPath()
       ctx.arc(point.x, point.y, on ? 4 : 3.2, 0, TAU)
@@ -419,12 +417,12 @@ export function createDotWorldScene(host: HTMLElement, labelHost: HTMLElement, o
     if (disposed) return
     const previous = new Map(points.map(point => [point.data.regionCode, point]))
     const now = view.performance.now()
-    points = next.filter(point => Number.isFinite(point.lat) && Number.isFinite(point.lng) && Math.abs(point.lat) <= 90 && Math.abs(point.lng) <= 180 && (point.isOpen || point.isMine)).map(data => {
+    points = next.filter(point => Number.isFinite(point.lat) && Number.isFinite(point.lng) && Math.abs(point.lat) <= 90 && Math.abs(point.lng) <= 180).map(data => {
       const old = previous.get(data.regionCode)
       const button = old?.button || doc.createElement('button')
       const point: MapPoint = { data, x: 0, y: 0, born: old?.born ?? now, phase: phaseFor(data.regionCode), label: options.label(data), button }
       button.type = 'button'
-      button.className = 'region-scene-pin region-dot-pin ' + (data.isOpen && data.isMine ? 'both' : data.isMine ? 'mine' : 'arm')
+      button.className = 'region-scene-pin region-dot-pin'
       button.setAttribute('aria-label', options.ariaLabel(data))
       // Canvas owns the reference's appearance; transparent buttons add keyboard access.
       Object.assign(button.style, {

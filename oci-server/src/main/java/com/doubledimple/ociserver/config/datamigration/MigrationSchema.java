@@ -22,7 +22,7 @@ import java.util.Set;
 /** Actual columns/keys from the current connection, restricted to the existing exported entity scope. */
 final class MigrationSchema {
     private static final Set<String> IGNORED = new HashSet<>(Arrays.asList(
-            "BOOT_INSTANCE", "OCI_COMPUTER_INFO", "LOGIN_USER", "INSTANCE_TRAFFIC", "INSTALL_APP"));
+            "BOOT_INSTANCE", "OCI_COMPUTER_INFO", "LOGIN_USER", "INSTANCE_TRAFFIC"));
 
     static Map<String, TableInfo> read(Connection connection) throws Exception {
         Set<String> allowed = entityTables();

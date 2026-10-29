@@ -28,7 +28,6 @@ import com.doubledimple.ocicommon.enums.CloudTypeEnum;
 import com.doubledimple.ocicommon.enums.RegionEnum;
 import com.doubledimple.ocicommon.enums.oci.AccountTypeSubEnum;
 import com.doubledimple.ocicommon.enums.oci.PlanTypeSubEnum;
-import com.doubledimple.ocicommon.param.OpenRegionNotify;
 import com.doubledimple.ocicommon.utils.FileUtils;
 import com.doubledimple.ociserver.config.ProxyContext;
 import com.doubledimple.ociserver.config.annotations.UseSocksProxy;
@@ -2189,30 +2188,16 @@ public class TenantServiceImpl implements TenantService {
         return stringObjectMap;
     }
 
-    /**
-    * @Description: 展示不重复的所有区域
-    * @Param: []
-    * @return: java.util.List<com.doubledimple.ocicommon.param.OpenRegionNotify>
-    * @Author doubleDimple
-    * @Date: 5/24/25 10:47 AM
-    */
     @Override
-    public List<OpenRegionNotify> listDisTenants() {
-        List<OpenRegionNotify> results = new ArrayList<>();
-        Set<String> uniqueRegions = new HashSet<>();
-        List<Tenant> all = tenantRepository.findAll();
-        if (all.size() > 0){
-            for (Tenant tenant : all) {
-                String regionCode = RegionEnum.getRegionCode(tenant.getRegion());
-                if (!uniqueRegions.contains(regionCode)){
-                    uniqueRegions.add(regionCode);
-                    OpenRegionNotify openRegionNotify = new OpenRegionNotify();
-                    openRegionNotify.setRegion(regionCode);
-                    results.add(openRegionNotify);
-                }
-            }
-        }
-        return results;
+    public List<String> listOwnedOciRegions() {
+        return tenantRepository.findAll().stream()
+                .filter(tenant -> Integer.valueOf(1).equals(tenant.getCloudType()))
+                .map(tenant -> RegionEnum.getRegionCode(tenant.getRegion()))
+                .filter(StringUtils::isNotBlank)
+                .map(String::trim)
+                .distinct()
+                .sorted()
+                .collect(Collectors.toList());
     }
 
     @Override

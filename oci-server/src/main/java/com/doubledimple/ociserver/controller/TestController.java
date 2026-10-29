@@ -4,7 +4,6 @@ import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
 import com.doubledimple.dao.entity.DbConfig;
 import com.doubledimple.dao.entity.EmailBody;
-import com.doubledimple.dao.entity.InstallApp;
 import com.doubledimple.dao.entity.Tenant;
 import com.doubledimple.dao.entity.TenantEmailConfig;
 import com.doubledimple.dao.entity.TenantSocial;
@@ -17,7 +16,6 @@ import com.doubledimple.dao.repository.TenantSocialRepository;
 import com.doubledimple.ociai.utils.OciAiChatUtils;
 import com.doubledimple.ocicommon.enums.CloudTypeEnum;
 import com.doubledimple.ocicommon.enums.oci.OciSocialType;
-import com.doubledimple.ocicommon.param.OpenInstanceNotify;
 import com.doubledimple.ociserver.config.task.DynamicDailyTask;
 import com.doubledimple.ociserver.config.task.VersionCheckTask;
 import com.doubledimple.ociserver.pojo.dto.OciPageResult;
@@ -26,7 +24,6 @@ import com.doubledimple.ociserver.pojo.response.ImageInfoRes;
 import com.doubledimple.ociserver.service.IpQualityCheckService;
 import com.doubledimple.ociserver.config.task.InstanceTrafficTask;
 import com.doubledimple.ociserver.config.task.StartBootInstanceTask;
-import com.doubledimple.ociserver.service.OpenApiService;
 import com.doubledimple.ociserver.service.SocialTypeService;
 import com.doubledimple.ociserver.service.TenantService;
 import com.doubledimple.ociserver.service.factory.CloudCostServiceFactory;
@@ -139,9 +136,6 @@ public class TestController  extends BaseController{
     @Resource
     private TenantSocialRepository tenantSocialRepository;
 
-    @Resource
-    OpenApiService openApiService;
-
 
     //1962075769852219392
     @GetMapping("/query")
@@ -212,21 +206,6 @@ public class TestController  extends BaseController{
         final List<AvailabilityDomain> safeFreeAds = OciLimitsUtils.getSafeFreeAds(tenant, 1);
         log.info("获取的AD列表是:{}", JSON.toJSONString(safeFreeAds));*/
 
-        InstallApp result = new InstallApp();
-        result.setUniqueId("123456789");
-        result.setIpAddress("192.168.1.1");
-        result.setInstallTime(LocalDateTime.now());
-        result.setCreateTime(LocalDateTime.now());
-        result.setUpdateTime(LocalDateTime.now());
-
-        //openApiService.installApp(result);
-
-        OpenInstanceNotify openInstanceNotify = new OpenInstanceNotify();
-        openInstanceNotify.setRegion("ap-singapore-1");
-        openInstanceNotify.setArchitecture("ARM");
-        openInstanceNotify.setAccountTypeName("个人升级号");
-        openInstanceNotify.setCount(1L);
-        openApiService.notify(openInstanceNotify);
     }
 
 }

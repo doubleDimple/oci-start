@@ -245,11 +245,6 @@ public class SystemConfigService {
         config.setExecuteHour(executeHour.getValue() != null ?
                 Integer.parseInt(executeHour.getValue()) : 9);
 
-        // 获取通知秘钥
-        SystemConfig notificationSecret = systemConfigRepository.findByKey("task.notification.secret")
-                .orElse(new SystemConfig());
-        config.setNotificationSecret(notificationSecret.getValue());
-
         // ===== 账号测活任务开关 =====
         SystemConfig accountCheck = systemConfigRepository.findByKey("task.enable.account-check")
                 .orElse(new SystemConfig());
@@ -273,9 +268,6 @@ public class SystemConfigService {
         if (request.getExecuteHour() < 0 || request.getExecuteHour() > 23) {
             throw new IllegalArgumentException("执行时间必须在0-23之间");
         }
-        if (Boolean.TRUE.equals(request.getKeepNotificationSecret()) && Boolean.TRUE.equals(request.getClearNotificationSecret())) {
-            throw new IllegalArgumentException("不能同时保留和清除通知密钥");
-        }
 
         // 保存enabled状态
         SystemConfig enabled = systemConfigRepository.findByKey("task.enabled")
@@ -287,14 +279,6 @@ public class SystemConfigService {
         // 保存执行时间
         saveOrUpdateConfig("task.execute.hour", String.valueOf(request.getExecuteHour()));
 
-        // 保存通知秘钥
-        if (!Boolean.TRUE.equals(request.getKeepNotificationSecret())) {
-            if (Boolean.TRUE.equals(request.getClearNotificationSecret())) {
-                saveOrUpdateConfig("task.notification.secret", "");
-            } else if (request.getNotificationSecret() != null && !request.getNotificationSecret().trim().isEmpty()) {
-                saveOrUpdateConfig("task.notification.secret", request.getNotificationSecret().trim());
-            }
-        }
         //保存是否启用账号测活
         saveOrUpdateConfig("task.enable.account-check", request.isEnableAccountCheck() ? "1" : "0");
 
@@ -1182,19 +1166,6 @@ public class SystemConfigService {
             throw new IllegalArgumentException("Logo名称过长");
         }
         saveOrUpdateConfig("system.site.logo", logoName.trim());
-    }
-
-    public boolean getChannelNotifyEnabled() {
-        Optional<SystemConfig> config = systemConfigRepository.findByKey("channel.notify.enabled");
-        return config.map(SystemConfig::isEnabled).orElse(true);
-    }
-
-    public void updateChannelNotifyConfig(boolean enabled) {
-        SystemConfig config = systemConfigRepository.findByKey("channel.notify.enabled")
-                .orElse(new SystemConfig());
-        config.setKey("channel.notify.enabled");
-        config.setEnabled(enabled);
-        systemConfigRepository.save(config);
     }
 
     public void disTurnstile() {

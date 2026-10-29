@@ -26,7 +26,6 @@ import com.doubledimple.ociserver.pojo.response.InstanceDetailsRes;
 import com.doubledimple.ociserver.pojo.response.TmpInstanceResponse;
 import com.doubledimple.ociserver.service.InstanceDetailsService;
 import com.doubledimple.ociserver.service.OciSshConnService;
-import com.doubledimple.ociserver.service.OpenApiService;
 import com.doubledimple.ociserver.service.oracle.OracleCloudService;
 import com.doubledimple.ociserver.service.SecurityRuleService;
 import com.doubledimple.ociserver.service.TemInstanceService;
@@ -126,9 +125,6 @@ public class RescueWebSocketHandler extends TextWebSocketHandler {
 
     @Resource
     InstanceDetailsService instanceDetailsService;
-
-    @Resource
-    OpenApiService openApiService;
 
     @Resource
     private ApplicationEventPublisher eventPublisher;

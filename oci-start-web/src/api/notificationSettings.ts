@@ -4,7 +4,7 @@ import { tenantGet, tenantPost } from './tenant'
 export type NotificationKind = 'task' | 'telegram' | 'proxy' | 'bark' | 'dingTalk' | 'feishu'
 export type NotificationTestKind = Exclude<NotificationKind, 'task'>
 export interface NotificationConfigMap {
-  task: { enabled: boolean; executeHour: number; enableAccountCheck: boolean; enableBootLog: boolean; enableCostCheck: boolean; hasNotificationSecret: boolean }
+  task: { enabled: boolean; executeHour: number; enableAccountCheck: boolean; enableBootLog: boolean; enableCostCheck: boolean }
   telegram: { enabled: boolean; chatId: string; chatName: string; hasBotToken: boolean }
   proxy: { enabled: boolean; type: string; host: string; port: number; username: string; hasPassword: boolean }
   bark: { enabled: boolean; url: string; hasDeviceKey: boolean }
@@ -12,7 +12,7 @@ export interface NotificationConfigMap {
   feishu: { enabled: boolean; hasWebhook: boolean; hasSecret: boolean }
 }
 export interface NotificationInputMap {
-  task: Omit<NotificationConfigMap['task'], 'hasNotificationSecret'> & { notificationSecret: string; keepNotificationSecret: boolean; clearNotificationSecret?: boolean }
+  task: NotificationConfigMap['task']
   telegram: Omit<NotificationConfigMap['telegram'], 'hasBotToken'> & { botToken: string; keepBotToken: boolean }
   proxy: Omit<NotificationConfigMap['proxy'], 'hasPassword'> & { password: string; keepPassword: boolean }
   bark: Omit<NotificationConfigMap['bark'], 'hasDeviceKey'> & { deviceKey: string; keepDeviceKey: boolean }
@@ -68,7 +68,7 @@ export async function loadNotificationSettings(signal?: AbortSignal): Promise<No
     // Explicit projection never retains token URLs or any legacy secret values.
     return { serverTimeZone,
       task: { enabled: flag(task.enabled), executeHour: integer(task.executeHour, 0, 23), enableAccountCheck: flag(task.enableAccountCheck),
-        enableBootLog: flag(task.enableBootLog), enableCostCheck: flag(task.enableCostCheck), hasNotificationSecret: flag(task.hasNotificationSecret) },
+        enableBootLog: flag(task.enableBootLog), enableCostCheck: flag(task.enableCostCheck) },
       telegram: { enabled: flag(telegram.enabled), chatId: text(telegram.chatId), chatName: text(telegram.chatName), hasBotToken: flag(telegram.hasBotToken) },
       proxy: { enabled: flag(proxy.enabled), type: text(proxy.type), host: text(proxy.host), port: integer(proxy.port, 1, 65535),
         username: text(proxy.username), hasPassword: flag(proxy.hasPassword) },
@@ -98,12 +98,9 @@ export function normalizeNotificationInput<K extends NotificationKind>(kind: K, 
   const enabled = inputFlag(input.enabled)
   let result: NotificationInputMap[NotificationKind]
   if (kind === 'task') {
-    const value = input as NotificationInputMap['task'], keepNotificationSecret = inputFlag(value.keepNotificationSecret)
-    const clearNotificationSecret = value.clearNotificationSecret === undefined ? false : inputFlag(value.clearNotificationSecret)
-    if (keepNotificationSecret && clearNotificationSecret) return badInput()
+    const value = input as NotificationInputMap['task']
     result = { enabled, executeHour: inputInteger(value.executeHour, 0, 23), enableAccountCheck: inputFlag(value.enableAccountCheck),
-      enableBootLog: inputFlag(value.enableBootLog), enableCostCheck: inputFlag(value.enableCostCheck), keepNotificationSecret, clearNotificationSecret,
-      notificationSecret: keepNotificationSecret || clearNotificationSecret ? '' : inputText(value.notificationSecret) }
+      enableBootLog: inputFlag(value.enableBootLog), enableCostCheck: inputFlag(value.enableCostCheck) }
   } else if (kind === 'telegram') {
     const value = input as NotificationInputMap['telegram'], keepBotToken = inputFlag(value.keepBotToken)
     const botToken = keepBotToken ? '' : inputText(value.botToken, false), chatId = inputText(value.chatId)

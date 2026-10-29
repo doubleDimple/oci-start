@@ -121,9 +121,6 @@ struct NotifyView: View {
                     )
                 }
             }
-            NativeSecretEditor(title: language.text("通知校验密钥", "Notification verification secret"),
-                               hasSaved: model.task.hasNotificationSecret, mode: $model.task.secretMode,
-                               value: $model.task.notificationSecret)
         } footer: {
             AppButton(
                 title: language.text("保存配置", "Save settings"),

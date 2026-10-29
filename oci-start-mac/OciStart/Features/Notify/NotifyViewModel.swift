@@ -62,7 +62,7 @@ final class NotifyViewModel: ObservableObject {
         }
     }
     private func clearSecrets() {
-        task.notificationSecret = ""; telegram.botToken = ""; proxy.password = ""; bark.deviceKey = ""
+        telegram.botToken = ""; proxy.password = ""; bark.deviceKey = ""
         dingTalk.webhook = ""; dingTalk.secret = ""; feishu.webhook = ""; feishu.secret = ""
     }
     private func validation(_ work: () throws -> Void) -> Bool {
@@ -101,10 +101,9 @@ final class NotifyViewModel: ObservableObject {
     func saveTask() {
         guard validation({
             try require((0...23).contains(task.executeHour), "执行小时应为 0–23。")
-            try task.secretMode.validate(task.notificationSecret, hasSaved: task.hasNotificationSecret, required: false)
         }) else { return }
         let value = task
-        save("task", clears: value.secretMode == .clear) { try await self.service.updateTask(value) }
+        save("task", clears: false) { try await self.service.updateTask(value) }
     }
     func saveTelegram() {
         telegram.chatId = telegram.chatId.trimmingCharacters(in: .whitespacesAndNewlines)

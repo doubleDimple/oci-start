@@ -18,9 +18,8 @@ public class CacheConstants {
     public static final String OCI_USER_LIST_KEY = "ociUserList";
 
     /**
-    * 活跃用户数量
+    * OCI 用户列表缓存前缀
     */
-    public static final String APP_INSTALL_ACTIVE_KEY = "appInstallActive";
     public static final String OCI_USER_LIST_CACHE = "ociUserListCache_";
 
     /**
@@ -36,15 +35,12 @@ public class CacheConstants {
 
     private final static String HELP_CACHE_KEY = "HELP_CACHE_";
 
-    //开机数量缓存
-    public static final String BOOT_COUNT_KEY = "BOOT_COUNT_KEY";
-
     //github stars 缓存key
     public static final String GITHUB_STARS_KEY = "GITHUB_STARS_KEY";
 
 
     // 缓存集合，方便批量配置
     public static final String[] CACHE_NAMES = {
-           OCI_IP_RANGES_CACHE,HELP_CACHE,OCI_USER_LIST_KEY,APP_INSTALL_ACTIVE_KEY,BOOT_COUNT_KEY,GITHUB_STARS_KEY
+           OCI_IP_RANGES_CACHE,HELP_CACHE,OCI_USER_LIST_KEY,GITHUB_STARS_KEY
     };
 }

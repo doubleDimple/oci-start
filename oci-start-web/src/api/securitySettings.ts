@@ -13,7 +13,7 @@ export interface TurnstileSecurityConfig { enabled: boolean; siteKey: string; ha
 export interface SecuritySettings {
   currentUsername: string; siteLogoName: string
   github: GithubSecurityConfig; google: GoogleSecurityConfig; mfa: MfaSecurityConfig
-  turnstile: TurnstileSecurityConfig; channelNotifyEnabled: boolean
+  turnstile: TurnstileSecurityConfig
 }
 export interface GithubSecurityInput extends Omit<GithubSecurityConfig, 'hasClientSecret'> { keepSecret: boolean; clientSecret: string }
 export interface GoogleSecurityInput extends Omit<GoogleSecurityConfig, 'hasClientSecret'> { keepSecret: boolean; clientSecret: string }
@@ -57,7 +57,6 @@ function configs(value: Record<string, unknown>): SecuritySettings {
       redirectUri: text(google.redirectUri), hasClientSecret: boolean(google.hasClientSecret) },
     mfa: { enabled: boolean(mfa.enabled), issuer: text(mfa.issuer), hasSecretKey: boolean(mfa.hasSecretKey) },
     turnstile: { enabled: boolean(turnstile.enabled), siteKey: text(turnstile.siteKey), hasSecretKey: boolean(turnstile.hasSecretKey) },
-    channelNotifyEnabled: boolean(value.channelNotifyEnabled),
   }
 }
 /** Preserve large GitHub numeric IDs as strings before JSON.parse can round them. */
@@ -180,7 +179,6 @@ export function deleteSecurityMfa(): Promise<void> {
 export function updateTurnstileSecurity(input: TurnstileSecurityInput): Promise<void> {
   return saveEmpty('updateTurnstileConfig', normalizeTurnstileSecurity(input), [input.secretKey])
 }
-export function updateSecurityChannelNotify(enabled: boolean): Promise<void> { return saveEmpty('updateChannelNotifyConfig', { enabled: flagInput(enabled) }) }
 
 export async function loadSecurityMfaEnrollment(signal?: AbortSignal): Promise<MfaEnrollment> {
   try {

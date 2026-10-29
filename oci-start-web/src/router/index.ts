@@ -13,7 +13,7 @@ const layout = () => import('@/layouts/DefaultLayout.vue')
 const children: RouteRecordRaw[] = [
   { path: 'about/author', meta: { title: '关于 Oci-Start', titleKey: 'headerVersion.about' }, component: () => import('@/views/common/AboutView.vue') },
   { path: 'boot/dashboard', meta: { title: '系统资源监控', id: 'api-dashboard' }, component: () => import('@/views/dashboard/DashboardView.vue') },
-  { path: 'resource/list', meta: { title: 'OCI 区域管理', id: 'api-records' }, component: () => import('@/views/regions/ArmRegionsView.vue') },
+  { path: 'resource/list', meta: { title: 'OCI 区域管理', id: 'api-records' }, component: () => import('@/views/regions/RegionsView.vue') },
   { path: 'tenants/list', meta: { title: 'OCI 租户管理', id: 'api-management' }, component: () => import('@/views/tenants/TenantsView.vue') },
   { path: 'tenants/regionList', meta: { title: '区域列表', id: 'api-management' }, component: () => import('@/views/tenants/TenantRegionsView.vue') },
   { path: 'tenants/auditPage', meta: { title: '审计日志', id: 'api-management' }, component: () => import('@/views/tenants/TenantAuditView.vue') },

@@ -49,7 +49,6 @@ struct SecuritySettingsSnapshot: Equatable {
     var google: GoogleOAuthForm = GoogleOAuthForm()
     var mfa: MfaForm = MfaForm()
     var turnstile: TurnstileForm = TurnstileForm()
-    var channelNotifyEnabled: Bool = false
 }
 
 enum SecuritySettingsJSON {
@@ -65,8 +64,6 @@ enum SecuritySettingsJSON {
         var out = SecuritySettingsSnapshot()
         out.currentUsername = str(payload["currentUsername"])
         out.siteLogoName = str(payload["siteLogoName"]).isEmpty ? "OCI-START" : str(payload["siteLogoName"])
-        guard let channelEnabled = payload["channelNotifyEnabled"] as? Bool else { throw APIError.invalidResponse }
-        out.channelNotifyEnabled = channelEnabled
 
         if let g = payload["github"] as? [String: Any] {
             guard let enabled = g["enabled"] as? Bool else { throw APIError.invalidResponse }

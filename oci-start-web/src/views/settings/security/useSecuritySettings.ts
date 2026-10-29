@@ -2,14 +2,14 @@ import { computed, onBeforeUnmount, ref, shallowRef } from 'vue'
 import {
   SecuritySettingsApiError, deleteSecurityMfa, loadSecurityMfaEnrollment, loadSecuritySettings,
   lookupSecurityGithub, regenerateSecurityMfa, securitySettingsError, updateGithubSecurity,
-  updateGoogleSecurity, updateMfaSecurity, updateSecurityAccount, updateSecurityChannelNotify,
+  updateGoogleSecurity, updateMfaSecurity, updateSecurityAccount,
   updateSecurityLogo, updateTurnstileSecurity, verifySecurityMfa,
   type AccountSecurityInput, type GithubIdentity, type GithubSecurityInput, type GoogleSecurityInput,
   type MfaEnrollment, type MfaSecurityInput, type SecuritySettings, type TurnstileSecurityInput,
 } from '@/api/securitySettings'
 
 export type SecurityMutationKind = 'account' | 'logo' | 'github' | 'google' | 'mfa'
-  | 'regenerateMfa' | 'deleteMfa' | 'turnstile' | 'channelNotify'
+  | 'regenerateMfa' | 'deleteMfa' | 'turnstile'
 export interface SecurityMutationResult { kind: SecurityMutationKind; logoName?: string; needRelogin?: boolean }
 export interface SecurityMutation {
   kind: SecurityMutationKind | null; pending: boolean; outcome: 'idle' | 'success' | 'unknown' | 'failed'
@@ -252,10 +252,6 @@ export function useSecuritySettings() {
         && current.turnstile.hasSecretKey === hasSecret)
     } finally { release() }
   }
-  async function saveChannelNotify(enabled: boolean): Promise<void> {
-    await perform('channelNotify', async () => { await updateSecurityChannelNotify(enabled); return { kind: 'channelNotify' } },
-      current => current.channelNotifyEnabled === enabled)
-  }
   onBeforeUnmount(() => {
     disposed = true
     cancelRead(); cancelGithubLookup(); clearMfaEnrollment(); clearVerification()
@@ -264,7 +260,7 @@ export function useSecuritySettings() {
   })
   return { settings, loading, loaded, problem, lastUpdated, refresh, mutation, contextLocked, canMutate,
     requiresReview, reviewReady, acknowledgeReview, clearMutation, needRelogin,
-    saveAccount, saveLogo, saveGithub, saveGoogle, saveMfa, regenerateMfa, deleteMfa, saveTurnstile, saveChannelNotify,
+    saveAccount, saveLogo, saveGithub, saveGoogle, saveMfa, regenerateMfa, deleteMfa, saveTurnstile,
     githubLookup, lookupGithub, cancelGithubLookup, mfaEnrollment, mfaLoading, mfaProblem,
     loadMfaEnrollment, clearMfaEnrollment, verification, verifyMfa, clearVerification }
 }

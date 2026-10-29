@@ -231,7 +231,6 @@ public sealed class NotifyView : UserControl
             {
                 enabled = _taskCard.IsEnabledToggle == true,
                 executeHour = Hour(),
-                notificationSecret = "",
                 enableAccountCheck = _accCheck.IsChecked == true,
                 enableBootLog = _bootLog.IsChecked == true,
                 enableCostCheck = _costCheck.IsChecked == true

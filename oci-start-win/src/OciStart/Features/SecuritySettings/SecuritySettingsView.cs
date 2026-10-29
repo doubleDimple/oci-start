@@ -7,7 +7,7 @@ using OciStart.Core;
 
 namespace OciStart.Features.SecuritySettings;
 
-/// <summary>安全管理 — 对齐 Mac：账号 / Logo / MFA / OAuth / Turnstile / 频道通知.</summary>
+/// <summary>安全管理 — 对齐 Mac：账号 / Logo / MFA / OAuth / Turnstile.</summary>
 public sealed class SecuritySettingsView : UserControl
 {
     private readonly PageScaffold _scaffold = new();
@@ -35,12 +35,12 @@ public sealed class SecuritySettingsView : UserControl
 
     private ModuleSettingsCard _accountCard = null!, _logoCard = null!, _mfaCard = null!;
     private ModuleSettingsCard _ghCard = null!, _ggCard = null!;
-    private ModuleSettingsCard _tsCard = null!, _channelCard = null!;
+    private ModuleSettingsCard _tsCard = null!;
 
     public SecuritySettingsView()
     {
         _scaffold.Title = "安全管理";
-        _scaffold.Subtitle = "账号安全 · OAuth · MFA · Turnstile · 频道通知";
+        _scaffold.Subtitle = "";
         _scaffold.SetToolbar(FormFieldFactory.Secondary("刷新", async (_, _) => await LoadAsync()));
 
         var accent = Color.FromRgb(0x3B, 0x82, 0xF6);
@@ -48,7 +48,6 @@ public sealed class SecuritySettingsView : UserControl
         var ghAccent = Color.FromRgb(0x24, 0x29, 0x2E);
         var ggAccent = Color.FromRgb(0x42, 0x85, 0xF4);
         var tsAccent = Color.FromRgb(0xF0, 0x88, 0x1A);
-        var chAccent = Color.FromRgb(0x9B, 0x59, 0xB6);
 
         _accountCard = new ModuleSettingsCard("账号设置", "修改用户名 / 密码", "👤", accent, false);
         _accountCard.SetBody(
@@ -98,15 +97,6 @@ public sealed class SecuritySettingsView : UserControl
             });
         _tsCard.SetFooter(FormFieldFactory.Primary("保存 Turnstile", async (_, _) => await SaveTurnstileAsync()));
 
-        _channelCard = new ModuleSettingsCard("开机频道通知", "匿名上报机型与区域", "📡", chAccent, true, 420);
-        _channelCard.SetBody(new TextBlock
-        {
-            Text = "开启后，抢机成功会向公共频道上报实例类型与区域，不含账号与 IP 等隐私信息。",
-            TextWrapping = TextWrapping.Wrap,
-            Foreground = (Brush)Application.Current.FindResource("TextSecondaryBrush")
-        });
-        _channelCard.SetFooter(FormFieldFactory.Primary("保存频道通知", async (_, _) => await SaveChannelAsync()));
-
         var scroll = new ScrollViewer
         {
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
@@ -118,7 +108,6 @@ public sealed class SecuritySettingsView : UserControl
                     new EqualHeightCardRow(_accountCard, _logoCard),
                     new EqualHeightCardRow(_mfaCard, _ghCard, 420),
                     new EqualHeightCardRow(_ggCard, _tsCard, 420),
-                    new EqualHeightCardRow(_channelCard, new Border(), 420)
                 }
             }
         };
@@ -173,11 +162,6 @@ public sealed class SecuritySettingsView : UserControl
                 _tsSecret.Text = JsonUtil.Str(m, "secretKey");
             });
 
-            // channel notify is a top-level bool on snapshot
-            _channelCard.IsEnabledToggle = JsonUtil.Bool(root, "channelNotifyEnabled")
-                || (root.TryGetValue("channelNotify", out var ch)
-                    && ch.ValueKind == System.Text.Json.JsonValueKind.Object
-                    && JsonUtil.Bool(JsonUtil.ToDict(ch), "enabled"));
         });
 
     private static void ApplyObj(
@@ -304,17 +288,5 @@ public sealed class SecuritySettingsView : UserControl
         catch (Exception ex) { ToastService.Error(ex is ApiError ae ? ae.Message : ex.Message); }
     }
 
-    private async Task SaveChannelAsync()
-    {
-        try
-        {
-            var raw = await _api.PostJsonAsync("/api/system/updateChannelNotifyConfig", new
-            {
-                enabled = _channelCard.IsEnabledToggle == true
-            }).ConfigureAwait(true);
-            ApiClient.EnsureApiOk(raw, "频道通知配置更新失败");
-            ToastService.Success("频道通知已保存");
-        }
-        catch (Exception ex) { ToastService.Error(ex is ApiError ae ? ae.Message : ex.Message); }
-    }
+
 }

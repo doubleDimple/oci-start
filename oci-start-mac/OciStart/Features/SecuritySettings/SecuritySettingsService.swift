@@ -125,13 +125,6 @@ struct SecuritySettingsService {
         try SecuritySettingsJSON.ensureOK(raw, fallback: "Turnstile 配置更新失败")
     }
 
-    /// POST `/api/system/updateChannelNotifyConfig`
-    func updateChannelNotify(enabled: Bool) async throws {
-        let url = try client.makeURL(baseURL, path: "/api/system/updateChannelNotifyConfig")
-        let raw = try await client.postJSON(url, body: ["enabled": enabled])
-        try SecuritySettingsJSON.ensureOK(raw, fallback: "频道通知配置更新失败")
-    }
-
     /// Fetch GitHub user id via public API.
     func fetchGithubUserId(username: String) async throws -> (id: String, login: String) {
         let trimmed = username.trimmingCharacters(in: .whitespacesAndNewlines)

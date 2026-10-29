@@ -56,7 +56,7 @@ public class DatabaseExportService {
     public static final int MAX_VALUE_BYTES = 1024 * 1024;
     public static final int MAX_ROWS = 100000;
     private static final Set<String> IGNORE_TABLES = new HashSet<>(Arrays.asList(
-            "BOOT_INSTANCE", "OCI_COMPUTER_INFO", "LOGIN_USER", "INSTANCE_TRAFFIC", "INSTALL_APP"));
+            "BOOT_INSTANCE", "OCI_COMPUTER_INFO", "LOGIN_USER", "INSTANCE_TRAFFIC"));
 
     private final JdbcTemplate jdbcTemplate;
     private final TableExportHandlerRegistry handlerRegistry;

@@ -1,86 +1,22 @@
 import Foundation
 
-// MARK: - OpenRegionNotify (web /resource/arm-data)
-
-struct OpenRegionNotify: Decodable, Equatable, Identifiable {
-    var id: String { region }
-    var region: String = ""
-    var architectureType: String = ""
-    var openTime: String?
-    var openCount: Int = 0
-    var lastNotifyTime: String?
-    var monthlyOpenCount: Int = 0
-
-    enum CodingKeys: String, CodingKey {
-        case region
-        case architectureType, architecture_type
-        case openTime, open_time
-        case openCount, open_count
-        case lastNotifyTime, last_notify_time
-        case monthlyOpenCount, monthly_open_count
-        case id
-    }
-
-    init() {}
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        region = (try? c.decode(String.self, forKey: .region)) ?? ""
-        architectureType =
-            (try? c.decode(String.self, forKey: .architectureType))
-            ?? (try? c.decode(String.self, forKey: .architecture_type))
-            ?? ""
-        openTime = Self.decodeTime(c, .openTime) ?? Self.decodeTime(c, .open_time)
-        lastNotifyTime = Self.decodeTime(c, .lastNotifyTime) ?? Self.decodeTime(c, .last_notify_time)
-        openCount = Self.decodeInt(c, .openCount) ?? Self.decodeInt(c, .open_count) ?? 0
-        monthlyOpenCount = Self.decodeInt(c, .monthlyOpenCount) ?? Self.decodeInt(c, .monthly_open_count) ?? 0
-        _ = try? c.decodeIfPresent(Int64.self, forKey: .id)
-    }
-
-    private static func decodeInt(_ c: KeyedDecodingContainer<CodingKeys>, _ k: CodingKeys) -> Int? {
-        if let v = try? c.decode(Int.self, forKey: k) { return v }
-        if let v = try? c.decode(Int64.self, forKey: k) { return Int(v) }
-        if let v = try? c.decode(Double.self, forKey: k) { return Int(v) }
-        return nil
-    }
-
-    private static func decodeTime(_ c: KeyedDecodingContainer<CodingKeys>, _ k: CodingKeys) -> String? {
-        if let s = try? c.decode(String.self, forKey: k) { return s }
-        if let arr = try? c.decode([Int].self, forKey: k), arr.count >= 6 {
-            return String(format: "%04d-%02d-%02d %02d:%02d:%02d",
-                          arr[0], arr[1], arr[2], arr[3], arr[4], arr[5])
-        }
-        return nil
-    }
-}
-
-struct ArmDataPayload: Decodable {
-    var armRecords: [OpenRegionNotify] = []
-    var regionMap: [String: String] = [:]
+struct OwnedRegion: Decodable, Equatable {
+    let region: String
 }
 
 struct MyRegionsPayload: Decodable {
-    var hasRecords: [OpenRegionNotify] = []
+    let hasRecords: [OwnedRegion]
+    let regionMap: [String: String]?
 }
-
-// MARK: - Row model for table
 
 struct RegionRow: Identifiable, Equatable {
     let id: String
     let regionCode: String
     let name: String
-    let isOpen: Bool
     let isMine: Bool
-    let architectureType: String
-    let openTime: String?
-    let openCount: Int
-    let monthlyOpenCount: Int
-    let lastNotifyTime: String?
     let continent: String
     var coordinate: RegionCoordinate? { KnownRegions.coordinates[regionCode] }
-    var displayName: String {
-        regionText(name, KnownRegions.englishName(regionCode))
-    }
+    var displayName: String { regionText(name, KnownRegions.englishName(regionCode)) }
 }
 
 enum RegionContinent: String, CaseIterable, Identifiable {
@@ -110,13 +46,13 @@ enum RegionContinent: String, CaseIterable, Identifiable {
 }
 
 enum RegionStatusFilter: String, CaseIterable, Identifiable {
-    case all, open, closed
+    case all, linked, unlinked
     var id: String { rawValue }
     var title: String {
         switch self {
         case .all: return regionText("全部状态", "All statuses")
-        case .open: return regionText("有开机记录", "Has launch history")
-        case .closed: return regionText("无开机记录", "No launch history")
+        case .linked: return regionText("已关联账号", "Account linked")
+        case .unlinked: return regionText("未关联账号", "No linked account")
         }
     }
 }

@@ -5,9 +5,6 @@ import Foundation
 struct NotifyTaskForm: Equatable {
     var enabled = false
     var executeHour = 9
-    var notificationSecret = ""
-    var hasNotificationSecret = false
-    var secretMode: NativeSecretMode = .replace
     var enableAccountCheck = false
     var enableBootLog = false
     var enableCostCheck = false
@@ -79,9 +76,6 @@ enum NotifyJSON {
             out.task.enabled = enabled
             guard let hour = d["executeHour"] as? Int, (0...23).contains(hour) else { throw APIError.invalidResponse }
             out.task.executeHour = hour
-            guard let hasNotificationSecret = d["hasNotificationSecret"] as? Bool else { throw APIError.invalidResponse }
-            out.task.hasNotificationSecret = hasNotificationSecret
-            out.task.secretMode = hasNotificationSecret ? .keep : .replace
             guard let enableAccountCheck = d["enableAccountCheck"] as? Bool else { throw APIError.invalidResponse }
             out.task.enableAccountCheck = enableAccountCheck
             guard let enableBootLog = d["enableBootLog"] as? Bool else { throw APIError.invalidResponse }

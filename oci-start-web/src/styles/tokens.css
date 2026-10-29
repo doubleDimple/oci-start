@@ -58,8 +58,7 @@ html:root[data-content-theme] {
   --region-map-dark-grid: #1d3040;
   --region-map-dark-text: #dcecf3;
   --region-map-dark-muted: #a0b7c7;
-  --region-map-dark-arm: #ffb47a;
-  --region-map-dark-mine: #64d9c1;
+  --region-map-dark-marker: #ffb47a;
   --region-map-light-surface: #f7f9fb;
   --region-map-light-panel: #ffffff;
   --region-map-light-land: #98adbc;
@@ -68,8 +67,7 @@ html:root[data-content-theme] {
   --region-map-light-grid: #e6edf2;
   --region-map-light-text: #263b49;
   --region-map-light-muted: #506575;
-  --region-map-light-arm: #b65b22;
-  --region-map-light-mine: #087e83;
+  --region-map-light-marker: #b65b22;
 
   --r-btn: 20px;
   --r-pill: 999px;

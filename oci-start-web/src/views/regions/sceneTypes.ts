@@ -7,8 +7,7 @@ export interface RegionSceneColors {
   landFill: string
   coast: string
   grid: string
-  arm: string
-  mine: string
+  marker: string
   text: string
   muted: string
 }

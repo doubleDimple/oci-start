@@ -22,7 +22,7 @@ const sections: { id: NotificationKind; icon: string }[] = [
   { id: 'dingTalk', icon: 'i-mdi-bell-outline' }, { id: 'feishu', icon: 'i-mdi-message-outline' },
 ]
 const secretFields: Record<NotificationKind, SecretField[]> = {
-  task: [{ key: 'notificationSecret', keep: 'keepNotificationSecret', has: 'hasNotificationSecret', optional: true }],
+  task: [],
   telegram: [{ key: 'botToken', keep: 'keepBotToken', has: 'hasBotToken' }],
   proxy: [{ key: 'password', keep: 'keepPassword', has: 'hasPassword', optional: true }],
   bark: [{ key: 'deviceKey', keep: 'keepDeviceKey', has: 'hasDeviceKey' }],
@@ -35,8 +35,7 @@ const { settings, loading, loaded, problem, lastUpdated, mutation, canMutate, co
 const active = ref<NotificationKind>('task'), aiOpen = ref(false)
 const formHeading = ref<HTMLElement>(), scrollArea = ref<HTMLElement>()
 const drafts = reactive<NotificationInputMap>({
-  task: { enabled: false, executeHour: 9, enableAccountCheck: false, enableBootLog: false, enableCostCheck: false,
-    notificationSecret: '', keepNotificationSecret: false, clearNotificationSecret: false },
+  task: { enabled: false, executeHour: 9, enableAccountCheck: false, enableBootLog: false, enableCostCheck: false },
   telegram: { enabled: false, chatId: '', chatName: '', botToken: '', keepBotToken: false },
   proxy: { enabled: false, type: 'HTTP', host: '', port: 7890, username: '', password: '', keepPassword: false },
   bark: { enabled: false, url: '', deviceKey: '', keepDeviceKey: false },
@@ -100,7 +99,6 @@ function updateMode(field: SecretField, value: unknown) {
   if (disabled.value || typeof value !== 'string' || !['keep', 'replace', 'clear'].includes(value)) return
   modes[active.value][field.key] = value as SecretMode
   Object.assign(drafts[active.value], { [field.key]: '', [field.keep]: value === 'keep' })
-  if (active.value === 'task') drafts.task.clearNotificationSecret = value === 'clear'
   validation.value = ''
 }
 function clearSecrets(kind?: NotificationKind) {
@@ -116,7 +114,6 @@ function resetSection(kind: NotificationKind) {
     Object.assign(drafts[kind], { [field.key]: '', [field.keep]: keep })
     modes[kind][field.key] = keep ? 'keep' : 'replace'
   }
-  if (kind === 'task') drafts.task.clearNotificationSecret = false
   baseline[kind] = snapshot(kind)
 }
 function resetAll() { clearSecrets(); sections.forEach(section => resetSection(section.id)); validation.value = '' }

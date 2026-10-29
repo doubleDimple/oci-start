@@ -132,7 +132,6 @@ public class SystemSettingsApiController  extends BaseController{
                 safeTask.put("enableAccountCheck", task.isEnableAccountCheck());
                 safeTask.put("enableBootLog", task.isEnableBootLog());
                 safeTask.put("enableCostCheck", task.isEnableCostCheck());
-                safeTask.put("hasNotificationSecret", hasStoredNotificationSecret(task.getNotificationSecret()));
                 data.put("task", safeTask);
 
                 TelegramConfig telegram = systemConfigService.getTelegramConfig();
@@ -372,7 +371,6 @@ public class SystemSettingsApiController  extends BaseController{
                 data.put("mfa", systemConfigService.getMfaConfig());
                 data.put("turnstile", systemConfigService.getTurnstileConfig());
             }
-            data.put("channelNotifyEnabled", systemConfigService.getChannelNotifyEnabled());
             Map<String, Object> body = new HashMap<>();
             body.put("success", true);
             body.put("data", data);
@@ -706,21 +704,6 @@ public class SystemSettingsApiController  extends BaseController{
         body.put("success", false); body.put("errorKey", errorKey); body.put("writeAttempted", attempted);
         int status = "invalidInput".equals(errorKey) ? 400 : "notFound".equals(errorKey) ? 404 : "conflict".equals(errorKey) ? 409 : 500;
         return ResponseEntity.status(status).header("Cache-Control", "no-store").body(body);
-    }
-
-    @PostMapping("/updateChannelNotifyConfig")
-    public ResponseEntity<?> updateChannelNotifyConfig(@RequestBody Map<String, Boolean> request, HttpServletRequest httpRequest) {
-        guardSecurityWrite(httpRequest);
-        try {
-            Boolean enabled = request.get("enabled");
-            if (enabled == null) {
-                return ResponseEntity.badRequest().body("enabled参数不能为空");
-            }
-            systemConfigService.updateChannelNotifyConfig(enabled);
-            return ResponseEntity.ok().build();
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body("频道通知配置保存失败，请重新读取确认");
-        }
     }
 
     @PostMapping("/updateTurnstileConfig")

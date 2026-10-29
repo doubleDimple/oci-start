@@ -117,13 +117,6 @@ openresty:
     base-url: ${OPENRESTY_API_BASE_URL:http://127.0.0.1:8080/api}
     token: ${OPENRESTY_API_TOKEN:}
 
-cf:
-  worker:
-    domain: https://oci-api-worker.lovele-cn.workers.dev
-
-thirdApi:
-  speedUrl: https://speed.objboy.com/
-
 oci:
   version: 5.7.93
   ssh-version: v-5.7.93

@@ -2,7 +2,6 @@ package com.doubledimple.ociserver.service;
 
 import com.doubledimple.dao.entity.InstanceCloudNetWork;
 import com.doubledimple.dao.entity.Tenant;
-import com.doubledimple.ocicommon.param.OpenRegionNotify;
 import com.doubledimple.ociserver.pojo.dto.TenantTransferRequest;
 import com.doubledimple.ociserver.pojo.request.AuditLogRequest;
 import com.doubledimple.ociserver.pojo.request.BootVolumeUpdateRequest;
@@ -95,7 +94,7 @@ public interface TenantService {
 
     Map<String, Object> deleteBootVolume(Long tenantId, String volumeId);
 
-    List<OpenRegionNotify> listDisTenants();
+    List<String> listOwnedOciRegions();
 
     void updateAccountDetail(Long tenantId);
 

@@ -9,7 +9,6 @@ import com.doubledimple.dao.repository.SystemConfigRepository;
 import com.doubledimple.ocicommon.enums.LoginTypeEnum;
 import com.doubledimple.ociserver.pojo.enums.MessageEnum;
 import com.doubledimple.ociserver.pojo.request.PasswordUpdateRequest;
-import com.doubledimple.ociserver.service.InstallAppService;
 import com.doubledimple.ociserver.service.message.factory.MessageFactory;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -54,9 +53,6 @@ public class LoginUserService {
 
     @Resource
     MessageFactory messageFactory;
-
-    @Resource
-    InstallAppService installAppService;
 
     /**
      * 验证用户名和密码，返回 LoginUser（失败抛异常）

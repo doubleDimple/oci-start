@@ -13,11 +13,6 @@ import lombok.Data;
 public class TaskConfig {
     private boolean enabled;
     private int executeHour;
-    /**
-     * 通知秘钥
-     */
-    private String notificationSecret;
-
     //账号测活
     private boolean enableAccountCheck;
     //抢机日志

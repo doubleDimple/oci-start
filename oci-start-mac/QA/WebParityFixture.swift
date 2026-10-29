@@ -67,23 +67,17 @@ final class PreviewProtocol: URLProtocol {
             let now = Int64(Date().timeIntervalSince1970 * 1000)
             body = json(["success": true, "serverTime": now, "expiresAt": now + 25000, "items": [
                 ["id": "1", "code": "123456"], ["id": "2", "code": "654321"]]])
-        case "/resource/arm-data":
-            body = success(["armRecords": [
-                ["region": "ap-tokyo-1", "architectureType": "ARM", "openTime": "2026-09-19 09:30:00", "openCount": 12, "monthlyOpenCount": 78],
-                ["region": "ap-singapore-1", "architectureType": "ARM", "openTime": "2026-09-18 12:00:00", "openCount": 7, "monthlyOpenCount": 28],
-                ["region": "eu-frankfurt-1", "architectureType": "ARM", "openCount": 9, "monthlyOpenCount": 19]],
-                "regionMap": ["ap-tokyo-1": "东京", "ap-singapore-1": "新加坡", "eu-frankfurt-1": "法兰克福"]])
         case "/resource/my-regions":
             body = success(["hasRecords": [["region": "ap-tokyo-1"], ["region": "us-ashburn-1"]]])
         case "/api/audit-logs":
             body = json(["success": true, "code": 200, "data": ["content": [
-                ["id": 1, "username": "Preview", "title": "查看区域", "method": "GET", "requestUri": "/resource/arm-data", "ip": "127.0.0.1", "location": "本地", "responseStatus": 200, "status": 1, "costTime": 35, "createTime": "2026-09-19T09:30:00"],
+                ["id": 1, "username": "Preview", "title": "查看区域", "method": "GET", "requestUri": "/resource/my-regions", "ip": "127.0.0.1", "location": "本地", "responseStatus": 200, "status": 1, "costTime": 35, "createTime": "2026-09-19T09:30:00"],
                 ["id": 2, "username": "Preview", "title": "读取备份", "method": "GET", "requestUri": "/api/memos", "ip": "127.0.0.1", "location": "本地", "responseStatus": 500, "status": 0, "costTime": 18, "errorMsg": "模拟读取失败", "createTime": "2026-09-19T09:20:00"]],
                 "totalElements": 2, "totalPages": 1]])
         case "/api/system/securitySettingsConfigs":
             precondition(request.url?.query == "redacted=true")
             body = json(["success": true, "data": [
-                "currentUsername": "Preview", "siteLogoName": "OCI-START", "channelNotifyEnabled": false,
+                "currentUsername": "Preview", "siteLogoName": "OCI-START",
                 "github": ["enabled": false, "hasClientSecret": true],
                 "google": ["enabled": false, "hasClientSecret": false],
                 "mfa": ["enabled": true, "hasSecretKey": true, "issuer": "OCI-START"],
@@ -92,7 +86,7 @@ final class PreviewProtocol: URLProtocol {
             precondition(request.url?.query == "redacted=true")
             body = json(["success": true, "data": [
                 "serverTimeZone": "Asia/Shanghai",
-                "task": ["enabled": true, "executeHour": 9, "hasNotificationSecret": true, "enableAccountCheck": true, "enableBootLog": true, "enableCostCheck": false],
+                "task": ["enabled": true, "executeHour": 9, "enableAccountCheck": true, "enableBootLog": true, "enableCostCheck": false],
                 "telegram": ["enabled": true, "hasBotToken": true, "chatId": "123456", "chatName": "运维通知"],
                 "proxy": ["enabled": false, "type": "HTTP", "host": "127.0.0.1", "port": 7890, "hasPassword": false],
                 "bark": ["enabled": false, "hasDeviceKey": false],

@@ -41,7 +41,6 @@ struct RegionsView: View {
                        selection: Binding(get: { model.statusFilter.rawValue }, set: { model.statusFilter = RegionStatusFilter(rawValue: $0 ?? "") ?? .all }),
                        width: 140, allowClear: false)
             Spacer(minLength: 0)
-            sourceError(regionText("ARM 开机记录", "ARM launch records"), model.armError)
             sourceError(regionText("我的区域", "My regions"), model.mineError)
             AppButton(title: "", systemImage: model.showMapBoard ? "map.fill" : "map", kind: .secondary) { model.showMapBoard.toggle() }
                 .help(regionText("显示 / 隐藏地图", "Show / hide map"))
@@ -55,9 +54,7 @@ struct RegionsView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 14) {
                     Group {
-                    Toggle(regionText("ARM 记录", "ARM history"), isOn: $model.showArm)
                     Toggle(regionText("我的区域", "My regions"), isOn: $model.showMine)
-                    Toggle(regionText("交集", "Overlap"), isOn: $model.onlyShared)
                     Divider().frame(height: 20)
                     Toggle(regionText("标签", "Labels"), isOn: $model.showLabels)
                     Toggle(regionText("脉冲", "Pulse"), isOn: $model.showPulse)
@@ -86,9 +83,7 @@ struct RegionsView: View {
                 .overlay(selectedDetail, alignment: .bottomLeading)
                 .clipped()
             HStack(spacing: 16) {
-                legend(Color(hex: "f4b760"), regionText("ARM 记录", "ARM history"))
-                legend(Color(hex: "1b8a6a"), regionText("我的区域", "My regions"))
-                legend(Color(hex: "1b8a6a"), regionText("交集 \(model.sharedCount)", "Overlap \(model.sharedCount)"), outlined: true)
+                legend(Color(hex: "b65b22"), regionText("已关联账号", "Account linked"))
                 Spacer(minLength: 0)
                 if model.unknownCoordinates > 0 {
                     Text(regionText("\(model.unknownCoordinates) 个区域无坐标，仍保留在列表", "\(model.unknownCoordinates) unmapped regions remain in the table"))
@@ -113,8 +108,6 @@ struct RegionsView: View {
                         .buttonStyle(PlainButtonStyle()).help(regionText("关闭详情", "Close details"))
                 }
                 Text(row.regionCode).font(.system(size: 12))
-                Text(regionText("开机记录 \(row.openCount) · 本月 \(row.monthlyOpenCount)", "Launches \(row.openCount) · This month \(row.monthlyOpenCount)")).font(.system(size: 13))
-                Text(regionText("最近上报：", "Last report: ") + (row.lastNotifyTime ?? "—")).font(.system(size: 12))
                 if row.coordinate == nil { Text(regionText("暂无公开坐标", "No known coordinates")).font(.system(size: 12)) }
             }
             .padding(12).frame(width: 270)
@@ -126,16 +119,11 @@ struct RegionsView: View {
     private var listCard: some View {
         VStack(spacing: 0) {
             GeometryReader { geometry in
-                NativeHorizontalTable(contentWidth: max(1085, geometry.size.width), viewportWidth: geometry.size.width, height: geometry.size.height) {
+                NativeHorizontalTable(contentWidth: max(640, geometry.size.width), viewportWidth: geometry.size.width, height: geometry.size.height) {
                     VStack(spacing: 0) {
                         HStack(spacing: 0) {
                             tableCell(regionText("区域", "Region"), 260).nativeTableHeader(regionText("区域", "Region"))
                             tableCell(regionText("状态", "Status"), 145).nativeTableHeader(regionText("状态", "Status"))
-                            tableCell(regionText("架构", "Architecture"), 120).nativeTableHeader(regionText("架构", "Architecture"))
-                            tableCell(regionText("开机次数", "Launches"), 100).nativeTableHeader(regionText("开机次数", "Launches"))
-                            tableCell(regionText("本月", "This month"), 110).nativeTableHeader(regionText("本月", "This month"))
-                            tableCell(regionText("首次开机", "First launch"), 175).nativeTableHeader(regionText("首次开机", "First launch"))
-                            tableCell(regionText("最近上报", "Last report"), 175).nativeTableHeader(regionText("最近上报", "Last report"))
                             Spacer(minLength: 0)
                         }
                         .font(.system(size: 14, weight: .medium))
@@ -155,7 +143,7 @@ struct RegionsView: View {
                             }
                         })
                     }
-                    .frame(width: max(1085, geometry.size.width), alignment: .topLeading)
+                    .frame(width: max(640, geometry.size.width), alignment: .topLeading)
                 }
             }
             PaginationBar(state: $model.pageState, onChange: { model.goPage { _ in } })
@@ -172,14 +160,8 @@ struct RegionsView: View {
                 Text(row.regionCode).font(.system(size: 13))
             }.lineLimit(1).padding(.horizontal, 12).frame(width: 260, alignment: .leading)
             VStack(alignment: .leading, spacing: 4) {
-                Text(!model.armLoaded ? "—" : row.isOpen ? regionText("有开机记录", "Has launch history") : regionText("无开机记录", "No launch history"))
-                if row.isMine { Text(regionText("我的区域", "My region")).foregroundColor(AppTheme.brand(dark)).font(.system(size: 12)) }
+                Text(!model.mineLoaded ? "—" : row.isMine ? regionText("已关联账号", "Account linked") : regionText("未关联账号", "No linked account"))
             }.padding(.horizontal, 12).frame(width: 145, alignment: .leading)
-            tableCell(row.architectureType, 120)
-            tableCell(model.armLoaded ? "\(row.openCount)" : "—", 100)
-            tableCell(model.armLoaded ? "\(row.monthlyOpenCount)" : "—", 110)
-            tableCell(row.openTime ?? "—", 175)
-            tableCell(row.lastNotifyTime ?? "—", 175)
             Spacer(minLength: 0)
         }
         .font(.system(size: 14))
@@ -190,9 +172,7 @@ struct RegionsView: View {
     private var footer: some View {
         HStack(spacing: 16) {
             Text(regionText("区域 \(model.totalRegions)", "\(model.totalRegions) regions"))
-            Text(regionText("ARM \(model.armLoaded ? "\(model.openArmCount)" : "—")", "ARM \(model.armLoaded ? "\(model.openArmCount)" : "—")"))
             Text(regionText("我的区域 \(model.mineLoaded ? "\(model.mineCount)" : "—")", "My regions \(model.mineLoaded ? "\(model.mineCount)" : "—")"))
-            Text(regionText("今日新增 \(model.armLoaded ? "\(model.todayNewCount)" : "—")", "New today \(model.armLoaded ? "\(model.todayNewCount)" : "—")"))
             Spacer(minLength: 0)
             Text(model.lastUpdateText).help(regionText("最近完整刷新时间", "Last complete refresh"))
         }.font(.system(size: 13)).lineLimit(1)
@@ -464,8 +444,8 @@ private final class RegionWorldCanvas: NSView {
         NSColor(srgbRed: CGFloat((hex >> 16) & 255) / 255, green: CGFloat((hex >> 8) & 255) / 255,
                 blue: CGFloat(hex & 255) / 255, alpha: 1)
     }
-    private func haloGradient(mine: Bool, active: Bool, color: NSColor) -> CGGradient? {
-        let key = (dark ? 4 : 0) + (mine ? 2 : 0) + (active ? 1 : 0)
+    private func haloGradient(active: Bool, color: NSColor) -> CGGradient? {
+        let key = (dark ? 4 : 0) + (active ? 1 : 0)
         if let cached = haloGradients[key] { return cached }
         let colors = [color.withAlphaComponent(active ? 0.5 : 0.32).cgColor,
                       color.withAlphaComponent(0).cgColor] as CFArray
@@ -488,20 +468,17 @@ private final class RegionWorldCanvas: NSView {
         var labelRects: [NSRect] = []
         let ordered = markerFrames.filter { $0.0.regionCode != selected } + markerFrames.filter { $0.0.regionCode == selected }
         let moving = pulse && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
-        let mine = dark ? color(0x4fe3c1) : color(0x1b8a6a)
-        let arm = dark ? color(0xf4b760) : color(0xb7791f)
+        let markerColor = dark ? color(0xffb47a) : color(0xb65b22)
 
         for (row, point) in ordered {
             let active = (row.regionCode == selected || row.regionCode == hovered)
-            let both = (row.isOpen && row.isMine)
-            let markerColor = row.isMine ? mine : arm
 
             // Outer Pulsing Ring
             if moving {
                 let phase = pulsePhases[row.regionCode] ?? 0
                 let ringProgress = CGFloat(((elapsed + phase) / 2.2).truncatingRemainder(dividingBy: 1.0))
                 let ringRadius = 3.0 + ringProgress * (active ? 16.0 : 11.0)
-                let ringColor = both ? arm : markerColor
+                let ringColor = markerColor
                 ringColor.withAlphaComponent((1.0 - ringProgress) * (active ? 0.75 : 0.45)).setStroke()
                 let ring = NSBezierPath(ovalIn: NSRect(x: point.x - ringRadius, y: point.y - ringRadius, width: ringRadius * 2, height: ringRadius * 2))
                 ring.lineWidth = 1.2
@@ -510,21 +487,14 @@ private final class RegionWorldCanvas: NSView {
 
             // Glowing Radial Gradient Halo
             let glowRadius: CGFloat = active ? 13.0 : 9.0
-            if let haloGrad = haloGradient(mine: row.isMine, active: active, color: markerColor) {
+            if let haloGrad = haloGradient(active: active, color: markerColor) {
                 ctx.drawRadialGradient(haloGrad,
                                        startCenter: CGPoint(x: point.x, y: point.y), startRadius: 0,
                                        endCenter: CGPoint(x: point.x, y: point.y), endRadius: glowRadius,
                                        options: [])
             }
 
-            // Distinct Concentric Accent Ring for `both` (ARM + Mine)
-            if both {
-                arm.withAlphaComponent(0.95).setStroke()
-                let ringR: CGFloat = active ? 6.8 : 5.5
-                let ring = NSBezierPath(ovalIn: NSRect(x: point.x - ringR, y: point.y - ringR, width: ringR * 2, height: ringR * 2))
-                ring.lineWidth = 1.5
-                ring.stroke()
-            } else if active {
+            if active {
                 markerColor.withAlphaComponent(0.8).setStroke()
                 let ring = NSBezierPath(ovalIn: NSRect(x: point.x - 6.6, y: point.y - 6.6, width: 13.2, height: 13.2))
                 ring.lineWidth = 1.0

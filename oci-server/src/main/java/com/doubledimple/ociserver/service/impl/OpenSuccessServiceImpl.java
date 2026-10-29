@@ -1,40 +1,25 @@
 package com.doubledimple.ociserver.service.impl;
 
-import cn.hutool.json.JSONUtil;
-import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
 import com.doubledimple.dao.entity.BootInstance;
-import com.doubledimple.dao.entity.RegisterDetail;
-import com.doubledimple.dao.entity.SystemConfig;
 import com.doubledimple.dao.repository.BootInstanceRepository;
-import com.doubledimple.dao.repository.RegisterDetailRepository;
-import com.doubledimple.dao.repository.SystemConfigRepository;
-import com.doubledimple.ocicommon.enums.oci.AccountTypeSubEnum;
-import com.doubledimple.ocicommon.enums.oci.PlanTypeSubEnum;
-import com.doubledimple.ocicommon.param.OpenInstanceNotify;
 import com.doubledimple.ociserver.pojo.domain.dto.OracleInstanceDetail;
 import com.doubledimple.ociserver.pojo.domain.dto.User;
 import com.doubledimple.ociserver.pojo.enums.MessageEnum;
 import com.doubledimple.ociserver.service.BootTotalInstanceService;
 import com.doubledimple.ociserver.service.message.factory.MessageFactory;
 import com.doubledimple.ociserver.service.InstanceDetailsService;
-import com.doubledimple.ociserver.service.OpenApiService;
 import com.doubledimple.ociserver.service.OpenSuccessService;
 import com.doubledimple.ociserver.utils.oracle.OciObjectStorageUtil;
 import com.oracle.bmc.auth.SimpleAuthenticationDetailsProvider;
-import com.oracle.bmc.ospgateway.model.Subscription;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringUtils;
 import org.springframework.context.ApplicationContext;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
-import java.util.Collections;
-import java.util.Optional;
 
 import static com.doubledimple.ociserver.utils.oracle.OciObjectStorageUtil.BUCKET_NAME;
 
@@ -59,24 +44,13 @@ public class OpenSuccessServiceImpl implements OpenSuccessService {
     MessageFactory messageFactory;
 
     @Resource
-    OpenApiService openApiService;
-
-    @Resource
     InstanceDetailsService instanceDetailsService;
-
-    @Resource
-    @Lazy
-    private SystemConfigRepository systemConfigRepository;
-
-    @Resource
-    RegisterDetailRepository registerDetailRepository;
 
     @Resource
     ApplicationContext applicationContext;
 
     @Override
     public void doSuccess(User user, OracleInstanceDetail instanceData, SimpleAuthenticationDetailsProvider provider) {
-        Long tenantId = null;
         instanceData.setUserName(user.getUserName());
         OpenSuccessServiceImpl self = applicationContext.getBean(OpenSuccessServiceImpl.class);
 
@@ -97,9 +71,6 @@ public class OpenSuccessServiceImpl implements OpenSuccessService {
             } catch (Exception e) {
                 log.error("兜底查询 BootInstance 失败: bootId={}, reason:{}", user.getBootId(), e.getMessage(), e);
             }
-        }
-        if (newBoot != null) {
-            tenantId = newBoot.getTenantId();
         }
 
         // 3) OCI 元数据同步（独立失败，不影响通知发送）
@@ -149,11 +120,6 @@ public class OpenSuccessServiceImpl implements OpenSuccessService {
                 log.error("消息 发送失败: {}", e.getMessage());
             }
         }
-        try {
-            this.executeFinalNotify(user, instanceData, tenantId);
-        } catch (Exception e) {
-            log.error("通知 API 异常: {}", e.getMessage());
-        }
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -163,28 +129,6 @@ public class OpenSuccessServiceImpl implements OpenSuccessService {
             instanceData.setAddCount(bootInstance.getAddCount());
             return bootInstance;
         }).orElse(null);
-    }
-
-    private void executeFinalNotify(User user, OracleInstanceDetail instanceData, Long tenantId) {
-        OpenInstanceNotify notify = new OpenInstanceNotify();
-        notify.setRegion(user.getRegion());
-        notify.setArchitecture(user.getArchitecture());
-        notify.setCount(instanceData.getAddCount());
-        String typeName = "未知";
-        if (tenantId != null) {
-            Optional<RegisterDetail> byTenantId = registerDetailRepository.findByTenantId(String.valueOf(tenantId));
-            if (byTenantId.isPresent()){
-                RegisterDetail registerDetail = byTenantId.get();
-                Subscription.AccountType accountType = registerDetail.getAccountType();
-                Subscription.PlanType planType = registerDetail.getPlanType();
-                typeName = AccountTypeSubEnum.getByCode(accountType.getValue()) + PlanTypeSubEnum.getByCode(planType.getValue());
-            }
-        }
-        notify.setAccountTypeName(typeName);
-        String secret = systemConfigRepository.findByKey("task.notification.secret")
-                .map(SystemConfig::getValue).orElse("");
-        notify.setSecret(secret);
-        openApiService.notify(notify);
     }
 
     @Override

@@ -20,7 +20,7 @@ struct SecuritySettingsView: View {
         NativeSettingsWorkspace(sections: [
             ("account", language.text("账号与站点", "Account and site")),
             ("github", "GitHub"), ("google", "Google"), ("mfa", "MFA"),
-            ("turnstile", "Turnstile"), ("channel", language.text("频道通知", "Channel notifications"))
+            ("turnstile", "Turnstile")
         ], selection: Binding(get: { active }, set: { next in
             guard next != active, model.canLeave() else { return }
             active = next
@@ -42,7 +42,6 @@ struct SecuritySettingsView: View {
                     case "google": googleCard
                     case "mfa": mfaCard
                     case "turnstile": turnstileCard
-                    case "channel": channelCard
                     default: accountCard
                     }
                 }
@@ -380,37 +379,6 @@ struct SecuritySettingsView: View {
                 isLoading: model.savingKey == "turnstile"
             ) {
                 model.saveTurnstile()
-            }
-        }
-    }
-
-    // MARK: - Channel notify
-
-    private var channelCard: some View {
-        NativeSettingsPanel(
-            title: language.text("开机频道通知", "Launch channel notifications"),
-            subtitle: "匿名上报机型与区域",
-            systemImage: "antenna.radiowaves.left.and.right",
-            accent: Color(hex: "9b59b6"),
-            enabled: $model.channelNotifyEnabled,
-            minHeight: cardMinHeight
-        ) {
-            Text("开启后，抢机成功会向公共频道上报实例类型与区域，不含账号与 IP 等隐私信息。")
-                .font(.system(size: 13))
-                .foregroundColor(AppTheme.textSecondary(dark))
-                .fixedSize(horizontal: false, vertical: true)
-            Text("采集：机型、区域。不采集：租户、密钥、IP、用户名。")
-                .font(.system(size: 13))
-                .foregroundColor(AppTheme.textSecondary(dark))
-                .fixedSize(horizontal: false, vertical: true)
-        } footer: {
-            AppButton(
-                title: language.text("保存配置", "Save settings"),
-                systemImage: "square.and.arrow.down",
-                kind: .primary,
-                isLoading: model.savingKey == "channel"
-            ) {
-                model.saveChannelNotify()
             }
         }
     }

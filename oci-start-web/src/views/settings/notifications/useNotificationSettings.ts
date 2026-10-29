@@ -12,7 +12,7 @@ export interface NotificationMutation {
   result: NotificationResult | null; problem: NotificationApiError | null
 }
 function emptyMutation(): NotificationMutation { return { kind: null, action: null, pending: false, outcome: 'idle', result: null, problem: null } }
-const secretFields = ['notificationSecret', 'botToken', 'password', 'deviceKey', 'webhook', 'secret'] as const
+const secretFields = ['botToken', 'password', 'deviceKey', 'webhook', 'secret'] as const
 
 /** The page owns drafts, confirmation dialogs, route guards and the first read. */
 export function useNotificationSettings() {
@@ -60,14 +60,13 @@ export function useNotificationSettings() {
     const expected: Record<string, unknown> = {}
     // Only the known redacted baseline keys can enter the comparison snapshot.
     const existence: Record<string, readonly [string, string]> = {
-      hasNotificationSecret: ['keepNotificationSecret', 'notificationSecret'], hasBotToken: ['keepBotToken', 'botToken'],
+      hasBotToken: ['keepBotToken', 'botToken'],
       hasPassword: ['keepPassword', 'password'], hasDeviceKey: ['keepDeviceKey', 'deviceKey'],
       hasWebhook: ['keepWebhook', 'webhook'], hasSecret: ['keepSecret', 'secret'],
     }
     for (const key of Object.keys(saved)) {
       const pair = existence[key]
-      const keepEmptyTaskSecret = key === 'hasNotificationSecret' && value.clearNotificationSecret !== true && !value.notificationSecret
-      expected[key] = pair ? value[pair[0]] === true || keepEmptyTaskSecret ? saved[key]
+      expected[key] = pair ? value[pair[0]] === true ? saved[key]
         : typeof value[pair[1]] === 'string' && (value[pair[1]] as string).length > 0 : value[key]
     }
     return expected as unknown as NotificationConfigMap[K]

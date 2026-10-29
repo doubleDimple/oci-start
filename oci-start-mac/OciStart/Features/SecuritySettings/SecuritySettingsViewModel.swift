@@ -14,7 +14,6 @@ final class SecuritySettingsViewModel: ObservableObject {
     @Published var google = GoogleOAuthForm()
     @Published var mfa = MfaForm()
     @Published var turnstile = TurnstileForm()
-    @Published var channelNotifyEnabled = false
     @Published private(set) var isLoading = false
     @Published private(set) var savingKey: String?
     @Published private(set) var errorText: String?
@@ -38,7 +37,7 @@ final class SecuritySettingsViewModel: ObservableObject {
         var currentMfa = mfa
         currentMfa.secretKey = ""; currentMfa.qrCodeBase64 = ""; currentMfa.verifyCode = ""
         return siteLogoName != baseline.siteLogoName || github != baseline.github || google != baseline.google
-            || currentMfa != baseline.mfa || turnstile != baseline.turnstile || channelNotifyEnabled != baseline.channelNotifyEnabled
+            || currentMfa != baseline.mfa || turnstile != baseline.turnstile
             || !currentPassword.isEmpty || !newUsername.isEmpty || !newPassword.isEmpty || !confirmPassword.isEmpty
     }
 
@@ -65,7 +64,7 @@ final class SecuritySettingsViewModel: ObservableObject {
             guard active, current == generation else { return }
             currentUsername = snapshot.currentUsername; siteLogoName = snapshot.siteLogoName
             github = snapshot.github; google = snapshot.google; mfa = snapshot.mfa
-            turnstile = snapshot.turnstile; channelNotifyEnabled = snapshot.channelNotifyEnabled
+            turnstile = snapshot.turnstile
             clearAccount()
             baseline = snapshot
             loaded = true; loadFailed = false; requiresReview = false; errorText = nil
@@ -220,12 +219,6 @@ final class SecuritySettingsViewModel: ObservableObject {
             do { notice = try await service.verifyMfaCode(code) }
             catch { errorText = "验证码未通过验证，请重试。" }
             savingKey = nil; mfa.verifyCode = ""
-        }
-    }
-    func saveChannelNotify() {
-        let enabled = channelNotifyEnabled
-        submit("channel", confirmation: enabled ? "启用向频道发送开机通知。" : "停用向频道发送开机通知。") {
-            try await self.service.updateChannelNotify(enabled: enabled)
         }
     }
     private func clearWarning(_ mode: NativeSecretMode) -> String { mode == .clear ? " 此操作会清除已保存的密钥。" : "" }

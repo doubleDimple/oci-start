@@ -13,12 +13,12 @@ import SecuritySecretInput from './security/SecuritySecretInput.vue'
 import { useSecuritySettings, type SecurityMutationKind } from './security/useSecuritySettings'
 import './security/security-settings.scss'
 
-type Section = 'account' | 'github' | 'google' | 'mfa' | 'turnstile' | 'channel'
+type Section = 'account' | 'github' | 'google' | 'mfa' | 'turnstile'
 type SecretMode = 'keep' | 'replace' | 'clear'
 const sections: { id: Section; icon: string }[] = [
   { id: 'account', icon: 'i-mdi-account-outline' }, { id: 'github', icon: 'i-mdi-github' },
   { id: 'google', icon: 'i-mdi-google' }, { id: 'mfa', icon: 'i-mdi-shield-key-outline' },
-  { id: 'turnstile', icon: 'i-mdi-shield-check-outline' }, { id: 'channel', icon: 'i-mdi-bell-outline' },
+  { id: 'turnstile', icon: 'i-mdi-shield-check-outline' },
 ]
 const { t, locale } = useI18n()
 const router = useRouter()
@@ -34,7 +34,6 @@ const github = reactive({ enabled: false, userName: '', githubId: '', clientId: 
 const google = reactive({ enabled: false, email: '', clientId: '', clientSecret: '', redirectUri: '' })
 const mfa = reactive({ enabled: false, issuer: '' })
 const turnstile = reactive({ enabled: false, siteKey: '', secretKey: '' })
-const channel = ref(false)
 const modes = reactive<Record<'github' | 'google' | 'turnstile', SecretMode>>({ github: 'replace', google: 'replace', turnstile: 'replace' })
 const code = ref('')
 const validation = ref('')
@@ -44,13 +43,13 @@ let discardAction: (() => void) | undefined
 let cancelNavigation: (() => void) | undefined
 let disposed = false
 // Baselines hold only metadata and empty secret drafts, never saved secrets.
-const baseline = reactive<Record<Section, string>>({ account: '', github: '', google: '', mfa: '', turnstile: '', channel: '' })
+const baseline = reactive<Record<Section, string>>({ account: '', github: '', google: '', mfa: '', turnstile: '' })
 function snapshot(section: Section): string {
   if (section === 'account') return JSON.stringify({ ...account, siteName: siteName.value })
   if (section === 'github') return JSON.stringify({ ...github, mode: modes.github })
   if (section === 'google') return JSON.stringify({ ...google, mode: modes.google })
   if (section === 'turnstile') return JSON.stringify({ ...turnstile, mode: modes.turnstile })
-  return JSON.stringify(section === 'mfa' ? mfa : channel.value)
+  return JSON.stringify(mfa)
 }
 const dirty = computed(() => loaded.value && snapshot(active.value) !== baseline[active.value])
 const accountChanged = computed(() => !!(account.newUsername.trim() || account.newPassword))
@@ -70,11 +69,10 @@ const secretMode = computed({
   },
 })
 const enabled = computed({
-  get: () => active.value === 'channel' ? channel.value : active.value === 'github' ? github.enabled
+  get: () => active.value === 'github' ? github.enabled
     : active.value === 'google' ? google.enabled : active.value === 'turnstile' ? turnstile.enabled : mfa.enabled,
   set(value: boolean) {
-    if (active.value === 'channel') channel.value = value
-    else if (active.value === 'github') github.enabled = value
+    if (active.value === 'github') github.enabled = value
     else if (active.value === 'google') google.enabled = value
     else if (active.value === 'turnstile') turnstile.enabled = value
     else mfa.enabled = value
@@ -83,7 +81,7 @@ const enabled = computed({
 const updatedLabel = computed(() => lastUpdated.value ? t('securitySettings.lastUpdated', {
   time: new Intl.DateTimeFormat(locale.value, { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(lastUpdated.value),
 }) : t('securitySettings.notLoaded'))
-const confirmTitle = computed(() => confirmation.value ? t(`securitySettings.confirmTitles.${confirmation.value === 'channelNotify' ? 'channel' : confirmation.value}`) : '')
+const confirmTitle = computed(() => confirmation.value ? t(`securitySettings.confirmTitles.${confirmation.value}`) : '')
 const confirmHint = computed(() => {
   const kind = confirmation.value
   if (kind === 'account') return t('securitySettings.confirmAccount')
@@ -91,7 +89,6 @@ const confirmHint = computed(() => {
   if (kind === 'regenerateMfa') return t('securitySettings.confirmRegenerate')
   if (kind === 'deleteMfa') return t('securitySettings.confirmDelete')
   if (kind === 'mfa') return t(`securitySettings.${mfa.enabled ? 'confirmMfaEnable' : 'confirmMfaDisable'}`)
-  if (kind === 'channelNotify') return t(`securitySettings.${channel.value ? 'confirmChannelEnable' : 'confirmChannelDisable'}`)
   return t(`securitySettings.${enabled.value ? 'confirmEnable' : 'confirmDisable'}`, { feature: t(`securitySettings.sections.${active.value}`) })
 })
 const clearsSecret = computed(() => confirmation.value !== null && ['github', 'google', 'turnstile'].includes(confirmation.value) && secretMode.value === 'clear')
@@ -117,7 +114,6 @@ function resetSection(section: Section) {
     Object.assign(turnstile, saved.turnstile, { secretKey: '' }); modes.turnstile = saved.turnstile.hasSecretKey ? 'keep' : 'replace'
   }
   if (section === 'mfa') Object.assign(mfa, { enabled: saved.mfa.enabled, issuer: saved.mfa.issuer })
-  if (section === 'channel') channel.value = saved.channelNotifyEnabled
   baseline[section] = snapshot(section)
 }
 function resetAll() { clearEphemeral(); sections.forEach(section => resetSection(section.id)); validation.value = '' }
@@ -208,7 +204,7 @@ function prepare(kind: SecurityMutationKind) {
   }
   page.cancelGithubLookup(); page.clearVerification(); confirmation.value = kind
 }
-function prepareActive() { prepare(active.value === 'channel' ? 'channelNotify' : active.value) }
+function prepareActive() { prepare(active.value) }
 function closeConfirmation() { if (!contextLocked.value) confirmation.value = null }
 async function submit() {
   const kind = confirmation.value
@@ -219,7 +215,6 @@ async function submit() {
   else if (kind === 'google') await page.saveGoogle({ ...google, keepSecret: modes.google === 'keep' })
   else if (kind === 'mfa') await page.saveMfa(mfa)
   else if (kind === 'turnstile') await page.saveTurnstile({ ...turnstile, keepSecret: modes.turnstile === 'keep' })
-  else if (kind === 'channelNotify') await page.saveChannelNotify(channel.value)
   else if (kind === 'regenerateMfa') await page.regenerateMfa()
   else await page.deleteMfa()
   if (disposed) return
@@ -345,7 +340,6 @@ onBeforeUnmount(() => {
                 <div class="security-field"><label for="security-turnstile-mode">{{ t('securitySettings.secretMode') }}</label><el-select id="security-turnstile-mode" v-model="secretMode" :disabled="disabled" :teleported="true"><el-option v-if="hasSecret" value="keep" :label="t('securitySettings.keepSecret')" /><el-option value="replace" :label="t('securitySettings.replaceSecret')" /><el-option value="clear" :disabled="enabled" :label="t('securitySettings.clearSecret')" /></el-select><small>{{ t(`securitySettings.${secretMode === 'clear' ? 'clearHint' : hasSecret ? 'keepHint' : 'noSecret'}`) }}</small></div>
                 <SecuritySecretInput v-if="secretMode === 'replace'" id="security-turnstile-secret" v-model="turnstile.secretKey" :disabled="disabled" :label="t('securitySettings.secretKey')" />
               </template>
-              <p v-else class="security-help">{{ t('securitySettings.channelHint') }}</p>
             </fieldset>
             <p v-if="validation" class="security-inline-error" role="alert">{{ t(`securitySettings.validation.${validation}`) }}</p>
           </form>

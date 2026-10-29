@@ -34,18 +34,12 @@ const selectId = `${id}-region`
 const helpId = `${id}-help`
 const canRender = computed(() => props.active && inViewport.value && documentVisible.value && !failed.value)
 const pointList = computed(() => props.points.filter(point =>
-  (point.isOpen || point.isMine) && Number.isFinite(point.lat) && Number.isFinite(point.lng)
+  Number.isFinite(point.lat) && Number.isFinite(point.lng)
   && Math.abs(point.lat) <= 90 && Math.abs(point.lng) <= 180,
 ))
 const selected = computed(() => pointList.value.find(point => point.regionCode === props.selectedRegion) || null)
 const panelOnLeft = computed(() => (selected.value?.lng ?? 0) > 0)
 const panelOnTop = computed(() => (selected.value?.lat ?? 0) < 0)
-const dateFormatter = computed(() => new Intl.DateTimeFormat(locale.value.startsWith('zh') ? 'zh-CN' : 'en-US', { dateStyle: 'medium', timeStyle: 'medium' }))
-const legend = computed(() => [
-  { key: 'arm', label: t('regionGlobe.armRecorded') },
-  { key: 'mine', label: t('regionGlobe.mine') },
-  { key: 'both', label: t('regionGlobe.both') },
-])
 const mapStyle = computed<Record<string, string>>(() => ({
   '--map-surface': `var(--region-map-${mapTheme.value}-surface)`,
   '--map-panel': `var(--region-map-${mapTheme.value}-panel)`,
@@ -53,8 +47,7 @@ const mapStyle = computed<Record<string, string>>(() => ({
   '--map-border': `var(--region-map-${mapTheme.value}-coast)`,
   '--map-text': `var(--region-map-${mapTheme.value}-text)`,
   '--map-muted': `var(--region-map-${mapTheme.value}-muted)`,
-  '--map-arm': `var(--region-map-${mapTheme.value}-arm)`,
-  '--map-mine': `var(--region-map-${mapTheme.value}-mine)`,
+  '--map-accent': `var(--region-map-${mapTheme.value}-marker)`,
   'color-scheme': mapTheme.value,
 }))
 let scene: RegionScene | null = null
@@ -67,18 +60,7 @@ let motionQuery: MediaQueryList | null = null
 
 function cityName(point: RegionGlobePoint) { return regionCityName(point.regionCode, locale.value) }
 function regionOptionLabel(point: RegionGlobePoint) { return `${cityName(point)} · ${point.regionCode}` }
-function categoryText(point: RegionGlobePoint) {
-  return [point.isOpen && t('regionGlobe.armRecorded'), point.isMine && t('regionGlobe.mine')].filter(Boolean).join(' · ')
-}
-function markerAriaLabel(point: RegionGlobePoint) { return `${point.name}, ${point.regionCode}, ${categoryText(point)}` }
-function formatCount(value: number) {
-  return Number.isFinite(value) ? new Intl.NumberFormat(locale.value).format(value) : t('regionGlobe.unavailable')
-}
-function formatDateTime(value: string | null) {
-  if (!value) return t('regionGlobe.unavailable')
-  const date = new Date(value.replace(/^(\d{4}-\d{2}-\d{2}) /, '$1T'))
-  return Number.isNaN(date.getTime()) ? value : dateFormatter.value.format(date)
-}
+function markerAriaLabel(point: RegionGlobePoint) { return `${point.name}, ${point.regionCode}, ${t('regionGlobe.mine')}` }
 function readColors(): RegionSceneColors {
   const style = getComputedStyle(root.value!)
   const token = (name: string) => style.getPropertyValue(name).trim()
@@ -87,7 +69,7 @@ function readColors(): RegionSceneColors {
     surface: token(`${prefix}-surface`), land: token(`${prefix}-land`),
     panel: token(`${prefix}-panel`), landFill: token(`${prefix}-land-fill`), coast: token(`${prefix}-coast`),
     text: token(`${prefix}-text`), muted: token(`${prefix}-muted`),
-    grid: token(`${prefix}-grid`), arm: token(`${prefix}-arm`), mine: token(`${prefix}-mine`),
+    grid: token(`${prefix}-grid`), marker: token(`${prefix}-marker`),
   }
 }
 function releaseScene() {
@@ -294,19 +276,15 @@ onBeforeUnmount(() => {
           <button type="button" :title="t('regionGlobe.closeDetails')" :aria-label="t('regionGlobe.closeDetails')" @click="clearSelection"><span class="i-mdi-close" aria-hidden="true" /></button>
         </div>
         <dl class="detail-data">
-          <div><dt>{{ t('regionGlobe.armStatus') }}</dt><dd>{{ t(selected.isOpen ? 'regionGlobe.armRecorded' : 'regionGlobe.noRecord') }}</dd></div>
-          <div><dt>{{ t('regionGlobe.ownership') }}</dt><dd>{{ t(selected.isMine ? 'regionGlobe.mine' : 'regionGlobe.notOwned') }}</dd></div>
-          <div><dt>{{ t('regionGlobe.totalOpen') }}</dt><dd>{{ formatCount(selected.openCount) }}</dd></div>
-          <div><dt>{{ t('regionGlobe.monthlyOpen') }}</dt><dd>{{ formatCount(selected.monthlyOpenCount) }}</dd></div>
-          <div class="wide"><dt>{{ t('regionGlobe.architecture') }}</dt><dd>{{ selected.architectureType || t('regionGlobe.unavailable') }}</dd></div>
-          <div class="wide"><dt>{{ t('regionGlobe.latestOpen') }}</dt><dd>{{ formatDateTime(selected.openTime) }}</dd></div>
-          <div class="wide"><dt>{{ t('regionGlobe.lastNotification') }}</dt><dd>{{ formatDateTime(selected.lastNotifyTime) }}</dd></div>
+          <div><dt>{{ t('regionGlobe.ownership') }}</dt><dd>{{ t('regionGlobe.mine') }}</dd></div>
+          <div><dt>{{ t('regionGlobe.latitude') }}</dt><dd>{{ selected.lat.toFixed(4) }}</dd></div>
+          <div><dt>{{ t('regionGlobe.longitude') }}</dt><dd>{{ selected.lng.toFixed(4) }}</dd></div>
         </dl>
       </aside>
     </div>
 
     <div class="scene-footer">
-      <div class="scene-legend"><span v-for="item in legend" :key="item.key"><i :class="`legend-${item.key}`" aria-hidden="true" />{{ item.label }}</span></div>
+      <div class="scene-legend"><span><i class="legend-owned" aria-hidden="true" />{{ t('regionGlobe.mine') }}</span></div>
       <p>{{ t('regionGlobe.mapHint') }}</p>
     </div>
     <p :id="helpId" class="sr-only">{{ t('regionGlobe.mapKeyboardHint') }} {{ t('regionGlobe.overlappingHint') }}</p>
@@ -316,7 +294,7 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .region-globe { display: flex; flex-direction: column; position: relative; width: 100%; min-height: 340px; isolation: isolate; overflow: hidden; border-radius: var(--r-card); background: var(--map-surface); color: var(--map-text); font-family: var(--sans); font-size: var(--font-size-body); container-type: inline-size; }
-.scene-toolbar { --map-panel: var(--bg-card); --map-text: var(--text-primary); --map-muted: var(--text-secondary); --map-arm: var(--brand); --map-mine: var(--brand); --map-border: var(--border); color-scheme: normal; position: relative; z-index: 3; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 12px 14px; background: var(--map-panel); border-bottom: 1px solid color-mix(in srgb, var(--map-border) 40%, transparent); }
+.scene-toolbar { --map-panel: var(--bg-card); --map-text: var(--text-primary); --map-muted: var(--text-secondary); --map-accent: var(--brand); --map-border: var(--border); color-scheme: normal; position: relative; z-index: 3; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 12px 14px; background: var(--map-panel); border-bottom: 1px solid color-mix(in srgb, var(--map-border) 40%, transparent); }
 .scene-controls button, .fallback-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-width: 30px; min-height: 30px; padding: 5px 9px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--map-muted); font: var(--font-size-body) var(--sans); line-height: 1.3; cursor: pointer; transition: background-color 140ms ease, color 140ms ease; }
 .scene-controls button:hover:not(:disabled) { color: var(--map-text); background: color-mix(in srgb, var(--map-land) 24%, transparent); }
 .region-picker { position: relative; flex: 1 1 160px; min-width: 0; max-width: 250px; }
@@ -325,7 +303,7 @@ onBeforeUnmount(() => {
 .scene-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; margin-left: auto; }
 .scene-controls button { padding: 5px 6px; }
 .scene-controls button > span:not(.control-text) { width: 16px; height: 16px; flex-shrink: 0; }
-.scene-controls button[aria-pressed="true"] { color: var(--map-arm); background: color-mix(in srgb, var(--map-arm) 8%, transparent); }
+.scene-controls button[aria-pressed="true"] { color: var(--map-accent); background: color-mix(in srgb, var(--map-accent) 8%, transparent); }
 .scene-controls button:disabled { opacity: .38; cursor: default; }
 .control-divider { height: 16px; width: 1px; margin: 0 4px; background: color-mix(in srgb, var(--map-land) 65%, transparent); }
 .map-theme-control { width: 120px; margin-left: 6px; }
@@ -334,25 +312,23 @@ onBeforeUnmount(() => {
 .scene-area { position: relative; flex: 1 0 auto; width: 100%; aspect-ratio: 360 / 150; min-height: 180px; overflow: hidden; }
 .scene-host, .scene-labels { position: absolute; inset: 0; }
 .scene-host { outline-offset: -3px; }
-.scene-host:focus-visible { outline: 2px solid var(--map-mine); }
+.scene-host:focus-visible { outline: 2px solid var(--map-accent); }
 .scene-host :deep(canvas) { display: block; outline: none; }
 .scene-labels { pointer-events: none; }
 .scene-message { position: absolute; z-index: 2; inset: 16px 24px; display: flex; align-items: center; justify-content: center; gap: 10px; text-align: center; color: var(--map-muted); font-size: var(--font-size-secondary); pointer-events: none; }
 .scene-fallback { flex-direction: column; }
-.scene-fallback > span { width: 30px; height: 30px; color: var(--map-mine); }
+.scene-fallback > span { width: 30px; height: 30px; color: var(--map-accent); }
 .scene-fallback strong { color: var(--map-text); font-size: var(--font-size-section); font-weight: 500; }
 .scene-fallback p { max-width: 330px; margin: 0; line-height: 1.6; }
 .fallback-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
 .fallback-actions button { margin-top: 4px; border-color: var(--map-land); color: var(--map-text); pointer-events: auto; }
-.loading-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--map-mine); }
+.loading-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--map-accent); }
 .empty-notice { position: absolute; top: 8px; inset-inline: 16px; margin: 0; text-align: center; color: var(--map-muted); font-size: var(--font-size-secondary); pointer-events: none; }
 .scene-footer { position: relative; z-index: 3; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 7px 16px; padding: 11px 16px; border-top: 1px solid color-mix(in srgb, var(--map-border) 40%, transparent); background: var(--map-panel); }
 .scene-legend { display: flex; flex-wrap: wrap; gap: 7px 14px; color: var(--map-text); font-size: var(--font-size-secondary); }
 .scene-legend > span { display: inline-flex; align-items: center; gap: 6px; }
 .scene-legend i { display: inline-block; flex-shrink: 0; width: 8px; height: 8px; border-radius: 50%; }
-.legend-mine { background: var(--map-mine); }
-.legend-arm { background: var(--map-arm); }
-.legend-both { background: linear-gradient(135deg, var(--map-mine) 50%, var(--map-arm) 50%); }
+.legend-owned { background: var(--map-accent); }
 .scene-footer > p { margin: 0; color: var(--map-muted); font-size: var(--font-size-secondary); }
 .region-details { position: absolute; z-index: 4; right: 14px; bottom: 12px; width: 270px; max-width: calc(100% - 28px); max-height: calc(100% - 24px); box-sizing: border-box; overflow: auto; padding: 14px; border: 1px solid var(--map-border); border-radius: 10px; background: var(--map-panel); color: var(--map-text); box-shadow: 0 6px 24px color-mix(in srgb, var(--map-text) 10%, transparent); overscroll-behavior: contain; }
 .region-details.details-left { right: auto; left: 14px; }
@@ -370,8 +346,8 @@ onBeforeUnmount(() => {
 .detail-data .wide { grid-column: 1 / -1; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 10px; }
 .detail-data .wide dd { margin: 0; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
-.region-globe :deep(.region-scene-pin:focus-visible) { outline: 2px solid var(--map-mine); outline-offset: 4px; }
-.region-globe button:focus-visible { outline: 2px solid var(--map-mine); outline-offset: 2px; }
+.region-globe :deep(.region-scene-pin:focus-visible) { outline: 2px solid var(--map-accent); outline-offset: 4px; }
+.region-globe button:focus-visible { outline: 2px solid var(--map-accent); outline-offset: 2px; }
 @container (max-width: 680px) {
   .scene-toolbar { padding: 10px; gap: 8px; }
   .region-picker { max-width: none; }

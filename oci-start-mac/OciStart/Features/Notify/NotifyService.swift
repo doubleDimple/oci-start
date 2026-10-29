@@ -16,9 +16,6 @@ struct NotifyService {
         let raw = try await client.postJSON(url, body: [
             "enabled": form.enabled,
             "executeHour": form.executeHour,
-            "notificationSecret": form.secretMode.payload(form.notificationSecret).trimmingCharacters(in: .whitespacesAndNewlines),
-            "keepNotificationSecret": form.secretMode == .keep,
-            "clearNotificationSecret": form.secretMode == .clear,
             "enableAccountCheck": form.enableAccountCheck,
             "enableBootLog": form.enableBootLog,
             "enableCostCheck": form.enableCostCheck
