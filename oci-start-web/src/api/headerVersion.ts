@@ -20,9 +20,11 @@ export type HeaderUpdateState = 'idle' | 'starting' | 'started' | 'unknown' | 'f
 const versionSnapshot = shallowRef<HeaderVersionInfo | null>(null)
 const updateState = shallowRef<HeaderUpdateState>('idle')
 const updateProblem = shallowRef<HeaderVersionProblem | null>(null)
+const updateStartedAt = shallowRef<number | null>(null)
 export const headerVersionSnapshot = readonly(versionSnapshot)
 export const headerVersionUpdateState = readonly(updateState)
 export const headerVersionUpdateProblem = readonly(updateProblem)
+export const headerVersionUpdateStartedAt = readonly(updateStartedAt)
 let snapshotRevision = 0
 let latestCacheRequest = 0
 let entryRefresh: Promise<void> | undefined
@@ -103,6 +105,7 @@ export async function executeHeaderUpdate(signal?: AbortSignal): Promise<void> {
   if (updateState.value === 'starting' || updateState.value === 'started' || updateState.value === 'unknown') return
   updateState.value = 'starting'
   updateProblem.value = null
+  updateStartedAt.value = Date.now()
   try {
     const body = await request.post<unknown, unknown>('/api/version/execute-update', undefined, {
       signal, silent: true, timeout: 30000,
@@ -112,6 +115,7 @@ export async function executeHeaderUpdate(signal?: AbortSignal): Promise<void> {
   } catch (error) {
     updateProblem.value = headerVersionProblem(error)
     updateState.value = headerUpdateUncertain(error) ? 'unknown' : 'failed'
+    if (updateState.value === 'failed') updateStartedAt.value = null
     throw error
   }
 }

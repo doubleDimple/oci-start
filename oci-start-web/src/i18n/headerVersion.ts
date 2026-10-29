@@ -1,5 +1,13 @@
 export const headerVersionZh = {
   about: '关于 Oci-Start',
+  dialogTitle: '版本与更新',
+  discoveredUpdate: '发现新版本',
+  estimatedRemaining: '预计剩余时间',
+  secondsRemaining: '预计剩余 {seconds} 秒',
+  waitingRecovery: '等待服务恢复',
+  awaitingConfirmation: '等待确认更新结果',
+  estimateOnly: '预计等待时间，以服务实际恢复为准',
+  estimateElapsed: '预计等待已结束，可返回登录页确认',
   updateAvailable: '有可用更新',
   updateAvailableVersion: '可更新至 {version}',
   currentVersion: '当前版本',
@@ -55,6 +63,14 @@ export const headerVersionZh = {
 
 export const headerVersionEn: typeof headerVersionZh = {
   about: 'About Oci-Start',
+  dialogTitle: 'Version & updates',
+  discoveredUpdate: 'A new version is available',
+  estimatedRemaining: 'Estimated time remaining',
+  secondsRemaining: 'Approximately {seconds} seconds remaining',
+  waitingRecovery: 'Waiting for the service',
+  awaitingConfirmation: 'Awaiting confirmation',
+  estimateOnly: 'Estimated wait; actual recovery time may vary.',
+  estimateElapsed: 'Estimated wait ended. Return to sign in to check.',
   updateAvailable: 'Update available',
   updateAvailableVersion: 'Update to {version}',
   currentVersion: 'Current version',

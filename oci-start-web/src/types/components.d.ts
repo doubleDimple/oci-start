@@ -57,6 +57,7 @@ declare module 'vue' {
     RouterView: typeof import('vue-router')['RouterView']
     ThemeDrawer: typeof import('./../components/ThemeDrawer.vue')['default']
     UserAvatar: typeof import('./../components/UserAvatar.vue')['default']
+    VersionStatusRing: typeof import('./../components/header/VersionStatusRing.vue')['default']
   }
   export interface ComponentCustomProperties {
     vLoading: typeof import('element-plus/es')['ElLoadingDirective']
