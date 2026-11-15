@@ -174,8 +174,8 @@ async function updateQuery(index: number, nextSize = size.value, scope = tenantI
   if (replace) await router.replace({ path: route.path, query })
   else await router.push({ path: route.path, query })
 }
-function changePage(value: number) { if (value - 1 !== pageIndex.value) void updateQuery(value - 1) }
-function changeSize(value: number) { if (value !== size.value) void updateQuery(0, value) }
+function changePage(value: number) { if (!loading.value && !invalidFilter.value && loaded.value && value - 1 !== pageIndex.value) void updateQuery(value - 1) }
+function changeSize(value: number) { if (!loading.value && !invalidFilter.value && loaded.value && value !== size.value) void updateQuery(0, value) }
 function applyFilter() {
   if (!selectedRegion.value || regionsLoading.value) return
   if (tenantId.value === selectedRegion.value && pageIndex.value === 0) void loadRows()
@@ -191,10 +191,10 @@ async function loadRows() {
   listController?.abort()
   listController = new AbortController()
   const key = queryKey.value
-  if (displayedQuery !== key) { rows.value = []; total.value = 0; loaded.value = false; updatedAt.value = null }
+  if (displayedQuery !== key) { rows.value = []; loaded.value = false; updatedAt.value = null }
   else rows.value = rows.value.map(row => ({ ...row, permissionContext: undefined }))
   listError.value = null
-  if (invalidFilter.value) { loading.value = false; return }
+  if (invalidFilter.value) { total.value = 0; loading.value = false; return }
   loading.value = true
   try {
     const result = await getInstances(pageIndex.value, size.value, tenantId.value, listController.signal)

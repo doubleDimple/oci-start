@@ -1,13 +1,11 @@
 package com.doubledimple.ociai.chat;
 
-import com.doubledimple.dao.entity.Tenant;
 import com.doubledimple.ocicommon.param.ApiResponse;
 import com.doubledimple.ocicommon.param.OpenAIChatRequest;
 import com.doubledimple.ocicommon.param.OpenAIChatResponse;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import javax.servlet.http.HttpServletResponse;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
@@ -21,8 +19,6 @@ public interface ChatAiService {
     void handleStreamResponseSync(OpenAIChatRequest request, String userId, HttpServletResponse httpResponse);
 
     Map<String, Object> enableModels();
-
-    void analyzeAllTenantsStream(SseEmitter emitter, List<Tenant> content );
 
 
     /**

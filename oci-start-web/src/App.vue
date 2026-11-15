@@ -15,11 +15,18 @@ import { useSessionGuard } from '@/composables/useSessionGuard'
 useSessionGuard()
 const { locale, t } = useI18n()
 const elLocale = computed(() => (locale.value === 'en' ? en : zhCn))
+const elMessageConfig = {
+  placement: 'top-right' as const,
+  offset: 18,
+  duration: 1800,
+  max: 5,
+  showClose: true,
+}
 function reloadPage() { window.location.reload() }
 </script>
 
 <template>
-  <ElConfigProvider :locale="elLocale">
+  <ElConfigProvider :locale="elLocale" :message="elMessageConfig">
     <AppProgress />
     <PageLoading v-if="sessionExpired" visible fullscreen />
     <RouterView v-else v-slot="{ Component }">

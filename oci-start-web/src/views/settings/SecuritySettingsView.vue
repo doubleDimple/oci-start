@@ -291,55 +291,73 @@ onBeforeUnmount(() => {
           <PageErrorNotice v-if="problem">{{ errorLabel(problem) }} {{ loaded ? t('securitySettings.retained') : '' }}</PageErrorNotice>
           <PageErrorNotice v-if="mutation.outcome === 'failed'">{{ errorLabel(mutation.problem) }}</PageErrorNotice>
           <div class="security-section-title">
-            <div><h2 ref="formHeading" tabindex="-1">{{ t(`securitySettings.sections.${active}`) }}</h2><p>{{ t(`securitySettings.descriptions.${active}`) }}</p></div>
+            <div class="security-section-lead">
+              <span class="security-section-icon" aria-hidden="true"><i :class="sections.find(item => item.id === active)?.icon || 'i-mdi-shield-outline'" /></span>
+              <div><h2 ref="formHeading" tabindex="-1">{{ t(`securitySettings.sections.${active}`) }}</h2><p>{{ t(`securitySettings.descriptions.${active}`) }}</p></div>
+            </div>
             <label v-if="active !== 'account'" class="security-toggle"><span>{{ loaded ? t(`securitySettings.${enabled ? 'enabled' : 'disabled'}`) : '—' }}</span><input v-model="enabled" type="checkbox" role="switch" :aria-label="t('securitySettings.enable')" :disabled="disabled" /><span class="security-switch" aria-hidden="true" /></label>
           </div>
           <form id="security-settings-form" class="security-form" :aria-busy="loading || contextLocked" @submit.prevent="prepareActive">
             <fieldset :disabled="disabled">
-              <template v-if="active === 'account'">
-                <div class="security-field"><span class="security-label">{{ t('securitySettings.currentUser') }}</span><strong class="security-current-user">{{ settings?.currentUsername || '—' }}</strong></div>
-                <div class="security-field"><label for="security-site-name">{{ t('securitySettings.siteName') }}</label><div class="security-input-action"><input id="security-site-name" v-model="siteName" type="text" maxlength="15" autocomplete="off" @keydown.enter="siteNameEnter" /><GhostBtn :disabled="!canMutate || siteName.trim() === settings?.siteLogoName" @click="prepare('logo')"><i class="i-mdi-check" aria-hidden="true" />{{ t('securitySettings.saveSite') }}</GhostBtn></div><small>{{ t('securitySettings.siteHint') }}</small></div>
-                <div class="security-divider" />
-                <SecuritySecretInput id="security-current-password" v-model="account.currentPassword" :disabled="disabled" :label="t('securitySettings.currentPassword')" autocomplete="current-password" />
-                <div class="security-field"><label for="security-new-username">{{ t('securitySettings.newUsername') }}</label><input id="security-new-username" v-model="account.newUsername" type="text" autocomplete="username" :placeholder="settings?.currentUsername" autocapitalize="off" :spellcheck="false" /></div>
-                <div class="security-pair"><SecuritySecretInput id="security-new-password" v-model="account.newPassword" :disabled="disabled" :label="t('securitySettings.newPassword')" /><SecuritySecretInput id="security-confirm-password" v-model="account.confirmPassword" :disabled="disabled" :label="t('securitySettings.confirmPassword')" /></div>
-                <p class="security-help">{{ t('securitySettings.accountHint') }}</p>
-              </template>
-              <template v-else-if="active === 'github' || active === 'google'">
-                <template v-if="active === 'github'">
-                  <div class="security-field"><label for="security-github-user">{{ t('securitySettings.githubUsername') }}</label><div class="security-input-action"><input id="security-github-user" v-model="github.userName" type="text" autocomplete="off" autocapitalize="off" :spellcheck="false" @input="changeGithubName" @keydown.enter="githubEnter" /><GhostBtn :loading="githubLookup.loading" :disabled="disabled || !github.userName.trim()" @click="lookupGithub"><i class="i-mdi-account-search-outline" aria-hidden="true" />{{ t('securitySettings.lookupGithub') }}</GhostBtn></div><small>{{ t('securitySettings.lookupHint') }}</small><PageErrorNotice v-if="githubLookup.problem">{{ errorLabel(githubLookup.problem) }}</PageErrorNotice></div>
-                  <div class="security-field"><label for="security-github-id">{{ t('securitySettings.githubId') }}</label><input id="security-github-id" :value="github.githubId" type="text" readonly placeholder="—" /></div>
-                </template>
-                <div v-else class="security-field"><label for="security-google-email">{{ t('securitySettings.googleEmail') }}</label><input id="security-google-email" v-model="google.email" type="email" autocomplete="off" :spellcheck="false" /></div>
-                <div class="security-field"><label for="security-oauth-client-id">{{ t('securitySettings.clientId') }}</label><input id="security-oauth-client-id" v-model="oauthDraft.clientId" type="text" autocomplete="off" :spellcheck="false" /></div>
-                <div class="security-field"><label for="security-secret-mode">{{ t('securitySettings.secretMode') }}</label><el-select id="security-secret-mode" v-model="secretMode" :disabled="disabled" :teleported="true"><el-option v-if="hasSecret" value="keep" :label="t('securitySettings.keepSecret')" /><el-option value="replace" :label="t('securitySettings.replaceSecret')" /><el-option value="clear" :disabled="enabled" :label="t('securitySettings.clearSecret')" /></el-select><small>{{ t(`securitySettings.${secretMode === 'clear' ? 'clearHint' : hasSecret ? 'keepHint' : 'noSecret'}`) }}</small></div>
-                <SecuritySecretInput v-if="secretMode === 'replace'" :key="active" id="security-oauth-secret" v-model="oauthDraft.clientSecret" :disabled="disabled" :label="t('securitySettings.clientSecret')" />
-                <div class="security-field"><label for="security-oauth-callback">{{ t('securitySettings.callback') }}</label><input id="security-oauth-callback" v-model="oauthDraft.redirectUri" type="url" autocomplete="off" :spellcheck="false" :placeholder="t(`securitySettings.${active === 'github' ? 'githubCallback' : 'googleCallback'}`)" /></div>
-              </template>
-              <template v-else-if="active === 'mfa'">
-                <div class="security-field"><label for="security-mfa-issuer">{{ t('securitySettings.issuer') }}</label><input id="security-mfa-issuer" v-model="mfa.issuer" type="text" placeholder="OCI-Start Verify" autocomplete="off" /><small>{{ t('securitySettings.issuerHint') }}</small></div>
-                <div class="security-divider" />
-                <div class="security-material-heading"><h3>{{ t('securitySettings.material') }}</h3><span>{{ loaded ? t(`securitySettings.${settings?.mfa.hasSecretKey ? 'configured' : 'notConfigured'}`) : '—' }}</span></div>
-                <div class="security-actions"><GhostBtn v-if="settings?.mfa.hasSecretKey && !mfaEnrollment" :loading="mfaLoading" :disabled="disabled" @click="page.loadMfaEnrollment"><i class="i-mdi-qrcode" aria-hidden="true" />{{ t('securitySettings.revealMfa') }}</GhostBtn><GhostBtn v-if="mfaEnrollment" @click="hideMfa"><i class="i-mdi-eye-off-outline" aria-hidden="true" />{{ t('securitySettings.hideMfa') }}</GhostBtn><GhostBtn :disabled="!canMutate || dirty" @click="prepare('regenerateMfa')"><i class="i-mdi-key-plus" aria-hidden="true" />{{ t(`securitySettings.${settings?.mfa.hasSecretKey ? 'regenerateMfa' : 'generateMfa'}`) }}</GhostBtn></div>
-                <p v-if="!settings?.mfa.hasSecretKey" class="security-help">{{ t('securitySettings.mfaMissing') }}</p>
-                <PageErrorNotice v-if="mfaProblem">{{ errorLabel(mfaProblem) }}</PageErrorNotice>
-                <div v-if="mfaEnrollment" class="security-enrollment">
-                  <img v-if="mfaEnrollment.qrCode" :src="`data:image/png;base64,${mfaEnrollment.qrCode}`" :alt="t('securitySettings.qrAlt')" width="180" height="180" />
-                  <div><SecuritySecretInput id="security-mfa-secret" :model-value="mfaEnrollment.secretKey || ''" :label="t('securitySettings.mfaSecret')" readonly copyable autocomplete="off" :disabled="disabled" /><p class="security-help">{{ t('securitySettings.mfaMaterialHint') }}</p></div>
+              <div v-if="active === 'account'" class="security-cards">
+                <div class="security-card">
+                  <div class="security-field"><span class="security-label">{{ t('securitySettings.currentUser') }}</span><strong class="security-current-user">{{ settings?.currentUsername || '—' }}</strong></div>
+                  <div class="security-field"><label for="security-site-name">{{ t('securitySettings.siteName') }}</label><div class="security-input-action"><input id="security-site-name" v-model="siteName" type="text" maxlength="15" autocomplete="off" @keydown.enter="siteNameEnter" /><GhostBtn :disabled="!canMutate || siteName.trim() === settings?.siteLogoName" @click="prepare('logo')"><i class="i-mdi-check" aria-hidden="true" />{{ t('securitySettings.saveSite') }}</GhostBtn></div><small>{{ t('securitySettings.siteHint') }}</small></div>
                 </div>
-                <div v-if="settings?.mfa.hasSecretKey" class="security-field">
-                  <label for="security-mfa-code">{{ t('securitySettings.verificationCode') }}</label><div class="security-input-action security-code"><input id="security-mfa-code" :value="code" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="000000" :disabled="verification.state === 'checking'" @input="updateCode" @keydown.enter="codeEnter" /><GhostBtn :loading="verification.state === 'checking'" :disabled="disabled || !/^\d{6}$/.test(code)" @click="verify"><i class="i-mdi-check" aria-hidden="true" />{{ t('securitySettings.verify') }}</GhostBtn></div>
-                  <small>{{ t('securitySettings.mfaVerifyHint') }}</small><small v-if="verification.state === 'passed'" role="status">{{ t('securitySettings.verificationPassed') }}</small>
-                  <small v-if="verification.state === 'failed' && verification.problem?.key === 'verifyFailed'" class="security-inline-error" role="alert">{{ errorLabel(verification.problem) }}</small>
-                  <PageErrorNotice v-else-if="verification.state === 'failed'">{{ errorLabel(verification.problem) }}</PageErrorNotice>
+                <div class="security-card">
+                  <SecuritySecretInput id="security-current-password" v-model="account.currentPassword" :disabled="disabled" :label="t('securitySettings.currentPassword')" autocomplete="current-password" />
+                  <div class="security-field"><label for="security-new-username">{{ t('securitySettings.newUsername') }}</label><input id="security-new-username" v-model="account.newUsername" type="text" autocomplete="username" :placeholder="settings?.currentUsername" autocapitalize="off" :spellcheck="false" /></div>
+                  <div class="security-pair"><SecuritySecretInput id="security-new-password" v-model="account.newPassword" :disabled="disabled" :label="t('securitySettings.newPassword')" /><SecuritySecretInput id="security-confirm-password" v-model="account.confirmPassword" :disabled="disabled" :label="t('securitySettings.confirmPassword')" /></div>
+                  <p class="security-help">{{ t('securitySettings.accountHint') }}</p>
                 </div>
-                <div v-if="settings?.mfa.hasSecretKey || settings?.mfa.enabled" class="security-danger-row"><GhostBtn danger :disabled="!canMutate || dirty" @click="prepare('deleteMfa')"><i class="i-mdi-delete-outline" aria-hidden="true" />{{ t('securitySettings.deleteMfa') }}</GhostBtn></div>
-              </template>
-              <template v-else-if="active === 'turnstile'">
-                <div class="security-field"><label for="security-turnstile-site">{{ t('securitySettings.siteKey') }}</label><input id="security-turnstile-site" v-model="turnstile.siteKey" type="text" autocomplete="off" :spellcheck="false" /><small>{{ t('securitySettings.turnstileHint') }}</small></div>
-                <div class="security-field"><label for="security-turnstile-mode">{{ t('securitySettings.secretMode') }}</label><el-select id="security-turnstile-mode" v-model="secretMode" :disabled="disabled" :teleported="true"><el-option v-if="hasSecret" value="keep" :label="t('securitySettings.keepSecret')" /><el-option value="replace" :label="t('securitySettings.replaceSecret')" /><el-option value="clear" :disabled="enabled" :label="t('securitySettings.clearSecret')" /></el-select><small>{{ t(`securitySettings.${secretMode === 'clear' ? 'clearHint' : hasSecret ? 'keepHint' : 'noSecret'}`) }}</small></div>
-                <SecuritySecretInput v-if="secretMode === 'replace'" id="security-turnstile-secret" v-model="turnstile.secretKey" :disabled="disabled" :label="t('securitySettings.secretKey')" />
-              </template>
+              </div>
+              <div v-else-if="active === 'github' || active === 'google'" class="security-cards">
+                <div class="security-card">
+                  <template v-if="active === 'github'">
+                    <div class="security-field"><label for="security-github-user">{{ t('securitySettings.githubUsername') }}</label><div class="security-input-action"><input id="security-github-user" v-model="github.userName" type="text" autocomplete="off" autocapitalize="off" :spellcheck="false" @input="changeGithubName" @keydown.enter="githubEnter" /><GhostBtn :loading="githubLookup.loading" :disabled="disabled || !github.userName.trim()" @click="lookupGithub"><i class="i-mdi-account-search-outline" aria-hidden="true" />{{ t('securitySettings.lookupGithub') }}</GhostBtn></div><small>{{ t('securitySettings.lookupHint') }}</small><PageErrorNotice v-if="githubLookup.problem">{{ errorLabel(githubLookup.problem) }}</PageErrorNotice></div>
+                    <div class="security-field"><label for="security-github-id">{{ t('securitySettings.githubId') }}</label><input id="security-github-id" :value="github.githubId" type="text" readonly placeholder="—" /></div>
+                  </template>
+                  <div v-else class="security-field"><label for="security-google-email">{{ t('securitySettings.googleEmail') }}</label><input id="security-google-email" v-model="google.email" type="email" autocomplete="off" :spellcheck="false" /></div>
+                  <div class="security-field"><label for="security-oauth-callback">{{ t('securitySettings.callback') }}</label><input id="security-oauth-callback" v-model="oauthDraft.redirectUri" type="url" autocomplete="off" :spellcheck="false" :placeholder="t(`securitySettings.${active === 'github' ? 'githubCallback' : 'googleCallback'}`)" /></div>
+                </div>
+                <div class="security-card">
+                  <div class="security-field"><label for="security-oauth-client-id">{{ t('securitySettings.clientId') }}</label><input id="security-oauth-client-id" v-model="oauthDraft.clientId" type="text" autocomplete="off" :spellcheck="false" /></div>
+                  <div class="security-field"><label for="security-secret-mode">{{ t('securitySettings.secretMode') }}</label><el-select id="security-secret-mode" v-model="secretMode" :disabled="disabled" :teleported="true"><el-option v-if="hasSecret" value="keep" :label="t('securitySettings.keepSecret')" /><el-option value="replace" :label="t('securitySettings.replaceSecret')" /><el-option value="clear" :disabled="enabled" :label="t('securitySettings.clearSecret')" /></el-select><small>{{ t(`securitySettings.${secretMode === 'clear' ? 'clearHint' : hasSecret ? 'keepHint' : 'noSecret'}`) }}</small></div>
+                  <SecuritySecretInput v-if="secretMode === 'replace'" :key="active" id="security-oauth-secret" v-model="oauthDraft.clientSecret" :disabled="disabled" :label="t('securitySettings.clientSecret')" />
+                </div>
+              </div>
+              <div v-else-if="active === 'mfa'" class="security-cards">
+                <div class="security-card">
+                  <div class="security-field"><label for="security-mfa-issuer">{{ t('securitySettings.issuer') }}</label><input id="security-mfa-issuer" v-model="mfa.issuer" type="text" placeholder="OCI-Start Verify" autocomplete="off" /><small>{{ t('securitySettings.issuerHint') }}</small></div>
+                  <div class="security-divider" />
+                  <div class="security-material-heading"><h3>{{ t('securitySettings.material') }}</h3><span>{{ loaded ? t(`securitySettings.${settings?.mfa.hasSecretKey ? 'configured' : 'notConfigured'}`) : '—' }}</span></div>
+                  <div class="security-actions"><GhostBtn v-if="settings?.mfa.hasSecretKey && !mfaEnrollment" :loading="mfaLoading" :disabled="disabled" @click="page.loadMfaEnrollment"><i class="i-mdi-qrcode" aria-hidden="true" />{{ t('securitySettings.revealMfa') }}</GhostBtn><GhostBtn v-if="mfaEnrollment" @click="hideMfa"><i class="i-mdi-eye-off-outline" aria-hidden="true" />{{ t('securitySettings.hideMfa') }}</GhostBtn><GhostBtn :disabled="!canMutate || dirty" @click="prepare('regenerateMfa')"><i class="i-mdi-key-plus" aria-hidden="true" />{{ t(`securitySettings.${settings?.mfa.hasSecretKey ? 'regenerateMfa' : 'generateMfa'}`) }}</GhostBtn></div>
+                  <p v-if="!settings?.mfa.hasSecretKey" class="security-help">{{ t('securitySettings.mfaMissing') }}</p>
+                  <PageErrorNotice v-if="mfaProblem">{{ errorLabel(mfaProblem) }}</PageErrorNotice>
+                  <div v-if="mfaEnrollment" class="security-enrollment">
+                    <img v-if="mfaEnrollment.qrCode" :src="`data:image/png;base64,${mfaEnrollment.qrCode}`" :alt="t('securitySettings.qrAlt')" width="180" height="180" />
+                    <div><SecuritySecretInput id="security-mfa-secret" :model-value="mfaEnrollment.secretKey || ''" :label="t('securitySettings.mfaSecret')" readonly copyable autocomplete="off" :disabled="disabled" /><p class="security-help">{{ t('securitySettings.mfaMaterialHint') }}</p></div>
+                  </div>
+                </div>
+                <div v-if="settings?.mfa.hasSecretKey || settings?.mfa.enabled" class="security-card">
+                  <div v-if="settings?.mfa.hasSecretKey" class="security-field">
+                    <label for="security-mfa-code">{{ t('securitySettings.verificationCode') }}</label><div class="security-input-action security-code"><input id="security-mfa-code" :value="code" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="000000" :disabled="verification.state === 'checking'" @input="updateCode" @keydown.enter="codeEnter" /><GhostBtn :loading="verification.state === 'checking'" :disabled="disabled || !/^\d{6}$/.test(code)" @click="verify"><i class="i-mdi-check" aria-hidden="true" />{{ t('securitySettings.verify') }}</GhostBtn></div>
+                    <small>{{ t('securitySettings.mfaVerifyHint') }}</small><small v-if="verification.state === 'passed'" role="status">{{ t('securitySettings.verificationPassed') }}</small>
+                    <small v-if="verification.state === 'failed' && verification.problem?.key === 'verifyFailed'" class="security-inline-error" role="alert">{{ errorLabel(verification.problem) }}</small>
+                    <PageErrorNotice v-else-if="verification.state === 'failed'">{{ errorLabel(verification.problem) }}</PageErrorNotice>
+                  </div>
+                  <div v-if="settings?.mfa.hasSecretKey || settings?.mfa.enabled" class="security-danger-row"><GhostBtn danger :disabled="!canMutate || dirty" @click="prepare('deleteMfa')"><i class="i-mdi-delete-outline" aria-hidden="true" />{{ t('securitySettings.deleteMfa') }}</GhostBtn></div>
+                </div>
+              </div>
+              <div v-else-if="active === 'turnstile'" class="security-cards">
+                <div class="security-card">
+                  <div class="security-field"><label for="security-turnstile-site">{{ t('securitySettings.siteKey') }}</label><input id="security-turnstile-site" v-model="turnstile.siteKey" type="text" autocomplete="off" :spellcheck="false" /><small>{{ t('securitySettings.turnstileHint') }}</small></div>
+                </div>
+                <div class="security-card">
+                  <div class="security-field"><label for="security-turnstile-mode">{{ t('securitySettings.secretMode') }}</label><el-select id="security-turnstile-mode" v-model="secretMode" :disabled="disabled" :teleported="true"><el-option v-if="hasSecret" value="keep" :label="t('securitySettings.keepSecret')" /><el-option value="replace" :label="t('securitySettings.replaceSecret')" /><el-option value="clear" :disabled="enabled" :label="t('securitySettings.clearSecret')" /></el-select><small>{{ t(`securitySettings.${secretMode === 'clear' ? 'clearHint' : hasSecret ? 'keepHint' : 'noSecret'}`) }}</small></div>
+                  <SecuritySecretInput v-if="secretMode === 'replace'" id="security-turnstile-secret" v-model="turnstile.secretKey" :disabled="disabled" :label="t('securitySettings.secretKey')" />
+                </div>
+              </div>
             </fieldset>
             <p v-if="validation" class="security-inline-error" role="alert">{{ t(`securitySettings.validation.${validation}`) }}</p>
           </form>

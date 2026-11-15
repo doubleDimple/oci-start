@@ -95,4 +95,28 @@ public class SystemMessageController extends BaseController{
             return ApiResponse.error("删除消息失败: " + e.getMessage());
         }
     }
+
+    //批量删除消息
+    @PostMapping("/delBatch")
+    @ResponseBody
+    public ApiResponse deleteBatchMessage(@RequestBody SystemMessageRequest messageRequest) {
+        try {
+            return systemMessageService.deleteMessages(messageRequest);
+        } catch (Exception e) {
+            log.error("批量删除消息失败", e);
+            return ApiResponse.error("批量删除消息失败: " + e.getMessage());
+        }
+    }
+
+    //清空全部消息
+    @PostMapping("/clear")
+    @ResponseBody
+    public ApiResponse clearAllMessages() {
+        try {
+            return systemMessageService.clearAllMessages();
+        } catch (Exception e) {
+            log.error("清空消息失败", e);
+            return ApiResponse.error("清空消息失败: " + e.getMessage());
+        }
+    }
 }

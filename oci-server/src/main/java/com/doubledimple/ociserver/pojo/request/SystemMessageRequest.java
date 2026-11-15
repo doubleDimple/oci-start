@@ -10,6 +10,7 @@ import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * @version 1.0.0
@@ -27,6 +28,9 @@ public class SystemMessageRequest extends BaseRequest{
 
     //业务id
     private String businessId;
+
+    //批量操作业务id列表
+    private List<String> businessIds;
 
     //消息类型
     private Message.MessageType messageType;

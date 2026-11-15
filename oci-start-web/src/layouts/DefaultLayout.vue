@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { LAYOUT_HEADER_BACK_KEY } from '@/utils/headerBack'
 import { MENU, type NavItem } from '@/nav/menu'
 import { pagesWithOwnLayout } from '@/nav/pageLayout'
 import { useShellStore } from '@/stores/shell'
@@ -19,7 +20,6 @@ import UserAvatar from '@/components/UserAvatar.vue'
 import { loadSiteBrand, siteLogoName } from '@/composables/useSiteBrand'
 import HeaderSearch from '@/components/header/HeaderSearch.vue'
 import HeaderMessages from '@/components/header/HeaderMessages.vue'
-import HeaderAssets from '@/components/header/HeaderAssets.vue'
 import HeaderVersion from '@/components/header/HeaderVersion.vue'
 import ThemeDrawer from '@/components/ThemeDrawer.vue'
 import DefaultUsernameNotice from '@/components/DefaultUsernameNotice.vue'
@@ -31,7 +31,6 @@ const shell = useShellStore()
 const user = useUserStore()
 const { locale, setLocale, syncing: localeSyncing } = useLocale()
 const { prepare: preparePage, cancelIntent: cancelPagePreparation } = useRoutePreload(['/tenants/list', '/oci/list', '/vps/instances/list'])
-const assets = ref<InstanceType<typeof HeaderAssets>>()
 const version = ref<InstanceType<typeof HeaderVersion>>()
 const messages = ref<InstanceType<typeof HeaderMessages>>()
 const userRequest = new AbortController()
@@ -44,6 +43,10 @@ const languageLabel = computed(() => `${t('header.language')} · ${locale.value 
 const themeIcon = computed(() => themeMode.value === 'system' ? 'i-mdi-monitor' : theme.value === 'dark' ? 'i-mdi-weather-night' : 'i-mdi-white-balance-sunny')
 const compactMedia = window.matchMedia('(max-width: 760px)')
 const compactViewport = ref(compactMedia.matches)
+const desktopBackSlot = ref<HTMLElement | null>(null)
+const mobileBackSlot = ref<HTMLElement | null>(null)
+const headerBackSlot = computed(() => compactViewport.value ? mobileBackSlot.value : desktopBackSlot.value)
+provide(LAYOUT_HEADER_BACK_KEY, headerBackSlot)
 const mobileNavOpen = ref(false)
 const sidebarToggle = ref<HTMLButtonElement | null>(null)
 const mobileSidebarToggle = ref<HTMLButtonElement | null>(null)
@@ -68,7 +71,7 @@ const mobileTabs: NavItem[] = [
 const pageTitleKeys: Record<string, string> = {
   '/tenants/list': 'tenants', '/boot/fullBootList': 'boot', '/vps/instances/list': 'instances',
   '/oci/list': 'ociInstances', '/delayTest': 'speed', '/boot/dashboard': 'monitor',
-  '/tenants/regionList': 'regions', '/tenants/auditPage': 'audit', '/tenants/regionSubList': 'subscriptions',
+  '/tenants/regionList': 'regions', '/tenants/auditPage': 'audit', '/tenants/users': 'users', '/tenants/regionSubList': 'subscriptions',
   '/tenants/addSpeed': 'import', '/tenants/bootPage': 'launch', '/tenants/gcpBootPage': 'gcpLaunch',
   '/instanceDetail/bootList': 'tenantInstances', '/monitor/homePage': 'traffic', '/cost/costPage': 'cost',
   '/oci/vnic/manage': 'network', '/oci/metricsPage': 'metrics', '/oci/terminal': 'terminal', '/ssh/terminal': 'terminal',
@@ -245,8 +248,7 @@ async function signOut() {
 }
 
 function userCommand(value: unknown) {
-  if (value === 'assets') assets.value?.open()
-  else if (value === 'auditLogs') void router.push('/system/auditLogs')
+  if (value === 'auditLogs') void router.push('/system/auditLogs')
   else if (value === 'about') version.value?.open()
   else if (value === 'logout') void signOut()
   else if (value === 'retry') void user.load(userRequest.signal)
@@ -338,8 +340,10 @@ function retryNavigation() {
       <header class="top">
         <div class="mobile-heading">
           <button ref="mobileSidebarToggle" class="icon-btn mobile-menu-toggle" type="button" :aria-label="t('header.expandNav')" :aria-expanded="mobileNavOpen" aria-controls="primary-navigation" @click="toggleSidebar"><i class="i-mdi-menu" aria-hidden="true" /></button>
+          <div v-if="compactViewport" ref="mobileBackSlot" class="header-back-slot is-mobile" />
           <span class="mobile-page-title" :title="mobilePageTitle"><span>{{ mobilePageTitle }}</span></span>
         </div>
+        <div v-if="!compactViewport" ref="desktopBackSlot" class="header-back-slot" />
         <nav v-if="!compactViewport" class="breadcrumbs" :aria-label="t('header.breadcrumbs')">
           <RouterLink to="/boot/dashboard">{{ siteLogoName || t('brand') }}</RouterLink>
           <template v-if="currentGroupLabel"><i class="breadcrumb-group-separator i-mdi-chevron-right" aria-hidden="true" /><span class="breadcrumb-group">{{ currentGroupLabel }}</span></template>
@@ -397,8 +401,7 @@ function retryNavigation() {
                 <el-dropdown-item disabled><span class="header-account-summary">{{ userLabel }}<small>{{ shell.cloudName }}</small></span></el-dropdown-item>
                 <el-dropdown-item v-if="user.loadFailed" command="retry" :disabled="user.loading"><i class="i-mdi-refresh" aria-hidden="true" />{{ t('header.retryUser') }}</el-dropdown-item>
                 <el-dropdown-item v-if="compactViewport" divided command="preferences"><i :class="themeIcon" aria-hidden="true" />{{ t('mobileShell.preferences') }}</el-dropdown-item>
-                <el-dropdown-item divided command="assets"><i class="i-mdi-chart-box-outline" aria-hidden="true" />{{ t('header.assets') }}</el-dropdown-item>
-                <el-dropdown-item command="auditLogs"><i class="i-mdi-shield-check-outline" aria-hidden="true" />{{ t('header.auditLogs') }}</el-dropdown-item>
+                <el-dropdown-item divided command="auditLogs"><i class="i-mdi-shield-check-outline" aria-hidden="true" />{{ t('header.auditLogs') }}</el-dropdown-item>
                 <el-dropdown-item command="about"><i class="i-mdi-information-outline" aria-hidden="true" />
                   {{ t(compactViewport && headerVersionSnapshot?.needUpdate ? 'headerVersion.updateAvailable' : 'about') }}
                 </el-dropdown-item>
@@ -423,7 +426,6 @@ function retryNavigation() {
         <a v-for="tab in mobileTabs" :key="tab.id" :href="router.resolve(tab.href).href" :class="{ active: activeMobileTab === tab.id }" :aria-current="activeMobileTab === tab.id ? 'page' : undefined" :aria-label="t(tab.labelKey)" @pointerenter="preparePage(tab.href)" @pointerleave="cancelPagePreparation" @focus="preparePage(tab.href)" @blur="cancelPagePreparation" @click="openItem(tab, $event)"><i :class="tab.icon" aria-hidden="true" /><span>{{ t(tab.labelKey) }}</span></a>
       </nav>
     </div>
-    <HeaderAssets ref="assets" />
     <DefaultUsernameNotice :username="user.username" :ready="!user.loading && !user.loadFailed && !user.signingOut" />
     <ThemeDrawer v-model="themeDrawerOpen" />
     <el-dialog v-model="mobilePreferencesOpen" class="mobile-preferences-dialog" :title="t('mobileShell.preferences')" width="min(460px, calc(100vw - 24px))" align-center append-to-body>
@@ -691,6 +693,10 @@ function retryNavigation() {
   background: var(--bg-card);
   border-bottom: 1px solid var(--border);
 }
+.header-back-slot { display: none; align-items: center; flex: none; }
+.header-back-slot:has(.page-back-button) { display: inline-flex; padding-right: 12px; margin-right: -4px; border-right: 1px solid var(--border); }
+.header-back-slot :deep(.page-back-button) { height: 32px; min-height: 32px; padding: 4px 12px; border-color: var(--border); background: var(--bg-card-subtle); font-size: var(--font-size-secondary); }
+.header-back-slot :deep(.page-back-button:not(:disabled):hover) { border-color: var(--border-strong); background: var(--bg-hover); }
 .breadcrumbs { display: flex; align-items: center; flex: 1; min-width: 0; gap: 6px; color: var(--text-secondary); font-size: var(--font-size-secondary); }
 .breadcrumbs a { flex: 0 1 auto; max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--brand); text-decoration: none; }
 .breadcrumb-group { white-space: nowrap; }
@@ -770,7 +776,11 @@ function retryNavigation() {
   .mobile-menu-search:focus-within { outline: 2px solid var(--brand); outline-offset: 2px; }
   .main { margin-left: 0; width: 100%; min-height: 0; }
   .top { height: calc(60px + env(safe-area-inset-top)); padding: env(safe-area-inset-top) max(12px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left)); gap: 8px; box-sizing: border-box; flex-wrap: nowrap; }
-  .mobile-heading { display: flex; flex: 1; align-items: center; gap: 10px; min-width: 0; }
+  .mobile-heading { display: flex; flex: 1; align-items: center; gap: 6px; min-width: 0; }
+  .header-back-slot.is-mobile:has(.page-back-button) { display: inline-flex; padding-right: 0; margin-right: 0; border-right: 0; }
+  .header-back-slot.is-mobile :deep(.page-back-button) { width: 40px; height: 40px; min-height: 40px; padding: 0; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--text-secondary); }
+  .header-back-slot.is-mobile :deep(.page-back-button:not(:disabled):hover) { background: var(--bg-hover); color: var(--text-primary); }
+  .header-back-slot.is-mobile :deep(.page-back-button > span:not(.back-spinner)) { display: none; }
   .mobile-page-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-primary); font-size: var(--font-size-body); font-weight: 600; }
   .mobile-page-title > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .desktop-search, .desktop-tools { display: none; }

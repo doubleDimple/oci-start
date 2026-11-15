@@ -2247,37 +2247,6 @@ public class TenantServiceImpl implements TenantService {
         return false;
     }
 
-    @Override
-    public ApiResponse assetAnalysis(Integer cloudType) {
-        if (cloudType == null) {
-            cloudType = 1;
-        }
-        Page<Tenant> allTenants = getAllTenants(cloudType, 0, 1000);
-        List<Tenant> content = allTenants.getContent();
-        long totalCount = content.size();
-        long upgradeCount = content.stream()
-                .filter(t -> "UPGRADE_ACCOUNT".equalsIgnoreCase(t.getAccountType()))
-                .count();
-        long freeCount = content.stream()
-                .filter(t -> !"UPGRADE_ACCOUNT".equalsIgnoreCase(t.getAccountType()))
-                .count();
-        double totalCost = content.stream()
-                .map(Tenant::getAccountCost)
-                .filter(StringUtils::isNotBlank)
-                .mapToDouble(Double::parseDouble)
-                .sum();
-
-        Map<String, Object> levelInfo = calculateUserLevel((int) totalCount);
-        Map<String, Object> result = new HashMap<>();
-        result.put("totalCount", totalCount);
-        result.put("upgradeCount", upgradeCount);
-        result.put("freeCount", freeCount);
-        result.put("totalCost", String.format("%.2f", totalCost));
-        result.put("level", levelInfo.get("level"));
-        result.put("levelTitle", levelInfo.get("title"));
-        return ApiResponse.success(result);
-    }
-
     @Transactional(rollbackFor = Exception.class)
     public ApiResponse transferTenant(TenantTransferRequest request) {
         Optional<Tenant> tenantOptional = tenantRepository.findById(request.getTenantId());
@@ -2293,15 +2262,6 @@ public class TenantServiceImpl implements TenantService {
         tenant.setTransferAmount(request.getTransferAmount());
         tenantRepository.save(tenant);
         return ApiResponse.success("转移成功");
-    }
-
-    @Override
-    public void analyzeAllTenantsStream(SseEmitter emitter) {
-         Page<Tenant> allTenants = getAllTenants(1, 0, 1000);
-         List<Tenant> content = allTenants.getContent();
-         if (content.size() > 0){
-             chatAiService.analyzeAllTenantsStream(emitter,content);
-         }
     }
 
     /**
@@ -2347,30 +2307,5 @@ public class TenantServiceImpl implements TenantService {
         } catch (IOException e) {
             log.error("SSE 推送消息失败 [事件: {}]", eventName, e);
         }
-    }
-
-    /**
-     * 根据账号数量判定等级
-     */
-    private Map<String, Object> calculateUserLevel(int count) {
-        int level;
-        String title;
-
-        if (count >= 30) {
-            level = 5; title = "🏅🏅🏅🏅🏅"; // 五枚勋章
-        } else if (count >= 16) {
-            level = 4; title = "🏅🏅🏅🏅";
-        } else if (count >= 6) {
-            level = 3; title = "🏅🏅🏅";
-        } else if (count >= 3) {
-            level = 2; title = "🏅🏅";
-        } else {
-            level = 1; title = "🏅";
-        }
-
-        Map<String, Object> map = new HashMap<>();
-        map.put("level", level);
-        map.put("title", title);
-        return map;
     }
 }

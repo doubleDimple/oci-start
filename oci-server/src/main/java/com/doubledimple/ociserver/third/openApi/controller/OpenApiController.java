@@ -15,8 +15,6 @@ import com.doubledimple.ocicommon.param.ApiResponse;
 import com.doubledimple.ociserver.utils.oracle.OciObjectStorageUtil;
 import com.oracle.bmc.objectstorage.model.BucketSummary;
 import com.oracle.bmc.objectstorage.model.ObjectSummary;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -40,7 +38,6 @@ import com.doubledimple.ociserver.config.annotations.AuditLog;
 
 @RestController
 @RequestMapping("/oci-start/open-api/v1")
-@Tag(name = "OCI-START OPEN-API", description = "开放API接口")
 @Slf4j
 @AuditLog(title = "开放平台接口")
 public class OpenApiController {
@@ -60,7 +57,7 @@ public class OpenApiController {
     * @Date: 9/12/25 10:06 AM
     */
     @PostMapping("/chat")
-    @Operation(summary = "ai聊天", description = "使用ai进行聊天")
+    @AuditLog(title = "ai聊天")
     @RequireApiToken
     public ApiResponse chat(@RequestBody AiChatRequest aiChatRequest) {
         if (StringUtils.isBlank(aiChatRequest.getUserId())){
@@ -76,7 +73,7 @@ public class OpenApiController {
     }
 
     @PostMapping(value = "/chat/completions")
-    @Operation(summary = "OpenAI兼容聊天接口", description = "同时兼容 stream=true 和 stream=false")
+    @AuditLog(title = "OpenAI兼容聊天接口")
     @RequireApiToken
     public Object chatCompletions(
             @RequestBody OpenAIChatRequest request,
@@ -96,7 +93,7 @@ public class OpenApiController {
      * new-api标准的模型列表接口
      */
     @GetMapping("/models")
-    @Operation(summary = "获取模型列表", description = "返回符合OpenAI标准的模型列表，供new-api使用")
+    @AuditLog(title = "获取模型列表")
     @RequireApiToken
     public Map<String, Object> models() {
         return chatAiService.enableModels();
@@ -110,7 +107,7 @@ public class OpenApiController {
      * 获取指定租户的存储桶列表
      */
     @GetMapping("/storage/buckets")
-    @Operation(summary = "获取存储桶列表", description = "获取指定租户下的所有OCI存储桶")
+    @AuditLog(title = "获取存储桶列表")
     @RequireApiToken
     public ApiResponse listBuckets(@RequestParam Long tenantId) {
         try {
@@ -137,7 +134,7 @@ public class OpenApiController {
      * 获取存储桶中的对象列表
      */
     @GetMapping("/storage/objects")
-    @Operation(summary = "获取对象列表", description = "获取指定存储桶下的对象列表")
+    @AuditLog(title = "获取对象列表")
     @RequireApiToken
     public ApiResponse listObjects(
             @RequestParam Long tenantId,
@@ -167,7 +164,7 @@ public class OpenApiController {
      * 生成对象预签名URL
      */
     @PostMapping("/storage/object/presigned")
-    @Operation(summary = "生成预签名URL", description = "生成OCI对象存储的预签名访问URL")
+    @AuditLog(title = "生成预签名URL")
     @RequireApiToken
     public ApiResponse generatePresignedUrl(@RequestBody PresignedUrlRequest req) {
         try {

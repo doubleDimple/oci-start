@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -33,4 +34,18 @@ public interface MessageRepository extends JpaRepository<Message, Long>, JpaSpec
 
     //查询未读消息数量
     public Long countByReadStatus(Integer readStatus);
+
+    /**
+     * 按业务ID批量删除消息
+     */
+    @Modifying
+    @Query("delete from Message m where m.businessId in :businessIds")
+    int deleteByBusinessIds(@Param("businessIds") List<String> businessIds);
+
+    /**
+     * 清空全部系统消息
+     */
+    @Modifying
+    @Query("delete from Message m")
+    int deleteAllMessages();
 }

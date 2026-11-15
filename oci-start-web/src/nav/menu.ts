@@ -81,6 +81,7 @@ export const MENU: NavGroup[] = [
     labelKey: 'nav.dev',
     children: [
       { id: 'api-tokens', href: '/system/apiTokens', labelKey: 'nav.token', icon: 'i-mdi-key-outline' },
+      { id: 'api-docs', href: '/system/apiDocs', labelKey: 'nav.apiDocs', icon: 'i-mdi-book-open-variant-outline' },
     ],
   },
 ]

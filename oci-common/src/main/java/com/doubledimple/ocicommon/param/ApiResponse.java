@@ -1,6 +1,5 @@
 package com.doubledimple.ocicommon.param;
 
-import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 import lombok.Data;
 
@@ -13,15 +12,10 @@ import lombok.Data;
  */
 @Data
 @Builder
-@Schema(description = "API响应结果")
 public class ApiResponse {
-    @Schema(description = "是否成功")
     private boolean success;
-    @Schema(description = "错误信息")
     private String message;
-    @Schema(description = "数据")
     private Object data;
-    @Schema(description = "返回码")
     private int code;
 
     public static final String SUCCESS = "success";

@@ -155,44 +155,66 @@ onBeforeUnmount(() => {
     <div ref="scrollArea" class="migration-scroll">
       <div class="migration-body">
         <template v-if="active === 'export'">
-          <div class="migration-heading"><h2 ref="sectionHeading" tabindex="-1">{{ t(artifact ? 'migration.generated' : 'migration.exportTitle') }}</h2><p>{{ t(artifact ? 'migration.generatedHint' : 'migration.exportHint') }}</p></div>
+          <div class="migration-heading">
+            <span class="migration-heading-icon" aria-hidden="true"><i class="i-mdi-database-export-outline" /></span>
+            <div><h2 ref="sectionHeading" tabindex="-1">{{ t(artifact ? 'migration.generated' : 'migration.exportTitle') }}</h2><p>{{ t(artifact ? 'migration.generatedHint' : 'migration.exportHint') }}</p></div>
+          </div>
           <PageErrorNotice v-if="exportState.problem">{{ errorLabel(exportState.problem) }}</PageErrorNotice>
-          <template v-if="artifact">
-            <dl class="migration-details">
-              <div><dt>{{ t('migration.fileName') }}</dt><dd class="migration-filename">{{ artifact.filename }}</dd></div>
-              <div><dt>{{ t('migration.fileSize') }}</dt><dd>{{ size(artifact.blob.size) }}</dd></div>
-            </dl>
-            <div class="migration-download-row"><GhostBtn :disabled="actionLocked" @click="downloadBackup"><i class="i-mdi-download" aria-hidden="true" />{{ t('migration.downloadBackup') }}</GhostBtn></div>
-            <div class="migration-key-section">
-              <SecuritySecretInput id="migration-export-key" :label="t('migration.masterKey')" :model-value="artifact.masterKey" readonly copyable autocomplete="off" :disabled="actionLocked" />
-              <p class="migration-help">{{ t('migration.keyHint') }}</p>
-              <GhostBtn :disabled="actionLocked" @click="downloadKey"><i class="i-mdi-key-outline" aria-hidden="true" />{{ t('migration.downloadKey') }}</GhostBtn>
+          <div v-if="artifact" class="migration-cards">
+            <div class="migration-card">
+              <dl class="migration-details">
+                <div><dt>{{ t('migration.fileName') }}</dt><dd class="migration-filename">{{ artifact.filename }}</dd></div>
+                <div><dt>{{ t('migration.fileSize') }}</dt><dd>{{ size(artifact.blob.size) }}</dd></div>
+              </dl>
+              <div class="migration-download-row"><GhostBtn :disabled="actionLocked" @click="downloadBackup"><i class="i-mdi-download" aria-hidden="true" />{{ t('migration.downloadBackup') }}</GhostBtn></div>
+              <p v-if="downloadNotice" class="migration-help" role="status">{{ t('migration.downloadStarted') }}</p>
+              <label class="migration-check migration-saved-check"><input type="checkbox" :checked="exportSaved" :disabled="actionLocked" @change="updateSaved" /><span>{{ t('migration.exportSaved') }}</span></label>
+              <p class="migration-help">{{ t('migration.exportSavedHint') }}</p>
             </div>
-            <p v-if="downloadNotice" class="migration-help" role="status">{{ t('migration.downloadStarted') }}</p>
-            <label class="migration-check migration-saved-check"><input type="checkbox" :checked="exportSaved" :disabled="actionLocked" @change="updateSaved" /><span>{{ t('migration.exportSaved') }}</span></label>
-            <p class="migration-help">{{ t('migration.exportSavedHint') }}</p>
-          </template>
-          <template v-else>
-            <dl class="migration-details">
-              <div><dt>{{ t('migration.format') }}</dt><dd>{{ t('migration.formatValue') }}</dd></div>
-              <div><dt>{{ t('migration.sizeLimits') }}</dt><dd>{{ t('migration.sizeLimitsValue') }}</dd></div>
-              <div><dt>{{ t('migration.includes') }}</dt><dd>{{ t('migration.includesValue') }}</dd></div>
-              <div><dt>{{ t('migration.excludes') }}</dt><dd>{{ t('migration.excludesValue') }}</dd></div>
-            </dl>
-            <p class="migration-help migration-scope">{{ t('migration.scopeHint') }}</p>
-            <p class="migration-help">{{ t('migration.keyHint') }}</p>
-          </template>
+            <div class="migration-card">
+              <div class="migration-key-section">
+                <SecuritySecretInput id="migration-export-key" :label="t('migration.masterKey')" :model-value="artifact.masterKey" readonly copyable autocomplete="off" :disabled="actionLocked" />
+                <p class="migration-help">{{ t('migration.keyHint') }}</p>
+                <GhostBtn :disabled="actionLocked" @click="downloadKey"><i class="i-mdi-key-outline" aria-hidden="true" />{{ t('migration.downloadKey') }}</GhostBtn>
+              </div>
+            </div>
+          </div>
+          <div v-else class="migration-cards">
+            <div class="migration-card">
+              <dl class="migration-details">
+                <div><dt>{{ t('migration.format') }}</dt><dd>{{ t('migration.formatValue') }}</dd></div>
+                <div><dt>{{ t('migration.sizeLimits') }}</dt><dd>{{ t('migration.sizeLimitsValue') }}</dd></div>
+                <div><dt>{{ t('migration.includes') }}</dt><dd>{{ t('migration.includesValue') }}</dd></div>
+                <div><dt>{{ t('migration.excludes') }}</dt><dd>{{ t('migration.excludesValue') }}</dd></div>
+              </dl>
+            </div>
+            <div class="migration-card migration-guide-card">
+              <div class="migration-callout">
+                <i class="i-mdi-information-outline" aria-hidden="true" />
+                <p class="migration-help migration-scope">{{ t('migration.scopeHint') }}</p>
+              </div>
+              <div class="migration-callout">
+                <i class="i-mdi-shield-key-outline" aria-hidden="true" />
+                <p class="migration-help">{{ t('migration.keyHint') }}</p>
+              </div>
+            </div>
+          </div>
         </template>
 
         <template v-else>
-          <div class="migration-heading"><h2 ref="sectionHeading" tabindex="-1">{{ t(requiresReview ? 'migration.unknownTitle' : importState.outcome === 'success' ? 'migration.importSuccess' : 'migration.importTitle') }}</h2><p>{{ t(requiresReview ? 'migration.unknownHint' : importState.outcome === 'success' ? 'migration.importSuccessHint' : 'migration.importHint') }}</p></div>
+          <div class="migration-heading">
+            <span class="migration-heading-icon" aria-hidden="true"><i class="i-mdi-database-import-outline" /></span>
+            <div><h2 ref="sectionHeading" tabindex="-1">{{ t(requiresReview ? 'migration.unknownTitle' : importState.outcome === 'success' ? 'migration.importSuccess' : 'migration.importTitle') }}</h2><p>{{ t(requiresReview ? 'migration.unknownHint' : importState.outcome === 'success' ? 'migration.importSuccessHint' : 'migration.importHint') }}</p></div>
+          </div>
           <template v-if="resultVisible">
-            <dl v-if="importAttempt" class="migration-details"><div><dt>{{ t('migration.resultFile') }}</dt><dd class="migration-filename">{{ importAttempt.filename }}</dd></div></dl>
-            <template v-if="importState.result">
-              <dl class="migration-details">
+            <div class="migration-result-summary">
+              <dl v-if="importAttempt" class="migration-details migration-stat-card"><div><dt>{{ t('migration.resultFile') }}</dt><dd class="migration-filename">{{ importAttempt.filename }}</dd></div></dl>
+              <dl v-if="importState.result" class="migration-details migration-stat-card">
                 <div><dt>{{ t('migration.importedRows') }}</dt><dd>{{ number(importState.result.importedRows) }}</dd></div>
                 <div><dt>{{ t('migration.preservedRows') }}</dt><dd>{{ number(importState.result.preservedRows) }}</dd></div>
               </dl>
+            </div>
+            <template v-if="importState.result">
               <MobileRecordList v-if="compact" drilldown list-id="migration-table-results" :record-keys="tableRows.map(row => row.table)" class="migration-mobile-list" :aria-label="t('migration.tableResults')">
                 <MobileRecordCard v-for="row in tableRows" :key="row.table" :record-key="row.table" :summary-title="row.table" :summary-meta="`${t('migration.importedRows')}: ${number(row.importedRows)}`">
                   <template #identity><h3 class="mobile-record-title">{{ row.table }}</h3></template>
@@ -205,25 +227,27 @@ onBeforeUnmount(() => {
           </template>
           <template v-else>
             <PageErrorNotice v-if="importState.problem"><p>{{ errorLabel(importState.problem) }}</p><p>{{ t(importState.outcome === 'rolledBack' ? 'migration.rolledBack' : 'migration.rejected') }}</p><GhostBtn @click="finishImport">{{ t('migration.editAfterFailure') }}</GhostBtn></PageErrorNotice>
-            <form id="migration-import-form" class="migration-form" @submit.prevent="prepareImport">
-              <div class="migration-file-field">
-                <span id="migration-file-label" class="migration-label">{{ t('migration.selectFile') }}</span>
-                <input ref="fileInput" class="migration-hidden-file" type="file" accept=".enc" tabindex="-1" :disabled="actionLocked" :aria-label="t('migration.selectFile')" @change="selectedFile" />
-                <div class="migration-drop-zone" :class="{ 'is-dragging': dragDepth > 0, 'is-disabled': actionLocked }" @dragenter="dragEnter" @dragover="dragOver" @dragleave="dragLeave" @drop="dropFile">
-                  <button type="button" class="migration-file-choose" :disabled="actionLocked" aria-labelledby="migration-file-label migration-selected-name" aria-describedby="migration-file-help" @click="chooseFile">
-                    <i :class="file ? 'i-mdi-file-lock-outline' : 'i-mdi-upload'" aria-hidden="true" />
-                    <span><strong id="migration-selected-name">{{ file?.name || t('migration.dropHint') }}</strong><small v-if="file">{{ size(file.size) }} · {{ t('migration.replaceFile') }}</small></span>
-                  </button>
-                  <button v-if="file" type="button" class="migration-file-remove" :disabled="actionLocked" :aria-label="t('migration.removeFile')" :title="t('migration.removeFile')" @click="removeFile"><i class="i-mdi-close" aria-hidden="true" /></button>
+            <div class="migration-cards">
+              <form id="migration-import-form" class="migration-form migration-card" @submit.prevent="prepareImport">
+                <div class="migration-file-field">
+                  <span id="migration-file-label" class="migration-label">{{ t('migration.selectFile') }}</span>
+                  <input ref="fileInput" class="migration-hidden-file" type="file" accept=".enc" tabindex="-1" :disabled="actionLocked" :aria-label="t('migration.selectFile')" @change="selectedFile" />
+                  <div class="migration-drop-zone" :class="{ 'is-dragging': dragDepth > 0, 'is-disabled': actionLocked }" @dragenter="dragEnter" @dragover="dragOver" @dragleave="dragLeave" @drop="dropFile">
+                    <button type="button" class="migration-file-choose" :disabled="actionLocked" aria-labelledby="migration-file-label migration-selected-name" aria-describedby="migration-file-help" @click="chooseFile">
+                      <i :class="file ? 'i-mdi-file-lock-outline' : 'i-mdi-upload'" aria-hidden="true" />
+                      <span><strong id="migration-selected-name">{{ file?.name || t('migration.dropHint') }}</strong><small v-if="file">{{ size(file.size) }} · {{ t('migration.replaceFile') }}</small></span>
+                    </button>
+                    <button v-if="file" type="button" class="migration-file-remove" :disabled="actionLocked" :aria-label="t('migration.removeFile')" :title="t('migration.removeFile')" @click="removeFile"><i class="i-mdi-close" aria-hidden="true" /></button>
+                  </div>
+                  <small id="migration-file-help" class="migration-help">{{ t('migration.fileHint') }}</small>
+                  <p v-if="fileValidating" class="migration-help" role="status">{{ t('migration.validatingFile') }}</p>
+                  <p v-if="fileProblem" class="migration-error" role="alert">{{ errorLabel(fileProblem) }}</p>
                 </div>
-                <small id="migration-file-help" class="migration-help">{{ t('migration.fileHint') }}</small>
-                <p v-if="fileValidating" class="migration-help" role="status">{{ t('migration.validatingFile') }}</p>
-                <p v-if="fileProblem" class="migration-error" role="alert">{{ errorLabel(fileProblem) }}</p>
-              </div>
-              <div @keydown.enter="importEnter"><SecuritySecretInput id="migration-import-key" :label="t('migration.masterKey')" :model-value="masterKey" :placeholder="t('migration.keyPlaceholder')" autocomplete="off" :disabled="actionLocked" @update:model-value="updateKey" /></div>
-              <p v-if="keyProblem" class="migration-error" role="alert">{{ t('migration.errors.keyFormat') }}</p>
-            </form>
-            <div class="migration-policy"><h3>{{ t('migration.importPolicyTitle') }}</h3><p>{{ t('migration.importPolicy') }}</p><p>{{ t('migration.importFiles') }}</p><p>{{ t('migration.sizeLimitsValue') }}</p><p>{{ t('migration.importRuntime') }}</p></div>
+                <div @keydown.enter="importEnter"><SecuritySecretInput id="migration-import-key" :label="t('migration.masterKey')" :model-value="masterKey" :placeholder="t('migration.keyPlaceholder')" autocomplete="off" :disabled="actionLocked" @update:model-value="updateKey" /></div>
+                <p v-if="keyProblem" class="migration-error" role="alert">{{ t('migration.errors.keyFormat') }}</p>
+              </form>
+              <div class="migration-policy migration-card"><h3>{{ t('migration.importPolicyTitle') }}</h3><p>{{ t('migration.importPolicy') }}</p><p>{{ t('migration.importFiles') }}</p><p>{{ t('migration.sizeLimitsValue') }}</p><p>{{ t('migration.importRuntime') }}</p></div>
+            </div>
           </template>
         </template>
       </div>

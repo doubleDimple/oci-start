@@ -25,6 +25,7 @@ export default {
       loginService: '登录服务', clientId: '客户端 ID', clientIdField: '客户端 ID（Client ID）',
       clientSecret: '客户端密钥（Client Secret）', redirectUrl: '回调地址', temporaryPassword: '临时密码',
       resetTime: '重置时间：{time}', policy: '策略 {index}',
+      accountInfo: '用户信息', currentPolicies: '当前策略', policySettings: '策略配置',
     },
     placeholders: {
       username: '输入用户名', email: "name{'@'}example.com", group: '选择用户组',
@@ -51,6 +52,11 @@ export default {
       totp: '动态验证码', totpDescription: '通过验证器生成一次性验证码',
     },
     empty: { users: '暂无用户，添加一位开始管理', recipients: '暂无通知收件人', social: '尚未配置社交登录' },
+    loading: {
+      users: '正在加载用户列表…',
+      notifications: '正在加载通知收件人…',
+      mfa: '正在加载多因子认证状态…',
+    },
     counts: { users: '共 {count} 位用户', recipients: '共 {count} 位收件人' },
     status: {
       active: '有效', inactive: '未激活', creating: '创建中', updating: '更新中',
@@ -119,6 +125,7 @@ export default {
       loginService: 'Login service', clientId: 'Client ID', clientIdField: 'Client ID',
       clientSecret: 'Client secret', redirectUrl: 'Redirect URL', temporaryPassword: 'Temporary password',
       resetTime: 'Reset at: {time}', policy: 'Policy {index}',
+      accountInfo: 'Account details', currentPolicies: 'Current policies', policySettings: 'Policy settings',
     },
     placeholders: {
       username: 'Enter a username', email: "name{'@'}example.com", group: 'Select a user group',
@@ -145,6 +152,11 @@ export default {
       totp: 'Authenticator codes', totpDescription: 'Generate one-time codes with an authenticator',
     },
     empty: { users: 'No users yet. Add a user to get started.', recipients: 'No notification recipients', social: 'No social login services configured' },
+    loading: {
+      users: 'Loading users…',
+      notifications: 'Loading recipients…',
+      mfa: 'Loading MFA status…',
+    },
     counts: { users: 'Users: {count}', recipients: 'Recipients: {count}' },
     status: {
       active: 'Active', inactive: 'Inactive', creating: 'Creating', updating: 'Updating',

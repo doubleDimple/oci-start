@@ -129,7 +129,7 @@ const rangeEnd = computed(() =>
   Math.min(total.value, page.value * size.value + rows.value.length),
 )
 const identityAction = computed(() =>
-  ['users', 'email', 'social'].includes(action.value),
+  ['email', 'social'].includes(action.value),
 )
 const resourceAction = computed(() =>
   ['detail', 'quota'].includes(action.value),
@@ -402,7 +402,7 @@ function rowActions(row: TenantRow): RowAction[] {
         icon: 'i-mdi-earth',
         path: '/tenants/regionSubList',
       },
-      { id: 'users', label: t('tenant.actions.users'), icon: 'i-mdi-account-group-outline' },
+      { id: 'users', label: t('tenant.actions.users'), icon: 'i-mdi-account-group-outline', path: '/tenants/users' },
       // 监控与审计分组
       { id: 'traffic', label: t('tenant.actions.traffic'), icon: 'i-mdi-bell-outline', divided: true },
       {

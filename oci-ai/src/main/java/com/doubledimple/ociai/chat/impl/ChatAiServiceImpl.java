@@ -2,10 +2,8 @@ package com.doubledimple.ociai.chat.impl;
 
 import com.alibaba.fastjson2.JSON;
 import com.doubledimple.dao.entity.AiChatHistory;
-import com.doubledimple.dao.entity.InstanceDetails;
 import com.doubledimple.dao.entity.Tenant;
 import com.doubledimple.dao.repository.AiChatHistoryRepository;
-import com.doubledimple.dao.repository.OracleInstanceDetailRepository;
 import com.doubledimple.dao.repository.TenantRepository;
 import com.doubledimple.ociai.chat.ChatAiConfigService;
 import com.doubledimple.ociai.chat.ChatAiService;
@@ -22,7 +20,6 @@ import com.doubledimple.ocicommon.param.Usage;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -36,7 +33,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -47,8 +43,6 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
-
-import static com.doubledimple.ociai.constant.AiPromptConstants.buildAssetAuditPrompt;
 
 /**
  * @version 1.0.0
@@ -78,9 +72,6 @@ public class ChatAiServiceImpl implements ChatAiService {
 
     @Resource
     private ObjectMapper objectMapper;
-
-    @Resource
-    OracleInstanceDetailRepository oracleInstanceDetailRepository;
 
     @Resource
     AiChatHistoryRepository aiChatHistoryRepository;
@@ -310,97 +301,6 @@ public class ChatAiServiceImpl implements ChatAiService {
 
         log.info("返回的可用模型是:{}", JSON.toJSONString(response));
         return response;
-    }
-
-    @Override
-    public void analyzeAllTenantsStream(SseEmitter emitter, List<Tenant> allTenants) {
-        Locale currentLocale = LocaleContextHolder.getLocale();
-        String language = currentLocale.getLanguage();
-        String targetLang = "Simplified Chinese";
-        if ("en".equalsIgnoreCase(language)) {
-            targetLang = "English";
-        } else if ("zh".equalsIgnoreCase(language)) {
-            // 如果是 zh，再细分简繁
-            if (currentLocale.toString().contains("TW") || currentLocale.toString().contains("HK")) {
-                targetLang = "繁体中文";
-            }
-        }
-        String finalTargetLang = targetLang;
-        CompletableFuture.runAsync(() -> {
-            try {
-
-                Optional<List<ChatAiConfigDto>> configOpt = configService.getConfigByCloudType(1);
-                if (!configOpt.isPresent() || configOpt.get().isEmpty()) {
-                    emitter.send(SseEmitter.event().data("data:AI配置缺失\n\n"));
-                    emitter.complete();
-                    return;
-                }
-                ChatAiConfigDto selectedConfig = configOpt.get().stream()
-                        .filter(ChatAiConfigDto::getEnabled).findFirst().orElse(configOpt.get().get(0));
-                Tenant aiTenant = tenantRepository.findById(Long.valueOf(selectedConfig.getTenantId())).orElse(null);
-
-                List<Tenant> sortedTenants = new ArrayList<>(allTenants);
-                sortedTenants.sort((a, b) -> {
-                    boolean aUp = a.getAccountTypeName() != null && a.getAccountTypeName().contains("升级");
-                    boolean bUp = b.getAccountTypeName() != null && b.getAccountTypeName().contains("升级");
-                    if (aUp != bUp) return Boolean.compare(bUp, aUp);
-                    int dA = 0; try { dA = Integer.parseInt(a.getActiveDays()); } catch (Exception ignored) {}
-                    int dB = 0; try { dB = Integer.parseInt(b.getActiveDays()); } catch (Exception ignored) {}
-                    return Integer.compare(dB, dA);
-                });
-
-                int rank = 1;
-                for (Tenant t : sortedTenants) {
-                    String defName = StringUtils.isNotBlank(t.getDefName()) ? t.getDefName() : "未命名租户";
-                    emitter.send(SseEmitter.event().data(String.format(">>> loading %d/%d : [%s]...\n", rank, sortedTenants.size(), defName)));
-                    List<InstanceDetails> instances = oracleInstanceDetailRepository.findByTenantId(t.getId());
-                    long armCount = 0; int totalOcpus = 0; int totalMemory = 0; int onlineCount = 0; int offlineCount = 0;
-                    if (instances != null) {
-                        for (InstanceDetails ins : instances) {
-                            boolean isArm = "ARM".equalsIgnoreCase(ins.getArchitecture()) || (ins.getProcessorDescription() != null && ins.getProcessorDescription().contains("Ampere"));
-                            if (isArm) armCount++;
-                            totalOcpus += (ins.getOcpus() != null ? ins.getOcpus() : 0);
-                            totalMemory += (ins.getMemoryInGBs() != null ? ins.getMemoryInGBs() : 0);
-                            if (ins.getOnLineEnable() != null && ins.getOnLineEnable() == 1) onlineCount++;
-                            else offlineCount++;
-                        }
-                    }
-                    String type = t.getAccountTypeName() != null ? t.getAccountTypeName() : "普通免费";
-                    int currentRegions = (t.getChildren() != null ? t.getChildren().size() : 0) + 1;
-                    String activeDays = StringUtils.isNotBlank(t.getActiveDays()) ? t.getActiveDays() : "0";
-                    boolean isPayg = type.contains("升级") || type.contains("PAYG");
-                    int daysInt = 0; try { daysInt = Integer.parseInt(activeDays); } catch (Exception ignored) {}
-                    String singlePrompt = String.format(buildAssetAuditPrompt(), finalTargetLang, defName, type, activeDays, currentRegions, (instances != null ? instances.size() : 0), armCount, totalOcpus, totalMemory, onlineCount, offlineCount);
-                    String review = aiUtils.chat(aiTenant, singlePrompt, selectedConfig.getModelId());
-                    review = cleanAiReview(review);
-                    if (!review.contains("¥")) {
-                        int price = calculatePriceManual(isPayg, currentRegions, daysInt, (int)armCount, offlineCount);
-                        review += String.format(" [估价：¥%d-%d]", (int)(price * 0.95), (int)(price * 1.05));
-                    }
-                    String riskTag = isPayg ? " [高权资产] " : (daysInt > 180 ? " [老牌稳健] " : (daysInt <= 30 ? " [高危风险] " : " [风控观察] "));
-                    StringBuilder tags = new StringBuilder();
-                    if (armCount > 0) tags.append("ARM×").append(armCount).append(" ");
-                    if (isPayg) {
-                        if (currentRegions > 3) tags.append("超配").append(currentRegions).append("区 ");
-                        else tags.append("标准3区 ");
-                    } else if (currentRegions > 1) {
-                        tags.append("多区稀有号 ");
-                    }
-                    if (offlineCount > 0) tags.append("离线 ");
-                    String line = String.format("%d. %s%s%s_%s | %dC/%dG | 点评: %s\n",
-                            rank++, riskTag, tags.toString(), t.getUserName(), defName,
-                            totalOcpus, totalMemory, review);
-
-                    emitter.send(SseEmitter.event().data(line));
-                    Thread.sleep(200);
-                }
-                emitter.send(SseEmitter.event().data("✔ 资产评估报告生成完毕。\n"));
-                emitter.complete();
-            } catch (Exception e) {
-                log.error("审计异常", e);
-                emitter.complete();
-            }
-        });
     }
 
     @Override
@@ -688,34 +588,6 @@ public class ChatAiServiceImpl implements ChatAiService {
         response.put("choices", Collections.singletonList(choice));
         String jsonString = objectMapper.writeValueAsString(response);
         emitter.send(jsonString);
-    }
-
-    /**
-     * 清洗 AI 返回的内容，剔除指令复读
-     */
-    private String cleanAiReview(String review) {
-        if (StringUtils.isBlank(review)) return "";
-        return review.replaceAll("(?i)【输出要求】.*?[：:]", "")
-                .replaceAll("(?i)犀利点评20字内", "")
-                .replaceAll("(?i)（必须包含价格区间）", "")
-                .replaceAll("(?i)点评[：:]", "")
-                .replaceAll("(?i)规则[：:]", "")
-                .replaceAll("(?i)---.*---", "")
-                .replaceAll("\n", " ")
-                .trim();
-    }
-
-    /**
-     * 手动估价逻辑
-     */
-    private int calculatePriceManual(boolean isPayg, int regions, int days, int armCores, int offlineCount) {
-        int base = isPayg ? 850 : (regions > 1 ? 350 : 50);
-        if (days > 180) base += 200;
-        base += (armCores * 50);
-        if (isPayg && regions > 3) base += (regions - 3) * 100;
-        if (days < 30) base *= 0.5;
-        base -= (offlineCount * 50);
-        return Math.max(base, 50);
     }
 
     private void recordModelUsage(String modelId) {

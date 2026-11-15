@@ -13,6 +13,8 @@ import PrimaryBtn from '@/components/PrimaryBtn.vue'
 import { cloudflareCanEdit, type CloudflareApiError } from '@/api/cloudflare'
 import CloudflareRecordDialog from './components/CloudflareRecordDialog.vue'
 import CloudflareCredentialsDialog from './components/CloudflareCredentialsDialog.vue'
+import CloudflarePublicIpsDialog from './components/CloudflarePublicIpsDialog.vue'
+import CloudflareOfficialIpsDialog from './components/CloudflareOfficialIpsDialog.vue'
 import { useCloudflarePage } from './useCloudflarePage'
 import './cloudflare.scss'
 
@@ -22,6 +24,9 @@ const route = useRoute()
 const router = useRouter()
 const credentialsOpen = ref(false)
 const credentialsBusy = ref(false)
+const publicIpsOpen = ref(false)
+const officialIpsOpen = ref(false)
+const overlayOpen = computed(() => credentialsOpen.value || publicIpsOpen.value || officialIpsOpen.value)
 let credentialsChanged = false
 const {
   zones, zonesLoading, zonesLoaded, zonesProblem, zoneId, selectedZone, zoneUnavailable,
@@ -30,7 +35,7 @@ const {
   operation, operationPending, operationOutcome, operationResult, operationProblem,
   openCreate, openEdit, openDelete, openSync, submitOperation, closeOperation,
   requiresReview, reviewZone, reviewReady, acknowledgeReview, contextLocked, canCreate, canOperate,
-} = useCloudflarePage(credentialsOpen)
+} = useCloudflarePage(overlayOpen)
 const columns = ['type', 'name', 'content', 'ttl', 'proxy', 'actions'] as const
 const pageSizes = [10, 20, 30, 50]
 const emptyText = computed(() => {
@@ -92,6 +97,8 @@ onBeforeRouteUpdate(() => !credentialsBusy.value)
       </div>
       <GhostBtn :loading="zonesLoading" :disabled="contextLocked" :title="t('cloudflareDns.refreshZones')" :aria-label="t('cloudflareDns.refreshZones')" @click="loadZones"><i class="i-mdi-refresh" aria-hidden="true" /></GhostBtn>
       <div class="cloudflare-toolbar-actions" data-page-error-anchor>
+        <GhostBtn :disabled="credentialsBusy" @click="officialIpsOpen = true"><i class="i-mdi-cloud-outline" aria-hidden="true" />{{ t('cloudflareDns.officialIps.button') }}</GhostBtn>
+        <GhostBtn :disabled="contextLocked" @click="publicIpsOpen = true"><i class="i-mdi-ip-network-outline" aria-hidden="true" />{{ t('cloudflareDns.publicIps.button') }}</GhostBtn>
         <GhostBtn :disabled="contextLocked" @click="openCredentials"><i class="i-mdi-key-outline" aria-hidden="true" />{{ t('cloudflareDns.credentials.title') }}</GhostBtn>
         <GhostBtn :disabled="!canOperate" @click="openSync"><i class="i-mdi-sync" aria-hidden="true" />{{ t('cloudflareDns.sync') }}</GhostBtn>
         <GhostBtn :loading="loading" :disabled="contextLocked || !selectedZone" @click="refresh"><i class="i-mdi-refresh" aria-hidden="true" />{{ t('cloudflareDns.refreshRecords') }}</GhostBtn>
@@ -147,6 +154,8 @@ onBeforeRouteUpdate(() => !credentialsBusy.value)
 
     <CloudflareRecordDialog v-if="operation" :operation="operation" :pending="operationPending" :outcome="operationOutcome" :result="operationResult" :problem="operationProblem" :read-problem="readProblem" @submit="submitOperation" @close="closeOperation" />
     <CloudflareCredentialsDialog v-if="credentialsOpen" @close="closeCredentials" @changed="markCredentialsChanged" @busy="setCredentialsBusy" />
+    <CloudflarePublicIpsDialog :visible="publicIpsOpen" @close="publicIpsOpen = false" />
+    <CloudflareOfficialIpsDialog :visible="officialIpsOpen" @close="officialIpsOpen = false" />
   </section>
 </template>
 

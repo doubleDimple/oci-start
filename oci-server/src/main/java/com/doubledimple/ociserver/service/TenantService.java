@@ -153,11 +153,7 @@ public interface TenantService {
     //导出某条租户数据
     public ResponseEntity<?> exportData(Long parentId);
 
-    ApiResponse assetAnalysis(Integer cloudType);
-
     ApiResponse transferTenant(TenantTransferRequest request);
-
-    void analyzeAllTenantsStream(SseEmitter emitter);
 
     void updateTenantWithSSE(String tenantId, SseEmitter emitter);
 

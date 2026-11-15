@@ -1233,13 +1233,6 @@ public class TenantController extends BaseController{
         return tenantService.queryAuditLogs(auditLogRequest);
     }
 
-    //资产分析
-    @GetMapping("/asset/analysis")
-    @ResponseBody
-    public ApiResponse assetAnalysis(@RequestParam(required = false) Integer cloudType){
-        return tenantService.assetAnalysis(cloudType);
-    }
-
     @PostMapping("/transfer")
     @ResponseBody
     public ApiResponse transferTenant(@RequestBody TenantTransferRequest request) {
@@ -1252,17 +1245,6 @@ public class TenantController extends BaseController{
             log.error("账号转移操作失败: {}", e.getMessage(), e);
             return ApiResponse.error("转移失败: " + e.getMessage());
         }
-    }
-
-    /**
-     * 一键审计所有账号
-     * 前端通过 SSE 接收流式分析报告
-     */
-    @GetMapping(value = "/analyze", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter startAudit() {
-        SseEmitter emitter = new SseEmitter(300000L);
-        tenantService.analyzeAllTenantsStream(emitter);
-        return emitter;
     }
 
     /**

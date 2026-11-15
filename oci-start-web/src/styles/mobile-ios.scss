@@ -137,8 +137,8 @@
     pointer-events: none;
   }
   html:root :is(.mobile-record-detail-toolbar, .tenant-detail-toolbar) { gap: 12px; min-height: 44px; padding-block: 0; }
-  html:root .page-back-button { height: 44px; min-height: 44px; padding: 4px 4px 4px 0; border: 0; border-radius: 8px; box-shadow: none; background: transparent; color: var(--brand); font-size: 16px; font-weight: 400; }
-  html:root .page-back-button > i { width: 12px; height: 12px; margin-inline: 4px 2px; background: none; mask: none; border-left: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); }
+  html:root .page-back-button:not(.in-header) { height: 44px; min-height: 44px; padding: 4px 4px 4px 0; border: 0; border-radius: 8px; box-shadow: none; background: transparent; color: var(--brand); font-size: 16px; font-weight: 400; }
+  html:root .page-back-button:not(.in-header) > i { width: 12px; height: 12px; margin-inline: 4px 2px; background: none; mask: none; border-left: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); }
   html:root .mobile-record-card { padding: 16px; }
   html:root .mobile-record-card .mobile-record-title { font-size: 17px; letter-spacing: -0.3px; }
   html:root .mobile-record-card .mobile-record-fields { gap: 0 16px; }

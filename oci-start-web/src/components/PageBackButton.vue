@@ -1,17 +1,23 @@
 <script setup lang="ts">
+import { computed, inject } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { LAYOUT_HEADER_BACK_KEY } from '@/utils/headerBack'
 
-defineProps<{ disabled?: boolean; loading?: boolean; title?: string }>()
+const props = defineProps<{ disabled?: boolean; loading?: boolean; title?: string; local?: boolean }>()
 const emit = defineEmits<{ click: [event: MouseEvent] }>()
 const { t } = useI18n()
+const headerBackSlot = inject(LAYOUT_HEADER_BACK_KEY, null)
+const teleportTarget = computed(() => (props.local ? null : headerBackSlot?.value ?? null))
 </script>
 
 <template>
-  <button class="page-back-button" type="button" :disabled="disabled || loading" :aria-busy="loading || undefined" :title="title || t('pageBack')" @click="emit('click', $event)">
-    <span v-if="loading" class="back-spinner" aria-hidden="true" />
-    <i v-else class="i-mdi-arrow-left" aria-hidden="true" />
-    <span>{{ t('pageBack') }}</span>
-  </button>
+  <Teleport :to="teleportTarget ?? 'body'" :disabled="!teleportTarget">
+    <button class="page-back-button" :class="{ 'in-header': Boolean(teleportTarget) }" type="button" :disabled="disabled || loading" :aria-busy="loading || undefined" :title="title || t('pageBack')" @click="emit('click', $event)">
+      <span v-if="loading" class="back-spinner" aria-hidden="true" />
+      <i v-else class="i-mdi-arrow-left" aria-hidden="true" />
+      <span>{{ t('pageBack') }}</span>
+    </button>
+  </Teleport>
 </template>
 
 <style scoped>

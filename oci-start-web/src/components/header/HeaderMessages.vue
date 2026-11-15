@@ -1,16 +1,17 @@
 <script setup lang="ts">
 import { computed, getCurrentInstance, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, type CSSProperties } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { ElMessage } from 'element-plus'
 import PageErrorNotice from '@/components/PageErrorNotice.vue'
 import GhostBtn from '@/components/GhostBtn.vue'
 import PagePagination from '@/components/PagePagination.vue'
 import {
-  deleteHeaderMessage, getHeaderMessage, getHeaderMessages, getHeaderUnreadCount,
-  headerMessagesError, readAllHeaderMessages, type HeaderMessage,
+  clearAllHeaderMessages, deleteHeaderMessage, deleteHeaderMessages, getHeaderMessage, getHeaderMessages,
+  getHeaderUnreadCount, headerMessagesError, readAllHeaderMessages, type HeaderMessage,
 } from '@/api/headerMessages'
 
-type Action = 'all' | 'delete'
-interface ActionFailure { action: Action; businessId: string; error: unknown }
+type Action = 'all' | 'delete' | 'batchDelete' | 'clearAll'
+interface ActionFailure { action: Action; businessId: string; businessIds?: string[]; error: unknown }
 
 const emit = defineEmits<{ open: [] }>()
 const { t, locale } = useI18n()
@@ -34,6 +35,8 @@ const action = ref<Action | ''>('')
 const actionId = ref('')
 const actionError = shallowRef<ActionFailure | null>(null)
 const notice = ref('')
+const selectedIds = ref<string[]>([])
+const clearConfirmOpen = ref(false)
 const detailOpen = ref(false)
 const detailId = ref('')
 const detail = shallowRef<HeaderMessage | null>(null)
@@ -42,6 +45,10 @@ const detailLoading = ref(false)
 const detailError = shallowRef<unknown>(null)
 const busy = computed(() => Boolean(action.value))
 const canMarkAll = computed(() => unread.value !== 0 || rows.value.some(row => row.readStatus === 0))
+const selectedSet = computed(() => new Set(selectedIds.value))
+const pageSelectedCount = computed(() => rows.value.filter(row => selectedSet.value.has(row.businessId)).length)
+const allPageSelected = computed(() => rows.value.length > 0 && pageSelectedCount.value === rows.value.length)
+const somePageSelected = computed(() => pageSelectedCount.value > 0 && !allPageSelected.value)
 const numberFormat = computed(() => new Intl.NumberFormat(locale.value === 'en' ? 'en-US' : 'zh-CN'))
 const dateFormat = computed(() => new Intl.DateTimeFormat(locale.value === 'en' ? 'en-US' : 'zh-CN', {
   year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
@@ -115,6 +122,7 @@ function closePanel(restoreFocus = false) {
   if (!panelOpen.value) return
   if (panel.value) panel.value.inert = true
   panelOpen.value = false
+  clearConfirmOpen.value = false
   stopList()
   if (restoreFocus) trigger.value?.focus()
 }
@@ -193,13 +201,39 @@ function markCachedRead(businessId: string) {
   if (previous?.readStatus === 0 && unread.value !== null) unread.value = Math.max(0, unread.value - 1)
 }
 function removeCachedMessage(businessId: string) {
-  const previous = rows.value.find(row => row.businessId === businessId)
-  if (!previous) return
-  rows.value = rows.value.filter(row => row.businessId !== businessId)
-  totalElements.value = Math.max(0, totalElements.value - 1)
+  removeCachedMessages([businessId])
+}
+function removeCachedMessages(businessIds: string[]) {
+  const removedIds = new Set(businessIds)
+  if (!removedIds.size) return
+  const removedUnread = rows.value.filter(row => removedIds.has(row.businessId) && row.readStatus === 0).length
+  rows.value = rows.value.filter(row => !removedIds.has(row.businessId))
+  selectedIds.value = selectedIds.value.filter(id => !removedIds.has(id))
+  totalElements.value = Math.max(0, totalElements.value - removedIds.size)
   totalPages.value = Math.ceil(totalElements.value / 5)
   page.value = Math.min(page.value, Math.max(1, totalPages.value))
-  if (previous.readStatus === 0 && unread.value !== null) unread.value = Math.max(0, unread.value - 1)
+  if (removedUnread > 0 && unread.value !== null) unread.value = Math.max(0, unread.value - removedUnread)
+}
+function toggleSelect(businessId: string) {
+  clearConfirmOpen.value = false
+  if (selectedSet.value.has(businessId)) {
+    selectedIds.value = selectedIds.value.filter(id => id !== businessId)
+  } else {
+    selectedIds.value = [...selectedIds.value, businessId]
+  }
+}
+function toggleSelectAllPage() {
+  clearConfirmOpen.value = false
+  const pageIds = rows.value.map(row => row.businessId)
+  if (!pageIds.length) return
+  if (allPageSelected.value) {
+    const pageSet = new Set(pageIds)
+    selectedIds.value = selectedIds.value.filter(id => !pageSet.has(id))
+  } else {
+    const next = new Set(selectedIds.value)
+    for (const id of pageIds) next.add(id)
+    selectedIds.value = [...next]
+  }
 }
 async function openDetail(message: HeaderMessage) {
   if (busy.value || listLoading.value) return
@@ -254,8 +288,10 @@ function detailClosed() {
   detailError.value = null
   if (!disposed) trigger.value?.focus()
 }
-async function runAction(target: Action, businessId = '') {
-  if (disposed || busy.value || (target === 'delete' && !businessId)) return
+async function runAction(target: Action, businessId = '', batchIds?: string[]) {
+  const targetIds = target === 'batchDelete' ? [...(batchIds ?? selectedIds.value)] : []
+  if (disposed || busy.value || (target === 'delete' && !businessId) || (target === 'batchDelete' && !targetIds.length)) return
+  clearConfirmOpen.value = false
   stopList()
   stopUnread()
   action.value = target
@@ -266,21 +302,40 @@ async function runAction(target: Action, businessId = '') {
   actionController = controller
   try {
     if (target === 'all') await readAllHeaderMessages(controller.signal)
-    else await deleteHeaderMessage(businessId, controller.signal)
+    else if (target === 'delete') await deleteHeaderMessage(businessId, controller.signal)
+    else if (target === 'batchDelete') await deleteHeaderMessages(targetIds, controller.signal)
+    else await clearAllHeaderMessages(controller.signal)
     if (disposed || controller.signal.aborted) return
     if (target === 'all') {
       rows.value = rows.value.map(row => ({ ...row, readStatus: 1 as const }))
       if (detail.value) detail.value = { ...detail.value, readStatus: 1 }
       unread.value = 0
-      notice.value = 'allReadDone'
-    } else {
+      notice.value = t('headerMessages.allReadDone')
+      ElMessage.success(notice.value)
+    } else if (target === 'delete') {
       removeCachedMessage(businessId)
       if (detailId.value === businessId) detailOpen.value = false
-      notice.value = 'deleted'
+      notice.value = t('headerMessages.deleted')
+      ElMessage.success(notice.value)
+    } else if (target === 'batchDelete') {
+      removeCachedMessages(targetIds)
+      if (targetIds.includes(detailId.value)) detailOpen.value = false
+      notice.value = t('headerMessages.batchDeleted', { count: formatNumber(targetIds.length) })
+      ElMessage.success(notice.value)
+    } else {
+      rows.value = []
+      selectedIds.value = []
+      totalElements.value = 0
+      totalPages.value = 0
+      page.value = 1
+      unread.value = 0
+      detailOpen.value = false
+      notice.value = t('headerMessages.clearedAll')
+      ElMessage.success(notice.value)
     }
   } catch (error) {
     if (disposed || controller.signal.aborted) return
-    actionError.value = { action: target, businessId, error }
+    actionError.value = { action: target, businessId, businessIds: targetIds.length ? targetIds : undefined, error }
   } finally {
     if (!disposed) {
       action.value = ''
@@ -293,7 +348,7 @@ async function runAction(target: Action, businessId = '') {
 }
 function retryAction() {
   const failure = actionError.value
-  if (failure) void runAction(failure.action, failure.businessId)
+  if (failure) void runAction(failure.action, failure.businessId, failure.businessIds)
 }
 function outsidePointer(event: PointerEvent) {
   const target = event.target
@@ -345,7 +400,7 @@ defineExpose({ close: () => closePanel() })
       <span v-if="unread !== null && unread > 0" class="message-badge" aria-hidden="true">{{ unread > 99 ? '99+' : formatNumber(unread) }}</span>
       <span v-else-if="unreadError" class="count-warning" aria-hidden="true" />
     </button>
-    <span class="sr-only" role="status">{{ notice ? t(`headerMessages.${notice}`) : '' }}</span>
+    <span class="sr-only" role="status">{{ notice }}</span>
   </span>
 
   <Teleport to="body">
@@ -357,13 +412,42 @@ defineExpose({ close: () => closePanel() })
           <button class="message-icon-button" type="button" :title="t('headerMessages.close')" :aria-label="t('headerMessages.close')" @click="closePanel(true)"><i class="i-mdi-close" aria-hidden="true" /></button>
         </header>
 
+        <div v-if="rows.length > 0 || totalElements > 0" class="message-batch-bar">
+          <template v-if="!clearConfirmOpen">
+            <label class="batch-select-all">
+              <input type="checkbox" :checked="allPageSelected" :indeterminate.prop="somePageSelected" :disabled="busy || listLoading || rows.length === 0" @change="toggleSelectAllPage" />
+              <span>{{ t('headerMessages.selectAll') }}</span>
+              <span v-if="selectedIds.length > 0" class="batch-selected-pill">{{ t('headerMessages.selectedCount', { count: formatNumber(selectedIds.length) }) }}</span>
+            </label>
+            <div class="batch-actions">
+              <button class="message-danger-chip" type="button" :disabled="busy || listLoading || selectedIds.length === 0" @click="runAction('batchDelete')">
+                <i :class="action === 'batchDelete' ? 'i-mdi-loading message-spin' : 'i-mdi-trash-can-outline'" aria-hidden="true" />
+                <span>{{ t(action === 'batchDelete' ? 'headerMessages.batchDeleting' : 'headerMessages.batchDelete') }}</span>
+              </button>
+              <button class="message-clear-button" type="button" :disabled="busy || listLoading || totalElements === 0" @click="clearConfirmOpen = true">
+                {{ t('headerMessages.clearAll') }}
+              </button>
+            </div>
+          </template>
+          <div v-else class="batch-confirm-row" role="alert">
+            <span class="batch-confirm-text">{{ t('headerMessages.clearConfirm', { count: formatNumber(totalElements) }) }}</span>
+            <div class="batch-confirm-actions">
+              <button class="batch-confirm-cancel" type="button" :disabled="busy" @click="clearConfirmOpen = false">{{ t('headerMessages.cancel') }}</button>
+              <button class="batch-confirm-submit" type="button" :disabled="busy" @click="runAction('clearAll')">{{ t(action === 'clearAll' ? 'headerMessages.clearingAll' : 'headerMessages.confirmClear') }}</button>
+            </div>
+          </div>
+        </div>
+
         <div class="message-panel-scroll" :aria-busy="listLoading || busy || undefined">
           <PageErrorNotice v-if="unreadError" :title="t('headerMessages.unreadFailed')" popper-class="header-message-error-popover"><p>{{ headerMessagesError(unreadError) }}</p><button type="button" :disabled="unreadLoading || busy" @click="refreshUnread">{{ t('headerMessages.retry') }}</button></PageErrorNotice>
           <PageErrorNotice v-if="actionError" :title="t('headerMessages.actionFailed')" popper-class="header-message-error-popover"><p>{{ headerMessagesError(actionError.error) }}</p><button type="button" :disabled="busy" @click="retryAction">{{ t('headerMessages.retry') }}</button></PageErrorNotice>
           <PageErrorNotice v-if="listError" :title="t('headerMessages.listFailed')" popper-class="header-message-error-popover"><p>{{ headerMessagesError(listError) }}</p><button type="button" :disabled="listLoading || busy" @click="loadPage(requestedPage)">{{ t('headerMessages.retry') }}</button></PageErrorNotice>
           <div v-if="listLoading" class="message-loading" role="status"><i class="i-mdi-loading message-spin" aria-hidden="true" />{{ t(loaded ? 'headerMessages.refreshing' : 'headerMessages.loading') }}</div>
           <ul v-if="rows.length" class="message-list">
-            <li v-for="message in rows" :key="message.businessId" :class="{ 'is-unread': message.readStatus === 0 }">
+            <li v-for="message in rows" :key="message.businessId" :class="{ 'is-unread': message.readStatus === 0, 'is-selected': selectedSet.has(message.businessId) }">
+              <label class="message-check">
+                <input type="checkbox" :checked="selectedSet.has(message.businessId)" :aria-label="t('headerMessages.selectMessage', { subject: subject(message) })" :disabled="busy || listLoading" @change="toggleSelect(message.businessId)" />
+              </label>
               <button class="message-open" type="button" :disabled="busy || listLoading" :aria-label="t('headerMessages.openMessage', { subject: subject(message), status: status(message) })" @click="openDetail(message)">
                 <span class="message-read-dot" :class="{ 'is-unread': message.readStatus === 0 }" aria-hidden="true" />
                 <span class="message-summary"><strong>{{ subject(message) }}</strong><span class="message-meta"><time :datetime="message.createTime || undefined">{{ messageTime(message.createTime) }}</time><span class="message-type">{{ messageType(message) }}</span></span></span>
@@ -414,6 +498,24 @@ defineExpose({ close: () => closePanel() })
 .panel-heading > span { color: var(--text-muted); font-size: var(--font-size-secondary); }
 .message-text-button { flex: none; padding: 4px 0; border: 0; background: transparent; color: var(--brand); font: 500 var(--font-size-body)/1.5 var(--sans); cursor: pointer; }
 .message-text-button:not(:disabled):hover { color: var(--brand-hover); text-decoration: underline; text-underline-offset: 3px; }
+.message-batch-bar { display: flex; align-items: center; justify-content: space-between; flex: none; gap: 8px; min-height: 38px; padding: 6px 12px 6px 14px; border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--bg-search) 60%, var(--bg-card)); font-size: var(--font-size-secondary); }
+.batch-select-all { display: inline-flex; align-items: center; gap: 6px; min-width: 0; min-height: 28px; color: var(--text-secondary); font-weight: 500; cursor: pointer; user-select: none; }
+.batch-select-all input, .message-check input { width: 15px; height: 15px; margin: 0; accent-color: var(--brand); cursor: pointer; }
+.batch-selected-pill { padding: 1px 6px; border-radius: 999px; background: color-mix(in srgb, var(--brand) 14%, var(--bg-card)); color: var(--brand); font-size: var(--font-size-caption); font-weight: 600; font-variant-numeric: tabular-nums; }
+.batch-actions { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.message-danger-chip { display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 9px; border: 1px solid color-mix(in srgb, var(--status-danger) 30%, var(--border)); border-radius: 999px; background: var(--status-danger-bg); color: var(--status-danger); font: 500 var(--font-size-caption)/1 var(--sans); cursor: pointer; transition: background-color 150ms ease, border-color 150ms ease; }
+.message-danger-chip > i { font-size: 14px; }
+.message-danger-chip:not(:disabled):hover { border-color: var(--status-danger); background: color-mix(in srgb, var(--status-danger) 18%, var(--bg-card)); }
+.message-clear-button { padding: 4px 4px; border: 0; background: transparent; color: var(--status-danger); font: 500 var(--font-size-caption)/1.2 var(--sans); cursor: pointer; }
+.message-clear-button:not(:disabled):hover { text-decoration: underline; text-underline-offset: 3px; }
+.batch-confirm-row { display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 8px; }
+.batch-confirm-text { color: var(--status-danger); font-size: var(--font-size-caption); font-weight: 600; overflow-wrap: anywhere; }
+.batch-confirm-actions { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.batch-confirm-cancel, .batch-confirm-submit { height: 26px; padding: 0 10px; border-radius: 999px; font: 600 var(--font-size-caption)/1 var(--sans); cursor: pointer; }
+.batch-confirm-cancel { border: 1px solid var(--border); background: var(--bg-card); color: var(--text-secondary); }
+.batch-confirm-submit { border: 0; background: var(--status-danger); color: #fff; }
+.message-check { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 26px; height: 32px; cursor: pointer; }
+.message-list > li.is-selected { background: color-mix(in srgb, var(--brand) 7%, var(--bg-card)); }
 .message-icon-button { display: inline-grid; place-items: center; flex: none; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 9px; background: transparent; color: var(--text-secondary); cursor: pointer; transition: background-color 160ms ease, color 160ms ease; }
 .message-icon-button > i { font-size: 18px; }
 .message-icon-button:not(:disabled):hover { background: var(--bg-hover); color: var(--text-primary); }

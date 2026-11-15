@@ -1,0 +1,214 @@
+/* Global unified toast bar: slides in from top-right with a two-part icon + body layout. */
+
+html:root .el-message {
+  --toast-accent: var(--status-info);
+  --toast-accent-bg: var(--status-info-bg);
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  width: 380px;
+  min-width: 0;
+  max-width: calc(100vw - 36px);
+  height: 56px;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--toast-accent) 34%, var(--border));
+  background: var(--bg-card);
+  box-shadow: 0 16px 38px rgba(15, 20, 26, 0.22), 0 4px 12px rgba(15, 20, 26, 0.12);
+  font-family: var(--sans);
+  transition:
+    top 240ms cubic-bezier(0.22, 1, 0.36, 1),
+    bottom 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+html:root .el-message.el-message--success {
+  --toast-accent: var(--status-ok);
+  --toast-accent-bg: var(--status-ok-bg);
+}
+
+html:root .el-message.el-message--error {
+  --toast-accent: var(--status-danger);
+  --toast-accent-bg: var(--status-danger-bg);
+}
+
+html:root .el-message.el-message--warning {
+  --toast-accent: var(--status-warn);
+  --toast-accent-bg: var(--status-warn-bg);
+}
+
+html:root .el-message.el-message--info {
+  --toast-accent: var(--status-info);
+  --toast-accent-bg: var(--status-info-bg);
+}
+
+html:root .el-message.el-message--primary {
+  --toast-accent: var(--brand);
+  --toast-accent-bg: var(--brand-subtle);
+}
+
+/* Part 1: Front icon compartment */
+html:root .el-message .el-message__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 100%;
+  flex-shrink: 0;
+  margin: 0;
+  font-size: 20px;
+  color: var(--toast-accent);
+  background: var(--toast-accent-bg);
+  border-radius: 11px 0 0 11px;
+  border-right: 1px solid color-mix(in srgb, var(--toast-accent) 18%, var(--border));
+}
+
+/* Part 2: Message body text + optional close trigger */
+html:root .el-message .el-message__content {
+  flex: 1 1 auto;
+  min-width: 0;
+  align-self: center;
+  margin: 0;
+  padding: 0 14px;
+  font-size: var(--font-size-body);
+  font-weight: 500;
+  line-height: 1.38;
+  color: var(--text-primary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+}
+
+html:root .el-message.is-closable .el-message__content {
+  padding-right: 8px;
+}
+
+html:root .el-message .el-message__closeBtn {
+  align-self: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  margin-right: 10px;
+  border-radius: 999px;
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+html:root .el-message .el-message__closeBtn:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+html:root .el-message.is-right {
+  right: 18px;
+  left: auto;
+  transform: translate3d(0, 0, 0);
+}
+
+@starting-style {
+  html:root .el-message.is-right {
+    opacity: 0;
+    transform: translate3d(calc(100% + 28px), 0, 0);
+  }
+}
+
+html:root .el-message-fade-enter-from.is-right,
+html:root .el-message-fade-leave-to.is-right {
+  opacity: 0;
+  transform: translate3d(calc(100% + 28px), 0, 0);
+}
+
+html:root .el-message.is-right.el-message-fade-enter-active {
+  will-change: transform, opacity;
+  animation: toast-slide-in-right 340ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+html:root .el-message.is-right.el-message-fade-leave-active {
+  will-change: transform, opacity;
+  pointer-events: none;
+  animation: toast-slide-out-right 220ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+@keyframes toast-slide-in-right {
+  0% {
+    opacity: 0;
+    transform: translate3d(calc(100% + 28px), 0, 0) scale(0.97);
+  }
+  60% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes toast-slide-out-right {
+  0% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(calc(100% + 28px), 0, 0) scale(0.98);
+  }
+}
+
+@keyframes toast-fade-in-reduced {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes toast-fade-out-reduced {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@media (max-width: 760px) {
+  html:root .el-message {
+    width: min(360px, calc(100vw - 24px));
+    min-width: 0;
+    max-width: calc(100vw - 24px);
+    height: 52px;
+  }
+  html:root .el-message.is-right {
+    right: 12px;
+  }
+  html:root .el-message .el-message__icon {
+    width: 42px;
+    height: 100%;
+    font-size: 18px;
+  }
+  html:root .el-message .el-message__content {
+    padding: 0 10px 0 12px;
+    font-size: var(--font-size-secondary);
+    line-height: 1.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:root .el-message {
+    transition: none;
+  }
+  html:root .el-message.is-right.el-message-fade-enter-active {
+    animation: toast-fade-in-reduced 120ms ease both;
+  }
+  html:root .el-message.is-right.el-message-fade-leave-active {
+    animation: toast-fade-out-reduced 100ms ease both;
+  }
+  html:root .el-message-fade-enter-from.is-right,
+  html:root .el-message-fade-leave-to.is-right {
+    transform: translate3d(0, 0, 0);
+  }
+  @starting-style {
+    html:root .el-message.is-right {
+      transform: translate3d(0, 0, 0);
+    }
+  }
+}

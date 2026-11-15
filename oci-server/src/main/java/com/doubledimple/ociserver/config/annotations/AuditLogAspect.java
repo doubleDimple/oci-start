@@ -136,16 +136,6 @@ public class AuditLogAspect {
             String classTitle = (classAnnotation != null && StringUtils.hasText(classAnnotation.title())) ? classAnnotation.title() : "";
             String methodTitle = (methodAnnotation != null && StringUtils.hasText(methodAnnotation.title())) ? methodAnnotation.title() : "";
 
-            if (!StringUtils.hasText(methodTitle)) {
-                try {
-                    io.swagger.v3.oas.annotations.Operation op = AnnotationUtils.findAnnotation(signature.getMethod(), io.swagger.v3.oas.annotations.Operation.class);
-                    if (op != null && StringUtils.hasText(op.summary())) {
-                        methodTitle = op.summary();
-                    }
-                } catch (Throwable ignored) {
-                }
-            }
-
             if (StringUtils.hasText(classTitle) && StringUtils.hasText(methodTitle)) {
                 title = classTitle + " - " + methodTitle;
             } else if (StringUtils.hasText(classTitle)) {

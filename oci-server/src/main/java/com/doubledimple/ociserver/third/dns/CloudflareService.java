@@ -24,6 +24,7 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.HttpClientErrorException;
@@ -35,8 +36,11 @@ import java.net.URI;
 import java.net.URLEncoder;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -54,6 +58,93 @@ public class CloudflareService {
     private DnsRecordRepository dnsRecordRepository;
 
     private static final String CLOUDFLARE_API_BASE = "https://api.cloudflare.com/client/v4";
+    private static final List<String> DEFAULT_CF_OFFICIAL_IPV4_CIDRS = Collections.unmodifiableList(Arrays.asList(
+            "103.21.244.0/22",
+            "103.22.200.0/22",
+            "103.31.4.0/22",
+            "104.16.0.0/13",
+            "104.24.0.0/14",
+            "108.162.192.0/18",
+            "131.0.72.0/22",
+            "141.101.64.0/18",
+            "162.158.0.0/15",
+            "172.64.0.0/13",
+            "173.245.48.0/20",
+            "188.114.96.0/20",
+            "190.93.240.0/20",
+            "197.234.240.0/22",
+            "198.41.128.0/17"
+    ));
+    private static final List<String> DEFAULT_CF_OFFICIAL_IPV6_CIDRS = Collections.unmodifiableList(Arrays.asList(
+            "2400:cb00::/32",
+            "2405:8100::/32",
+            "2405:b500::/32",
+            "2606:4700::/32",
+            "2803:f800::/32",
+            "2a06:98c0::/29",
+            "2c0f:f248::/32"
+    ));
+
+    /**
+     * 获取 Cloudflare 官方公网 IP CIDR 列表（优先实时拉取公开接口，不可达时回退到内置列表）
+     */
+    public Map<String, Object> listOfficialIpRanges() {
+        List<String> ipv4 = new ArrayList<>();
+        List<String> ipv6 = new ArrayList<>();
+        String etag = "";
+        String source = "builtin";
+
+        try {
+            SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+            factory.setConnectTimeout(4000);
+            factory.setReadTimeout(4000);
+            RestTemplate restTemplate = new RestTemplate(factory);
+            String body = restTemplate.getForObject(CLOUDFLARE_API_BASE + "/ips", String.class);
+            if (StringUtils.isNotBlank(body)) {
+                ObjectMapper mapper = new ObjectMapper();
+                JsonNode root = mapper.readTree(body);
+                if (root.path("success").asBoolean(false) && root.has("result")) {
+                    JsonNode result = root.get("result");
+                    extractCidrs(result.get("ipv4_cidrs"), ipv4);
+                    extractCidrs(result.get("ipv6_cidrs"), ipv6);
+                    if (result.hasNonNull("etag")) {
+                        etag = result.get("etag").asText("");
+                    }
+                    if (!ipv4.isEmpty() || !ipv6.isEmpty()) {
+                        source = "live";
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("在线获取 Cloudflare 官方公网 IP 段失败，使用内置列表回退: {}", e.getMessage());
+        }
+
+        if (ipv4.isEmpty()) {
+            ipv4.addAll(DEFAULT_CF_OFFICIAL_IPV4_CIDRS);
+        }
+        if (ipv6.isEmpty()) {
+            ipv6.addAll(DEFAULT_CF_OFFICIAL_IPV6_CIDRS);
+        }
+
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("ipv4", ipv4);
+        data.put("ipv6", ipv6);
+        data.put("etag", etag);
+        data.put("source", source);
+        return data;
+    }
+
+    private void extractCidrs(JsonNode node, List<String> target) {
+        if (node == null || !node.isArray()) {
+            return;
+        }
+        for (JsonNode item : node) {
+            String value = item.asText("").trim();
+            if (StringUtils.isNotBlank(value)) {
+                target.add(value);
+            }
+        }
+    }
 
     /**
      * 获取DNS记录

@@ -243,6 +243,25 @@ public class CloudflareController  extends BaseController {
     }
 
     /**
+     * API接口：获取 Cloudflare 官方公网 IP 段（IPv4 / IPv6 CIDR）
+     */
+    @GetMapping("/api/official-ips")
+    @ResponseBody
+    public ApiResponse getOfficialIpRanges() {
+        try {
+            Map<String, Object> officialIps = cloudflareService.listOfficialIpRanges();
+            return ApiResponse.builder()
+                    .success(true)
+                    .message("获取 Cloudflare 官方公网 IP 成功")
+                    .data(officialIps)
+                    .build();
+        } catch (Exception e) {
+            log.error("获取 Cloudflare 官方公网 IP 失败", e);
+            return ApiResponse.error("获取 Cloudflare 官方公网 IP 失败: " + e.getMessage());
+        }
+    }
+
+    /**
      * API接口：同步所有域名的DNS记录
      */
     @PostMapping("/api/sync/all")

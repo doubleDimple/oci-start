@@ -13,6 +13,7 @@ import './styles/tokens.css'
 import './styles/index.scss'
 import './styles/motion.scss'
 import './styles/mobile-ios.scss'
+import './styles/toast.scss'
 
 applyStoredTheme()
 

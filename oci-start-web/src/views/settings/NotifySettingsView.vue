@@ -239,47 +239,56 @@ onBeforeUnmount(() => {
           <PageErrorNotice v-if="problem">{{ errorLabel(problem) }} {{ loaded ? t('notificationSettings.retained') : '' }}</PageErrorNotice>
           <PageErrorNotice v-if="mutation.outcome === 'failed'">{{ errorLabel(mutation.problem) }}</PageErrorNotice>
           <div class="notification-section-title">
-            <div><h2 ref="formHeading" tabindex="-1">{{ t(`notificationSettings.sections.${active}`) }}</h2><p>{{ t(`notificationSettings.descriptions.${active}`) }}</p></div>
+            <div class="notification-section-lead">
+              <span class="notification-section-icon" aria-hidden="true"><i :class="sections.find(item => item.id === active)?.icon || 'i-mdi-bell-outline'" /></span>
+              <div><h2 ref="formHeading" tabindex="-1">{{ t(`notificationSettings.sections.${active}`) }}</h2><p>{{ t(`notificationSettings.descriptions.${active}`) }}</p></div>
+            </div>
             <label class="notification-toggle"><span>{{ loaded ? t(`notificationSettings.${enabled ? 'enabled' : 'disabled'}`) : '—' }}</span><input v-model="enabled" type="checkbox" role="switch" :aria-label="t('notificationSettings.enable')" :disabled="disabled" /><span class="notification-switch" aria-hidden="true" /></label>
           </div>
           <form id="notification-settings-form" class="notification-form" :aria-busy="loading || contextLocked" @submit.prevent="prepareSave">
             <fieldset :disabled="disabled">
-              <template v-if="active === 'task'">
-                <div class="notification-pair">
+              <div v-if="active === 'task'" class="notification-cards">
+                <div class="notification-card">
                   <div class="notification-field"><label for="notification-hour">{{ t('notificationSettings.executeHour') }}</label><el-select id="notification-hour" v-model="drafts.task.executeHour" :disabled="disabled" :teleported="true"><el-option v-for="hour in 24" :key="hour" :value="hour - 1" :label="t('notificationSettings.hour', { hour: String(hour - 1).padStart(2, '0') })" /></el-select></div>
                   <div class="notification-field"><span class="notification-label">{{ t('notificationSettings.timeZone') }}</span><span class="notification-value">{{ settings?.serverTimeZone || '—' }}</span></div>
                 </div>
-                <div class="notification-field"><span class="notification-label" id="notification-task-items">{{ t('notificationSettings.taskItems') }}</span>
-                  <div class="notification-checks" role="group" aria-labelledby="notification-task-items">
-                    <label><input v-model="drafts.task.enableAccountCheck" type="checkbox" /><span>{{ t('notificationSettings.accountCheck') }}</span></label>
-                    <label><input v-model="drafts.task.enableBootLog" type="checkbox" /><span>{{ t('notificationSettings.bootLog') }}</span></label>
-                    <label><input v-model="drafts.task.enableCostCheck" type="checkbox" /><span>{{ t('notificationSettings.costCheck') }}</span></label>
-                  </div><small>{{ t('notificationSettings.taskHint') }}</small>
+                <div class="notification-card">
+                  <div class="notification-field"><span class="notification-label" id="notification-task-items">{{ t('notificationSettings.taskItems') }}</span>
+                    <div class="notification-checks" role="group" aria-labelledby="notification-task-items">
+                      <label><input v-model="drafts.task.enableAccountCheck" type="checkbox" /><span>{{ t('notificationSettings.accountCheck') }}</span></label>
+                      <label><input v-model="drafts.task.enableBootLog" type="checkbox" /><span>{{ t('notificationSettings.bootLog') }}</span></label>
+                      <label><input v-model="drafts.task.enableCostCheck" type="checkbox" /><span>{{ t('notificationSettings.costCheck') }}</span></label>
+                    </div><small>{{ t('notificationSettings.taskHint') }}</small>
+                  </div>
                 </div>
-              </template>
-              <template v-else-if="active === 'telegram'">
-                <div class="notification-field"><label for="notification-chat-id">{{ t('notificationSettings.chatId') }}</label><input id="notification-chat-id" v-model="drafts.telegram.chatId" type="text" autocomplete="off" autocapitalize="off" :spellcheck="false" /><small>{{ t('notificationSettings.chatIdHint') }}</small></div>
-                <div class="notification-field"><label for="notification-chat-name">{{ t('notificationSettings.chatName') }}</label><input id="notification-chat-name" v-model="drafts.telegram.chatName" type="text" autocomplete="off" :spellcheck="false" /></div>
-              </template>
-              <template v-else-if="active === 'proxy'">
-                <div class="notification-field"><label for="notification-proxy-type">{{ t('notificationSettings.proxyType') }}</label><el-select id="notification-proxy-type" v-model="drafts.proxy.type" :disabled="disabled" :teleported="true"><el-option v-if="!['HTTP', 'SOCKS5'].includes(drafts.proxy.type)" :value="drafts.proxy.type" :label="drafts.proxy.type" disabled /><el-option value="HTTP" label="HTTP" /><el-option value="SOCKS5" label="SOCKS5" /></el-select></div>
-                <div class="notification-pair notification-host-port">
-                  <div class="notification-field"><label for="notification-proxy-host">{{ t('notificationSettings.proxyHost') }}</label><input id="notification-proxy-host" v-model="drafts.proxy.host" type="text" autocomplete="off" autocapitalize="off" :spellcheck="false" placeholder="127.0.0.1" /></div>
-                  <div class="notification-field"><label for="notification-proxy-port">{{ t('notificationSettings.proxyPort') }}</label><input id="notification-proxy-port" v-model.number="drafts.proxy.port" type="number" min="1" max="65535" step="1" inputmode="numeric" /></div>
+              </div>
+              <div v-else class="notification-cards">
+                <div v-if="active === 'telegram' || active === 'proxy' || active === 'bark'" class="notification-card">
+                  <template v-if="active === 'telegram'">
+                    <div class="notification-field"><label for="notification-chat-id">{{ t('notificationSettings.chatId') }}</label><input id="notification-chat-id" v-model="drafts.telegram.chatId" type="text" autocomplete="off" autocapitalize="off" :spellcheck="false" /><small>{{ t('notificationSettings.chatIdHint') }}</small></div>
+                    <div class="notification-field"><label for="notification-chat-name">{{ t('notificationSettings.chatName') }}</label><input id="notification-chat-name" v-model="drafts.telegram.chatName" type="text" autocomplete="off" :spellcheck="false" /></div>
+                  </template>
+                  <template v-else-if="active === 'proxy'">
+                    <div class="notification-field"><label for="notification-proxy-type">{{ t('notificationSettings.proxyType') }}</label><el-select id="notification-proxy-type" v-model="drafts.proxy.type" :disabled="disabled" :teleported="true"><el-option v-if="!['HTTP', 'SOCKS5'].includes(drafts.proxy.type)" :value="drafts.proxy.type" :label="drafts.proxy.type" disabled /><el-option value="HTTP" label="HTTP" /><el-option value="SOCKS5" label="SOCKS5" /></el-select></div>
+                    <div class="notification-pair notification-host-port">
+                      <div class="notification-field"><label for="notification-proxy-host">{{ t('notificationSettings.proxyHost') }}</label><input id="notification-proxy-host" v-model="drafts.proxy.host" type="text" autocomplete="off" autocapitalize="off" :spellcheck="false" placeholder="127.0.0.1" /></div>
+                      <div class="notification-field"><label for="notification-proxy-port">{{ t('notificationSettings.proxyPort') }}</label><input id="notification-proxy-port" v-model.number="drafts.proxy.port" type="number" min="1" max="65535" step="1" inputmode="numeric" /></div>
+                    </div>
+                    <div class="notification-field"><label for="notification-proxy-username">{{ t('notificationSettings.proxyUsername') }}</label><input id="notification-proxy-username" v-model="drafts.proxy.username" type="text" autocomplete="off" autocapitalize="off" :spellcheck="false" /></div>
+                  </template>
+                  <div v-else class="notification-field"><label for="notification-bark-url">{{ t('notificationSettings.barkUrl') }}</label><input id="notification-bark-url" v-model="drafts.bark.url" type="url" autocomplete="off" autocapitalize="off" :spellcheck="false" placeholder="https://api.day.app" /><small>{{ t('notificationSettings.barkHint') }}</small></div>
                 </div>
-                <div class="notification-field"><label for="notification-proxy-username">{{ t('notificationSettings.proxyUsername') }}</label><input id="notification-proxy-username" v-model="drafts.proxy.username" type="text" autocomplete="off" autocapitalize="off" :spellcheck="false" /></div>
-              </template>
-              <div v-else-if="active === 'bark'" class="notification-field"><label for="notification-bark-url">{{ t('notificationSettings.barkUrl') }}</label><input id="notification-bark-url" v-model="drafts.bark.url" type="url" autocomplete="off" autocapitalize="off" :spellcheck="false" placeholder="https://api.day.app" /><small>{{ t('notificationSettings.barkHint') }}</small></div>
-              <div v-for="field in currentSecrets" :key="`${active}-${field.key}`" class="notification-secret">
-                <div class="notification-field">
-                  <label :for="`notification-mode-${field.key}`">{{ t(`notificationSettings.${field.key}`) }}<span v-if="field.optional">{{ t('notificationSettings.optional') }}</span></label>
-                  <el-select :id="`notification-mode-${field.key}`" :model-value="modeOf(field)" :disabled="disabled" :teleported="true" :aria-label="`${t(`notificationSettings.${field.key}`)} · ${t('notificationSettings.secretMode')}`" @update:model-value="updateMode(field, $event)">
-                    <el-option v-if="hasSaved(field)" value="keep" :label="t('notificationSettings.keepSecret')" /><el-option value="replace" :label="t('notificationSettings.replaceSecret')" /><el-option v-if="hasSaved(field)" value="clear" :disabled="enabled && !field.optional" :label="t('notificationSettings.clearSecret')" />
-                  </el-select>
-                  <small v-if="modeOf(field) !== 'replace'">{{ t(`notificationSettings.${modeOf(field) === 'clear' ? 'clearHint' : 'keepHint'}`) }}</small>
+                <div v-for="field in currentSecrets" :key="`${active}-${field.key}`" class="notification-card">
+                  <div class="notification-field">
+                    <label :for="`notification-mode-${field.key}`">{{ t(`notificationSettings.${field.key}`) }}<span v-if="field.optional">{{ t('notificationSettings.optional') }}</span></label>
+                    <el-select :id="`notification-mode-${field.key}`" :model-value="modeOf(field)" :disabled="disabled" :teleported="true" :aria-label="`${t(`notificationSettings.${field.key}`)} · ${t('notificationSettings.secretMode')}`" @update:model-value="updateMode(field, $event)">
+                      <el-option v-if="hasSaved(field)" value="keep" :label="t('notificationSettings.keepSecret')" /><el-option value="replace" :label="t('notificationSettings.replaceSecret')" /><el-option v-if="hasSaved(field)" value="clear" :disabled="enabled && !field.optional" :label="t('notificationSettings.clearSecret')" />
+                    </el-select>
+                    <small v-if="modeOf(field) !== 'replace'">{{ t(`notificationSettings.${modeOf(field) === 'clear' ? 'clearHint' : 'keepHint'}`) }}</small>
+                  </div>
+                  <SecuritySecretInput v-if="modeOf(field) === 'replace'" :id="`notification-secret-${field.key}`" :model-value="secretValue(field)" :disabled="disabled"
+                    :label="t('notificationSettings.newValue', { field: t(`notificationSettings.${field.key}`) })" @update:model-value="updateSecret(field, $event)" />
                 </div>
-                <SecuritySecretInput v-if="modeOf(field) === 'replace'" :id="`notification-secret-${field.key}`" :model-value="secretValue(field)" :disabled="disabled"
-                  :label="t('notificationSettings.newValue', { field: t(`notificationSettings.${field.key}`) })" @update:model-value="updateSecret(field, $event)" />
               </div>
             </fieldset>
             <p v-if="validation" class="notification-error" role="alert">{{ t(`notificationSettings.validation.${validation}`) }}</p>

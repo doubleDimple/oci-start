@@ -19,6 +19,8 @@ import javax.persistence.criteria.Predicate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 /**
  * @version 1.0.0
@@ -96,5 +98,36 @@ public class SystemMessageServiceImpl implements SystemMessageService {
             messageRepository.delete(message);
         }
         return ApiResponse.success();
+    }
+
+    @Override
+    @Transactional
+    public ApiResponse deleteMessages(SystemMessageRequest messageRequest) {
+        List<String> rawIds = messageRequest != null ? messageRequest.getBusinessIds() : null;
+        if (rawIds == null || rawIds.isEmpty()) {
+            return ApiResponse.error("请选择要删除的消息");
+        }
+        List<String> ids = rawIds.stream()
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .distinct()
+                .collect(Collectors.toList());
+        if (ids.isEmpty()) {
+            return ApiResponse.error("请选择要删除的消息");
+        }
+        int deleted = 0;
+        final int batchSize = 500;
+        for (int i = 0; i < ids.size(); i += batchSize) {
+            deleted += messageRepository.deleteByBusinessIds(ids.subList(i, Math.min(i + batchSize, ids.size())));
+        }
+        return ApiResponse.success(deleted);
+    }
+
+    @Override
+    @Transactional
+    public ApiResponse clearAllMessages() {
+        int deleted = messageRepository.deleteAllMessages();
+        return ApiResponse.success(deleted);
     }
 }

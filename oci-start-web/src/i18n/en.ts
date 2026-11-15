@@ -52,7 +52,6 @@ import tenantResources from './tenants/resources'
 import tenantSubscription from './tenants/subscriptions'
 import { headerEn } from './header'
 import { headerMessagesEn } from './headerMessages'
-import { headerAssetsEn } from './headerAssets'
 import { headerVersionEn } from './headerVersion'
 import { auditLogsEn } from './auditLogs'
 import { mobileTenantToolsMessages } from './mobileTenantTools'
@@ -114,7 +113,6 @@ export default {
   gcpInstances: gcpInstances.en,
   header: headerEn,
   headerMessages: headerMessagesEn,
-  headerAssets: headerAssetsEn,
   headerVersion: headerVersionEn,
   ociBoot: ociBoot.en,
   bootTasks: bootTasks.en,
@@ -259,5 +257,6 @@ export default {
     mfa: 'MFA backup',
     dev: 'Developer',
     token: 'API tokens',
+    apiDocs: 'API docs',
   },
 }

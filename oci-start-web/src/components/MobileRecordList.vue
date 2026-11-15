@@ -87,7 +87,7 @@ onBeforeUnmount(() => {
 <template>
   <div ref="root" class="mobile-record-list" :data-mobile-record-list-id="enabled ? listId : undefined" :class="{ 'is-drilldown': enabled, 'is-record-detail': !!selected }">
     <div v-if="selected" class="mobile-record-detail-toolbar">
-      <PageBackButton @click="back" />
+      <PageBackButton local @click="back" />
       <span ref="heading" tabindex="-1">{{ t('mobileRecords.details') }}</span>
     </div>
     <p v-if="unavailable" class="mobile-record-unavailable" role="status">{{ t('mobileRecords.unavailable') }}</p>

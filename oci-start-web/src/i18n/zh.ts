@@ -52,7 +52,6 @@ import tenantResources from './tenants/resources'
 import tenantSubscription from './tenants/subscriptions'
 import { headerZh } from './header'
 import { headerMessagesZh } from './headerMessages'
-import { headerAssetsZh } from './headerAssets'
 import { headerVersionZh } from './headerVersion'
 import { auditLogsZh } from './auditLogs'
 import { mobileTenantToolsMessages } from './mobileTenantTools'
@@ -114,7 +113,6 @@ export default {
   gcpInstances: gcpInstances.zh,
   header: headerZh,
   headerMessages: headerMessagesZh,
-  headerAssets: headerAssetsZh,
   headerVersion: headerVersionZh,
   ociBoot: ociBoot.zh,
   bootTasks: bootTasks.zh,
@@ -259,5 +257,6 @@ export default {
     mfa: 'MFA 备份',
     dev: '开发配置',
     token: 'Token 配置',
+    apiDocs: 'API 文档',
   },
 }

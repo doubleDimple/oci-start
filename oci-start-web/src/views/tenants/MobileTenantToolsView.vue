@@ -14,7 +14,7 @@ import {
 import { mobileTenantToolsMessages } from '@/i18n/mobileTenantTools'
 import { isMobileRecordNavigation } from '@/composables/useMobileRecords'
 
-const TenantIdentityDialogs = defineAsyncComponent(() => import('./components/TenantIdentityDialogs.vue'))
+const TenantIdentityUsersWorkspace = defineAsyncComponent(() => import('./components/TenantIdentityUsersWorkspace.vue'))
 const TenantRegionVolumesDialog = defineAsyncComponent(() => import('./components/TenantRegionVolumesDialog.vue'))
 const TenantRegionSecurityDialog = defineAsyncComponent(() => import('./components/TenantRegionSecurityDialog.vue'))
 const TenantRegionMysqlDialog = defineAsyncComponent(() => import('./components/TenantRegionMysqlDialog.vue'))
@@ -79,18 +79,18 @@ function back() {
 }
 
 watch(() => [tool.value, route.query.tenantId, route.query.cloudType], load, { immediate: true })
-// Let the tool finish its own confirmation and close flow before changing accounts.
-onBeforeRouteLeave(() => !open.value)
-onBeforeRouteUpdate((to, from) => isMobileRecordNavigation(to, from) || !open.value)
+// Let modal tools finish their own confirmation and close flow before changing accounts.
+onBeforeRouteLeave(() => tool.value === 'users' || !open.value)
+onBeforeRouteUpdate((to, from) => isMobileRecordNavigation(to, from) || tool.value === 'users' || !open.value)
 onBeforeUnmount(() => { disposed = true; generation++; controller?.abort() })
 </script>
 
 <template>
   <section class="mobile-tenant-tools" :aria-label="title" :aria-busy="loading">
     <header class="mobile-tenant-tools-toolbar">
-      <PageBackButton :disabled="open" @click="back" />
+      <PageBackButton :disabled="tool !== 'users' && open" @click="back" />
       <span v-if="tenant" class="mobile-tenant-tools-name">{{ name }}<span v-if="tenant.region"> · {{ tenant.region }}</span></span>
-      <PrimaryBtn v-if="tenant && !open" @click="open = true">{{ t('open', { tool: title }) }}</PrimaryBtn>
+      <PrimaryBtn v-if="tenant && !open && tool !== 'users'" @click="open = true">{{ t('open', { tool: title }) }}</PrimaryBtn>
     </header>
     <div v-if="loading" class="mobile-tenant-tools-state" role="status"><i class="i-mdi-loading mobile-tenant-tools-spinner" aria-hidden="true" /><p>{{ t('loading') }}</p></div>
     <div v-else-if="error" class="mobile-tenant-tools-state" role="alert">
@@ -102,7 +102,7 @@ onBeforeUnmount(() => { disposed = true; generation++; controller?.abort() })
     </div>
     <p v-else-if="tenant" class="mobile-tenant-tools-context">{{ t('tenantId') }}: {{ tenant.id }}</p>
     <template v-if="open && tenant">
-      <TenantIdentityDialogs v-if="tool === 'users'" :key="`users-${tenant.id}`" :tenant="tenant" action="users" @close="open = false" />
+      <TenantIdentityUsersWorkspace v-if="tool === 'users'" :key="`users-${tenant.id}`" :tenant="tenant" />
       <TenantRegionVolumesDialog v-else-if="tool === 'volumes'" :key="`volumes-${tenant.id}`" :tenant="tenant" @close="open = false" />
       <TenantRegionSecurityDialog v-else-if="tool === 'security'" :key="`security-${tenant.id}`" :tenant="tenant" @close="open = false" />
       <TenantRegionMysqlDialog v-else-if="tool === 'mysql'" :key="`mysql-${tenant.id}`" :tenant="tenant" @close="open = false" />

@@ -15,6 +15,9 @@ import {
   bootError, generateBootPassword, getBootImages, getBootRegions, isBootTenantId, saveBootTask,
   type BootArchitecture, type BootImage, type BootRegion, type BootTaskInput,
 } from '@/api/ociBoot'
+import {
+  estimateBootTemplatePrice, formatUsd, OCI_HOURS_PER_MONTH,
+} from './bootPricing'
 
 type Mode = 'quick' | 'custom'
 interface BootTemplate {
@@ -58,6 +61,9 @@ const shell = useShellStore()
 const { t, locale } = useI18n()
 const root = ref<HTMLElement | null>(null)
 const confirmActions = ref<HTMLElement | null>(null)
+const riskTrigger = ref<HTMLButtonElement | null>(null)
+const riskCloseButton = ref<HTMLButtonElement | null>(null)
+const riskVisible = ref(false)
 usePageMotion(root)
 const numberFormat = computed(() => new Intl.NumberFormat(locale.value === 'en' ? 'en-US' : 'zh-CN'))
 const number = (value: number) => numberFormat.value.format(value)
@@ -117,6 +123,14 @@ const needsImage = computed(() => mode.value === 'custom' && !useDefaultImage.va
 const imageValid = computed(() => !needsImage.value || Boolean(selectedImage.value))
 const hasErrors = computed(() => !selectedRegion.value || !selectedTemplate.value
   || (mode.value === 'custom' && (!countValid.value || !intervalValid.value || !dayGapValid.value || !imageValid.value)))
+const selectedPrice = computed(() => {
+  if (mode.value !== 'custom' || !selectedTemplate.value?.paid) return null
+  return estimateBootTemplatePrice(selectedTemplate.value, countValid.value ? Number(countInput.value) : 1)
+})
+const confirmationPrice = computed(() => {
+  if (!confirmation.value?.template.paid) return null
+  return estimateBootTemplatePrice(confirmation.value.template, confirmation.value.input.instanceCount)
+})
 const createDisabled = computed(() => locked.value || regionsLoading.value || !selectedRegion.value || imagesLoading.value)
 let pageVersion = 0
 let regionVersion = 0
@@ -140,6 +154,14 @@ function validWindow(value: string): boolean {
 function inputValue(event: Event): string { return (event.target as HTMLInputElement).value }
 function templateSpecs(template: BootTemplate): string {
   return t('ociBoot.specs', { cpu: number(template.ocpu), memory: number(template.memory), disk: number(template.disk) })
+}
+function templateCardPrice(template: BootTemplate): string {
+  const estimate = estimateBootTemplatePrice(template, 1)
+  if (!estimate) return ''
+  return t('ociBoot.priceCardTag', {
+    hourly: formatUsd(estimate.perInstanceHourlyUsd, 3),
+    monthly: formatUsd(estimate.perInstanceMonthlyUsd, 2),
+  })
 }
 function regionLabel(region: BootRegion): string {
   const code = codeByRegionName.get(region.region) || region.region
@@ -258,6 +280,7 @@ watch([() => route.query.tenantId, () => route.query.regionId], () => {
   regionsError.value = null
   confirmOpen.value = false
   confirmation.value = null
+  riskVisible.value = false
   creating.value = false
   saved.value = false
   saveUncertain.value = false
@@ -268,6 +291,7 @@ watch([() => route.query.tenantId, () => route.query.regionId], () => {
 }, { immediate: true })
 
 async function prepareSubmission() {
+  riskVisible.value = false
   if (locked.value || regionsLoading.value || imagesLoading.value) return
   attempted.value = true
   if (hasErrors.value || !selectedRegion.value || !selectedTemplate.value) {
@@ -297,6 +321,15 @@ async function prepareSubmission() {
 }
 function focusConfirmationCancel() { confirmActions.value?.querySelector<HTMLButtonElement>('button')?.focus() }
 function clearConfirmation() { if (!confirmOpen.value) confirmation.value = null }
+async function focusRiskClose() {
+  await nextTick()
+  riskCloseButton.value?.focus({ preventScroll: true })
+}
+async function closeRiskNotice() {
+  riskVisible.value = false
+  await nextTick()
+  riskTrigger.value?.focus({ preventScroll: true })
+}
 function captureSaveFailure(error: unknown) {
   // Do not retain an Axios config/FormData containing the generated password in UI state.
   const message = bootError(error)
@@ -385,6 +418,20 @@ onBeforeUnmount(() => {
         <div class="boot-toolbar-actions" data-page-error-anchor>
           <button type="button" class="text-button" :disabled="locked" @click="resetConfiguration">{{ t('ociBoot.reset') }}</button>
           <PrimaryBtn type="submit" :loading="creating" :disabled="createDisabled"><i v-if="!creating" class="i-mdi-play-outline" aria-hidden="true" />{{ t(`ociBoot.${creating ? 'creating' : 'create'}`) }}</PrimaryBtn>
+          <el-popover v-model:visible="riskVisible" trigger="click" placement="bottom-end" :width="360" :persistent="false" popper-class="boot-risk-popover" @show="focusRiskClose">
+            <template #reference>
+              <button ref="riskTrigger" type="button" class="boot-risk-trigger" :title="t('ociBoot.riskTitle')" :aria-label="t('ociBoot.riskTitle')" aria-haspopup="dialog" :aria-expanded="riskVisible" :aria-controls="riskVisible ? 'boot-risk-popover' : undefined" @keydown.esc.stop.prevent="closeRiskNotice">
+                <i class="i-mdi-alert-circle-outline" aria-hidden="true" />
+              </button>
+            </template>
+            <section id="boot-risk-popover" class="boot-risk-popover-card" role="dialog" :aria-label="t('ociBoot.riskTitle')" @keydown.esc.stop.prevent="closeRiskNotice" @click.stop>
+              <header class="boot-risk-popover-head">
+                <span class="boot-risk-popover-title"><i class="i-mdi-alert-circle-outline" aria-hidden="true" /><strong>{{ t('ociBoot.riskTitle') }}</strong></span>
+                <button ref="riskCloseButton" type="button" class="boot-risk-popover-close" :title="t('ociBoot.close')" :aria-label="t('ociBoot.close')" @click="closeRiskNotice"><i class="i-mdi-close" aria-hidden="true" /></button>
+              </header>
+              <p class="boot-risk-popover-body">{{ t('ociBoot.riskBanner') }}</p>
+            </section>
+          </el-popover>
         </div>
       </div>
 
@@ -406,7 +453,6 @@ onBeforeUnmount(() => {
         <PageErrorNotice v-else-if="regionsError" class="boot-load-notice" :title="t('ociBoot.regionsFailed')"><span>{{ bootError(regionsError) }}</span><GhostBtn @click="loadRegions">{{ t('ociBoot.retry') }}</GhostBtn></PageErrorNotice>
         <div v-else-if="!regions.length" class="boot-empty" role="status"><i class="i-mdi-map-marker-outline" aria-hidden="true" /><strong>{{ t('ociBoot.noRegions') }}</strong><p>{{ t('ociBoot.noRegionsHint') }}</p><GhostBtn @click="loadRegions">{{ t('ociBoot.retry') }}</GhostBtn></div>
         <template v-else>
-          <div class="boot-risk-strip"><i class="i-mdi-information-outline" aria-hidden="true" /><div><strong>{{ t('ociBoot.riskTitle') }}</strong><p>{{ t('ociBoot.riskBanner') }}</p></div></div>
           <div class="boot-columns">
             <section class="template-section" aria-labelledby="boot-template-label">
               <div class="section-heading"><h2 id="boot-template-label">{{ t('ociBoot.templates') }}</h2><p>{{ mode === 'quick' ? t('ociBoot.quickHint', { count: number(1), seconds: number(60) }) : t('ociBoot.customHint') }}</p></div>
@@ -415,7 +461,10 @@ onBeforeUnmount(() => {
                   <input v-model="templateId" type="radio" name="boot-template" :value="template.id" :disabled="locked" />
                   <span class="template-top"><strong class="template-name">{{ t(`ociBoot.${template.label}`) }}</strong><span class="template-check" aria-hidden="true"><i v-if="templateId === template.id" class="i-mdi-check" /></span></span>
                   <span class="template-specs">{{ templateSpecs(template) }}</span>
-                  <span v-if="template.paid" class="paid-badge">{{ t('ociBoot.paidTemplate') }}</span>
+                  <div v-if="template.paid" class="template-paid-row">
+                    <span class="paid-badge">{{ t('ociBoot.paidTemplate') }}</span>
+                    <span v-if="mode === 'custom' && templateCardPrice(template)" class="template-price-tag">{{ templateCardPrice(template) }}</span>
+                  </div>
                 </label>
               </div>
               <p v-if="attempted && !selectedTemplate" id="boot-template-error" class="field-error" role="alert">{{ t('ociBoot.templateRequired') }}</p>
@@ -435,6 +484,46 @@ onBeforeUnmount(() => {
               </template>
               <div v-else-if="!selectedTemplate" class="boot-empty"><i class="i-mdi-tune-variant" aria-hidden="true" /><p>{{ t('ociBoot.noTemplateHint') }}</p></div>
               <template v-else>
+                <div v-if="selectedPrice" class="boot-price-card" role="region" :aria-label="t('ociBoot.priceTitle')">
+                  <div class="boot-price-head">
+                    <div class="boot-price-title-wrap">
+                      <span class="boot-price-icon" aria-hidden="true"><i class="i-mdi-cash-multiple" /></span>
+                      <div>
+                        <h3>{{ t('ociBoot.priceTitle') }}</h3>
+                        <small>{{ selectedPrice.shapeName }}</small>
+                      </div>
+                    </div>
+                    <span class="boot-price-badge">{{ t('ociBoot.priceRefBadge') }}</span>
+                  </div>
+                  <div class="boot-price-metrics">
+                    <div class="boot-price-metric">
+                      <span>{{ t('ociBoot.pricePerInstance') }}</span>
+                      <strong>{{ t('ociBoot.pricePerHour', { price: formatUsd(selectedPrice.perInstanceHourlyUsd, 3) }) }}</strong>
+                      <small>{{ t('ociBoot.pricePerMonth', { price: formatUsd(selectedPrice.perInstanceMonthlyUsd, 2) }) }}</small>
+                    </div>
+                    <div v-if="selectedPrice.count > 1" class="boot-price-metric is-total">
+                      <span>{{ t('ociBoot.priceTotal', { count: number(selectedPrice.count) }) }}</span>
+                      <strong>{{ t('ociBoot.pricePerHour', { price: formatUsd(selectedPrice.totalHourlyUsd, 3) }) }}</strong>
+                      <small>{{ t('ociBoot.pricePerMonth', { price: formatUsd(selectedPrice.totalMonthlyUsd, 2) }) }}</small>
+                    </div>
+                  </div>
+                  <ul class="boot-price-breakdown">
+                    <li>
+                      <span>{{ t('ociBoot.priceOcpuLine') }}</span>
+                      <span>{{ t('ociBoot.priceHourUnit', { qty: number(selectedTemplate.ocpu), rate: formatUsd(selectedPrice.ocpuPerHourUsd, 4) }) }} = <strong>{{ formatUsd(selectedTemplate.ocpu * selectedPrice.ocpuPerHourUsd, 3) }}/h</strong></span>
+                    </li>
+                    <li>
+                      <span>{{ t('ociBoot.priceMemoryLine') }}</span>
+                      <span>{{ t('ociBoot.priceHourUnit', { qty: `${number(selectedTemplate.memory)} GB`, rate: formatUsd(selectedPrice.memoryPerGbHourUsd, 4) }) }} = <strong>{{ formatUsd(selectedTemplate.memory * selectedPrice.memoryPerGbHourUsd, 3) }}/h</strong></span>
+                    </li>
+                    <li>
+                      <span>{{ t('ociBoot.priceStorageLine') }}</span>
+                      <span>{{ t('ociBoot.priceStorageUnit', { gb: number(selectedTemplate.disk), rate: formatUsd(selectedPrice.storagePerGbMonthUsd, 4) }) }} = <strong>{{ formatUsd(selectedPrice.perInstanceStorageMonthlyUsd, 2) }}</strong></span>
+                    </li>
+                  </ul>
+                  <p class="boot-price-footnote">{{ t('ociBoot.priceFootnote', { hours: number(OCI_HOURS_PER_MONTH) }) }}</p>
+                </div>
+
                 <div class="form-section">
                   <div class="section-label"><h3>{{ t('ociBoot.imageTitle') }}</h3><label class="default-image-toggle"><input v-model="useDefaultImage" type="checkbox" :disabled="locked" />{{ t('ociBoot.useDefaultImage') }}</label></div>
                   <p class="field-hint">{{ t(useDefaultImage ? 'ociBoot.defaultImageHint' : 'ociBoot.imageHint') }}</p>
@@ -478,7 +567,10 @@ onBeforeUnmount(() => {
       <div class="boot-footer" aria-live="polite">
         <span v-if="selectedRegion">{{ t('ociBoot.tenantContext', { name: selectedRegion.tenancyName || selectedRegion.userName || regionLabel(selectedRegion) }) }}</span>
         <span v-if="attempted && hasErrors" class="field-error">{{ t('ociBoot.validationSummary') }}</span>
-        <span v-else-if="selectedTemplate">{{ t(`ociBoot.${selectedTemplate.label}`) }} · {{ templateSpecs(selectedTemplate) }}</span>
+        <span v-else-if="selectedTemplate">
+          {{ t(`ociBoot.${selectedTemplate.label}`) }} · {{ templateSpecs(selectedTemplate) }}
+          <template v-if="selectedPrice"> · {{ t('ociBoot.pricePerHour', { price: formatUsd(selectedPrice.totalHourlyUsd, 3) }) }} ({{ t('ociBoot.pricePerMonth', { price: formatUsd(selectedPrice.totalMonthlyUsd, 2) }) }})</template>
+        </span>
       </div>
     </form>
 
@@ -489,6 +581,7 @@ onBeforeUnmount(() => {
         <dl class="config-summary">
           <div><dt>{{ t('ociBoot.summaryRegion') }}</dt><dd>{{ regionLabel(confirmation.region) }}</dd></div>
           <div><dt>{{ t('ociBoot.summaryTemplate') }}</dt><dd>{{ t(`ociBoot.${confirmation.template.label}`) }}<span v-if="confirmation.template.paid" class="paid-badge">{{ t('ociBoot.paidTemplate') }}</span><small class="summary-specs">{{ templateSpecs(confirmation.template) }}</small></dd></div>
+          <div v-if="confirmationPrice"><dt>{{ t('ociBoot.summaryPrice') }}</dt><dd>{{ t('ociBoot.pricePerHour', { price: formatUsd(confirmationPrice.totalHourlyUsd, 3) }) }}<small class="summary-specs">{{ t('ociBoot.pricePerMonth', { price: formatUsd(confirmationPrice.totalMonthlyUsd, 2) }) }}</small></dd></div>
           <div><dt>{{ t('ociBoot.summaryImage') }}</dt><dd>{{ confirmation.input.imageId ? `${confirmation.input.operatingSystem} ${confirmation.input.operatingSystemVersion}` : t('ociBoot.defaultImage') }}</dd></div>
           <div><dt>{{ t('ociBoot.summaryWindow') }}</dt><dd>{{ windowLabel(confirmation.input.dayGap) }}</dd></div>
         </dl>

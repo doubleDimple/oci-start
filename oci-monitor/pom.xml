@@ -18,16 +18,6 @@
 
     <dependencies>
 
-        <!-- Swagger2 API 文档 -->
-        <dependency>
-            <groupId>io.springfox</groupId>
-            <artifactId>springfox-swagger2</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.springfox</groupId>
-            <artifactId>springfox-swagger-ui</artifactId>
-        </dependency>
-
         <!-- JSON 处理 -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>

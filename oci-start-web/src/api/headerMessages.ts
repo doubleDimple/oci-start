@@ -114,6 +114,16 @@ export async function deleteHeaderMessage(businessId: string, signal?: AbortSign
   await post('del', { businessId }, signal)
 }
 
+export async function deleteHeaderMessages(businessIds: string[], signal?: AbortSignal): Promise<void> {
+  const uniqueIds = [...new Set(businessIds.map(id => id.trim()).filter(Boolean))]
+  if (!uniqueIds.length) throw new HeaderMessageError('headerMessages.requestFailed')
+  await post('delBatch', { businessIds: uniqueIds }, signal)
+}
+
+export async function clearAllHeaderMessages(signal?: AbortSignal): Promise<void> {
+  await post('clear', {}, signal)
+}
+
 function backendMessage(body: unknown): string {
   if (typeof body === 'string') return nonEmpty(body) && !body.trimStart().startsWith('<') ? body : ''
   if (!isObject(body)) return ''

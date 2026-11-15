@@ -17,6 +17,7 @@ const children: RouteRecordRaw[] = [
   { path: 'tenants/list', meta: { title: 'OCI 租户管理', id: 'api-management' }, component: () => import('@/views/tenants/TenantsView.vue') },
   { path: 'tenants/regionList', meta: { title: '区域列表', id: 'api-management' }, component: () => import('@/views/tenants/TenantRegionsView.vue') },
   { path: 'tenants/auditPage', meta: { title: '审计日志', id: 'api-management' }, component: () => import('@/views/tenants/TenantAuditView.vue') },
+  { path: 'tenants/users', meta: { title: '用户与安全', id: 'api-management' }, component: () => import('@/views/tenants/TenantIdentityView.vue') },
   { path: 'tenants/regionSubList', meta: { title: '区域订阅', id: 'api-management' }, component: () => import('@/views/tenants/RegionSubView.vue') },
   { path: 'tenants/addSpeed', meta: { title: 'API 导入', id: 'api-management' }, component: () => import('@/views/tenants/TenantImportView.vue') },
   { path: 'tenants/bootPage', meta: { title: '添加开机', id: 'api-fullBootList' }, component: () => import('@/views/boot/AddBootView.vue') },
@@ -61,6 +62,7 @@ const children: RouteRecordRaw[] = [
   { path: 'migration/migPage', meta: { title: '数据迁移', id: 'api-migPage' }, component: () => import('@/views/tools/MigrationView.vue') },
   { path: 'mfa/page', meta: { title: 'MFA 备份', id: 'api-mfa' }, component: () => import('@/views/tools/MfaView.vue') },
   { path: 'system/apiTokens', meta: { title: 'Token 配置', id: 'api-tokens' }, component: () => import('@/views/settings/ApiTokensView.vue') },
+  { path: 'system/apiDocs', meta: { title: 'API 文档', titleKey: 'nav.apiDocs', id: 'api-docs' }, component: () => import('@/views/settings/ApiDocsView.vue') },
   { path: 'oci/terminal', meta: { title: 'SSH 终端', id: 'api-ociMachineList' }, component: () => import('@/views/terminal/SshTerminalView.vue') },
   { path: 'ssh/terminal', meta: { title: 'SSH 终端' }, component: () => import('@/views/terminal/SshTerminalView.vue') },
   { path: 'oci/sysHelp', meta: { title: '系统救援' }, component: () => import('@/views/terminal/RescueView.vue') },
@@ -127,6 +129,7 @@ router.beforeEach(async to => {
 // Resolve local authorization before a deep-linked page starts its cloud requests.
 const tenantRoutePermissions: Record<string, TenantPermission> = {
   '/tenants/auditPage': 'AUDIT_READ',
+  '/tenants/users': 'USER_READ',
   '/tenants/regionSubList': 'REGION_SUBSCRIBE',
   '/tenants/bootPage': 'INSTANCE_CREATE',
   '/tenants/bootList': 'INSTANCE_CREATE',
