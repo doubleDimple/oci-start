@@ -69,8 +69,9 @@ const filteredRows = computed(() => {
     && (status.value === 'all' || loaded.value && row.isMine === (status.value === 'linked')))
 })
 const pagedRows = computed(() => filteredRows.value.slice((page.value - 1) * PAGE_SIZE, page.value * PAGE_SIZE))
-const mapRegions = computed<RegionGlobePoint[]>(() => allRows.value.filter(row => row.isMine && row.coordinates)
-  .map(row => ({ regionCode: row.regionCode, name: row.name, ...row.coordinates! })))
+// Every Oracle region with known coordinates is mapped; linked ones are highlighted.
+const mapRegions = computed<RegionGlobePoint[]>(() => allRows.value.filter(row => row.coordinates)
+  .map(row => ({ regionCode: row.regionCode, name: row.name, isMine: loaded.value && row.isMine, ...row.coordinates! })))
 const mapRegionCodes = computed(() => new Set(mapRegions.value.map(row => row.regionCode)))
 const unmappedCount = computed(() => allRows.value.filter(row => row.isMine && !row.coordinates).length)
 const updatedText = computed(() => lastUpdate.value ? t('regionPage.updatedAt', { time: new Intl.DateTimeFormat(locale.value, { dateStyle: 'medium', timeStyle: 'medium' }).format(lastUpdate.value) }) : t('regionPage.notUpdated'))
@@ -110,7 +111,7 @@ async function locateRegion(code: string) {
   if (!disposed) await selectRegion(code)
 }
 function locationHint(row: RegionRow) {
-  return t(!row.coordinates ? 'regionPage.unmappedRegion' : row.isMine ? 'regionPage.locateRegion' : 'regionPage.untrackedRegion', { region: row.name })
+  return t(!row.coordinates ? 'regionPage.unmappedRegion' : 'regionPage.locateRegion', { region: row.name })
 }
 async function scrollToSelection() {
   await nextTick()

@@ -6,6 +6,8 @@ export interface RegionSceneColors {
   land: string
   coast: string
   marker: string
+  /** Oracle regions without a linked account. */
+  available: string
   text: string
   muted: string
 }

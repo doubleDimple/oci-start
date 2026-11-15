@@ -7,21 +7,27 @@
 .launch-panel { grid-column: 1 / -1; }
 .success-rate { font-size: 12px; color: var(--text-secondary); }
 .success-rate strong { color: var(--brand); font-weight: 600; margin-left: 8px; }
-.launch-kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 20px; padding: 12px 0 19px; }
-.launch-kpi { min-width: 0; }
-.launch-kpi + .launch-kpi { border-left: 1px solid var(--monitor-border); padding-left: 20px; }
-.launch-kpi > span { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); font-size: 12px; }
-.launch-kpi i { flex: none; font-size: 16px; }
-.launch-kpi > strong { display: block; margin-top: 8px; font-size: 25px; font-weight: 600; font-variant-numeric: tabular-nums; }
+/* Same tile + meter language as the tenant profile KPIs. */
+.launch-kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; padding: 4px 0 18px; }
+.launch-kpi { --launch-accent: var(--brand); min-width: 0; padding: 14px 16px 15px; border-radius: 12px; background: color-mix(in srgb, var(--launch-accent) 6%, var(--bg-card)); border: 1px solid color-mix(in srgb, var(--launch-accent) 14%, var(--monitor-border)); }
+.launch-kpi > span { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--text-secondary); font-size: 12px; }
+.launch-kpi i { flex: none; color: var(--launch-accent); font-size: 20px; }
+.launch-kpi > strong { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; margin: 8px 0 10px; color: var(--text-primary); font-size: 28px; font-weight: 650; line-height: 1.2; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.launch-kpi > strong small { color: var(--launch-accent); font-size: 12px; font-weight: 600; letter-spacing: 0; }
+.launch-meter { height: 5px; border-radius: 3px; overflow: hidden; background: color-mix(in srgb, var(--launch-accent) 14%, transparent); }
+.launch-meter.empty { visibility: hidden; }
+.launch-meter span { display: block; height: 100%; border-radius: inherit; background: var(--launch-accent); transition: width .6s cubic-bezier(.2, .8, .2, 1); }
 .outcomes { border-top: 1px solid var(--monitor-border); padding-top: 14px; }
 .outcomes-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .outcomes-heading > span { color: var(--text-secondary); font-size: 12px; }
-.outcomes-heading b { font-weight: 500; }
-.outcomes-chart { height: 30px; margin-top: 5px; border-radius: 4px; overflow: hidden; }
+.outcomes-heading b { font-weight: 600; font-variant-numeric: tabular-nums; }
+.outcomes-chart { height: 22px; margin-top: 8px; }
 .stats-error { color: var(--status-danger); font-size: 12px; }
 
 .launch-period { display: inline-block; margin-left: 8px; color: var(--text-muted); font-size: 10px; font-weight: 400; }
 .launch-link { display: inline-flex; align-items: center; justify-content: flex-end; gap: 5px; margin-top: 14px; color: var(--brand); text-decoration: none; font-size: 11px; }
 .launch-link:hover { text-decoration: underline; }
-@container (max-width: 760px) { .launch-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 12px; } .launch-kpi + .launch-kpi { padding-left: 0; border-left: 0; } }
-@container (max-width: 420px) { .monitor-panel { padding: 15px 13px; border-radius: 13px; } .panel-heading h2 { font-size: 14px; } .launch-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .launch-kpi > span { font-size: 11px; } .launch-kpi > strong { font-size: 23px; } .chart-legend { gap: 7px 10px; } }
+@container (max-width: 1000px) { .launch-kpis { gap: 10px; } .launch-kpi { padding: 12px 13px 13px; } .launch-kpi > strong { font-size: 24px; } }
+@container (max-width: 760px) { .launch-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .launch-kpi:last-child { grid-column: 1 / -1; } }
+@container (max-width: 420px) { .monitor-panel { padding: 15px 13px; border-radius: 13px; } .panel-heading h2 { font-size: 14px; } .launch-kpi { padding: 12px; } .launch-kpi > span { font-size: 11px; } .launch-kpi > strong { font-size: 23px; } .chart-legend { gap: 7px 10px; } }
+@media (prefers-reduced-motion: reduce) { .launch-meter span { transition: none; } }

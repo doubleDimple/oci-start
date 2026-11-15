@@ -120,10 +120,13 @@ export function createDotWorldScene(host: HTMLElement, labelHost: HTMLElement, o
     if (!labels || !width || !height) return
     ctx.font = FONT
     const ordered = [...points].sort((a, b) => Number(b.data.regionCode === selected) - Number(a.data.regionCode === selected))
+    // Only linked regions keep permanent labels; other Oracle regions label on hover/selection.
+    const markers = points.filter(point => point.data.isMine)
     for (const point of ordered) {
       if (!point.label || !isVisible(point)) continue
       const labelWidth = Math.min(140, ctx.measureText(point.label).width)
       const on = point.data.regionCode === selected || point.data.regionCode === hovered
+      if (!point.data.isMine && !on) continue
       const offsets = [-8, -26, 10, -44, 28, 46]
       let found: LabelBox | undefined
       for (const yOffset of offsets) {
@@ -132,7 +135,7 @@ export function createDotWorldScene(host: HTMLElement, labelHost: HTMLElement, o
           const y = point.y + yOffset
           const candidate = { x, y, width: labelWidth, height: 16, point }
           if (x < 10 || y < 8 || x + labelWidth > width - 10 || y + 16 > height - 8) continue
-          const overlapsMarker = points.some(other => other !== point && other.x > x - 14 && other.x < x + labelWidth + 14 && other.y > y - 10 && other.y < y + 26)
+          const overlapsMarker = markers.some(other => other !== point && other.x > x - 14 && other.x < x + labelWidth + 14 && other.y > y - 10 && other.y < y + 26)
           if (!overlapsMarker && !labelBoxes.some(box => x < box.x + box.width + 18 && x + labelWidth + 18 > box.x && y < box.y + box.height + 8 && y + 24 > box.y)) {
             found = candidate
             break
@@ -157,7 +160,7 @@ export function createDotWorldScene(host: HTMLElement, labelHost: HTMLElement, o
     const lngTo = Math.min(180, centerLng + width / 2 / scale)
     const latFrom = Math.min(LAT_TOP, centerLat + height / 2 / scale)
     const latTo = Math.max(LAT_BOTTOM, centerLat - height / 2 / scale)
-    const anchors = points.map(point => [width / 2 + (point.data.lng - centerLng) * scale, height / 2 + (centerLat - point.data.lat) * scale])
+    const anchors = points.filter(point => point.data.isMine).map(point => [width / 2 + (point.data.lng - centerLng) * scale, height / 2 + (centerLat - point.data.lat) * scale])
     const glowing: [number, number, number][] = []
     baseCtx.fillStyle = colors.land
     baseCtx.beginPath()
@@ -223,6 +226,15 @@ export function createDotWorldScene(host: HTMLElement, labelHost: HTMLElement, o
     ctx.stroke()
     ctx.globalAlpha = 1
   }
+  function diamond(point: MapPoint, radius: number) {
+    ctx.beginPath()
+    ctx.moveTo(point.x, point.y - radius)
+    ctx.lineTo(point.x + radius, point.y)
+    ctx.lineTo(point.x, point.y + radius)
+    ctx.lineTo(point.x - radius, point.y)
+    ctx.closePath()
+    ctx.fill()
+  }
   function drawLinks(now: number) {
     if (!links) return
     for (const [start, end] of linkPairs) {
@@ -268,8 +280,34 @@ export function createDotWorldScene(host: HTMLElement, labelHost: HTMLElement, o
     ctx.drawImage(base, 0, 0, width, height)
     drawLinks(now)
     const moving = pulse && !reduced && active && !doc.hidden
+    // Available (not linked) Oracle regions: solid diamonds in their own colour, beneath linked ones.
     for (const point of points) {
-      if (!isVisible(point, 32)) continue
+      if (point.data.isMine || !isVisible(point, 32)) continue
+      const on = point.data.regionCode === selected || point.data.regionCode === hovered
+      const size = on ? 6.5 : 5
+      const glow = ctx.createRadialGradient(point.x, point.y, 0, point.x, point.y, on ? 16 : 11)
+      glow.addColorStop(0, colors.available)
+      glow.addColorStop(1, 'rgba(0,0,0,0)')
+      ctx.globalAlpha = on ? .4 : .22
+      ctx.fillStyle = glow
+      ctx.beginPath()
+      ctx.arc(point.x, point.y, on ? 16 : 11, 0, TAU)
+      ctx.fill()
+      ctx.globalAlpha = 1
+      ctx.shadowColor = 'rgba(0,0,0,.25)'
+      ctx.shadowBlur = 4
+      ctx.shadowOffsetY = 1
+      ctx.fillStyle = colors.panel
+      diamond(point, size + 2.2)
+      ctx.shadowColor = 'transparent'
+      ctx.shadowBlur = 0
+      ctx.shadowOffsetY = 0
+      ctx.fillStyle = colors.available
+      diamond(point, size)
+      if (on) drawRing(point, 11, colors.available, .6, 1.5)
+    }
+    for (const point of points) {
+      if (!point.data.isMine || !isVisible(point, 32)) continue
       const on = point.data.regionCode === selected || point.data.regionCode === hovered
       const color = colors.marker
       if (moving) {
@@ -322,11 +360,11 @@ export function createDotWorldScene(host: HTMLElement, labelHost: HTMLElement, o
       ctx.shadowBlur = 0
       ctx.shadowOffsetY = 0
       ctx.globalAlpha = 1
-      ctx.fillStyle = on ? colors.marker : colors.text
+      ctx.fillStyle = on ? (box.point.data.isMine ? colors.marker : colors.available) : colors.text
       ctx.fillText(box.point.label, box.x, box.y + 8, 140)
     }
   }
-  function canAnimate() { return !disposed && !failed && active && !doc.hidden && !reduced && ((pulse && points.length > 0) || (links && linkPairs.length > 0)) && width > 0 && height > 0 }
+  function canAnimate() { return !disposed && !failed && active && !doc.hidden && !reduced && ((pulse && points.some(point => point.data.isMine)) || (links && linkPairs.length > 0)) && width > 0 && height > 0 }
   function stopFrame() {
     if (frame) view.cancelAnimationFrame(frame)
     frame = 0
@@ -371,7 +409,8 @@ export function createDotWorldScene(host: HTMLElement, labelHost: HTMLElement, o
     const y = (event.clientY - rect.top) * height / rect.height
     return points.map(point => ({ point, distance: (point.x - x) ** 2 + (point.y - y) ** 2 }))
       .filter(hit => hit.distance <= 14 ** 2 && isVisible(hit.point))
-      .sort((a, b) => a.distance - b.distance)
+      // Linked regions win ties when markers crowd together (e.g. Singapore / Batam / Kulai).
+      .sort((a, b) => (Math.sqrt(a.distance) - (a.point.data.isMine ? 5 : 0)) - (Math.sqrt(b.distance) - (b.point.data.isMine ? 5 : 0)))
   }
   function onMove(event: PointerEvent) {
     if (!active || disposed) return
@@ -430,8 +469,8 @@ export function createDotWorldScene(host: HTMLElement, labelHost: HTMLElement, o
     for (const [code, point] of previous) if (!nextCodes.has(code)) point.button.remove()
     // Retain existing DOM nodes in place so refreshes and locale changes preserve focus.
     for (const point of points) if (point.button.parentNode !== overlays) overlays.insertBefore(point.button, tooltip)
-    // Decorative links use only current real points, in stable region-code order.
-    const ordered = [...points].sort((a, b) => a.data.regionCode < b.data.regionCode ? -1 : a.data.regionCode > b.data.regionCode ? 1 : 0)
+    // Decorative links use only current linked points, in stable region-code order.
+    const ordered = points.filter(point => point.data.isMine).sort((a, b) => a.data.regionCode < b.data.regionCode ? -1 : a.data.regionCode > b.data.regionCode ? 1 : 0)
     linkPairs = []
     for (let i = 1; i < ordered.length; i++) {
       const start = ordered[i - 1]

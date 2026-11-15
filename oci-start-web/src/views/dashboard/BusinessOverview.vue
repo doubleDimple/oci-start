@@ -54,7 +54,7 @@ const describe = (name: string, slices: BusinessSlice[]) => tr('chartDescription
 const ranks = computed(() => [
   { key: 'regionRanking', buckets: (overview.value?.regionRanking ?? []).map(bucket => ({ ...bucket, label: bucket.key === 'unknown' ? tr('unknownRegion') : bucket.label })), color: palette.value.brand, to: '/oci/list', link: 'instancesLink' },
   { key: 'tenantRanking', buckets: (overview.value?.tenantRanking ?? []).map(bucket => ({ ...bucket, label: bucket.label || tr('tenantFallback', { id: bucket.key }) })), color: palette.value.info, to: '/tenants/list', link: 'tenantsLink' },
-].map(rank => ({ ...rank, chart: rankingOption(rank.buckets, palette.value, rank.color, locale.value), description: tr('chartDescription', { name: tr(rank.key), values: rank.buckets.map(bucket => `${bucket.label} ${number(bucket.count)}`).join('，') }) })))
+].map(rank => ({ ...rank, chart: rankingOption(rank.buckets, palette.value, rank.color, locale.value, tr('unit')), description: tr('chartDescription', { name: tr(rank.key), values: rank.buckets.map(bucket => `${bucket.label} ${number(bucket.count)}`).join('，') }) })))
 const emailLabels = computed<[string, string, string]>(() => [tr('success'), tr('failed'), tr('pending')])
 const operationLabels = computed<[string, string, string]>(() => [tr('normalRecord'), tr('errorRecord'), tr('pending')])
 const trends = computed(() => [

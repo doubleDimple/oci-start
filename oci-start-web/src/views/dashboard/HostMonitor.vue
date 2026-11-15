@@ -7,7 +7,7 @@ import { readChartTheme } from '@/utils/chartTheme'
 import DashboardChart from './DashboardChart.vue'
 import AnimatedNumber from './AnimatedNumber.vue'
 import { finite, useDashboard, type MetricKey } from './useDashboard'
-import { capacityOption, trendOption, type SeriesSpec } from './dashboardCharts'
+import { activityOption, capacityOption, trendOption, type SeriesSpec } from './dashboardCharts'
 
 const { t, locale } = useI18n()
 const root = ref<HTMLElement | null>(null)
@@ -51,10 +51,10 @@ function toggleMetric(key: MetricKey) {
 }
 const resources = computed(() => trendOption(visibleSamples.value, resourceSeries.value.filter(item => selectedMetrics.value.includes(item.key)), palette.value, locale.value))
 const network = computed(() => trendOption(visibleSamples.value, networkSeries.value, palette.value, locale.value, 'KiB/s'))
-const activity = computed(() => trendOption(visibleSamples.value, [
+const activity = computed(() => activityOption(visibleSamples.value, [
   { key: 'processes', name: tr('processes'), color: palette.value.info },
   { key: 'threads', name: tr('threads'), color: palette.value.tertiary },
-], palette.value, locale.value, '', true))
+], palette.value, locale.value))
 const metricCards = computed(() => {
   const up = finite(m.value.uploadSpeed), down = finite(m.value.downloadSpeed)
   const rate = up === null || down === null ? null : up + down

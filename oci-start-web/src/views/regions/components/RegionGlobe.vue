@@ -37,6 +37,9 @@ const pointList = computed(() => props.points.filter(point =>
   Number.isFinite(point.lat) && Number.isFinite(point.lng)
   && Math.abs(point.lat) <= 90 && Math.abs(point.lng) <= 180,
 ))
+const ownedCount = computed(() => pointList.value.filter(point => point.isMine).length)
+// Picker lists linked regions first, then the rest of Oracle's regions.
+const pickerPoints = computed(() => [...pointList.value].sort((a, b) => Number(b.isMine) - Number(a.isMine)))
 const selected = computed(() => pointList.value.find(point => point.regionCode === props.selectedRegion) || null)
 const panelOnLeft = computed(() => (selected.value?.lng ?? 0) > 0)
 const panelOnTop = computed(() => (selected.value?.lat ?? 0) < 0)
@@ -48,6 +51,7 @@ const mapStyle = computed<Record<string, string>>(() => ({
   '--map-text': `var(--region-map-${mapTheme.value}-text)`,
   '--map-muted': `var(--region-map-${mapTheme.value}-muted)`,
   '--map-accent': `var(--region-map-${mapTheme.value}-marker)`,
+  '--map-available': `var(--region-map-${mapTheme.value}-available)`,
   'color-scheme': mapTheme.value,
 }))
 let scene: RegionScene | null = null
@@ -60,7 +64,8 @@ let motionQuery: MediaQueryList | null = null
 
 function cityName(point: RegionGlobePoint) { return regionCityName(point.regionCode, locale.value) }
 function regionOptionLabel(point: RegionGlobePoint) { return `${cityName(point)} · ${point.regionCode}` }
-function markerAriaLabel(point: RegionGlobePoint) { return `${point.name}, ${point.regionCode}, ${t('regionGlobe.mine')}` }
+function ownership(point: RegionGlobePoint) { return t(point.isMine ? 'regionGlobe.mine' : 'regionGlobe.available') }
+function markerAriaLabel(point: RegionGlobePoint) { return `${point.name}, ${point.regionCode}, ${ownership(point)}` }
 function readColors(): RegionSceneColors {
   const style = getComputedStyle(root.value!)
   const token = (name: string) => style.getPropertyValue(name).trim()
@@ -69,7 +74,7 @@ function readColors(): RegionSceneColors {
     surface: token(`${prefix}-surface`), land: token(`${prefix}-land`),
     panel: token(`${prefix}-panel`), coast: token(`${prefix}-coast`),
     text: token(`${prefix}-text`), muted: token(`${prefix}-muted`),
-    marker: token(`${prefix}-marker`),
+    marker: token(`${prefix}-marker`), available: token(`${prefix}-available`),
   }
 }
 function releaseScene() {
@@ -238,7 +243,7 @@ onBeforeUnmount(() => {
           @visible-change="onPickerVisibilityChange"
         >
           <template #prefix><span class="i-mdi-magnify picker-search-icon" aria-hidden="true" /></template>
-          <el-option v-for="point in pointList" :key="point.regionCode" :value="point.regionCode" :label="regionOptionLabel(point)" />
+          <el-option v-for="point in pickerPoints" :key="point.regionCode" :value="point.regionCode" :label="regionOptionLabel(point)" />
         </el-select>
       </div>
       <div class="scene-controls">
@@ -276,7 +281,7 @@ onBeforeUnmount(() => {
           <button type="button" :title="t('regionGlobe.closeDetails')" :aria-label="t('regionGlobe.closeDetails')" @click="clearSelection"><span class="i-mdi-close" aria-hidden="true" /></button>
         </div>
         <dl class="detail-data">
-          <div><dt>{{ t('regionGlobe.ownership') }}</dt><dd>{{ t('regionGlobe.mine') }}</dd></div>
+          <div><dt>{{ t('regionGlobe.ownership') }}</dt><dd>{{ ownership(selected) }}</dd></div>
           <div><dt>{{ t('regionGlobe.latitude') }}</dt><dd>{{ selected.lat.toFixed(4) }}</dd></div>
           <div><dt>{{ t('regionGlobe.longitude') }}</dt><dd>{{ selected.lng.toFixed(4) }}</dd></div>
         </dl>
@@ -284,7 +289,7 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="scene-footer">
-      <div class="scene-legend"><span><i class="legend-owned" aria-hidden="true" />{{ t('regionGlobe.mine') }}</span></div>
+      <div class="scene-legend"><span><i class="legend-owned" aria-hidden="true" />{{ t('regionGlobe.mine') }} {{ ownedCount }}</span><span><i class="legend-available" aria-hidden="true" />{{ t('regionGlobe.available') }} {{ pointList.length - ownedCount }}</span></div>
       <p>{{ t('regionGlobe.mapHint') }}</p>
     </div>
     <p :id="helpId" class="sr-only">{{ t('regionGlobe.mapKeyboardHint') }} {{ t('regionGlobe.overlappingHint') }}</p>
@@ -329,6 +334,7 @@ onBeforeUnmount(() => {
 .scene-legend > span { display: inline-flex; align-items: center; gap: 6px; }
 .scene-legend i { display: inline-block; flex-shrink: 0; width: 8px; height: 8px; border-radius: 50%; }
 .legend-owned { background: var(--map-accent); }
+.legend-available { width: 8px; height: 8px; border-radius: 1px !important; background: var(--map-available); transform: rotate(45deg); box-shadow: 0 0 0 1.5px var(--map-panel); }
 .scene-footer > p { margin: 0; color: var(--map-muted); font-size: var(--font-size-secondary); }
 .region-details { position: absolute; z-index: 4; right: 14px; bottom: 12px; width: 270px; max-width: calc(100% - 28px); max-height: calc(100% - 24px); box-sizing: border-box; overflow: auto; padding: 14px; border: 1px solid var(--map-border); border-radius: 10px; background: var(--map-panel); color: var(--map-text); box-shadow: 0 6px 24px color-mix(in srgb, var(--map-text) 10%, transparent); overscroll-behavior: contain; }
 .region-details.details-left { right: auto; left: 14px; }

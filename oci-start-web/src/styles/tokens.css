@@ -58,6 +58,7 @@ html:root[data-content-theme] {
   --region-map-dark-text: #dcecf3;
   --region-map-dark-muted: #a0b7c7;
   --region-map-dark-marker: #ffb47a;
+  --region-map-dark-available: #b9a4ff;
   --region-map-light-surface: #f7f9fb;
   --region-map-light-panel: #ffffff;
   --region-map-light-land: #98adbc;
@@ -65,6 +66,7 @@ html:root[data-content-theme] {
   --region-map-light-text: #263b49;
   --region-map-light-muted: #506575;
   --region-map-light-marker: #b65b22;
+  --region-map-light-available: #6a46d6;
 
   --r-btn: 20px;
   --r-pill: 999px;
