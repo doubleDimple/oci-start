@@ -18,9 +18,9 @@ export function cloudscapeContent(mode: Mode) {
     hover: mode === 'light' ? '#f5f2ef' : '#292522',
     border: color(tokens['color-border-divider-default'], mode),
     borderStrong: color(tokens['color-border-input-default'], mode),
-    textPrimary: color(tokens['color-text-body-default'], mode),
-    textSecondary: color(tokens['color-text-body-secondary'], mode),
-    textMuted: color(tokens['color-text-input-placeholder'], mode),
+    textPrimary: mode === 'light' ? '#111214' : color(tokens['color-text-body-default'], mode),
+    textSecondary: mode === 'light' ? '#2c2c2e' : color(tokens['color-text-body-secondary'], mode),
+    textMuted: mode === 'light' ? '#515154' : color(tokens['color-text-input-placeholder'], mode),
     shadowCard: mode === 'light' ? '0 1px 2px rgba(15, 20, 26, 0.05)' : '0 1px 2px rgba(0, 0, 0, 0.2)',
   }
 }
@@ -36,7 +36,7 @@ export function cloudscapeVariables(mode: Mode): Record<string, string> {
     '--brand-solid-hover': '#ee9148',
     '--text-on-solid': '#3b220f',
     '--text-on-brand': color(tokens['color-text-button-primary-default'], mode),
-    '--text-heading': color(tokens['color-text-heading-default'], mode),
+    '--text-heading': mode === 'light' ? '#111214' : color(tokens['color-text-heading-default'], mode),
     '--status-ok': color(tokens['color-text-status-success'], mode),
     '--status-ok-bg': color(tokens['color-background-status-success'], mode),
     '--status-info': color(tokens['color-text-status-info'], mode),
