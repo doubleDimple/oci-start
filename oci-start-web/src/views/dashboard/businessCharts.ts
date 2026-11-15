@@ -2,7 +2,7 @@ import type { EChartsCoreOption } from 'echarts/core'
 import type { ChartTheme } from '@/utils/chartTheme'
 import type { BusinessActivity, BusinessBucket } from '@/api/dashboard'
 
-export interface BusinessSlice { key: string; name: string; value: number; color: string }
+export interface BusinessSlice { key: string; name: string; value: number; color: string; opacity?: number }
 function tooltip(palette: Readonly<ChartTheme>) {
   return { renderMode: 'richText' as const, confine: true, backgroundColor: palette.surface, borderColor: palette.border, padding: 12, textStyle: { color: palette.text, fontFamily: palette.fontFamily, fontSize: 12 } }
 }
@@ -32,6 +32,25 @@ export function rankingOption(buckets: BusinessBucket[], palette: Readonly<Chart
       showBackground: true, backgroundStyle: { color: palette.border, opacity: .12, borderRadius: 4 },
       itemStyle: { color, borderRadius: 4 }, label: { show: true, position: 'right', color: palette.text, fontFamily: palette.fontFamily, fontSize: 12, formatter: (item: { value: unknown }) => Number(item.value).toLocaleString(locale) },
       emphasis: { itemStyle: { opacity: .8 } }, animationDelay: (index: number) => index * 45,
+    }],
+  }
+}
+
+/** Vertical bars for ordered buckets such as account age or region count. */
+export function columnOption(slices: BusinessSlice[], palette: Readonly<ChartTheme>, locale: string, unit: string): EChartsCoreOption {
+  const format = (value: unknown) => `${Number(value).toLocaleString(locale)} ${unit}`
+  return {
+    textStyle: { color: palette.secondary, fontFamily: palette.fontFamily, fontSize: 12 },
+    grid: { left: 4, right: 4, top: 26, bottom: 4, containLabel: true },
+    tooltip: { ...tooltip(palette), trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: palette.border, opacity: .08 } }, valueFormatter: format },
+    xAxis: { type: 'category', data: slices.map(slice => slice.name), axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: palette.secondary, fontSize: 11, interval: 0, hideOverlap: false, margin: 10 } },
+    yAxis: { type: 'value', show: false, min: 0, max: Math.max(1, ...slices.map(slice => slice.value)) * 1.18 },
+    series: [{ id: 'columns', name: '', type: 'bar', barMaxWidth: 34, barMinHeight: 2,
+      data: slices.map(slice => ({ id: slice.key, value: slice.value, itemStyle: { color: slice.color, opacity: slice.opacity ?? 1 } })),
+      showBackground: true, backgroundStyle: { color: palette.border, opacity: .1, borderRadius: [6, 6, 2, 2] },
+      itemStyle: { borderRadius: [6, 6, 2, 2] },
+      label: { show: true, position: 'top', distance: 6, color: palette.text, fontFamily: palette.fontFamily, fontSize: 12, fontWeight: 600, formatter: (item: { value: unknown }) => Number(item.value).toLocaleString(locale) },
+      emphasis: { itemStyle: { opacity: .85 } }, animationDelay: (index: number) => index * 60,
     }],
   }
 }

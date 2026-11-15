@@ -4,9 +4,7 @@ export interface RegionSceneColors {
   surface: string
   panel: string
   land: string
-  landFill: string
   coast: string
-  grid: string
   marker: string
   text: string
   muted: string

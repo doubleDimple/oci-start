@@ -3,6 +3,7 @@ package com.doubledimple.ociserver.service.dashboard;
 import com.doubledimple.dao.entity.*;
 import com.doubledimple.ociserver.pojo.response.BusinessOverview;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.oracle.bmc.ospgateway.model.Subscription;
 import org.junit.jupiter.api.*;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
@@ -28,7 +29,7 @@ class BusinessOverviewServiceTest {
         factory.setPackagesToScan(Tenant.class.getPackage().getName());
         factory.setPersistenceUnitPostProcessors(unit -> {
             unit.getManagedClassNames().clear();
-            for (Class<?> type : new Class<?>[]{Tenant.class, InstanceDetails.class, AuditLog.class, EmailSendRecord.class, BootInstance.class}) unit.addManagedClassName(type.getName());
+            for (Class<?> type : new Class<?>[]{Tenant.class, InstanceDetails.class, AuditLog.class, EmailSendRecord.class, BootInstance.class, RegisterDetail.class}) unit.addManagedClassName(type.getName());
         });
         Properties properties = new Properties();
         properties.setProperty("hibernate.hbm2ddl.auto", "create-drop");
@@ -140,8 +141,48 @@ class BusinessOverviewServiceTest {
         assertEquals(6, result.getRegionRanking().size()); assertEquals(6, result.getTenantRanking().size());
     }
 
+    @Test void tenantProfileUsesRegisterDetailsRegionsAndAgeBoundaries() {
+        LocalDate today = LocalDate.now(CLOCK);
+        tenant(1, 0, 1, true, "ap-tokyo-1", "Upgraded year-old corporate");
+        tenant(11, 1, 1, true, "ap-osaka-1", null);
+        tenant(12, 1, 1, true, "ap-seoul-1", null);
+        tenant(13, 1, 1, true, "ap-sydney-1", null);
+        tenant(2, 0, 1, true, "us-ashburn-1", "Free, exactly half a year");
+        tenant(21, 2, 1, true, "us-phoenix-1", null);
+        tenant(3, 0, 1, false, "eu-frankfurt-1", "Free, one day short of half a year");
+        tenant(4, 0, 1, true, "ap-singapore-1", "Matched by OCI user id");
+        tenant(5, 0, 1, null, "ap-tokyo-1", "No register detail");
+        tenant(6, 0, 2, true, "us-central1", "GCP excluded");
+        register(1L, null, Subscription.PlanType.Payg, Subscription.AccountType.Corporate, today.minusDays(365));
+        register(2L, null, Subscription.PlanType.FreeTier, Subscription.AccountType.Personal, today.minusDays(180));
+        register(3L, null, Subscription.PlanType.FreeTier, Subscription.AccountType.Personal, today.minusDays(179));
+        register(null, "user-4", Subscription.PlanType.Payg, Subscription.AccountType.CorporateSubmitted, today.minusDays(10));
+        register(6L, null, Subscription.PlanType.Payg, Subscription.AccountType.Personal, today.minusDays(999));
+        entities.flush();
+        BusinessOverview result = service.overview(7);
+        assertEquals(2, value(result.getPlanTypes(), "upgrade"));
+        assertEquals(2, value(result.getPlanTypes(), "free"));
+        assertEquals(1, value(result.getPlanTypes(), "unknown"));
+        assertEquals(2, value(result.getEntityTypes(), "personal"));
+        assertEquals(2, value(result.getEntityTypes(), "corporate"));
+        assertEquals(1, value(result.getAccountAges(), "over1y"));
+        assertEquals(1, value(result.getAccountAges(), "m6to12"));
+        assertEquals(1, value(result.getAccountAges(), "m3to6"));
+        assertEquals(1, value(result.getAccountAges(), "under1m"));
+        assertEquals(1, value(result.getAccountAges(), "unknown"));
+        assertEquals(3, value(result.getRegionSpans(), "r1"));
+        assertEquals(1, value(result.getRegionSpans(), "r2"));
+        assertEquals(0, value(result.getRegionSpans(), "r3"));
+        assertEquals(1, value(result.getRegionSpans(), "r4plus"));
+        assertEquals(result.getAccounts(), result.getPlanTypes().stream().mapToLong(BusinessOverview.Bucket::getCount).sum());
+    }
+
+    private void register(Long local, String user, Subscription.PlanType plan, Subscription.AccountType type, LocalDate registered) {
+        RegisterDetail r = new RegisterDetail(); r.setTenantPrvId(local); r.setTenantId(user); r.setPlanType(plan); r.setAccountType(type);
+        r.setRegisterTime(Date.from(registered.atTime(12, 0).atZone(CLOCK.getZone()).toInstant())); entities.persist(r);
+    }
     private void tenant(long id, long parent, int cloud, Boolean active, String region, String name) {
-        Tenant t = new Tenant(); t.setId(id); t.setParenId(parent); t.setCloudType(cloud); t.setActive(active); t.setRegion(region); t.setTenancyName(name); t.setUserName("Account " + id); t.setKeyFile("SECRET_KEY"); entities.persist(t);
+        Tenant t = new Tenant(); t.setId(id); t.setParenId(parent); t.setCloudType(cloud); t.setActive(active); t.setRegion(region); t.setTenancyName(name); t.setUserName("Account " + id); t.setTenantId("user-" + id); t.setKeyFile("SECRET_KEY"); entities.persist(t);
     }
     private void instance(long tenant, int cloud, String state, String architecture, boolean installed, Integer age, Integer cpu, Integer memory, Long disk) {
         InstanceDetails i = new InstanceDetails(); i.setTenantId(tenant); i.setCloudType(cloud); i.setInstanceId(UUID.randomUUID().toString()); i.setState(state); i.setArchitecture(architecture); i.setMonitorInstalled(installed); i.setLastHeartbeat(age == null ? null : new Date(CLOCK.millis() - age)); i.setOcpus(cpu); i.setMemoryInGBs(memory); i.setBootVolumeSizeInGBs(disk); i.setPassword("SECRET_PASSWORD"); entities.persist(i);

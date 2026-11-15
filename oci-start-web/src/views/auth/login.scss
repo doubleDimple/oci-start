@@ -407,12 +407,6 @@
   box-shadow: 0 3px 10px rgba(0,0,0,.1);
 }
 .btn-oauth:not(.submit) i { font-size: 17px; }
-.enterprise-trust-badge {
-  display: flex; align-items: center; justify-content: center; gap: 7px;
-  margin-top: 24px; padding: 6px 10px; font-size: 12.5px; color: var(--faint); text-align: center;
-}
-.enterprise-trust-badge svg { width: 15px; height: 15px; color: var(--brand-hi); flex-shrink: 0; }
-&[data-theme="light"] .enterprise-trust-badge svg { color: var(--brand); }
 #turnstileContainer { max-width: 100%; overflow-x: auto; }
 .cf-turnstile { max-width: 100%; }
 

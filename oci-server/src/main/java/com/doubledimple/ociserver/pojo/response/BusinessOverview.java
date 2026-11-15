@@ -29,6 +29,14 @@ public class BusinessOverview {
     private List<Bucket> monitoring = new ArrayList<>();
     private List<Bucket> regionRanking = new ArrayList<>();
     private List<Bucket> tenantRanking = new ArrayList<>();
+    /** Main OCI tenants by register plan: upgrade (PAYG), free (FREE_TIER), unknown. */
+    private List<Bucket> planTypes = new ArrayList<>();
+    /** Main OCI tenants by register entity: personal, corporate, unknown. */
+    private List<Bucket> entityTypes = new ArrayList<>();
+    /** Main OCI tenants by days since registration. */
+    private List<Bucket> accountAges = new ArrayList<>();
+    /** Main OCI tenants by subscribed region count (home region included). */
+    private List<Bucket> regionSpans = new ArrayList<>();
     private Activity operations;
     private Activity email;
     private DashboardStats launch;

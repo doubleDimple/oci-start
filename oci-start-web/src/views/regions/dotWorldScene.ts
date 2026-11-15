@@ -1,40 +1,15 @@
 import type { RegionGlobePoint } from './globeTypes'
+import { LAND_MASK_BASE64, LAND_MASK_COLS, LAND_MASK_RES, LAND_MASK_ROWS, LAND_MASK_TOP } from './landMask'
 import { REGION_SCENE_ERROR_EVENT, type RegionScene, type RegionSceneColors, type RegionSceneOptions } from './sceneTypes'
 
-// Simplified silhouettes from design/dot-world-map.html, retained as supplied.
-// These are geographic artwork, not political boundaries.
-type Coordinate = readonly [number, number]
-const LAND: readonly (readonly Coordinate[])[] = [
-  [[-168,65],[-165,60],[-158,57],[-152,58],[-146,60],[-138,59],[-131,53],[-125,49],[-124,42],[-120,34],[-117,32],[-110,24],[-105,20],[-97,16],[-92,15],[-88,16],[-87,21],[-91,21],[-95,19],[-97,23],[-97,26],[-94,29],[-89,29],[-84,30],[-81,25],[-80,32],[-76,35],[-70,42],[-67,45],[-60,47],[-56,51],[-56,54],[-64,60],[-78,62],[-78,55],[-82,55],[-86,66],[-95,68],[-105,68],[-115,70],[-125,70],[-135,69],[-145,70],[-156,71],[-166,68]],
-  [[-45,60],[-52,64],[-53,68],[-62,70],[-68,76],[-62,82],[-40,83],[-24,80],[-20,73],[-30,68],[-42,61]],
-  [[-81,-4],[-79,0],[-77,8],[-72,12],[-62,10],[-60,8],[-52,5],[-50,0],[-44,-2],[-38,-5],[-35,-8],[-39,-13],[-39,-18],[-48,-25],[-53,-34],[-58,-38],[-62,-40],[-65,-45],[-68,-50],[-70,-54],[-75,-52],[-74,-45],[-73,-37],[-71,-30],[-70,-20],[-75,-15],[-81,-6]],
-  [[-17,15],[-16,20],[-12,28],[-10,32],[-5,36],[10,37],[20,32],[28,31],[33,28],[35,23],[38,18],[43,12],[51,12],[51,5],[42,-1],[40,-10],[35,-20],[32,-26],[27,-34],[20,-35],[18,-30],[13,-20],[9,-1],[3,6],[-8,4],[-13,9]],
-  [[-10,36],[-9,43],[-2,48],[3,51],[6,53],[9,54],[11,58],[16,60],[22,60],[30,60],[28,66],[21,70],[32,71],[46,68],[62,70],[76,73],[92,75],[106,77],[116,74],[132,72],[146,70],[160,70],[170,66],[179,65],[172,60],[162,58],[155,52],[142,48],[135,43],[130,35],[122,32],[120,25],[110,20],[105,10],[100,6],[97,16],[90,22],[82,17],[77,8],[72,20],[66,25],[57,25],[50,30],[45,37],[36,36],[30,41],[26,38],[22,40],[16,38],[13,45],[8,44],[3,42],[-2,37]],
-  [[95,5],[105,-6],[115,-9],[125,-9],[135,-5],[141,-3],[141,-9],[131,-8],[120,-10],[110,-8],[100,0]],
-  [[113,-22],[114,-35],[118,-35],[129,-32],[137,-35],[141,-38],[147,-39],[151,-37],[153,-28],[145,-15],[142,-11],[136,-12],[130,-11],[125,-14],[118,-20]],
-  [[172,-41],[174,-37],[178,-38],[176,-41],[174,-46],[168,-46],[167,-44]],
-  [[130,31],[134,34],[139,35],[141,39],[145,44],[142,42],[137,37],[132,34]],
-  [[-5,50],[-6,55],[-3,58],[-1,56],[1,53],[1,51],[-4,50]],
-  [[43,-12],[50,-15],[50,-25],[45,-25],[43,-17]],
-  [[-24,65],[-22,66],[-14,66],[-14,64],[-22,63]],
-  [[120,18],[124,18],[126,10],[122,6],[119,11]],
-  [[-85,22],[-77,23],[-74,20],[-80,21]],
-  [[8,55],[11,57],[13,55],[10,54]]
-]
-const LAND_BOUNDS = LAND.map(polygon => ({
-  polygon,
-  left: Math.min(...polygon.map(point => point[0])),
-  right: Math.max(...polygon.map(point => point[0])),
-  bottom: Math.min(...polygon.map(point => point[1])),
-  top: Math.max(...polygon.map(point => point[1])),
-}))
-const LAT_TOP = 84
-const LAT_BOTTOM = -58
+const LAT_TOP = LAND_MASK_TOP
+const LAT_BOTTOM = LAND_MASK_TOP - LAND_MASK_ROWS * LAND_MASK_RES
 const LAT_SPAN = LAT_TOP - LAT_BOTTOM
-const DOT_STEP = 5
-const DOT_RADIUS = 1.1
+// Target on-screen spacing of the dot matrix; dots stay anchored to geography while zooming.
+const DOT_SPACING = 5.5
+const GLOW_RADIUS = 60
 const TAU = Math.PI * 2
-const FONT = '500 12px -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif'
+const FONT = '600 12px -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif'
 
 interface MapPoint {
   data: RegionGlobePoint
@@ -47,17 +22,14 @@ interface MapPoint {
 }
 interface LabelBox { x: number; y: number; width: number; height: number; point: MapPoint }
 
-function inPolygon(lng: number, lat: number, polygon: readonly Coordinate[]) {
-  let inside = false
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-    const [xi, yi] = polygon[i]
-    const [xj, yj] = polygon[j]
-    if ((yi > lat) !== (yj > lat) && lng < (xj - xi) * (lat - yi) / (yj - yi) + xi) inside = !inside
-  }
-  return inside
-}
+let landMask: Uint8Array | null = null
 function isLand(lng: number, lat: number) {
-  return LAND_BOUNDS.some(bounds => lng >= bounds.left && lng <= bounds.right && lat >= bounds.bottom && lat <= bounds.top && inPolygon(lng, lat, bounds.polygon))
+  if (!landMask) landMask = Uint8Array.from(atob(LAND_MASK_BASE64), char => char.charCodeAt(0))
+  const row = Math.floor((LAND_MASK_TOP - lat) / LAND_MASK_RES)
+  const col = Math.floor((lng + 180) / LAND_MASK_RES)
+  if (row < 0 || row >= LAND_MASK_ROWS || col < 0 || col >= LAND_MASK_COLS) return false
+  const index = row * LAND_MASK_COLS + col
+  return (landMask[index >> 3] & (1 << (index & 7))) !== 0
 }
 function phaseFor(code: string) {
   let hash = 0
@@ -152,16 +124,16 @@ export function createDotWorldScene(host: HTMLElement, labelHost: HTMLElement, o
       if (!point.label || !isVisible(point)) continue
       const labelWidth = Math.min(140, ctx.measureText(point.label).width)
       const on = point.data.regionCode === selected || point.data.regionCode === hovered
-      const offsets = [-13, 3, -29, 19, -45, 35]
+      const offsets = [-8, -26, 10, -44, 28, 46]
       let found: LabelBox | undefined
       for (const yOffset of offsets) {
-        for (const toLeft of [point.x > width - labelWidth - 18, point.x <= width - labelWidth - 18]) {
-          const x = point.x + (toLeft ? -labelWidth - 8 : 8)
+        for (const toLeft of [point.x > width - labelWidth - 26, point.x <= width - labelWidth - 26]) {
+          const x = point.x + (toLeft ? -labelWidth - 16 : 16)
           const y = point.y + yOffset
           const candidate = { x, y, width: labelWidth, height: 16, point }
-          if (x < 6 || y < 6 || x + labelWidth > width - 6 || y + 16 > height - 6) continue
-          const overlapsMarker = points.some(other => other !== point && other.x > x - 7 && other.x < x + labelWidth + 7 && other.y > y - 7 && other.y < y + 23)
-          if (!overlapsMarker && !labelBoxes.some(box => x < box.x + box.width + 8 && x + labelWidth + 8 > box.x && y < box.y + box.height + 4 && y + 20 > box.y)) {
+          if (x < 10 || y < 8 || x + labelWidth > width - 10 || y + 16 > height - 8) continue
+          const overlapsMarker = points.some(other => other !== point && other.x > x - 14 && other.x < x + labelWidth + 14 && other.y > y - 10 && other.y < y + 26)
+          if (!overlapsMarker && !labelBoxes.some(box => x < box.x + box.width + 18 && x + labelWidth + 18 > box.x && y < box.y + box.height + 8 && y + 24 > box.y)) {
             found = candidate
             break
           }
@@ -169,7 +141,7 @@ export function createDotWorldScene(host: HTMLElement, labelHost: HTMLElement, o
         if (found) break
       }
       if (found) labelBoxes.push(found)
-      else if (on) labelBoxes.push({ x: Math.max(6, Math.min(width - labelWidth - 6, point.x + 8)), y: Math.max(6, Math.min(height - 22, point.y - 16)), width: labelWidth, height: 16, point })
+      else if (on) labelBoxes.push({ x: Math.max(10, Math.min(width - labelWidth - 10, point.x + 16)), y: Math.max(8, Math.min(height - 24, point.y - 8)), width: labelWidth, height: 16, point })
     }
   }
   function buildBase() {
@@ -177,52 +149,42 @@ export function createDotWorldScene(host: HTMLElement, labelHost: HTMLElement, o
     base.height = Math.max(1, Math.round(height * pixelRatio))
     baseCtx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0)
     baseCtx.clearRect(0, 0, width, height)
-    // Cache the graticule and continent silhouettes together with the dot texture.
-    // They are rebuilt only when the viewport or palette changes, never per frame.
-    const xAt = (lng: number) => width / 2 + (lng - centerLng) * scale
-    const yAt = (lat: number) => height / 2 + (centerLat - lat) * scale
-    baseCtx.strokeStyle = colors.grid
-    baseCtx.lineWidth = .7
-    baseCtx.setLineDash([2, 5])
-    baseCtx.beginPath()
-    for (let lng = -180; lng <= 180; lng += 30) {
-      baseCtx.moveTo(xAt(lng), yAt(LAT_TOP))
-      baseCtx.lineTo(xAt(lng), yAt(LAT_BOTTOM))
-    }
-    for (let lat = -30; lat <= 60; lat += 30) {
-      baseCtx.moveTo(xAt(-180), yAt(lat))
-      baseCtx.lineTo(xAt(180), yAt(lat))
-    }
-    baseCtx.stroke()
-    baseCtx.setLineDash([])
-    baseCtx.beginPath()
-    for (const polygon of LAND) {
-      polygon.forEach(([lng, lat], i) => {
-        if (i === 0) baseCtx.moveTo(xAt(lng), yAt(lat))
-        else baseCtx.lineTo(xAt(lng), yAt(lat))
-      })
-      baseCtx.closePath()
-    }
-    baseCtx.fillStyle = colors.landFill
-    baseCtx.fill()
-    baseCtx.strokeStyle = colors.coast
-    baseCtx.lineWidth = .8
-    baseCtx.lineJoin = 'round'
-    baseCtx.stroke()
+    if (!width || !height) return
+    // The dot matrix is cached and rebuilt only when the viewport, palette or points change.
+    const step = LAND_MASK_RES * Math.max(1, Math.round(DOT_SPACING / (LAND_MASK_RES * scale)))
+    const radius = Math.max(.8, Math.min(2.2, step * scale * .3))
+    const lngFrom = Math.max(-180, centerLng - width / 2 / scale)
+    const lngTo = Math.min(180, centerLng + width / 2 / scale)
+    const latFrom = Math.min(LAT_TOP, centerLat + height / 2 / scale)
+    const latTo = Math.max(LAT_BOTTOM, centerLat - height / 2 / scale)
+    const anchors = points.map(point => [width / 2 + (point.data.lng - centerLng) * scale, height / 2 + (centerLat - point.data.lat) * scale])
+    const glowing: [number, number, number][] = []
     baseCtx.fillStyle = colors.land
-    // Pixel sampling stays at the reference's 5px / 1.1px, even after zooming.
     baseCtx.beginPath()
-    for (let y = DOT_STEP / 2; y < height; y += DOT_STEP) {
-      const lat = centerLat - (y - height / 2) / scale
-      if (lat < LAT_BOTTOM || lat > LAT_TOP) continue
-      for (let x = DOT_STEP / 2; x < width; x += DOT_STEP) {
-        const lng = centerLng + (x - width / 2) / scale
-        if (lng < -180 || lng > 180 || !isLand(lng, lat)) continue
-        baseCtx.moveTo(x + DOT_RADIUS, y)
-        baseCtx.arc(x, y, DOT_RADIUS, 0, TAU)
+    for (let row = Math.floor((LAT_TOP - latFrom) / step); LAT_TOP - row * step > latTo; row++) {
+      const lat = LAT_TOP - (row + .5) * step
+      const y = height / 2 + (centerLat - lat) * scale
+      for (let col = Math.floor((lngFrom + 180) / step); -180 + col * step < lngTo; col++) {
+        const lng = -180 + (col + .5) * step
+        if (!isLand(lng, lat)) continue
+        const x = width / 2 + (lng - centerLng) * scale
+        baseCtx.moveTo(x + radius, y)
+        baseCtx.arc(x, y, radius, 0, TAU)
+        let nearest = GLOW_RADIUS
+        for (const [ax, ay] of anchors) nearest = Math.min(nearest, Math.hypot(ax - x, ay - y))
+        if (nearest < GLOW_RADIUS) glowing.push([x, y, 1 - nearest / GLOW_RADIUS])
       }
     }
     baseCtx.fill()
+    // Land around each region picks up the marker colour, fading with distance.
+    baseCtx.fillStyle = colors.marker
+    for (const [x, y, strength] of glowing) {
+      baseCtx.globalAlpha = strength * strength * .7
+      baseCtx.beginPath()
+      baseCtx.arc(x, y, radius, 0, TAU)
+      baseCtx.fill()
+    }
+    baseCtx.globalAlpha = 1
   }
   function updateView() {
     scale = Math.max(.001, Math.min(Math.max(1, width - 24) / 360, Math.max(1, height - 24) / LAT_SPAN)) * magnification
@@ -271,24 +233,29 @@ export function createDotWorldScene(host: HTMLElement, labelHost: HTMLElement, o
       const controlY = (start.y + end.y) / 2 + dx * .22
       if (Math.max(start.x, end.x, controlX) < 0 || Math.min(start.x, end.x, controlX) > width || Math.max(start.y, end.y, controlY) < 0 || Math.min(start.y, end.y, controlY) > height) continue
       ctx.strokeStyle = colors.marker
-      ctx.globalAlpha = .35
-      ctx.lineWidth = 1
+      ctx.globalAlpha = .45
+      ctx.lineWidth = 1.2
+      ctx.lineCap = 'round'
       ctx.beginPath()
       ctx.moveTo(start.x, start.y)
       ctx.quadraticCurveTo(controlX, controlY, end.x, end.y)
       ctx.stroke()
       ctx.globalAlpha = 1
       if (reduced || !active || doc.hidden) continue
-      // Link motion is independent of the node pulse switch.
-      const progress = (now / 2600) % 1
-      const remaining = 1 - progress
-      const x = remaining * remaining * start.x + 2 * remaining * progress * controlX + progress * progress * end.x
-      const y = remaining * remaining * start.y + 2 * remaining * progress * controlY + progress * progress * end.y
+      // Link motion is independent of the node pulse switch: a short comet travels the arc.
+      const head = (now / 2600) % 1
       ctx.fillStyle = colors.marker
-      ctx.globalAlpha = Math.sin(Math.PI * progress)
-      ctx.beginPath()
-      ctx.arc(x, y, 1.8, 0, TAU)
-      ctx.fill()
+      for (let i = 0; i < 8; i++) {
+        const progress = head - i * .012
+        if (progress <= 0) break
+        const remaining = 1 - progress
+        const x = remaining * remaining * start.x + 2 * remaining * progress * controlX + progress * progress * end.x
+        const y = remaining * remaining * start.y + 2 * remaining * progress * controlY + progress * progress * end.y
+        ctx.globalAlpha = Math.sin(Math.PI * progress) * (1 - i / 8)
+        ctx.beginPath()
+        ctx.arc(x, y, 2 - i * .15, 0, TAU)
+        ctx.fill()
+      }
       ctx.globalAlpha = 1
     }
   }
@@ -311,25 +278,31 @@ export function createDotWorldScene(host: HTMLElement, labelHost: HTMLElement, o
         const phase = ((now + point.phase) % 2200) / 2200
         drawRing(point, 3 + phase * (on ? 16 : 11), color, (1 - phase) * (on ? .75 : .45))
       }
-      const radius = on ? 13 : 9
+      const radius = on ? 18 : 13
       const glow = ctx.createRadialGradient(point.x, point.y, 0, point.x, point.y, radius)
       glow.addColorStop(0, color)
       glow.addColorStop(1, 'rgba(0,0,0,0)')
-      ctx.globalAlpha = on ? .5 : .32
+      ctx.globalAlpha = on ? .45 : .28
       ctx.fillStyle = glow
       ctx.beginPath()
       ctx.arc(point.x, point.y, radius, 0, TAU)
       ctx.fill()
       ctx.globalAlpha = 1
-      // A solid separation ring keeps markers clear on land and crossing links.
+      // A lifted panel-coloured ring keeps markers clear on land and crossing links.
+      ctx.shadowColor = 'rgba(0,0,0,.22)'
+      ctx.shadowBlur = 4
+      ctx.shadowOffsetY = 1
       ctx.fillStyle = colors.panel
       ctx.beginPath()
-      ctx.arc(point.x, point.y, on ? 6 : 4.8, 0, TAU)
+      ctx.arc(point.x, point.y, on ? 7 : 5.5, 0, TAU)
       ctx.fill()
-      if (on) drawRing(point, 7.2, color, .9, 1.5)
+      ctx.shadowColor = 'transparent'
+      ctx.shadowBlur = 0
+      ctx.shadowOffsetY = 0
+      if (on) drawRing(point, 9.5, color, .55, 1.5)
       ctx.fillStyle = color
       ctx.beginPath()
-      ctx.arc(point.x, point.y, on ? 4 : 3.2, 0, TAU)
+      ctx.arc(point.x, point.y, on ? 4.5 : 3.6, 0, TAU)
       ctx.fill()
     }
     ctx.font = FONT
@@ -337,13 +310,19 @@ export function createDotWorldScene(host: HTMLElement, labelHost: HTMLElement, o
     ctx.textBaseline = 'middle'
     for (const box of labelBoxes) {
       const on = box.point.data.regionCode === selected || box.point.data.regionCode === hovered
-      ctx.fillStyle = on ? colors.panel : colors.surface
-      ctx.globalAlpha = .94
+      ctx.shadowColor = 'rgba(0,0,0,.12)'
+      ctx.shadowBlur = on ? 10 : 6
+      ctx.shadowOffsetY = 1
+      ctx.fillStyle = colors.panel
+      ctx.globalAlpha = on ? 1 : .92
       ctx.beginPath()
-      ctx.roundRect(box.x - 4, box.y - 2, box.width + 8, box.height + 4, 4)
+      ctx.roundRect(box.x - 7, box.y - 3, box.width + 14, box.height + 6, 11)
       ctx.fill()
+      ctx.shadowColor = 'transparent'
+      ctx.shadowBlur = 0
+      ctx.shadowOffsetY = 0
       ctx.globalAlpha = 1
-      ctx.fillStyle = on ? colors.text : colors.muted
+      ctx.fillStyle = on ? colors.marker : colors.text
       ctx.fillText(box.point.label, box.x, box.y + 8, 140)
     }
   }
@@ -463,6 +442,7 @@ export function createDotWorldScene(host: HTMLElement, labelHost: HTMLElement, o
     hoverPoint = points.find(point => point.data.regionCode === hovered) || null
     hovered = hoverPoint?.data.regionCode ?? null
     updateTooltip(hoverPoint)
+    buildBase()
     layoutLabels()
     redraw()
   }

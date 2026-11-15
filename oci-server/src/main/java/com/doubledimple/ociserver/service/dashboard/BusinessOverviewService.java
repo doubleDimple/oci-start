@@ -5,6 +5,7 @@ import com.doubledimple.ociserver.pojo.response.BusinessOverview.Activity;
 import com.doubledimple.ociserver.pojo.response.BusinessOverview.Bucket;
 import com.doubledimple.ociserver.pojo.response.BusinessOverview.Day;
 import com.doubledimple.ociserver.pojo.response.DashboardStats;
+import com.oracle.bmc.ospgateway.model.Subscription;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,9 +15,11 @@ import javax.persistence.TypedQuery;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -99,6 +102,7 @@ public class BusinessOverviewService {
                 + "where " + OCI_INSTANCES + " group by " + owner + ", " + ownerName
                 + " order by count(i) desc, " + owner + " asc", Object[].class).setMaxResults(RANK_LIMIT).getResultList();
         for (Object[] row : tenants) result.getTenantRanking().add(new Bucket(String.valueOf(row[0]), text(row[1]), count(row[2])));
+        tenantProfile(result, today);
 
         // GET polling would overwhelm genuine activity; this view counts recorded
         // POST/PUT/PATCH/DELETE operations, including failed operations.
@@ -120,6 +124,62 @@ public class BusinessOverviewService {
         launchStats.setFailCounts(count(launch[3]));
         result.setLaunch(launchStats);
         return result;
+    }
+
+    /**
+     * Profiles main OCI tenants. Register details are matched like the tenant list:
+     * latest record for the local tenant id first, then the OCI user id.
+     */
+    private void tenantProfile(BusinessOverview result, LocalDate today) {
+        Map<Long, Object[]> byLocal = new HashMap<>();
+        Map<String, Object[]> byUser = new HashMap<>();
+        for (Object[] row : rows("select r.tenantPrvId, r.tenantId, r.planType, r.accountType, r.registerTime from RegisterDetail r order by r.id asc")) {
+            if (row[0] != null) byLocal.put(((Number) row[0]).longValue(), row);
+            if (row[1] != null) byUser.put((String) row[1], row);
+        }
+        Map<Long, Long> secondaryRegions = new HashMap<>();
+        for (Object[] row : rows("select t.parenId, count(t) from Tenant t where t.cloudType = 1 and t.parenId is not null and t.parenId <> 0 group by t.parenId")) {
+            secondaryRegions.put(((Number) row[0]).longValue(), count(row[1]));
+        }
+        Map<String, Long> plans = buckets("upgrade", "free", "unknown");
+        Map<String, Long> entityTypes = buckets("personal", "corporate", "unknown");
+        Map<String, Long> ages = buckets("under1m", "m1to3", "m3to6", "m6to12", "over1y", "unknown");
+        Map<String, Long> spans = buckets("r1", "r2", "r3", "r4plus");
+        for (Object[] tenant : rows("select t.id, t.tenantId from Tenant t where " + OCI_ACCOUNTS)) {
+            long id = ((Number) tenant[0]).longValue();
+            Object[] detail = byLocal.containsKey(id) ? byLocal.get(id) : tenant[1] == null ? null : byUser.get((String) tenant[1]);
+            add(plans, detail == null ? "unknown" : plan(detail[2]), 1);
+            add(entityTypes, detail == null ? "unknown" : entityType(detail[3]), 1);
+            add(ages, detail == null ? "unknown" : age((Date) detail[4], today), 1);
+            long regionCount = 1 + secondaryRegions.getOrDefault(id, 0L);
+            add(spans, regionCount >= 4 ? "r4plus" : "r" + regionCount, 1);
+        }
+        result.setPlanTypes(list(plans));
+        result.setEntityTypes(list(entityTypes));
+        result.setAccountAges(list(ages));
+        result.setRegionSpans(list(spans));
+    }
+
+    private static String plan(Object value) {
+        if (value == Subscription.PlanType.Payg) return "upgrade";
+        if (value == Subscription.PlanType.FreeTier) return "free";
+        return "unknown";
+    }
+    private static String entityType(Object value) {
+        if (value == Subscription.AccountType.Personal) return "personal";
+        if (value == Subscription.AccountType.Corporate || value == Subscription.AccountType.CorporateSubmitted) return "corporate";
+        return "unknown";
+    }
+    /** Half a year = 180 days and one year = 365 days, counted in the server time zone. */
+    private String age(Date registered, LocalDate today) {
+        if (registered == null) return "unknown";
+        long days = ChronoUnit.DAYS.between(registered.toInstant().atZone(clock.getZone()).toLocalDate(), today);
+        if (days < 0) return "unknown";
+        if (days < 30) return "under1m";
+        if (days < 90) return "m1to3";
+        if (days < 180) return "m3to6";
+        if (days < 365) return "m6to12";
+        return "over1y";
     }
 
     private Activity activity(String entity, String timestamp, String status, String scope,

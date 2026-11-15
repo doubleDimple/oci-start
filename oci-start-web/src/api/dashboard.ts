@@ -71,6 +71,11 @@ export interface BusinessOverview {
   monitoring: BusinessBucket[]
   regionRanking: BusinessBucket[]
   tenantRanking: BusinessBucket[]
+  /** Tenant profile buckets; absent when the server predates them. */
+  planTypes?: BusinessBucket[]
+  entityTypes?: BusinessBucket[]
+  accountAges?: BusinessBucket[]
+  regionSpans?: BusinessBucket[]
   operations: BusinessActivity
   email: BusinessActivity
   launch: DashboardStats

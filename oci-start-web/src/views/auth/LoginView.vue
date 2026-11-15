@@ -433,7 +433,6 @@ onBeforeUnmount(() => {
               <button id="loginButton" type="submit" class="submit btn btn-primary" :class="{ busy }" :disabled="busy || loginDisabled"><span class="spin" aria-hidden="true"/><span class="txt">{{ busy ? t('login.input.login.loading') : t('login.btn.login') }}</span></button><p class="msg" aria-hidden="true"/>
               <div v-if="config.githubEnabled || config.googleEnabled" class="auth-divider"><span>{{ copy.orThirdParty }}</span></div>
               <div v-if="config.githubEnabled || config.googleEnabled" class="oauth-row"><button v-if="config.githubEnabled" id="githubLoginBtn" type="button" class="btn btn-github btn-oauth" :disabled="!!oauthBusy || busy || loginDisabled" @click="oauth('github')"><i class="i-mdi-github" aria-hidden="true"/><span>{{ oauthBusy === 'github' ? t('login.input.step.next') : t('login.btn.github') }}</span></button><button v-if="config.googleEnabled" id="googleLoginBtn" type="button" class="btn btn-google btn-oauth" :disabled="!!oauthBusy || busy || loginDisabled" @click="oauth('google')"><i class="i-mdi-google" aria-hidden="true"/><span>{{ oauthBusy === 'google' ? t('login.input.step.next') : t('login.btn.google') }}</span></button></div>
-              <div class="enterprise-trust-badge" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg><span>{{ copy.securityBadge }}</span></div>
             </div>
           </form>
           <form v-if="config.allowRegister" v-show="tab === 'register'" id="registerForm" class="auth-form" novalidate @submit.prevent="submitRegistration">
@@ -462,7 +461,6 @@ onBeforeUnmount(() => {
               </div>
             </div>
             <button type="submit" class="submit btn btn-primary" :disabled="busy || reservedRegistrationName">{{ busy ? t('login.input.sending') : t('login.register') }}</button>
-            <div class="enterprise-trust-badge" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg><span>{{ copy.securityBadge }}</span></div>
           </form>
         </template>
       </div>

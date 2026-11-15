@@ -67,9 +67,9 @@ function readColors(): RegionSceneColors {
   const prefix = `--region-map-${mapTheme.value}`
   return {
     surface: token(`${prefix}-surface`), land: token(`${prefix}-land`),
-    panel: token(`${prefix}-panel`), landFill: token(`${prefix}-land-fill`), coast: token(`${prefix}-coast`),
+    panel: token(`${prefix}-panel`), coast: token(`${prefix}-coast`),
     text: token(`${prefix}-text`), muted: token(`${prefix}-muted`),
-    grid: token(`${prefix}-grid`), marker: token(`${prefix}-marker`),
+    marker: token(`${prefix}-marker`),
   }
 }
 function releaseScene() {

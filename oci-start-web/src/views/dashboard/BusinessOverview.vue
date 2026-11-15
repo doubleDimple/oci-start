@@ -6,7 +6,7 @@ import { usePageMotion } from '@/composables/usePageMotion'
 import { readChartTheme } from '@/utils/chartTheme'
 import type { BusinessBucket } from '@/api/dashboard'
 import { useBusinessOverview } from './useBusinessOverview'
-import { distributionOption, rankingOption, businessActivityOption, type BusinessSlice } from './businessCharts'
+import { distributionOption, rankingOption, businessActivityOption, columnOption, type BusinessSlice } from './businessCharts'
 import { finite } from './useDashboard'
 import AnimatedNumber from './AnimatedNumber.vue'
 import DashboardChart from './DashboardChart.vue'
@@ -67,6 +67,30 @@ const notices = computed(() => [
   { key: 'failedOperations', value: overview.value?.operations.failed ?? null, to: '/system/auditLogs' },
   { key: 'failedEmails', value: overview.value?.email.failed ?? null, to: '/email/management' },
 ].filter(notice => notice.value !== null && notice.value > 0))
+// Tenant profile: main OCI tenants only. Bucket arrays are absent on servers that predate them.
+const total = (buckets: BusinessBucket[] | undefined, skip: string[] = []) => buckets ? buckets.filter(bucket => !skip.includes(bucket.key)).reduce((sum, bucket) => sum + bucket.count, 0) : null
+const profileTotal = computed(() => overview.value?.planTypes ? overview.value.accounts : null)
+const profileCards = computed(() => {
+  const ages = overview.value?.accountAges
+  return [
+    { key: 'upgradeAccounts', value: count(overview.value?.planTypes, 'upgrade'), icon: 'i-mdi-rocket-launch-outline', color: palette.value.brand },
+    { key: 'freeAccounts', value: count(overview.value?.planTypes, 'free'), icon: 'i-mdi-account-outline', color: palette.value.info },
+    { key: 'halfYearAccounts', value: total(ages?.filter(bucket => bucket.key === 'm6to12' || bucket.key === 'over1y')), icon: 'i-mdi-calendar-clock-outline', color: palette.value.tertiary },
+    { key: 'yearAccounts', value: count(ages, 'over1y'), icon: 'i-mdi-calendar-star', color: palette.value.warning },
+    { key: 'multiRegionAccounts', value: total(overview.value?.regionSpans, ['r1']), icon: 'i-mdi-earth', color: palette.value.info },
+  ].map(card => ({ ...card, share: ratio(card.value, profileTotal.value), width: card.value !== null && profileTotal.value ? `${Math.min(100, card.value / profileTotal.value * 100)}%` : '0%' }))
+})
+const planSlices = computed<BusinessSlice[]>(() => (overview.value?.planTypes ?? []).map(bucket => ({ key: bucket.key, name: tr(`plan_${bucket.key}`), value: bucket.count, color: bucket.key === 'upgrade' ? palette.value.brand : bucket.key === 'free' ? palette.value.info : palette.value.muted })))
+const planChart = computed(() => distributionOption(planSlices.value, palette.value))
+const entities = computed(() => (overview.value?.entityTypes ?? []).filter(bucket => bucket.key !== 'unknown' || bucket.count > 0))
+const ramp = (buckets: BusinessBucket[] | undefined, prefix: string, color: string, steps: number[]) => (buckets ?? []).map((bucket, index): BusinessSlice => ({
+  key: bucket.key, name: tr(`${prefix}_${bucket.key}`), value: bucket.count,
+  color: bucket.key === 'unknown' ? palette.value.muted : color, opacity: bucket.key === 'unknown' ? .45 : steps[index] ?? 1,
+}))
+const profileColumns = computed(() => [
+  { key: 'ageDistribution', slices: ramp(overview.value?.accountAges, 'age', palette.value.tertiary, [.4, .55, .7, .85, 1]), note: 'ageNote' },
+  { key: 'regionDistribution', slices: ramp(overview.value?.regionSpans, 'span', palette.value.info, [.45, .65, .85, 1]), note: 'regionNote' },
+].map(column => ({ ...column, chart: columnOption(column.slices, palette.value, locale.value, tr('accountUnit')), description: tr('chartDescription', { name: tr(column.key), values: column.slices.map(slice => `${slice.name} ${number(slice.value)}`).join('，') }) })))
 const updated = computed(() => overview.value ? new Date(overview.value.generatedAt).toLocaleTimeString(locale.value, { hour12: false }) : '')
 </script>
 
@@ -91,6 +115,29 @@ const updated = computed(() => overview.value ? new Date(overview.value.generate
         <dd class="capacity-value"><AnimatedNumber :value="item.value" :format="number" /><span v-if="item.unit" class="capacity-unit">{{ item.unit }}</span><span v-if="item.partial" class="capacity-partial">{{ tr('partial') }}</span><span v-if="item.hint" class="sr-only">{{ item.hint }}</span></dd>
       </div>
     </dl>
+
+    <section class="monitor-panel tenant-profile" :aria-label="tr('profile')" data-motion-enter>
+      <header class="panel-heading"><div class="profile-title"><h2>{{ tr('profile') }}</h2><span class="business-tag">{{ tr('profileScope') }}</span></div><RouterLink class="business-text-link" to="/tenants/list">{{ tr('tenantsLink') }}<i class="i-mdi-arrow-top-right" aria-hidden="true" /></RouterLink></header>
+      <div class="profile-kpis">
+        <div v-for="card in profileCards" :key="card.key" class="profile-kpi" :data-profile-kpi="card.key" :style="{ '--profile-accent': card.color }">
+          <div class="profile-kpi-heading"><span>{{ tr(card.key) }}</span><i :class="card.icon" aria-hidden="true" /></div>
+          <strong class="profile-kpi-value"><AnimatedNumber :value="card.value" :format="number" /><small>{{ card.share }}</small></strong>
+          <div class="profile-meter" aria-hidden="true"><span :style="{ width: card.width }" /></div>
+        </div>
+      </div>
+      <div class="profile-charts">
+        <div class="profile-chart">
+          <h3>{{ tr('planDistribution') }}</h3>
+          <div class="business-donut-layout"><div class="business-ring profile-ring"><DashboardChart :option="planChart" :label="describe(tr('planDistribution'), planSlices)" /><div class="ring-label"><strong>{{ ratio(count(overview?.planTypes, 'upgrade'), profileTotal) }}</strong><span>{{ tr('upgradeRate') }}</span></div></div><ul class="business-legend"><li v-for="slice in planSlices" :key="slice.key"><span><i class="legend-dot" :style="{ background: slice.color }" />{{ slice.name }}</span><strong>{{ number(slice.value) }}</strong><small>{{ ratio(slice.value, profileTotal) }}</small></li><li v-if="!overview?.planTypes" class="business-placeholder">{{ tr(loading ? 'loading' : 'profileUnavailable') }}</li></ul></div>
+          <div v-if="entities.length" class="profile-entities"><span>{{ tr('entityType') }}</span><span v-for="bucket in entities" :key="bucket.key" class="profile-chip">{{ tr(`entity_${bucket.key}`) }}<strong>{{ number(bucket.count) }}</strong></span></div>
+        </div>
+        <div v-for="column in profileColumns" :key="column.key" class="profile-chart">
+          <h3>{{ tr(column.key) }}</h3>
+          <div class="profile-column-chart"><DashboardChart :option="column.chart" :label="column.description" /><span v-if="!profileTotal" class="business-chart-empty">{{ tr(loading ? 'loading' : !overview?.planTypes && overview ? 'profileUnavailable' : 'noTenants') }}</span></div>
+          <p class="profile-note">{{ tr(column.note) }}</p>
+        </div>
+      </div>
+    </section>
 
     <div class="business-grid">
       <section class="monitor-panel distribution-panel" data-motion-enter>
