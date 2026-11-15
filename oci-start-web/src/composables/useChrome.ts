@@ -56,9 +56,9 @@ export const CONTENT_PRESETS: ContentPalette[] = ([
     hover: '#eef2f6',
     border: '#e2e8f0',
     borderStrong: '#cbd5e1',
-    textPrimary: '#0f172a',
-    textSecondary: '#475569',
-    textMuted: '#94a3b8',
+    textPrimary: '#0a0a0c',
+    textSecondary: '#1d1d1f',
+    textMuted: '#424245',
     shadowCard: '0 1px 3px rgba(0, 0, 0, 0.04)',
   },
   {
@@ -72,9 +72,9 @@ export const CONTENT_PRESETS: ContentPalette[] = ([
     hover: '#e8f0fa',
     border: '#c7d7ea',
     borderStrong: '#9cb7da',
-    textPrimary: '#0c1a2e',
-    textSecondary: '#3e5473',
-    textMuted: '#7d95b5',
+    textPrimary: '#080e16',
+    textSecondary: '#162233',
+    textMuted: '#38485e',
     shadowCard: '0 2px 12px rgba(16, 42, 77, 0.05)',
   },
   {
@@ -88,9 +88,9 @@ export const CONTENT_PRESETS: ContentPalette[] = ([
     hover: '#f3ede1',
     border: '#dcd4c3',
     borderStrong: '#baa992',
-    textPrimary: '#292524',
-    textSecondary: '#57534e',
-    textMuted: '#a8a29e',
+    textPrimary: '#100e0c',
+    textSecondary: '#1f1c19',
+    textMuted: '#46413d',
     shadowCard: '0 2px 10px rgba(41, 37, 36, 0.04)',
   },
   {
@@ -303,9 +303,9 @@ export function deriveCustomPalette(hex: string): ContentPalette {
         hover: '#eef2f6',
         border: '#e2e8f0',
         borderStrong: '#cbd5e1',
-        textPrimary: '#0f172a',
-        textSecondary: '#475569',
-        textMuted: '#94a3b8',
+        textPrimary: '#0a0a0c',
+        textSecondary: '#1d1d1f',
+        textMuted: '#424245',
         shadowCard: '0 1px 3px rgba(0, 0, 0, 0.04)',
       })
     }
@@ -321,9 +321,9 @@ export function deriveCustomPalette(hex: string): ContentPalette {
       hover: hslToHex(hsl.h, Math.min(hsl.s, 18), 94),
       border: hslToHex(hsl.h, Math.min(hsl.s, 15), 78),
       borderStrong: hslToHex(hsl.h, Math.min(hsl.s, 15), 58),
-      textPrimary: '#0f172a',
-      textSecondary: '#475569',
-      textMuted: '#94a3b8',
+      textPrimary: '#0a0a0c',
+      textSecondary: '#1d1d1f',
+      textMuted: '#424245',
       shadowCard: '0 2px 10px rgba(0, 0, 0, 0.05)',
     })
   }
@@ -491,6 +491,11 @@ export function applyChrome() {
   setVar('--el-text-color-regular', palette.textPrimary)
   setVar('--el-text-color-secondary', palette.textSecondary)
   setVar('--el-text-color-placeholder', palette.textMuted)
+  setVar('--el-text-color-disabled', palette.textMuted)
+  setVar('--el-input-text-color', palette.textPrimary)
+  setVar('--el-input-placeholder-color', palette.textMuted)
+  setVar('--el-table-text-color', palette.textPrimary)
+  setVar('--el-table-header-text-color', palette.textSecondary)
 
   // Synchronize sidebar tokens
   const sidebarColor = current.sidebar || (mode === 'dark' ? DEFAULT_DARK.sidebar : DEFAULT_LIGHT.sidebar)
@@ -498,8 +503,8 @@ export function applyChrome() {
   const sidebarAccent = cloudscapeVariables(sidebarMode)
   setVar('--bg-sidebar', sidebarColor)
   setVar('--bg-sidebar-hover', cloudscapeContent(sidebarMode).hover)
-  setVar('--text-on-dark', readableColor(sidebarMode === 'light' ? '#0f141a' : '#ebebf0', [sidebarColor], sidebarMode))
-  setVar('--text-on-dark-muted', readableColor(sidebarMode === 'light' ? '#424650' : '#c6c6cd', [sidebarColor], sidebarMode))
+  setVar('--text-on-dark', readableColor(sidebarMode === 'light' ? '#0a0a0c' : '#ebebf0', [sidebarColor], sidebarMode))
+  setVar('--text-on-dark-muted', readableColor(sidebarMode === 'light' ? '#1d1d1f' : '#c6c6cd', [sidebarColor], sidebarMode))
   setVar('--nav-selected-bg', sidebarAccent['--brand-subtle'])
   setVar('--nav-selected-fg', sidebarAccent['--brand'])
 

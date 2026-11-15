@@ -34,10 +34,17 @@ const {
   CONTENT_PRESETS,
   SIDEBAR_PRESETS,
   isLightColor,
+  getLuminance,
   hexToRgb,
   rgbToHsl,
   hslToHex,
 } = helpers
+
+function contrastRatio(fg, bg) {
+  const l1 = getLuminance(fg)
+  const l2 = getLuminance(bg)
+  return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05)
+}
 
 test('all CONTENT_PRESETS have distinct card and page colors so container divs never disappear', () => {
   assert.ok(CONTENT_PRESETS.length >= 6)
@@ -97,4 +104,46 @@ test('all SIDEBAR_PRESETS specify correct contrast flags', () => {
     assert.ok(sidebar.color.startsWith('#'))
     assert.equal(sidebar.isLight, isLightColor(sidebar.color))
   }
+})
+
+test('light mode presets and derived palettes use crisp high-contrast dark ink', () => {
+  const lightPalettes = [
+    ...CONTENT_PRESETS.filter(preset => preset.mode === 'light'),
+    deriveCustomPalette('#ffffff'),
+    deriveCustomPalette('#f1f5f9'),
+  ]
+  for (const palette of lightPalettes) {
+    for (const surface of [palette.page, palette.card, palette.cardSubtle, palette.search]) {
+      assert.ok(
+        contrastRatio(palette.textPrimary, surface) >= 15,
+        `${palette.id} textPrimary (${palette.textPrimary}) on ${surface} must be crisp black ink`,
+      )
+      assert.ok(
+        contrastRatio(palette.textSecondary, surface) >= 11.5,
+        `${palette.id} textSecondary (${palette.textSecondary}) on ${surface} must avoid washed-out gray`,
+      )
+      assert.ok(
+        contrastRatio(palette.textMuted, surface) >= 7.0,
+        `${palette.id} textMuted (${palette.textMuted}) on ${surface} must remain clearly legible`,
+      )
+    }
+  }
+})
+
+test('tokens.css and login.scss scope antialiased font-smoothing to dark mode so light text keeps full stroke weight', async () => {
+  const tokensCss = await readFile(new URL('../src/styles/tokens.css', import.meta.url), 'utf8')
+  const darkBlockStart = tokensCss.indexOf('html:root[data-content-theme="dark"]')
+  const bodyBlockStart = tokensCss.indexOf('html:root, html:root body, #app')
+  assert.ok(darkBlockStart !== -1 && bodyBlockStart !== -1)
+  const darkBlock = tokensCss.slice(darkBlockStart, bodyBlockStart)
+  const bodyBlock = tokensCss.slice(bodyBlockStart)
+  assert.match(darkBlock, /-webkit-font-smoothing:\s*antialiased/)
+  assert.doesNotMatch(bodyBlock, /-webkit-font-smoothing:\s*antialiased/)
+
+  const loginScss = await readFile(new URL('../src/views/auth/login.scss', import.meta.url), 'utf8')
+  const darkAuthLine = loginScss.indexOf('&[data-theme="dark"] {')
+  const authBaseEnd = loginScss.indexOf('.stage{')
+  assert.ok(darkAuthLine !== -1 && authBaseEnd !== -1)
+  assert.match(loginScss.slice(darkAuthLine, authBaseEnd), /-webkit-font-smoothing:\s*antialiased/)
+  assert.doesNotMatch(loginScss.slice(darkAuthLine + 120, authBaseEnd), /-webkit-font-smoothing:\s*antialiased/)
 })

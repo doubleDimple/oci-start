@@ -529,7 +529,7 @@ function onReset() {
 }
 .preset-mode-tag.light {
   background: #f1f5f9;
-  color: #475569;
+  color: #1d1d1f;
 }
 .preset-mode-tag.dark {
   background: #1e293b;

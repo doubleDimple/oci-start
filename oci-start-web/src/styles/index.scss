@@ -164,6 +164,9 @@ html:root[data-content-theme] {
     background: var(--bg-card);
     color: var(--text-primary);
   }
+  .el-dropdown-menu__item:not(.is-disabled) {
+    color: var(--text-primary);
+  }
 
   .el-message-box {
     --el-messagebox-font-size: var(--font-size-dialog-title);
@@ -186,10 +189,17 @@ html:root[data-content-theme] {
     --el-pagination-font-size: var(--font-size-body);
     --el-pagination-font-size-small: var(--font-size-body);
     --el-pagination-hover-color: var(--brand);
+    --el-pagination-text-color: var(--text-primary);
     --el-pagination-button-color: var(--text-primary);
     --el-pagination-button-bg-color: var(--bg-card);
     --el-pagination-button-disabled-bg-color: var(--bg-card);
     --el-text-color-primary: var(--text-primary);
+    --el-text-color-regular: var(--text-primary);
+    color: var(--text-primary);
+  }
+  .el-pagination__total,
+  .el-pagination__jump {
+    color: var(--text-secondary);
   }
   .el-pagination.is-background .el-pager li.is-active {
     color: var(--text-on-brand);
@@ -217,9 +227,44 @@ html:root[data-content-theme] {
   .el-textarea__inner {
     border-radius: var(--r-sm);
     background: var(--bg-search);
+    color: var(--text-primary);
+    font-family: var(--sans);
     box-shadow: 0 0 0 1px var(--border-strong) inset;
+    &::placeholder { color: var(--text-muted); opacity: 1; }
   }
-  .el-table .el-table__cell {
+  .el-table .el-table__cell,
+  .el-table .cell {
+    color: var(--text-primary);
+  }
+  .el-table__empty-text {
+    color: var(--text-secondary);
+  }
+  .el-descriptions {
+    --el-descriptions-item-bordered-label-background: var(--bg-card-subtle);
+    color: var(--text-primary);
+  }
+  .el-descriptions__label {
+    color: var(--text-secondary);
+  }
+  .el-descriptions__content {
+    color: var(--text-primary);
+  }
+  .el-tabs__item {
+    color: var(--text-secondary);
+  }
+  .el-tabs__item.is-active {
+    color: var(--brand);
+  }
+  .el-form-item__label {
+    color: var(--text-secondary);
+  }
+  .el-checkbox__label,
+  .el-radio__label,
+  .el-switch__label,
+  .el-collapse-item__header,
+  .el-collapse-item__content,
+  .el-drawer__header,
+  .el-drawer__body {
     color: var(--text-primary);
   }
   .el-table td.el-table__fixed-right-patch,

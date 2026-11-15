@@ -5,7 +5,11 @@
   line-height: normal;
   --text-primary: var(--text);
   &[data-theme="light"] { color-scheme: light; }
-  &[data-theme="dark"] { color-scheme: dark; }
+  &[data-theme="dark"] {
+    color-scheme: dark;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
   .turnstile-container { margin-bottom: 18px; text-align: center; }
   #turnstileHint { margin: 8px 0 0; font-size: 12px; color: var(--text-muted); }
   .auth-challenge .message { margin-top: 12px; text-align: left; }
@@ -20,7 +24,7 @@
   &{min-height:100dvh;margin:0}
   &{
     background:var(--bg);color:var(--text);font-family:var(--sans);
-    -webkit-font-smoothing:antialiased;display:flex;
+    display:flex;
   }
   a{color:inherit}
 
