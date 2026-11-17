@@ -14,8 +14,9 @@
   font: 400 var(--font-size-body)/1.5 var(--sans);
 
   .btn {
-    min-height: 36px;
-    padding: 7px 14px;
+    min-height: 32px;
+    padding: 5px 12px;
+    font-size: var(--font-size-secondary);
   }
 
   i {
@@ -598,8 +599,7 @@
   }
 
   :is(input, textarea):focus-visible {
-    outline: 2px solid var(--brand);
-    outline-offset: 2px;
+    outline: none;
   }
 
   :is(input, textarea)::placeholder {

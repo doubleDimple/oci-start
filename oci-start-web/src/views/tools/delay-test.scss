@@ -6,7 +6,7 @@
   .delay-run-status { display: inline-flex; align-items: center; gap: 6px; color: var(--text-primary); font-size: var(--font-size-secondary); }
   .delay-run-status > i { font-size: 16px; }
   .delay-toolbar-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-left: auto; }
-  .btn { min-height: 36px; padding: 7px 12px; }
+  .btn { min-height: 32px; padding: 5px 12px; font-size: var(--font-size-secondary); }
   .delay-content { flex: 1; min-height: 0; min-width: 0; overflow: auto; padding: 18px; }
   .delay-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-bottom: 16px; }
   .delay-stat { min-width: 0; padding: 16px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--bg-card); }

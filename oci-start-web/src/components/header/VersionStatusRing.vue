@@ -91,19 +91,19 @@ onBeforeUnmount(() => { stopClock(); document.removeEventListener('visibilitycha
 <style scoped>
 .version-ring-widget { width: min(100%, 290px); justify-self: center; align-self: center; }
 .version-status-ring { position: relative; width: 100%; aspect-ratio: 1; color: var(--brand); isolation: isolate; }
-.version-status-ring::before { content: ''; position: absolute; inset: 15%; border-radius: 50%; background: radial-gradient(circle at 38% 30%, color-mix(in srgb, var(--brand-solid) 13%, transparent), color-mix(in srgb, var(--brand-solid) 3%, transparent) 70%); z-index: -1; }
+.version-status-ring::before { content: ''; position: absolute; inset: 15%; border-radius: 50%; background: radial-gradient(circle at 38% 30%, color-mix(in srgb, var(--chart-primary) 13%, transparent), color-mix(in srgb, var(--chart-primary) 3%, transparent) 70%); z-index: -1; }
 .version-ring-art { display: block; width: 100%; overflow: visible; fill: none; }
-.ring-gradient-start { stop-color: color-mix(in srgb, var(--brand-solid) 70%, var(--bg-card)); }
-.ring-gradient-end { stop-color: color-mix(in srgb, var(--brand-solid) 84%, var(--brand)); }
+.ring-gradient-start { stop-color: color-mix(in srgb, var(--chart-primary) 70%, var(--bg-card)); }
+.ring-gradient-end { stop-color: color-mix(in srgb, var(--chart-primary) 84%, var(--brand)); }
 .ring-ticks { stroke: color-mix(in srgb, var(--text-secondary) 25%, transparent); stroke-width: 1; }
 .ring-ticks .is-major { stroke: color-mix(in srgb, var(--brand) 48%, var(--border)); stroke-width: 1.5; }
 .ring-inner { stroke: color-mix(in srgb, var(--brand) 12%, var(--border)); stroke-dasharray: 1 7; }
 .ring-track { stroke: color-mix(in srgb, var(--brand) 10%, var(--border)); stroke-width: 6; }
-.ring-halo { stroke: var(--brand-solid); stroke-width: 18; opacity: .09; }
+.ring-halo { stroke: var(--chart-primary); stroke-width: 18; opacity: .09; }
 .ring-value { stroke-width: 5; stroke-linecap: round; stroke-dasharray: 100; transition: stroke-dashoffset 1s linear; }
 .ring-orbit { transform-origin: 150px 150px; animation: version-orbit 12s linear infinite; }
 .ring-orbit > circle:first-child { stroke: var(--brand); stroke-width: 1.2; stroke-dasharray: 7 43; opacity: .6; }
-.orbit-point { fill: var(--brand-solid); stroke: var(--bg-card); stroke-width: 2; }
+.orbit-point { fill: var(--chart-primary); stroke: var(--bg-card); stroke-width: 2; }
 .version-ring-center { position: absolute; inset: 22% 17%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; text-align: center; }
 .ring-icon { display: block; font-size: 25px; margin-bottom: 1px; }
 .ring-overline { color: var(--text-secondary); font-size: 12px; line-height: 1.4; }

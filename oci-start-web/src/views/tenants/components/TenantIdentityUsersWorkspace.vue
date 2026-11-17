@@ -1603,9 +1603,10 @@ defineExpose({
 }
 
 :is(.identity-drawer-body, .identity-drawer-footer) :deep(.el-button:not(.is-link)) {
-  min-height: 36px;
+  min-height: 32px;
   height: auto;
-  padding: 7px 16px;
+  padding: 5px 13px;
+  font-size: var(--font-size-secondary);
   font-weight: 500;
 }
 
@@ -1615,7 +1616,7 @@ defineExpose({
 
 .identity-drawer-footer :deep(.el-button--primary:not(.is-link)) {
   border-radius: var(--r-pill);
-  padding-inline: 18px;
+  padding-inline: 15px;
 }
 
 .identity-drawer-body :deep(.el-input__wrapper),

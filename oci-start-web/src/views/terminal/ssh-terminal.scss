@@ -6,7 +6,8 @@
   button, input, select { font: inherit; }
   button { touch-action: manipulation; }
   button:disabled { cursor: default; opacity: .5; }
-  button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+  button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+  input:focus-visible, select:focus-visible { outline: none; }
   .btn { min-height: 36px; padding: 7px 12px; font-weight: 500; }
   .ssh-toolbar { display: flex; flex: none; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 16px; border-bottom: 1px solid var(--border); }
   .ssh-state { display: inline-flex; flex: none; align-items: center; gap: 7px; font-size: var(--font-size-secondary); white-space: nowrap; }

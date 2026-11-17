@@ -25,18 +25,18 @@
   .tenant-search {
     display: flex;
     align-items: center;
-    gap: 9px;
+    gap: 8px;
     flex: 1 1 200px;
     max-width: 340px;
     min-width: 0;
-    height: 36px;
-    padding: 0 12px;
+    height: 32px;
+    padding: 0 11px;
     background: var(--bg-search);
     border: 1px solid var(--border-strong);
     border-radius: var(--r-sm);
     transition: border-color 180ms ease, box-shadow 180ms ease;
   }
-  .tenant-search:focus-within { border-color: var(--brand); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 10%, transparent); }
+  .tenant-search:focus-within { border-color: var(--border-strong); box-shadow: none; outline: none; }
   .tenant-search > i { color: var(--text-muted); font-size: 19px; flex-shrink: 0; }
   .tenant-search input { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; color: var(--text-primary); font: inherit; font-size: var(--font-size-body); }
   .tenant-search input::placeholder { color: var(--text-muted); }
@@ -54,15 +54,15 @@
   .toolbar-actions .el-dropdown {
     display: inline-flex;
     align-items: center;
-    height: 36px;
+    height: 32px;
     vertical-align: middle;
   }
   .toolbar-button {
     display: inline-flex;
     justify-content: center;
     align-items: center;
-    width: 36px;
-    height: 36px;
+    width: 32px;
+    height: 32px;
     padding: 0;
     box-sizing: border-box;
     border: 1px solid var(--border);
@@ -70,7 +70,7 @@
     background: var(--bg-card);
     color: var(--text-secondary);
     font: inherit;
-    font-size: var(--font-size-body);
+    font-size: var(--font-size-secondary);
     font-weight: 500;
     white-space: nowrap;
     cursor: pointer;
@@ -78,9 +78,9 @@
     transition: all 160ms ease;
   }
   .toolbar-button i {
-    font-size: 17px;
-    width: 17px;
-    height: 17px;
+    font-size: 15px;
+    width: 15px;
+    height: 15px;
     flex: none;
   }
   .toolbar-button:not(:disabled):hover {
@@ -103,10 +103,10 @@
     border-color: color-mix(in srgb, var(--brand) 30%, transparent);
   }
   .toolbar-actions .tenant-import {
-    height: 36px !important;
-    min-height: 36px !important;
-    padding: 0 16px !important;
-    font-size: var(--font-size-body) !important;
+    height: 32px !important;
+    min-height: 32px !important;
+    padding: 0 13px !important;
+    font-size: var(--font-size-secondary) !important;
   }
   .search-context { display: flex; align-items: center; flex-shrink: 0; gap: 10px; flex-wrap: wrap; margin: 0; padding: 0 18px 12px; color: var(--text-secondary); font-size: var(--font-size-secondary); }
   .search-context button { padding: 0; border: 0; background: none; color: var(--brand); font: inherit; font-size: var(--font-size-body); cursor: pointer; }
@@ -230,31 +230,31 @@
     justify-content: flex-start;
     align-items: center;
     gap: 6px;
-    height: 32px;
+    height: 28px;
     flex-wrap: nowrap;
     white-space: nowrap;
   }
   .row-actions .el-dropdown {
     display: inline-flex;
     align-items: center;
-    height: 32px;
+    height: 28px;
     vertical-align: middle;
   }
   .boot-button, .more-button {
     display: inline-flex;
     justify-content: center;
     align-items: center;
-    width: 32px;
-    height: 32px;
+    width: 28px;
+    height: 28px;
     padding: 0;
     margin: 0;
     box-sizing: border-box;
     border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
-    border-radius: 9px;
+    border-radius: 8px;
     background: var(--bg-card);
     color: var(--text-primary);
     font: inherit;
-    font-size: 16px;
+    font-size: 14px;
     font-weight: 500;
     white-space: nowrap;
     cursor: pointer;
@@ -264,9 +264,9 @@
 
     > i {
       flex: none;
-      width: 16px;
-      height: 16px;
-      font-size: 16px;
+      width: 15px;
+      height: 15px;
+      font-size: 15px;
     }
 
     &:hover:not(:disabled) {
@@ -287,14 +287,14 @@
 
   .boot-button:has(span) {
     width: auto;
-    padding: 0 10px;
-    font-size: var(--font-size-body);
+    padding: 0 8px;
+    font-size: var(--font-size-secondary);
   }
 
   .boot-button-placeholder {
     display: inline-block;
-    width: 32px;
-    height: 32px;
+    width: 28px;
+    height: 28px;
     flex-shrink: 0;
     visibility: hidden;
   }

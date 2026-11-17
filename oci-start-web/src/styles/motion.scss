@@ -1,7 +1,11 @@
 /* Short, interruptible feedback; pages never depend on animation to become visible. */
-:where(button, a, input:not(.el-input__inner):not(.el-select__input):not(.el-range-input), select, textarea, [role='button']):focus-visible {
+:where(button, a, input[type='checkbox'], input[type='radio'], [role='button']):focus-visible {
   outline: 2px solid var(--brand);
   outline-offset: 3px;
+}
+:where(input:not([type='checkbox']):not([type='radio']), select, textarea):focus,
+:where(input:not([type='checkbox']):not([type='radio']), select, textarea):focus-visible {
+  outline: none;
 }
 
 .el-button:not(.is-link):not(.is-text) {

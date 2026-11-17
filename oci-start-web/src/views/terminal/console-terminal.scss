@@ -6,7 +6,8 @@
   button, input, textarea { font: inherit; }
   button { touch-action: manipulation; }
   button:disabled { cursor: default; opacity: .55; }
-  button:focus-visible, input:focus-visible, textarea:focus-visible, pre:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+  button:focus-visible, pre:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+  input:focus-visible, textarea:focus-visible { outline: none; }
   .btn { min-height: 36px; padding: 7px 12px; font-weight: 500; }
   .vnc-toolbar { display: flex; align-items: center; flex: none; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
   .vnc-instance { display: flex; align-items: center; gap: 12px; min-width: 0; }
@@ -66,8 +67,8 @@
   .vnc-form textarea { resize: vertical; min-height: 120px; max-height: 40vh; }
   .vnc-form textarea::placeholder { color: var(--text-muted); }
   .vnc-form p { margin: 0; font-size: var(--font-size-secondary); }
-  .vnc-primary { min-height: 36px; padding: 7px 14px; border: 1px solid var(--brand); border-radius: var(--r-pill); background: var(--brand); color: var(--nav-active-fg); cursor: pointer; }
-  .vnc-primary:hover { background: var(--brand-hover); }
+  .vnc-primary { min-height: 32px; padding: 5px 14px; border: 1px solid var(--brand-solid); border-radius: var(--r-pill); background: var(--brand-solid); color: var(--text-on-solid); font-size: var(--font-size-secondary); font-weight: 600; cursor: pointer; }
+  .vnc-primary:hover { background: var(--brand-solid-hover); border-color: var(--brand-solid-hover); }
 }
 @media (max-width: 1100px) {
   .vnc-page { .vnc-instance > span { display: none; } .vnc-instance strong { max-width: 150px; } }

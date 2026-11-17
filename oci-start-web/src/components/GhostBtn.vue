@@ -10,19 +10,23 @@ defineProps<{ danger?: boolean; loading?: boolean; disabled?: boolean }>()
   background: var(--bg-card);
   color: var(--brand);
   font: inherit;
-  font-size: var(--font-size-body);
+  font-size: var(--font-size-secondary);
   font-weight: 600;
   border-radius: var(--r-pill);
-  padding: 10px 14px;
+  padding: 5px 12px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  min-height: 40px;
+  gap: 5px;
+  min-height: 32px;
+  line-height: 1.4;
   white-space: nowrap;
   touch-action: manipulation;
   transition: transform 180ms cubic-bezier(.22, 1, .36, 1), background-color 180ms ease, border-color 180ms ease;
+}
+@media (max-width: 760px) {
+  .btn { min-height: 40px; padding: 8px 14px; font-size: var(--font-size-body); }
 }
 .btn:not(:disabled):hover { background: var(--bg-hover); }
 .btn:not(:disabled):active { transform: scale(.97); }

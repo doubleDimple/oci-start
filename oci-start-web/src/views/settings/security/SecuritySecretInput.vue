@@ -137,7 +137,7 @@ onBeforeUnmount(() => {
   border-radius: 8px;
   background: var(--bg-card);
 }
-.security-secret-control:focus-within { border-color: var(--brand); }
+.security-secret-control:focus-within { border-color: var(--border); outline: none; }
 .security-secret-control.is-disabled { background: var(--bg-search); }
 .security-secret-control input {
   flex: 1 1 0;

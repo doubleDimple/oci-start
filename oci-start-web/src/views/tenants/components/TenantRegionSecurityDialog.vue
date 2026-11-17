@@ -54,6 +54,7 @@ let disposed = false
 
 const needsPorts = computed(() => form.protocol === 'tcp' || form.protocol === 'udp')
 const addressLabel = computed(() => t(`tenantSecurity.${direction.value === 'ingress' ? 'source' : 'destination'}`))
+const tenantContext = computed(() => [props.tenant.defName, props.tenant.region].filter(Boolean).join(' · '))
 function renderError(value: string) { return value.startsWith('tenantSecurity.') ? t(value, { field: addressLabel.value }) : value }
 const pageRules = computed(() => {
   const offset = (page.value - 1) * pageSize.value
@@ -267,6 +268,10 @@ async function beforeClose(done: () => void) {
   if (discard) done()
 }
 
+function requestClose() {
+  void beforeClose(close)
+}
+
 function close() {
   disposed = true
   readVersion++
@@ -299,18 +304,29 @@ const ElTableColumn = BaseTableColumn<SecurityRule & { ruleIndex: number }>
 </script>
 
 <template>
-  <el-dialog
+  <el-drawer
     :model-value="true"
-    :title="t('tenantSecurity.title')"
-    width="min(860px, calc(100vw - 32px))"
-    align-center
-    class="region-security-dialog"
-    :close-on-click-modal="false"
+    direction="rtl"
+    size="min(880px, 92vw)"
+    class="region-security-drawer"
+    append-to-body
+    destroy-on-close
+    :close-on-click-modal="!busy && !editor"
     :close-on-press-escape="!busy"
     :show-close="!busy"
     :before-close="beforeClose"
     @close="close"
   >
+    <template #header>
+      <div class="security-drawer-header">
+        <span class="security-drawer-icon" aria-hidden="true"><i class="i-mdi-shield-check-outline" /></span>
+        <div class="security-drawer-heading">
+          <h2 class="security-drawer-title">{{ t('tenantSecurity.title') }}</h2>
+          <p v-if="tenantContext" class="security-drawer-subtitle">{{ tenantContext }}</p>
+        </div>
+      </div>
+    </template>
+
     <div class="security-content">
       <div class="security-toolbar">
         <div class="security-direction" role="group" :aria-label="t('tenantSecurity.direction')">
@@ -370,7 +386,7 @@ const ElTableColumn = BaseTableColumn<SecurityRule & { ruleIndex: number }>
         </MobileRecordCard>
         <p v-if="loading || !pageRules.length" class="security-mobile-empty" role="status">{{ t(loading ? 'pageLoading.loading' : 'tenantSecurity.empty') }}</p>
       </MobileRecordList>
-      <el-table v-else v-loading="loading" :data="pageRules" row-key="ruleIndex" class="security-table" max-height="min(440px, 52vh)" :empty-text="t('tenantSecurity.empty')">
+      <el-table v-else v-loading="loading" :data="pageRules" row-key="ruleIndex" class="security-table" max-height="calc(100dvh - 300px)" :empty-text="t('tenantSecurity.empty')">
         <el-table-column label="#" width="54"><template #default="{ row }">{{ n(row.ruleIndex + 1) }}</template></el-table-column>
         <el-table-column :label="t('tenantSecurity.protocol')" min-width="100"><template #default="{ row }">{{ protocolLabel(row.protocol) }}</template></el-table-column>
         <el-table-column prop="source" :label="addressLabel" min-width="180" show-overflow-tooltip />
@@ -387,16 +403,32 @@ const ElTableColumn = BaseTableColumn<SecurityRule & { ruleIndex: number }>
         <span>{{ t('tenantSecurity.count', { count: n(rules.length) }) }}</span>
       </PagePagination>
     </div>
-  </el-dialog>
+
+    <template #footer>
+      <div class="security-drawer-footer">
+        <GhostBtn :disabled="busy" @click="requestClose">{{ t('tenantSecurity.close') }}</GhostBtn>
+      </div>
+    </template>
+  </el-drawer>
 </template>
 
 <style scoped>
 .security-content { min-width: 0; font-family: var(--sans); font-size: var(--font-size-body); color: var(--text-primary); }
-:global(.region-security-dialog) { font-family: var(--sans); font-size: var(--font-size-body); color: var(--text-primary); }
-:global(.region-security-dialog .el-dialog__title) { font-size: var(--font-size-dialog-title); font-weight: 600; color: var(--text-primary); }
+:global(.region-security-drawer) { --el-drawer-bg-color: var(--bg-card); background: var(--bg-card); font-family: var(--sans); font-size: var(--font-size-body); color: var(--text-primary); }
+:global(.region-security-drawer .el-drawer__header) { margin: 0; padding: 18px 20px 14px; border-bottom: 1px solid var(--border); color: var(--text-primary); align-items: flex-start; gap: 12px; }
+:global(.region-security-drawer .el-drawer__close-btn) { width: 36px; height: 36px; border-radius: var(--r-pill); color: var(--text-secondary); flex-shrink: 0; transition: background-color 180ms ease, color 180ms ease; }
+:global(.region-security-drawer .el-drawer__close-btn:is(:hover, :focus-visible)) { color: var(--brand); background: var(--bg-hover); }
+:global(.region-security-drawer .el-drawer__body) { min-height: 0; padding: 18px 20px; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; background: var(--bg-card); }
+:global(.region-security-drawer .el-drawer__footer) { padding: 0; border-top: 1px solid var(--border); background: var(--bg-card); }
 :global(.tenant-region-security-confirm) { font-family: var(--sans); --el-messagebox-title-color: var(--text-primary); --el-messagebox-content-color: var(--text-primary); --el-messagebox-font-size: var(--font-size-dialog-title); --el-messagebox-content-font-size: var(--font-size-body); }
 :global(.tenant-region-security-confirm .el-message-box__title) { font-weight: 600; }
 :global(.tenant-region-security-select.el-popper) { font-family: var(--sans); font-size: var(--font-size-body); }
+.security-drawer-header { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.security-drawer-icon { width: 38px; height: 38px; border-radius: 10px; background: var(--brand-subtle); color: var(--brand); display: grid; place-items: center; font-size: 20px; flex-shrink: 0; }
+.security-drawer-heading { min-width: 0; }
+.security-drawer-title { margin: 0; font-size: var(--font-size-dialog-title); font-weight: 600; line-height: 1.35; color: var(--text-primary); }
+.security-drawer-subtitle { margin: 2px 0 0; font-size: var(--font-size-secondary); color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.security-drawer-footer { display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding: 12px 20px calc(12px + env(safe-area-inset-bottom)); }
 .security-content :deep(.el-button), .security-content :deep(.el-input__inner), .security-content :deep(.el-select__wrapper), .security-content :deep(.el-checkbox__label) { font-size: var(--font-size-body); }
 .security-content :deep(.el-empty__description p) { font-size: var(--font-size-secondary); }
 .security-toolbar, .security-actions, .security-editor-actions { display: flex; align-items: center; gap: 8px; }
@@ -407,7 +439,7 @@ const ElTableColumn = BaseTableColumn<SecurityRule & { ruleIndex: number }>
 .security-direction button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 .security-direction button:disabled { cursor: default; opacity: .6; }
 .security-actions :deep(.btn), .security-editor-actions :deep(.btn) { min-height: 34px; padding: 7px 13px; font-size: var(--font-size-body); }
-.security-editor { margin-bottom: 14px; padding: 14px; border: 1px solid var(--border); border-radius: var(--r-sm); }
+.security-editor { margin-bottom: 14px; padding: 16px; border: 1px solid var(--border); border-radius: var(--r-card); background: var(--bg-card-subtle); }
 .security-fields { display: grid; grid-template-columns: 140px minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
 .security-fields label { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .security-fields label > span { font-size: var(--font-size-body); color: var(--text-primary); }
@@ -415,14 +447,18 @@ const ElTableColumn = BaseTableColumn<SecurityRule & { ruleIndex: number }>
 .security-error { color: var(--status-danger); font-size: var(--font-size-secondary); margin: 10px 0 0; overflow-wrap: anywhere; }
 .security-error-panel { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 28px 16px; color: var(--status-danger); font-size: var(--font-size-secondary); text-align: center; overflow-wrap: anywhere; }
 .security-error-panel p { margin: 0; }
-.security-table { font-family: var(--sans); font-size: var(--font-size-body); }
-.security-table :deep(th.el-table__cell) { background: var(--bg-card); color: var(--text-secondary); font-size: var(--font-size-body); font-weight: 600; padding-block: 7px; }
-.security-table :deep(td.el-table__cell) { padding-block: 9px; }
+.security-table { border: 1px solid var(--border); border-radius: var(--r-sm); overflow: hidden; font-family: var(--sans); font-size: var(--font-size-body); }
+.security-table :deep(th.el-table__cell) { background: var(--bg-card-subtle); color: var(--text-secondary); font-size: var(--font-size-body); font-weight: 600; padding-block: 8px; }
+.security-table :deep(td.el-table__cell) { padding-block: 10px; }
 .security-table :deep(.el-button) { font-size: var(--font-size-body); }
 .security-pagination { margin-top: 12px; }
 @media (max-width: 760px) {
-  :global(.region-security-dialog) { max-height: calc(100dvh - 32px); overflow-y: auto; }
-  .security-mobile-list { padding: 0; max-height: 48dvh; overflow-y: auto; overscroll-behavior: contain; }
+  :global(.region-security-drawer .el-drawer__header) { padding: 16px 16px 14px; }
+  :global(.region-security-drawer .el-drawer__close-btn) { width: 44px; height: 44px; }
+  :global(.region-security-drawer .el-drawer__body) { padding: 14px 16px; }
+  .security-drawer-footer { padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); }
+  .security-drawer-footer :deep(button) { width: 100%; min-height: 44px; }
+  .security-mobile-list { padding: 0; max-height: 52dvh; overflow-y: auto; overscroll-behavior: contain; }
   .security-mobile-empty { display: grid; place-items: center; min-height: 88px; padding: 16px; margin: 0; text-align: center; line-height: 1.6; }
   .security-mobile-list :deep(.btn), .security-actions :deep(.btn), .security-editor-actions :deep(.btn) { min-height: 44px; }
   .security-direction { width: 100%; }
@@ -432,6 +468,7 @@ const ElTableColumn = BaseTableColumn<SecurityRule & { ruleIndex: number }>
   .security-fields { grid-template-columns: minmax(0, 1fr); }
 }
 @media (prefers-reduced-motion: reduce) {
+  :global(.region-security-drawer .el-drawer__close-btn),
   .security-direction button { transition: none; }
 }
 </style>

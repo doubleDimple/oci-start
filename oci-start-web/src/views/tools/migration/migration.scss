@@ -2,7 +2,7 @@
   display: flex; flex: 1; flex-direction: column; height: 100%; min-width: 0; min-height: 0; overflow: hidden;
   background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--r-card);
   color: var(--text-primary); font: 400 var(--font-size-body)/1.5 var(--sans);
-  .btn { min-height: 36px; padding: 7px 13px; }
+  .btn { min-height: 32px; padding: 5px 12px; font-size: var(--font-size-secondary); }
   i { display: inline-block; width: 18px; height: 18px; flex: none; }
 }
 .migration-toolbar { display: flex; align-items: center; flex: none; gap: 22px; min-height: 62px; padding: 12px 20px; border-bottom: 1px solid var(--border); }

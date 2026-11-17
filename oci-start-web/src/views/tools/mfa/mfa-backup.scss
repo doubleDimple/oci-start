@@ -2,7 +2,7 @@
   display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; height: 100%; overflow: hidden;
   border: 1px solid var(--border); border-radius: var(--r-card); background: var(--bg-card);
   color: var(--text-primary); font: 400 var(--font-size-body)/1.5 var(--sans);
-  .btn { min-height: 36px; padding: 7px 13px; }
+  .btn { min-height: 32px; padding: 5px 12px; font-size: var(--font-size-secondary); }
   i { display: inline-block; flex: none; width: 18px; height: 18px; }
 }
 .mfa-toolbar { display: flex; align-items: center; flex: none; gap: 16px; min-height: 64px; padding: 13px 20px; border-bottom: 1px solid var(--border); }
@@ -13,7 +13,7 @@
   border: 1px solid var(--border); border-radius: var(--r-pill); background: var(--bg-search);
   input { width: 100%; min-width: 0; height: 36px; padding: 0; border: 0; background: transparent; color: var(--text-primary); font: inherit; outline: none; }
   input::placeholder { color: var(--text-muted); }
-  &:focus-within { outline: 2px solid var(--brand); outline-offset: 2px; }
+  &:focus-within { outline: none; }
 }
 .mfa-table-scroll { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
 .mfa-table {
@@ -43,7 +43,7 @@
 .mfa-countdown.is-ending { color: var(--status-warn); }
 .mfa-row-actions {
   display: flex; align-items: center; gap: 3px;
-  button { display: inline-flex; align-items: center; justify-content: center; flex: none; gap: 5px; min-width: 32px; height: 34px; padding: 5px 7px; border: 0; border-radius: 6px; background: transparent; color: var(--text-primary); font: inherit; cursor: pointer; white-space: nowrap; }
+  button { display: inline-flex; align-items: center; justify-content: center; flex: none; gap: 5px; min-width: 28px; height: 28px; padding: 4px 7px; border: 0; border-radius: 6px; background: transparent; color: var(--text-primary); font: inherit; font-size: var(--font-size-secondary); cursor: pointer; white-space: nowrap; }
   button:hover:not(:disabled) { background: var(--bg-search); }
   button:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
   button:disabled { cursor: default; opacity: .5; }

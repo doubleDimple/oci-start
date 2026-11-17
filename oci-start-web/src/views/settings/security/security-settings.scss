@@ -10,7 +10,7 @@
   background: var(--bg-card);
   color: var(--text-primary);
   font: 400 var(--font-size-body)/1.5 var(--sans);
-  .btn { min-height: 36px; padding: 7px 13px; }
+  .btn { min-height: 32px; padding: 5px 12px; font-size: var(--font-size-secondary); }
   i { display: inline-block; width: 18px; height: 18px; flex: none; }
 }
 .security-toolbar { display: flex; align-items: center; flex: none; gap: 16px; min-height: 62px; padding: 12px 20px; border-bottom: 1px solid var(--border); }
@@ -70,7 +70,7 @@
   .security-field input:where(:not(.el-select__input):not(.el-input__inner)) {
     box-sizing: border-box; width: 100%; min-width: 0; height: 38px; padding: 0 11px;
     border: 1px solid var(--border); border-radius: 8px; background: var(--bg-card); color: var(--text-primary); font: inherit;
-    &:focus { border-color: var(--brand); outline: 2px solid color-mix(in srgb, var(--brand) 16%, transparent); outline-offset: 1px; }
+    &:focus { border-color: var(--border); outline: none; }
     &:read-only { background: var(--bg-search); }
     &:disabled { cursor: default; }
     &::placeholder { color: var(--text-muted); opacity: 1; }

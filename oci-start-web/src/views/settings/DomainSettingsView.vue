@@ -114,7 +114,7 @@ onBeforeUnmount(cancelDiscard)
         <footer class="domain-provider-actions">
           <GhostBtn v-if="providers[provider].testState === 'testing'" :disabled="!!saveProvider || loading" @click="cancelTest(provider)"><i class="i-mdi-stop" aria-hidden="true" />{{ t('domainProviders.cancelTest') }}</GhostBtn>
           <GhostBtn v-else :disabled="locked(provider)" @click="runTest(provider)"><i class="i-mdi-connection" aria-hidden="true" />{{ t('domainProviders.test') }}</GhostBtn>
-          <GhostBtn :disabled="locked(provider) || !providers[provider].dirty" @click="prepareSave(provider)"><i class="i-mdi-content-save-outline" aria-hidden="true" />{{ t('domainProviders.save') }}</GhostBtn>
+          <PrimaryBtn :disabled="locked(provider) || !providers[provider].dirty" @click="prepareSave(provider)"><i class="i-mdi-content-save-outline" aria-hidden="true" />{{ t('domainProviders.save') }}</PrimaryBtn>
         </footer>
       </section>
     </div>

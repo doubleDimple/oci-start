@@ -13,19 +13,23 @@ withDefaults(defineProps<{ loading?: boolean; disabled?: boolean; type?: 'button
   background: var(--brand-solid);
   color: var(--text-on-solid);
   font: inherit;
-  font-size: var(--font-size-body);
+  font-size: var(--font-size-secondary);
   font-weight: 600;
   border-radius: var(--r-pill);
-  padding: 8px 20px;
+  padding: 5px 14px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   justify-content: center;
-  min-height: 40px;
+  min-height: 32px;
+  line-height: 1.4;
   white-space: nowrap;
   touch-action: manipulation;
   transition: transform 180ms cubic-bezier(.22, 1, .36, 1), background-color 180ms ease, box-shadow 180ms ease;
+}
+@media (max-width: 760px) {
+  .btn { min-height: 40px; padding: 8px 16px; font-size: var(--font-size-body); }
 }
 .btn:not(:disabled):hover { background: var(--brand-solid-hover); }
 .btn:not(:disabled):active { transform: scale(.97); }

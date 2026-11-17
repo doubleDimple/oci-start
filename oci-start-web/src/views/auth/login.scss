@@ -146,11 +146,11 @@
   }
   &[data-theme="light"] input:hover:not(:disabled):not(:focus){border-color:var(--text)}
   input:focus{
-    outline:none;border-color:var(--brand-hi);
-    box-shadow:0 0 0 2px var(--brand);background:var(--surface);
+    outline:none;border-color:var(--line-2);
+    box-shadow:none;background:var(--surface);
   }
   &[data-theme="light"] input:focus{
-    border-color:var(--brand);box-shadow:0 0 0 2px var(--brand);background:var(--surface);
+    border-color:var(--line-2);box-shadow:none;background:var(--surface);
   }
   input.bad{border-color:var(--danger)!important}
 
@@ -475,7 +475,7 @@
   .icon-btn { width: 40px; height: 44px; margin-left: 2px; border-radius: 10px; color: var(--brand-hi); }
   .icon-btn svg { width: 21px; height: 21px; }
   .auth > .login-card { width: 100%; max-width: 420px; padding: 0 max(24px, env(safe-area-inset-right)) 0 max(24px, env(safe-area-inset-left)); margin: clamp(28px, 6vh, 64px) auto 24px; }
-  .mobile-auth-mark { display: grid; place-items: center; width: 64px; height: 64px; margin: 0 auto 22px; border-radius: 16px; background: var(--brand-solid); color: var(--text-on-solid); }
+  .mobile-auth-mark { display: grid; place-items: center; width: 64px; height: 64px; margin: 0 auto 22px; border-radius: 16px; background: var(--brand); color: var(--text-on-brand); }
   .mobile-auth-mark svg { width: 35px; height: 35px; }
   .auth-header { text-align: center; }
   .login-card h1 { text-align: center; font-size: 28px; font-weight: 700; line-height: 1.2; letter-spacing: -0.6px; }
@@ -483,7 +483,7 @@
   .field label { padding-left: 4px; margin-bottom: 7px; font-size: 13px; font-weight: 500; }
   input[type=text], input[type=password], &[data-theme="light"] input[type=text], &[data-theme="light"] input[type=password] { min-width: 0; min-height: 50px; padding: 13px 15px; border: 1px solid var(--line-2); border-radius: var(--r-sm); background: var(--surface); color: var(--text); font-size: 16px; line-height: 22px; }
   .ctrl.has-prefix input, .verification-input.has-prefix input { padding-left: 48px; }
-  input:focus { border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-soft); }
+  input:focus { border-color: var(--line-2); box-shadow: none; outline: none; }
   .password-container input { padding-right: 52px; }
   .peek { right: 3px; width: 44px; height: 44px; border-radius: 10px; color: var(--muted); }
   .peek svg { width: 21px; height: 21px; }

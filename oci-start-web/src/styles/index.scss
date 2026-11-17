@@ -32,7 +32,12 @@ html:root[data-content-theme] {
     border-radius: var(--r-btn);
     font-weight: 600;
     font-family: var(--sans);
-    font-size: var(--font-size-body);
+    font-size: var(--font-size-secondary);
+    &:not(.is-link):not(.is-text):not(.is-circle):not(.el-button--small):not(.el-button--large) {
+      min-height: 32px;
+      height: auto;
+      padding: 6px 13px;
+    }
   }
   .el-button--primary:not(.is-plain):not(.is-text):not(.is-link):not(.is-dashed) {
     --el-button-bg-color: var(--brand-solid);
@@ -47,6 +52,17 @@ html:root[data-content-theme] {
     --el-button-hover-text-color: var(--text-on-solid);
     --el-button-active-text-color: var(--text-on-solid);
     --el-button-disabled-text-color: var(--text-on-solid);
+  }
+  .el-button--primary.is-plain {
+    --el-button-text-color: var(--brand-solid);
+    --el-button-bg-color: var(--bg-card);
+    --el-button-border-color: color-mix(in srgb, var(--brand-solid) 35%, var(--border));
+    --el-button-hover-bg-color: var(--brand-solid);
+    --el-button-hover-border-color: var(--brand-solid);
+    --el-button-hover-text-color: var(--text-on-solid);
+    --el-button-active-bg-color: var(--brand-solid-hover);
+    --el-button-active-border-color: var(--brand-solid-hover);
+    --el-button-active-text-color: var(--text-on-solid);
   }
   .el-button--success, .el-button--warning, .el-button--danger {
     &:not(.is-plain):not(.is-text):not(.is-link):not(.is-dashed) {
@@ -106,7 +122,8 @@ html:root[data-content-theme] {
   .el-select__wrapper.is-focused,
   .el-select__wrapper:focus-within,
   .el-textarea__inner:focus {
-    box-shadow: 0 0 0 2px var(--brand) inset;
+    box-shadow: 0 0 0 1px var(--border-strong) inset;
+    outline: none;
   }
   .el-form-item.is-error .el-input__wrapper,
   .el-form-item.is-error .el-select__wrapper,

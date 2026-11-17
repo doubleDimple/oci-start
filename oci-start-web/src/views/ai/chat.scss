@@ -67,7 +67,7 @@
   .chat-text-button:hover:not(:disabled) { background: var(--bg-hover); }
   .chat-text-button:disabled { opacity: .5; cursor: default; }
   .chat-compose-box { padding: 4px; border: 1px solid var(--border-strong); border-radius: 20px; background: var(--bg-card); box-shadow: var(--shadow-card); transition: border-color 140ms ease, box-shadow 140ms ease; }
-  .chat-compose-box:focus-within { border-color: var(--brand); box-shadow: 0 0 0 1px var(--brand); }
+  .chat-compose-box:focus-within { border-color: var(--border-strong); box-shadow: var(--shadow-card); }
   .chat-compose-box .el-textarea { display: block; background: transparent; border: 0; box-shadow: none; }
   .chat-compose-box .el-textarea__inner, .chat-compose-box .el-textarea__inner:hover, .chat-compose-box .el-textarea__inner:focus { padding: 12px 14px 8px; border: 0; border-radius: 0; background: transparent; box-shadow: none; color: var(--text-primary); font: var(--font-size-body)/1.75 var(--sans); resize: none; }
   .chat-compose-box .el-textarea__inner::placeholder { color: var(--text-muted); }

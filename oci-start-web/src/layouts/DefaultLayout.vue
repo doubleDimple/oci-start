@@ -484,15 +484,15 @@ function retryNavigation() {
   flex-shrink: 0;
   border: 0;
   border-radius: 10px;
-  background: var(--brand-solid);
-  color: var(--text-on-solid);
+  background: var(--brand);
+  color: var(--text-on-brand);
   display: grid;
   place-items: center;
   font-size: 18px;
   cursor: pointer;
   transition: transform 180ms cubic-bezier(.22, 1, .36, 1), background-color 180ms ease;
 }
-.leaf:hover { background: var(--brand-solid-hover); }
+.leaf:hover { background: var(--brand-hover); }
 .leaf:active { transform: scale(.94); }
 .leaf:focus-visible { outline: 2px solid var(--text-on-dark); outline-offset: 3px; }
 .brand-text {
@@ -773,7 +773,7 @@ function retryNavigation() {
   .mobile-menu-search > i { flex: none; width: 18px; height: 18px; }
   .mobile-menu-search input { min-width: 0; width: 100%; border: 0; outline: 0; background: transparent; color: var(--text-on-dark); font: var(--font-size-body)/1.5 var(--sans); }
   .mobile-menu-search input::placeholder { color: var(--text-on-dark-muted); opacity: 1; }
-  .mobile-menu-search:focus-within { outline: 2px solid var(--brand); outline-offset: 2px; }
+  .mobile-menu-search:focus-within { outline: none; }
   .main { margin-left: 0; width: 100%; min-height: 0; }
   .top { height: calc(60px + env(safe-area-inset-top)); padding: env(safe-area-inset-top) max(12px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left)); gap: 8px; box-sizing: border-box; flex-wrap: nowrap; }
   .mobile-heading { display: flex; flex: 1; align-items: center; gap: 6px; min-width: 0; }

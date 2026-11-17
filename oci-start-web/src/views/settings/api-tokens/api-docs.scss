@@ -61,8 +61,9 @@
   background: var(--bg-card);
 
   &:focus-within {
-    border-color: var(--brand);
-    box-shadow: var(--focus-ring);
+    border-color: var(--border);
+    box-shadow: none;
+    outline: none;
   }
 
   > i {
@@ -147,8 +148,9 @@
   background: var(--bg-card-subtle);
 
   &:focus-within {
-    border-color: var(--brand);
-    box-shadow: var(--focus-ring);
+    border-color: var(--border);
+    box-shadow: none;
+    outline: none;
   }
 
   > i {
@@ -427,8 +429,8 @@
 
     &:focus {
       outline: none;
-      border-color: var(--brand);
-      box-shadow: var(--focus-ring);
+      border-color: var(--border);
+      box-shadow: none;
       background: var(--bg-card);
     }
   }
@@ -449,8 +451,8 @@
 
   &:focus {
     outline: none;
-    border-color: var(--brand);
-    box-shadow: var(--focus-ring);
+    border-color: var(--border);
+    box-shadow: none;
     background: var(--bg-card);
   }
 }

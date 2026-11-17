@@ -342,7 +342,7 @@ const ElTableColumn = BaseTableColumn<VnicRow>
     <el-dialog v-model="ipv6Open" class="vnic-ipv6-dialog" :title="t('vnic.ipv6Title')" width="740px" append-to-body :close-on-click-modal="false" :close-on-press-escape="!busy && !actionOpen" :show-close="!busy && !actionOpen">
       <p class="vnic-dialog-context">{{ ipv6Row ? name(ipv6Row) : ipv6VnicId }}</p>
       <p class="vnic-dialog-note">{{ t('vnic.updatedIpv6') }}</p>
-      <div class="vnic-ipv6-toolbar"><el-button :disabled="!ipv6Addresses.length" @click="exportAddresses">{{ t('vnic.export') }}</el-button><el-button :disabled="!ipv6Row || !canWrite || actionOpen" @click="addIpv6">{{ t('vnic.addIpv6') }}</el-button></div>
+      <div class="vnic-ipv6-toolbar"><el-button :disabled="!ipv6Addresses.length" @click="exportAddresses">{{ t('vnic.export') }}</el-button><el-button type="primary" :disabled="!ipv6Row || !canWrite || actionOpen" @click="addIpv6">{{ t('vnic.addIpv6') }}</el-button></div>
       <div class="vnic-ipv6-scroll">
         <MobileRecordList v-if="compact && ipv6Open && ipv6Addresses.length" drilldown :list-id="`vnic-ipv6-${ipv6VnicId}`" :record-keys="ipv6Addresses">
           <MobileRecordCard v-for="address in ipv6Addresses" :key="address" :record-key="address" :summary-title="address" :summary-meta="ipv6Row ? name(ipv6Row) : ''">

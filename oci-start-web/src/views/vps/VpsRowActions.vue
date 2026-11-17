@@ -98,16 +98,16 @@ function command(value: unknown): void {
   display: inline-flex;
   justify-content: center;
   align-items: center;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   padding: 0;
   box-sizing: border-box;
   border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
-  border-radius: 9px;
+  border-radius: 8px;
   background: var(--bg-card);
   color: var(--text-primary);
   font: inherit;
-  font-size: 15px;
+  font-size: 14px;
   cursor: pointer;
   transition: all 0.16s ease;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
@@ -116,9 +116,9 @@ function command(value: unknown): void {
 
 .vps-action-btn > i {
   flex: none;
-  width: 16px;
-  height: 16px;
-  font-size: 16px;
+  width: 15px;
+  height: 15px;
+  font-size: 15px;
 }
 
 .vps-action-btn:hover:not(:disabled) {

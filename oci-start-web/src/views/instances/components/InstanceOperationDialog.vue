@@ -35,6 +35,15 @@ let disposed = false
 const working = computed(() => busy.value || sendingCode.value)
 const locked = computed(() => working.value || state.value === 'success' || state.value === 'uncertain')
 const danger = computed(() => ['stop', 'terminate', 'delete'].includes(props.action))
+const DRAWER_ACTION_ICONS: Record<string, string> = {
+  name: 'i-mdi-pencil-outline',
+  remark: 'i-mdi-note-edit-outline',
+  config: 'i-mdi-chip',
+  volume: 'i-mdi-harddisk',
+  vpu: 'i-mdi-tune-vertical',
+}
+const drawerMode = computed(() => props.action in DRAWER_ACTION_ICONS)
+const drawerIcon = computed(() => DRAWER_ACTION_ICONS[props.action] || 'i-mdi-tune')
 const preserveBootVolume = computed(() => isManagedTenant(props.row.permissionContext)
   && !hasTenantPermission(props.row.permissionContext, 'BOOT_VOLUME_DELETE'))
 const actionHintKey = computed(() => props.action === 'terminate' && preserveBootVolume.value ? 'terminatePreserveVolume' : props.action)
@@ -82,6 +91,10 @@ function close() {
   if (working.value) return
   if (state.value === 'uncertain') emit('changed')
   emit('close')
+}
+
+function guardClose(done: () => void) {
+  if (!working.value) done()
 }
 
 function accepted(result: OperationResponse | null | undefined) {
@@ -213,7 +226,92 @@ onBeforeUnmount(() => { disposed = true; generation++; clearInterval(resendTimer
 </script>
 
 <template>
+  <el-drawer
+    v-if="drawerMode"
+    :model-value="true"
+    direction="rtl"
+    size="min(540px, 94vw)"
+    class="instance-operation-drawer"
+    append-to-body
+    destroy-on-close
+    :close-on-click-modal="!working"
+    :close-on-press-escape="!working"
+    :show-close="!working"
+    :before-close="guardClose"
+    @close="close"
+  >
+    <template #header>
+      <div class="operation-drawer-header">
+        <span class="operation-drawer-icon" aria-hidden="true"><i :class="drawerIcon" /></span>
+        <div class="operation-drawer-heading">
+          <h2 class="operation-drawer-title">{{ t(`instanceOperations.titles.${action}`) }}</h2>
+          <p class="operation-drawer-subtitle">{{ instanceName }}</p>
+        </div>
+      </div>
+    </template>
+
+    <div class="operation-drawer-body" :aria-busy="working">
+      <div class="operation-instance">
+        <strong>{{ instanceName }}</strong>
+        <span v-if="row.instanceId">{{ row.instanceId }}</span>
+      </div>
+      <div class="operation-card">
+        <el-form label-position="top" :disabled="locked" class="operation-form" @submit.prevent="submit">
+          <button type="submit" class="drawer-hidden-submit" tabindex="-1" aria-hidden="true" />
+          <template v-if="action === 'name'">
+            <el-form-item :label="t('instanceOperations.fields.name')" for="instance-operation-name">
+              <el-input id="instance-operation-name" v-model="name" :placeholder="t('instanceOperations.fields.namePlaceholder')" />
+            </el-form-item>
+            <p class="operation-note operation-last-note">{{ t('instanceOperations.hints.name') }}</p>
+          </template>
+          <el-form-item v-else-if="action === 'remark'" :label="t('instanceOperations.fields.remark')" for="instance-operation-remark" class="operation-last-item">
+            <el-input id="instance-operation-remark" v-model="remark" type="textarea" :rows="4" :placeholder="t('instanceOperations.fields.remarkPlaceholder')" />
+          </el-form-item>
+          <template v-else-if="action === 'config'">
+            <div class="operation-fields">
+              <el-form-item :label="t('instanceOperations.fields.cpu')" for="instance-operation-cpu">
+                <el-input-number id="instance-operation-cpu" v-model="cpu" :min="1" :max="24" :step="1" :precision="0" controls-position="right" />
+              </el-form-item>
+              <el-form-item :label="t('instanceOperations.fields.memory')" for="instance-operation-memory">
+                <el-input-number id="instance-operation-memory" v-model="memory" :min="1" :max="256" :step="1" :precision="0" controls-position="right" />
+              </el-form-item>
+            </div>
+            <p class="operation-note operation-last-note">{{ t('instanceOperations.hints.config') }}</p>
+          </template>
+          <template v-else-if="action === 'volume'">
+            <p class="operation-current">{{ knownVolume ? t('instanceOperations.hints.currentVolume', { size: n(currentVolume ?? 0) }) : t('instanceOperations.hints.currentVolumeUnknown') }}</p>
+            <el-form-item :label="t('instanceOperations.fields.volume')" for="instance-operation-volume">
+              <el-input-number id="instance-operation-volume" v-model="volume" :min="47" :step="1" :precision="0" controls-position="right" />
+            </el-form-item>
+            <p class="operation-note operation-last-note">{{ t('instanceOperations.hints.volume') }}</p>
+          </template>
+          <template v-else-if="action === 'vpu'">
+            <el-form-item :label="t('instanceOperations.fields.vpu')" for="instance-operation-vpu">
+              <el-slider id="instance-operation-vpu" v-model="vpu" :min="0" :max="120" :step="10" show-input :aria-label="t('instanceOperations.fields.vpu')" />
+            </el-form-item>
+            <p class="operation-note operation-last-note">{{ t('instanceOperations.hints.vpu') }}</p>
+          </template>
+        </el-form>
+      </div>
+      <el-alert v-if="state === 'success'" :title="t(`instanceOperations.success.${actionHintKey}`)" type="success" :closable="false" show-icon role="status" />
+      <el-alert v-else-if="state === 'uncertain'" :title="t('instanceOperations.hints.uncertain')" type="warning" :closable="false" show-icon role="alert" />
+      <template v-else-if="error">
+        <PageErrorNotice v-if="state === 'failed' || errorText">{{ error }}</PageErrorNotice>
+        <div v-else class="operation-error" role="alert"><p>{{ error }}</p></div>
+        <p v-if="state === 'failed'" class="operation-note">{{ t('instanceOperations.hints.failedCheck') }}</p>
+      </template>
+    </div>
+
+    <template #footer>
+      <div class="operation-drawer-footer">
+        <GhostBtn :disabled="working" @click="close">{{ t(`instanceOperations.actions.${state === 'uncertain' ? 'refresh' : state === 'success' ? 'close' : 'cancel'}`) }}</GhostBtn>
+        <PrimaryBtn v-if="state !== 'success' && state !== 'uncertain'" :loading="working" :disabled="unchanged || (action === 'volume' && !knownVolume)" @click="submit">{{ actionLabel }}</PrimaryBtn>
+      </div>
+    </template>
+  </el-drawer>
+
   <el-dialog
+    v-else
     :model-value="true" :title="t(`instanceOperations.titles.${action}`)" width="520px"
     align-center class="instance-operation-dialog" :close-on-click-modal="false"
     :close-on-press-escape="!working" :show-close="!working" @close="close"
@@ -223,55 +321,19 @@ onBeforeUnmount(() => { disposed = true; generation++; clearInterval(resendTimer
       <span v-if="row.instanceId">{{ row.instanceId }}</span>
     </div>
     <el-alert
-      v-if="['start', 'stop', 'terminate', 'delete'].includes(action)"
       :title="t(`instanceOperations.hints.${actionHintKey}`)" :type="danger ? 'warning' : 'info'" :closable="false" show-icon
     />
-    <el-form label-position="top" :disabled="locked" class="operation-form" @submit.prevent="submit">
-      <template v-if="action === 'name'">
-        <el-form-item :label="t('instanceOperations.fields.name')" for="instance-operation-name">
-          <el-input id="instance-operation-name" v-model="name" :placeholder="t('instanceOperations.fields.namePlaceholder')" />
-        </el-form-item>
-        <p class="operation-note">{{ t('instanceOperations.hints.name') }}</p>
-      </template>
-      <el-form-item v-else-if="action === 'remark'" :label="t('instanceOperations.fields.remark')" for="instance-operation-remark">
-        <el-input id="instance-operation-remark" v-model="remark" type="textarea" :rows="4" :placeholder="t('instanceOperations.fields.remarkPlaceholder')" />
+    <el-form v-if="action === 'terminate' && codeSent" label-position="top" :disabled="locked" class="operation-form" @submit.prevent="submit">
+      <p class="operation-note">{{ t('instanceOperations.hints.codeRequested') }}</p>
+      <el-form-item :label="t('instanceOperations.fields.code')" for="instance-operation-code">
+        <el-input id="instance-operation-code" v-model="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" :placeholder="t('instanceOperations.fields.codePlaceholder')" />
       </el-form-item>
-      <template v-else-if="action === 'config'">
-        <div class="operation-fields">
-          <el-form-item :label="t('instanceOperations.fields.cpu')" for="instance-operation-cpu">
-            <el-input-number id="instance-operation-cpu" v-model="cpu" :min="1" :max="24" :step="1" :precision="0" controls-position="right" />
-          </el-form-item>
-          <el-form-item :label="t('instanceOperations.fields.memory')" for="instance-operation-memory">
-            <el-input-number id="instance-operation-memory" v-model="memory" :min="1" :max="256" :step="1" :precision="0" controls-position="right" />
-          </el-form-item>
-        </div>
-        <p class="operation-note">{{ t('instanceOperations.hints.config') }}</p>
-      </template>
-      <template v-else-if="action === 'volume'">
-        <p class="operation-current">{{ knownVolume ? t('instanceOperations.hints.currentVolume', { size: n(currentVolume ?? 0) }) : t('instanceOperations.hints.currentVolumeUnknown') }}</p>
-        <el-form-item :label="t('instanceOperations.fields.volume')" for="instance-operation-volume">
-          <el-input-number id="instance-operation-volume" v-model="volume" :min="47" :step="1" :precision="0" controls-position="right" />
-        </el-form-item>
-        <p class="operation-note">{{ t('instanceOperations.hints.volume') }}</p>
-      </template>
-      <template v-else-if="action === 'vpu'">
-        <el-form-item :label="t('instanceOperations.fields.vpu')" for="instance-operation-vpu">
-          <el-slider id="instance-operation-vpu" v-model="vpu" :min="0" :max="120" :step="10" show-input :aria-label="t('instanceOperations.fields.vpu')" />
-        </el-form-item>
-        <p class="operation-note">{{ t('instanceOperations.hints.vpu') }}</p>
-      </template>
-      <template v-else-if="action === 'terminate' && codeSent">
-        <p class="operation-note">{{ t('instanceOperations.hints.codeRequested') }}</p>
-        <el-form-item :label="t('instanceOperations.fields.code')" for="instance-operation-code">
-          <el-input id="instance-operation-code" v-model="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" :placeholder="t('instanceOperations.fields.codePlaceholder')" />
-        </el-form-item>
-        <div class="operation-verification">
-          <p class="operation-note">{{ t('instanceOperations.hints.code') }}</p>
-          <el-button link :loading="sendingCode" :disabled="locked || resendSeconds > 0" @click="sendCode">
-            {{ resendSeconds ? t('instanceOperations.actions.resendAfter', { seconds: resendSeconds }) : t('instanceOperations.actions.resend') }}
-          </el-button>
-        </div>
-      </template>
+      <div class="operation-verification">
+        <p class="operation-note">{{ t('instanceOperations.hints.code') }}</p>
+        <el-button link :loading="sendingCode" :disabled="locked || resendSeconds > 0" @click="sendCode">
+          {{ resendSeconds ? t('instanceOperations.actions.resendAfter', { seconds: resendSeconds }) : t('instanceOperations.actions.resend') }}
+        </el-button>
+      </div>
     </el-form>
     <el-alert v-if="state === 'success'" :title="t(`instanceOperations.success.${actionHintKey}`)" type="success" :closable="false" show-icon role="status" />
     <el-alert v-else-if="state === 'uncertain'" :title="t('instanceOperations.hints.uncertain')" type="warning" :closable="false" show-icon role="alert" />
@@ -284,42 +346,72 @@ onBeforeUnmount(() => { disposed = true; generation++; clearInterval(resendTimer
       <GhostBtn :disabled="working" @click="close">{{ t(`instanceOperations.actions.${state === 'uncertain' ? 'refresh' : state === 'success' ? 'close' : 'cancel'}`) }}</GhostBtn>
       <template v-if="state !== 'success' && state !== 'uncertain'">
         <GhostBtn v-if="danger" danger :loading="working" :disabled="unchanged" @click="submit">{{ actionLabel }}</GhostBtn>
-        <PrimaryBtn v-else :loading="working" :disabled="unchanged || (action === 'volume' && !knownVolume)" @click="submit">{{ actionLabel }}</PrimaryBtn>
+        <PrimaryBtn v-else :loading="working" :disabled="unchanged" @click="submit">{{ actionLabel }}</PrimaryBtn>
       </template>
     </template>
   </el-dialog>
 </template>
 
-<style>
-.instance-operation-dialog { max-width: calc(100vw - 32px); padding: 26px; font-family: var(--sans); font-size: var(--font-size-body); color: var(--text-primary); }
-.instance-operation-dialog .el-dialog__title { font-size: var(--font-size-dialog-title); font-weight: 600; }
-.instance-operation-dialog .el-form-item__label,
-.instance-operation-dialog .el-input__inner,
-.instance-operation-dialog .el-textarea__inner,
-.instance-operation-dialog .el-button,
-.instance-operation-dialog .el-alert__title { font-family: var(--sans); font-size: var(--font-size-body); }
-.instance-operation-dialog .el-form-item__label { color: var(--text-primary); }
-.instance-operation-dialog .el-alert__description { font-size: var(--font-size-secondary); }
-.instance-operation-dialog .el-alert__content { min-width: 0; overflow-wrap: anywhere; }
-.instance-operation-dialog .operation-instance { display: grid; gap: 6px; padding: 16px; margin-bottom: 20px; border-radius: 14px; background: var(--bg-search); overflow-wrap: anywhere; }
-.instance-operation-dialog .operation-instance strong { font-size: var(--font-size-body); font-weight: 600; color: var(--text-primary); }
-.instance-operation-dialog .operation-instance span { font-size: var(--font-size-secondary); color: var(--text-secondary); }
-.instance-operation-dialog .operation-form { margin-top: 20px; }
-.instance-operation-dialog .operation-form:empty { margin-top: 0; }
-.instance-operation-dialog .operation-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-.instance-operation-dialog .el-input-number { width: 100%; }
-.instance-operation-dialog .el-slider__input { width: 108px; }
-.instance-operation-dialog .operation-note { margin: 0 0 18px; color: var(--text-secondary); font-size: var(--font-size-secondary); line-height: 1.65; }
-.instance-operation-dialog .operation-current { margin: 0 0 16px; color: var(--text-primary); }
-.instance-operation-dialog .operation-verification { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px; margin-bottom: 18px; }
-.instance-operation-dialog .operation-verification .operation-note { flex: 1; min-width: 180px; margin: 0; }
-.instance-operation-dialog .operation-verification .el-button { white-space: normal; text-align: left; }
-.instance-operation-dialog .operation-error { color: var(--status-danger); font-size: var(--font-size-secondary); overflow-wrap: anywhere; }
-.instance-operation-dialog .operation-error p { margin: 8px 0 0; }
-.instance-operation-dialog .el-dialog__footer { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
-.instance-operation-dialog .el-dialog__footer button { white-space: normal; }
+<style scoped>
+:global(.instance-operation-drawer) { --el-drawer-bg-color: var(--bg-card); background: var(--bg-card); color: var(--text-primary); font-family: var(--sans); font-size: var(--font-size-body); }
+:global(.instance-operation-drawer .el-drawer__header) { margin: 0; padding: 18px 20px 14px; border-bottom: 1px solid var(--border); color: var(--text-primary); align-items: flex-start; gap: 12px; }
+:global(.instance-operation-drawer .el-drawer__close-btn) { width: 36px; height: 36px; border-radius: var(--r-pill); color: var(--text-secondary); flex-shrink: 0; transition: background-color 180ms ease, color 180ms ease; }
+:global(.instance-operation-drawer .el-drawer__close-btn:is(:hover, :focus-visible)) { color: var(--brand); background: var(--bg-hover); }
+:global(.instance-operation-drawer .el-drawer__body) { min-height: 0; padding: 18px 20px; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; background: var(--bg-card); }
+:global(.instance-operation-drawer .el-drawer__footer) { padding: 0; border-top: 1px solid var(--border); background: var(--bg-card); }
+.operation-drawer-header { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.operation-drawer-icon { width: 38px; height: 38px; border-radius: 10px; background: var(--brand-subtle); color: var(--brand); display: grid; place-items: center; font-size: 20px; flex-shrink: 0; }
+.operation-drawer-heading { min-width: 0; }
+.operation-drawer-title { margin: 0; font-size: var(--font-size-dialog-title); font-weight: 600; line-height: 1.35; color: var(--text-primary); }
+.operation-drawer-subtitle { margin: 2px 0 0; font-size: var(--font-size-secondary); color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.operation-drawer-body { display: flex; flex-direction: column; gap: 14px; }
+.operation-card { padding: 16px; border-radius: var(--r-card); border: 1px solid var(--border); background: var(--bg-card-subtle); }
+.operation-card .operation-form { margin-top: 0; }
+.operation-last-item { margin-bottom: 0; }
+.operation-last-note { margin-bottom: 0 !important; }
+.drawer-hidden-submit { position: absolute; width: 0; height: 0; padding: 0; border: 0; opacity: 0; pointer-events: none; }
+.operation-drawer-footer { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; padding: 12px 20px calc(12px + env(safe-area-inset-bottom)); }
+:global(.instance-operation-dialog) { max-width: calc(100vw - 32px); padding: 26px; font-family: var(--sans); font-size: var(--font-size-body); color: var(--text-primary); }
+:global(.instance-operation-dialog .el-dialog__title) { font-size: var(--font-size-dialog-title); font-weight: 600; }
+:global(:is(.instance-operation-dialog, .instance-operation-drawer) .el-form-item__label),
+:global(:is(.instance-operation-dialog, .instance-operation-drawer) .el-input__inner),
+:global(:is(.instance-operation-dialog, .instance-operation-drawer) .el-textarea__inner),
+:global(:is(.instance-operation-dialog, .instance-operation-drawer) .el-button),
+:global(:is(.instance-operation-dialog, .instance-operation-drawer) .el-alert__title) { font-family: var(--sans); font-size: var(--font-size-body); }
+:global(:is(.instance-operation-dialog, .instance-operation-drawer) .el-form-item__label) { color: var(--text-primary); }
+:global(:is(.instance-operation-dialog, .instance-operation-drawer) .el-alert__description) { font-size: var(--font-size-secondary); }
+:global(:is(.instance-operation-dialog, .instance-operation-drawer) .el-alert__content) { min-width: 0; overflow-wrap: anywhere; }
+.operation-instance { display: grid; gap: 6px; padding: 14px 16px; border-radius: var(--r-card); border: 1px solid var(--border); background: var(--bg-card-subtle); overflow-wrap: anywhere; }
+:global(.instance-operation-dialog .operation-instance) { margin-bottom: 20px; border: 0; background: var(--bg-search); }
+.operation-instance strong { font-size: var(--font-size-body); font-weight: 600; color: var(--text-primary); }
+.operation-instance span { font-size: var(--font-size-secondary); color: var(--text-secondary); }
+.operation-form { margin-top: 20px; }
+.operation-form:empty { margin-top: 0; }
+.operation-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.operation-form :deep(.el-input-number) { width: 100%; }
+.operation-form :deep(.el-slider__input) { width: 108px; }
+.operation-note { margin: 0 0 18px; color: var(--text-secondary); font-size: var(--font-size-secondary); line-height: 1.65; }
+.operation-current { margin: 0 0 16px; color: var(--text-primary); }
+.operation-verification { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px; margin-bottom: 18px; }
+.operation-verification .operation-note { flex: 1; min-width: 180px; margin: 0; }
+.operation-verification .el-button { white-space: normal; text-align: left; }
+.operation-error { color: var(--status-danger); font-size: var(--font-size-secondary); overflow-wrap: anywhere; }
+.operation-error p { margin: 8px 0 0; }
+:global(.instance-operation-dialog .el-dialog__footer) { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+:global(.instance-operation-dialog .el-dialog__footer button) { white-space: normal; }
+@media (max-width: 760px) {
+  :global(.instance-operation-drawer .el-drawer__header) { padding: 16px 16px 14px; }
+  :global(.instance-operation-drawer .el-drawer__close-btn) { width: 44px; height: 44px; }
+  :global(.instance-operation-drawer .el-drawer__body) { padding: 14px 16px; }
+  .operation-card { padding: 14px; }
+  .operation-drawer-footer { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 10px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); }
+  .operation-drawer-footer :deep(button) { width: 100%; min-height: 44px; }
+}
 @media (max-width: 480px) {
-  .instance-operation-dialog { padding: 22px; }
-  .instance-operation-dialog .operation-fields { grid-template-columns: 1fr; gap: 0; }
+  :global(.instance-operation-dialog) { padding: 22px; }
+  .operation-fields { grid-template-columns: 1fr; gap: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  :global(.instance-operation-drawer .el-drawer__close-btn) { transition: none; }
 }
 </style>

@@ -266,7 +266,7 @@ onBeforeUnmount(() => { disposed = true; clearSecret(); baseline = '' })
 .proxy-editor-field, .proxy-editor-search { display: grid; min-width: 0; gap: 6px; }
 .proxy-editor-field > label, .proxy-editor-search > span { color: var(--text-primary); font-size: var(--font-size-body); font-weight: 500; }
 .proxy-editor-field input:where(:not(.el-select__input):not(.el-input__inner)), .proxy-editor-search input { box-sizing: border-box; width: 100%; min-width: 0; height: 36px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; outline: none; background: var(--bg-card); color: var(--text-primary); font: inherit; }
-.proxy-editor-field input:where(:not(.el-select__input):not(.el-input__inner)):focus, .proxy-editor-search input:focus { border-color: var(--brand); outline: 2px solid color-mix(in srgb, var(--brand) 18%, transparent); outline-offset: 1px; }
+.proxy-editor-field input:where(:not(.el-select__input):not(.el-input__inner)):focus, .proxy-editor-search input:focus { border-color: var(--border); outline: none; }
 .proxy-editor-field > .el-select { width: 100%; min-width: 0; }
 .proxy-editor-field :deep(.el-select__wrapper) { min-height: 36px; }
 .proxy-editor-field :disabled { cursor: default; }

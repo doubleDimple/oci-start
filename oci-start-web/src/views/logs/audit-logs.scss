@@ -13,10 +13,14 @@
       padding: 0 10px !important;
       transition: border-color 180ms ease, box-shadow 180ms ease;
 
-      &:hover,
+      &:hover {
+        border-color: var(--border-strong) !important;
+        box-shadow: none !important;
+      }
+
       &.is-focus {
-        border-color: var(--brand) !important;
-        box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 10%, transparent) !important;
+        border-color: transparent !important;
+        box-shadow: none !important;
       }
     }
   }
@@ -31,10 +35,14 @@
       box-shadow: none !important;
       border: 1px solid transparent !important;
 
-      &:hover,
+      &:hover {
+        border-color: var(--border-strong) !important;
+        box-shadow: none !important;
+      }
+
       &.is-focused {
-        border-color: var(--brand) !important;
-        box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 10%, transparent) !important;
+        border-color: transparent !important;
+        box-shadow: none !important;
       }
     }
   }

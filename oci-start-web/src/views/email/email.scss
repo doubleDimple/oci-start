@@ -9,7 +9,7 @@
   .email-sections button, .email-service-tabs button { display: inline-flex; justify-content: center; align-items: center; min-height: 30px; padding: 5px 12px; border: 0; border-radius: var(--r-pill); background: transparent; color: var(--text-primary); font: inherit; white-space: nowrap; cursor: pointer; }
   .email-sections button.active, .email-service-tabs button.active { background: var(--bg-card); box-shadow: var(--shadow-card); font-weight: 600; }
   .email-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-left: auto; }
-  .email-tools .btn { min-height: 36px; padding: 7px 12px; }
+  .email-tools .btn { min-height: 32px; padding: 5px 12px; font-size: var(--font-size-secondary); }
   .email-service-tools { display: flex; flex: none; align-items: center; flex-wrap: wrap; gap: 10px 16px; padding: 12px 18px; border-bottom: 1px solid var(--border); }
   .email-search { width: min(360px, 100%); flex: 0 1 360px; }
   .email-search .el-input__wrapper { min-height: 36px; }
@@ -31,10 +31,10 @@
     flex: none;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
+    width: 28px;
+    height: 28px;
     border: 1px solid var(--border-color);
-    border-radius: 9px;
+    border-radius: 8px;
     background: var(--card-bg);
     color: var(--text-primary);
     cursor: pointer;

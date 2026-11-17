@@ -99,6 +99,10 @@ function close() {
   emit('close')
 }
 
+function guardClose(done: () => void) {
+  if (!saving.value && !sendingCode.value) done()
+}
+
 function queueLog(message: string) {
   queuedLogs.push(message)
   if (logFrame) return
@@ -365,7 +369,75 @@ onBeforeUnmount(cleanup)
 </script>
 
 <template>
-  <el-dialog :model-value="visible" :title="label" width="620px" class="tenant-operation-dialog" align-center append-to-body destroy-on-close :close-on-click-modal="false" :close-on-press-escape="!saving && !sendingCode" :show-close="!saving && !sendingCode" @close="close">
+  <el-drawer
+    v-if="visible && action === 'traffic'"
+    :model-value="true"
+    direction="rtl"
+    size="min(540px, 94vw)"
+    class="tenant-traffic-drawer"
+    append-to-body
+    destroy-on-close
+    :close-on-click-modal="!saving"
+    :close-on-press-escape="!saving"
+    :show-close="!saving"
+    :before-close="guardClose"
+    @close="close"
+  >
+    <template #header>
+      <div class="traffic-drawer-header">
+        <span class="traffic-drawer-icon" aria-hidden="true"><i class="i-mdi-bell-outline" /></span>
+        <div class="traffic-drawer-heading">
+          <span class="operation-eyebrow">{{ label }}</span>
+          <h2 class="traffic-drawer-title">{{ title }}</h2>
+          <p v-if="tenantName" class="traffic-drawer-subtitle">{{ tenantName }}</p>
+        </div>
+      </div>
+    </template>
+
+    <div class="operation-body traffic-drawer-body" :aria-busy="loading || saving">
+      <el-alert v-if="['tenantOperations.errors.threshold', 'tenantOperations.errors.missingTenant'].includes(error)" :title="errorText" type="error" :closable="false" show-icon class="operation-error" role="alert" />
+      <PageErrorNotice v-else-if="error"><p>{{ errorText }}</p><el-button v-if="loadFailed" @click="loadConfiguration">{{ t('tenantOperations.actions.reload') }}</el-button></PageErrorNotice>
+      <div v-if="loadFailed && !error" class="retry-row"><el-button @click="loadConfiguration">{{ t('tenantOperations.actions.reload') }}</el-button></div>
+      <el-skeleton v-if="loading" :rows="4" animated />
+
+      <el-form v-else label-position="top" :disabled="saving || loadFailed" class="operation-form traffic-form" @submit.prevent="submit">
+        <button type="submit" class="drawer-hidden-submit" tabindex="-1" aria-hidden="true" />
+        <div class="traffic-card">
+          <div class="setting-row traffic-setting-row">
+            <div>
+              <strong>{{ t('tenantOperations.traffic.statistics') }}</strong>
+              <p>{{ t('tenantOperations.traffic.statisticsHint') }}</p>
+            </div>
+            <el-switch v-model="traffic.statisticsEnabled" :aria-label="t('tenantOperations.traffic.enableStatistics')" />
+          </div>
+        </div>
+        <div class="traffic-card">
+          <el-form-item :label="t('tenantOperations.traffic.threshold')" required class="traffic-threshold-item">
+            <el-input-number v-model="traffic.threshold" :min="0" :controls="false" :placeholder="t('tenantOperations.traffic.thresholdPlaceholder')" />
+            <span class="field-hint">{{ t('tenantOperations.traffic.thresholdHint') }}</span>
+          </el-form-item>
+        </div>
+        <div class="traffic-card">
+          <div class="setting-row traffic-setting-row">
+            <div>
+              <strong>{{ t('tenantOperations.traffic.autoShutdown') }}</strong>
+              <p>{{ t(canAutoShutdown ? 'tenantOperations.traffic.autoShutdownHint' : 'tenantOperations.traffic.powerRequired') }}</p>
+            </div>
+            <el-switch v-model="traffic.autoShutdown" :disabled="!traffic.statisticsEnabled || !canAutoShutdown" :aria-label="t('tenantOperations.traffic.autoShutdown')" />
+          </div>
+        </div>
+      </el-form>
+    </div>
+
+    <template #footer>
+      <div class="operation-footer traffic-drawer-footer">
+        <el-button :disabled="saving" @click="close">{{ t('tenantOperations.actions.cancel') }}</el-button>
+        <el-button type="primary" :loading="saving" :disabled="submitDisabled" @click="submit">{{ submitLabel }}</el-button>
+      </div>
+    </template>
+  </el-drawer>
+
+  <el-dialog v-else-if="visible" :model-value="true" :title="label" width="620px" class="tenant-operation-dialog" align-center append-to-body destroy-on-close :close-on-click-modal="false" :close-on-press-escape="!saving && !sendingCode" :show-close="!saving && !sendingCode" @close="close">
     <template #header>
       <div class="operation-heading">
         <span class="operation-eyebrow">{{ label }}</span>
@@ -415,13 +487,7 @@ onBeforeUnmount(cleanup)
         </Transition>
       </template>
 
-      <el-form v-else-if="action === 'traffic'" label-position="top" :disabled="saving || loadFailed" class="operation-form" @submit.prevent="submit">
-        <div class="setting-row"><div><strong>{{ t('tenantOperations.traffic.statistics') }}</strong><p>{{ t('tenantOperations.traffic.statisticsHint') }}</p></div><el-switch v-model="traffic.statisticsEnabled" :aria-label="t('tenantOperations.traffic.enableStatistics')" /></div>
-        <el-form-item :label="t('tenantOperations.traffic.threshold')" required class="threshold-field"><el-input-number v-model="traffic.threshold" :min="0" :controls="false" :placeholder="t('tenantOperations.traffic.thresholdPlaceholder')" /><span class="field-hint">{{ t('tenantOperations.traffic.thresholdHint') }}</span></el-form-item>
-        <div class="setting-row"><div><strong>{{ t('tenantOperations.traffic.autoShutdown') }}</strong><p>{{ t(canAutoShutdown ? 'tenantOperations.traffic.autoShutdownHint' : 'tenantOperations.traffic.powerRequired') }}</p></div><el-switch v-model="traffic.autoShutdown" :disabled="!traffic.statisticsEnabled || !canAutoShutdown" :aria-label="t('tenantOperations.traffic.autoShutdown')" /></div>
-      </el-form>
-
-      <div v-else-if="action === 'import'">
+      <div v-if="action === 'import'">
         <input ref="fileInput" class="file-input" type="file" accept="application/json,.json" :aria-label="t('tenantOperations.import.fileLabel')" @change="onFileChange" />
         <button type="button" class="file-drop" :class="{ dragging, ready: importRecords }" :disabled="saving || readingFile" @click="fileInput?.click()" @dragover.prevent="dragging = true" @dragleave.prevent="dragging = false" @drop.prevent="onDrop">
           <span class="file-symbol" :class="importRecords ? 'i-mdi-file-check-outline' : 'i-mdi-file-upload-outline'" aria-hidden="true" />
@@ -480,13 +546,31 @@ onBeforeUnmount(cleanup)
 
 <style scoped>
 :global(.tenant-operation-dialog) { max-width: calc(100vw - 32px); padding: 26px; font-family: var(--sans); font-size: var(--font-size-body); color: var(--text-primary); }
+:global(.tenant-traffic-drawer) { --el-drawer-bg-color: var(--bg-card); background: var(--bg-card); color: var(--text-primary); font-family: var(--sans); font-size: var(--font-size-body); }
+:global(.tenant-traffic-drawer .el-drawer__header) { margin: 0; padding: 18px 20px 14px; border-bottom: 1px solid var(--border); color: var(--text-primary); align-items: flex-start; gap: 12px; }
+:global(.tenant-traffic-drawer .el-drawer__close-btn) { width: 36px; height: 36px; border-radius: var(--r-pill); color: var(--text-secondary); flex-shrink: 0; transition: background-color 180ms ease, color 180ms ease; }
+:global(.tenant-traffic-drawer .el-drawer__close-btn:is(:hover, :focus-visible)) { color: var(--brand); background: var(--bg-hover); }
+:global(.tenant-traffic-drawer .el-drawer__body) { min-height: 0; padding: 18px 20px; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; background: var(--bg-card); }
+:global(.tenant-traffic-drawer .el-drawer__footer) { padding: 0; border-top: 1px solid var(--border); background: var(--bg-card); }
 :global(.tenant-operation-confirm) { font-family: var(--sans); --el-messagebox-title-color: var(--text-primary); --el-messagebox-content-color: var(--text-primary); --el-messagebox-font-size: var(--font-size-dialog-title); --el-messagebox-content-font-size: var(--font-size-body); }
 :global(.tenant-operation-confirm .el-message-box__title) { font-weight: 600; }
 :global(.tenant-operation-select.el-popper) { font-family: var(--sans); font-size: var(--font-size-body); }
-:global(.tenant-operation-dialog .el-button), :global(.tenant-operation-dialog .el-input__inner), :global(.tenant-operation-dialog .el-select__wrapper), :global(.tenant-operation-dialog .el-form-item__label), :global(.tenant-operation-dialog .el-radio__label), :global(.tenant-operation-dialog .el-checkbox__label) { font-size: var(--font-size-body); }
-:global(.tenant-operation-dialog .el-alert__title) { font-size: var(--font-size-body); }
-:global(.tenant-operation-dialog .el-alert__description), :global(.tenant-operation-dialog .el-form-item__error) { font-size: var(--font-size-secondary); }
+:global(:is(.tenant-operation-dialog, .tenant-traffic-drawer) .el-button), :global(:is(.tenant-operation-dialog, .tenant-traffic-drawer) .el-input__inner), :global(:is(.tenant-operation-dialog, .tenant-traffic-drawer) .el-select__wrapper), :global(:is(.tenant-operation-dialog, .tenant-traffic-drawer) .el-form-item__label), :global(:is(.tenant-operation-dialog, .tenant-traffic-drawer) .el-radio__label), :global(:is(.tenant-operation-dialog, .tenant-traffic-drawer) .el-checkbox__label) { font-size: var(--font-size-body); }
+:global(:is(.tenant-operation-dialog, .tenant-traffic-drawer) .el-alert__title) { font-size: var(--font-size-body); }
+:global(:is(.tenant-operation-dialog, .tenant-traffic-drawer) .el-alert__description), :global(:is(.tenant-operation-dialog, .tenant-traffic-drawer) .el-form-item__error) { font-size: var(--font-size-secondary); }
 :global(.tenant-operation-dialog .el-dialog__body) { max-height: calc(100dvh - 250px); overflow-y: auto; overscroll-behavior: contain; }
+.traffic-drawer-header { display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
+.traffic-drawer-icon { width: 38px; height: 38px; border-radius: 10px; background: var(--brand-subtle); color: var(--brand); display: grid; place-items: center; font-size: 20px; flex-shrink: 0; margin-top: 2px; }
+.traffic-drawer-heading { min-width: 0; }
+.traffic-drawer-title { margin: 4px 0 0; font-size: var(--font-size-dialog-title); line-height: 1.35; font-weight: 600; color: var(--text-primary); }
+.traffic-drawer-subtitle { margin: 2px 0 0; font-size: var(--font-size-secondary); color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.traffic-drawer-body { display: flex; flex-direction: column; gap: 14px; }
+.traffic-form { display: flex; flex-direction: column; gap: 12px; }
+.traffic-card { padding: 14px 16px; border-radius: var(--r-card); border: 1px solid var(--border); background: var(--bg-card-subtle); }
+.traffic-setting-row { padding: 0; }
+.traffic-threshold-item { margin-bottom: 0 !important; }
+.traffic-drawer-footer { padding: 12px 20px calc(12px + env(safe-area-inset-bottom)); }
+.drawer-hidden-submit { position: absolute; width: 0; height: 0; padding: 0; border: 0; opacity: 0; pointer-events: none; }
 .operation-heading { padding: 5px 24px 6px 0; }
 .operation-eyebrow { color: var(--brand); font-size: var(--font-size-secondary); font-weight: 600; letter-spacing: .04em; }
 .operation-heading h2 { margin: 8px 0 0; font-size: var(--font-size-dialog-title); line-height: 1.3; font-weight: 600; letter-spacing: -.03em; }
@@ -565,7 +649,7 @@ onBeforeUnmount(cleanup)
 .check-log p { margin: 0 0 4px; overflow-wrap: anywhere; white-space: pre-wrap; }
 .waiting-line { color: var(--text-secondary); font-family: var(--sans); font-size: var(--font-size-secondary); }
 .operation-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px; padding-top: 6px; }
-.operation-footer :deep(.el-button) { min-width: 92px; max-width: 100%; margin-left: 0; border-radius: var(--r-pill); min-height: 38px; height: auto; padding-block: 9px; white-space: normal; line-height: 1.3; }
+.operation-footer :deep(.el-button) { min-width: 84px; max-width: 100%; margin-left: 0; border-radius: var(--r-pill); min-height: 32px; height: auto; padding: 5px 14px; font-size: var(--font-size-secondary); white-space: normal; line-height: 1.3; }
 .operation-body button:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
 .operation-body button:disabled { cursor: default; opacity: .6; }
 .operation-swap-enter-active, .operation-swap-leave-active { transition: opacity .18s ease, transform .22s cubic-bezier(.22, 1, .36, 1); }
@@ -578,7 +662,16 @@ onBeforeUnmount(cleanup)
   .verification-hint { align-items: flex-start; flex-direction: column; }
   .check-intro { padding: 16px 0; }
 }
+@media (max-width: 760px) {
+  :global(.tenant-traffic-drawer .el-drawer__header) { padding: 16px 16px 14px; }
+  :global(.tenant-traffic-drawer .el-drawer__close-btn) { width: 44px; height: 44px; }
+  :global(.tenant-traffic-drawer .el-drawer__body) { padding: 14px 16px; }
+  .traffic-card { padding: 14px; }
+  .traffic-drawer-footer { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); }
+  .traffic-drawer-footer :deep(.el-button) { width: 100%; min-height: 44px; }
+}
 @media (prefers-reduced-motion: reduce) {
+  :global(.tenant-traffic-drawer .el-drawer__close-btn),
   .operation-swap-enter-active, .operation-swap-leave-active, .proxy-choice, .mode-switch button, .file-drop { transition: none; }
   .operation-swap-enter-from, .operation-swap-leave-to, .proxy-choice:active, .mode-switch button:active, .file-drop.dragging { transform: none; }
   .check-panel :deep(.el-progress-bar__inner) { transition: none; }

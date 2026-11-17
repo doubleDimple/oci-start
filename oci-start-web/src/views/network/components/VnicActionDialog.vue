@@ -286,7 +286,8 @@ onBeforeUnmount(() => {
   .vnic-action-form input { box-sizing: border-box; min-width: 0; width: 100%; min-height: 36px; border: 1px solid var(--border-strong); border-radius: var(--r-sm); padding: 7px 10px; background: var(--bg-search); color: var(--text-primary); font: var(--font-size-body)/1.5 var(--sans); }
   input::placeholder { color: var(--text-muted); }
   input:disabled { cursor: default; }
-  input:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+  button:focus-visible, summary:focus-visible, input[type='checkbox']:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+  input:not([type='checkbox']):focus, input:not([type='checkbox']):focus-visible { outline: none; }
   .vnic-action-numbers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
   .vnic-action-cidr { display: flex; align-items: center; gap: 8px; }
   .vnic-action-cidr button { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--bg-card); color: var(--text-primary); cursor: pointer; }

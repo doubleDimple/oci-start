@@ -65,6 +65,10 @@ function close() {
   if (!busy.value) emit('close')
 }
 
+function guardClose(done: () => void) {
+  if (!busy.value) done()
+}
+
 function nameOf(row: MysqlInstance) {
   return row.displayName || t('tenantRegions.mysql.unnamed')
 }
@@ -274,20 +278,32 @@ const ElTableColumn = BaseTableColumn<MysqlInstance>
 </script>
 
 <template>
-  <el-dialog
+  <el-drawer
     :model-value="true"
-    :title="t('tenantRegions.mysql.title')"
-    width="min(1160px, calc(100vw - 32px))"
-    class="tenant-region-mysql-dialog"
-    align-center
-    :close-on-click-modal="false"
+    direction="rtl"
+    size="min(1080px, 94vw)"
+    class="tenant-region-mysql-drawer"
+    append-to-body
+    destroy-on-close
+    :close-on-click-modal="!busy"
     :close-on-press-escape="!busy"
     :show-close="!busy"
+    :before-close="guardClose"
     @close="close"
   >
+    <template #header>
+      <div class="mysql-drawer-header">
+        <span class="mysql-drawer-icon" aria-hidden="true"><i class="i-mdi-database-outline" /></span>
+        <div class="mysql-drawer-heading">
+          <h2 class="mysql-drawer-title">{{ t('tenantRegions.mysql.title') }}</h2>
+          <p class="mysql-drawer-subtitle">{{ tenantLabel }}</p>
+        </div>
+      </div>
+    </template>
+
     <div class="mysql-content" :aria-busy="!!busy || loading">
       <div class="mysql-toolbar">
-        <span class="tenant-label">{{ tenantLabel }}</span>
+        <span class="mysql-summary">{{ t('tenantRegions.mysql.title') }}</span>
         <div class="toolbar-actions">
           <el-button :disabled="!!busy || loading" @click="refresh">{{ t('tenantRegions.common.refresh') }}</el-button>
           <el-button :loading="busy === 'syncAll'" :disabled="!!busy && busy !== 'syncAll'" @click="syncAll">{{ t('tenantRegions.mysql.syncAll') }}</el-button>
@@ -340,7 +356,7 @@ const ElTableColumn = BaseTableColumn<MysqlInstance>
         :data="rows"
         row-key="id"
         class="mysql-table"
-        max-height="min(56vh, 560px)"
+        max-height="calc(100dvh - 280px)"
         :empty-text="t('tenantRegions.mysql.empty')"
       >
         <el-table-column :label="t('tenantRegions.mysql.instance')" min-width="170">
@@ -409,27 +425,43 @@ const ElTableColumn = BaseTableColumn<MysqlInstance>
       </el-table>
       <p v-if="busyText" class="busy-status" role="status" aria-live="polite">{{ busyText }}</p>
     </div>
-  </el-dialog>
+
+    <template #footer>
+      <div class="mysql-drawer-footer">
+        <GhostBtn :disabled="!!busy" @click="close">{{ t('tenantRegions.common.close') }}</GhostBtn>
+      </div>
+    </template>
+  </el-drawer>
 </template>
 
 <style scoped>
 .mysql-content { min-width: 0; color: var(--text-primary); font-family: var(--sans); font-size: var(--font-size-body); }
-:global(.tenant-region-mysql-dialog) { font-family: var(--sans); font-size: var(--font-size-body); color: var(--text-primary); }
-:global(.tenant-region-mysql-dialog .el-dialog__title) { font-size: var(--font-size-dialog-title); font-weight: 600; color: var(--text-primary); }
+:global(.tenant-region-mysql-drawer) { --el-drawer-bg-color: var(--bg-card); background: var(--bg-card); font-family: var(--sans); font-size: var(--font-size-body); color: var(--text-primary); }
+:global(.tenant-region-mysql-drawer .el-drawer__header) { margin: 0; padding: 18px 20px 14px; border-bottom: 1px solid var(--border); color: var(--text-primary); align-items: flex-start; gap: 12px; }
+:global(.tenant-region-mysql-drawer .el-drawer__close-btn) { width: 36px; height: 36px; border-radius: var(--r-pill); color: var(--text-secondary); flex-shrink: 0; transition: background-color 180ms ease, color 180ms ease; }
+:global(.tenant-region-mysql-drawer .el-drawer__close-btn:is(:hover, :focus-visible)) { color: var(--brand); background: var(--bg-hover); }
+:global(.tenant-region-mysql-drawer .el-drawer__body) { min-height: 0; padding: 18px 20px; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; background: var(--bg-card); }
+:global(.tenant-region-mysql-drawer .el-drawer__footer) { padding: 0; border-top: 1px solid var(--border); background: var(--bg-card); }
 :global(.tenant-region-mysql-confirm) { font-family: var(--sans); --el-messagebox-title-color: var(--text-primary); --el-messagebox-content-color: var(--text-primary); --el-messagebox-font-size: var(--font-size-dialog-title); --el-messagebox-content-font-size: var(--font-size-body); }
 :global(.tenant-region-mysql-confirm .el-message-box__title) { font-weight: 600; }
 :global(.tenant-region-mysql-menu.el-popper) { font-family: var(--sans); font-size: var(--font-size-body); }
 :global(.tenant-region-mysql-menu .el-dropdown-menu__item) { font-family: var(--sans); font-size: var(--font-size-body); }
+.mysql-drawer-header { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.mysql-drawer-icon { width: 38px; height: 38px; border-radius: 10px; background: var(--brand-subtle); color: var(--brand); display: grid; place-items: center; font-size: 20px; flex-shrink: 0; }
+.mysql-drawer-heading { min-width: 0; }
+.mysql-drawer-title { margin: 0; font-size: var(--font-size-dialog-title); font-weight: 600; line-height: 1.35; color: var(--text-primary); }
+.mysql-drawer-subtitle { margin: 2px 0 0; font-size: var(--font-size-secondary); color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mysql-drawer-footer { display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding: 12px 20px calc(12px + env(safe-area-inset-bottom)); }
 .mysql-content :deep(.el-button), .mysql-content :deep(.el-input__inner), .mysql-content :deep(.el-select__wrapper), .mysql-content :deep(.el-form-item__label), .mysql-content :deep(.el-table) { font-size: var(--font-size-body); }
 .mysql-content :deep(.el-alert__title) { font-size: var(--font-size-body); }
 .mysql-content :deep(.el-alert__description), .mysql-content :deep(.el-form-item__error), .mysql-content :deep(.el-empty__description p) { font-size: var(--font-size-secondary); }
-.mysql-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
-.tenant-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-secondary); font-size: var(--font-size-secondary); }
+.mysql-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; margin-bottom: 16px; border-radius: var(--r-card); border: 1px solid var(--border); background: var(--bg-card-subtle); }
+.mysql-summary { min-width: 0; color: var(--text-secondary); font-size: var(--font-size-secondary); font-weight: 500; }
 .toolbar-actions { display: flex; flex-shrink: 0; align-items: center; gap: 8px; }
 .toolbar-actions :deep(.el-button + .el-button) { margin-left: 0; }
 .mysql-content :deep(.el-alert) { margin-bottom: 14px; border-radius: var(--r-sm); }
-.mysql-table { border: 1px solid var(--border); border-radius: var(--r-sm); }
-.mysql-table :deep(th.el-table__cell) { padding-block: 8px; background: var(--bg-hover); color: var(--text-secondary); font-size: var(--font-size-body); font-weight: 600; }
+.mysql-table { border: 1px solid var(--border); border-radius: var(--r-sm); overflow: hidden; }
+.mysql-table :deep(th.el-table__cell) { padding-block: 8px; background: var(--bg-card-subtle); color: var(--text-secondary); font-size: var(--font-size-body); font-weight: 600; }
 .mysql-table :deep(td.el-table__cell) { padding-block: 10px; }
 .cell-secondary { margin-top: 3px; color: var(--text-secondary); font-size: var(--font-size-secondary); }
 .copy-name, .copy-endpoint, .copy-username, .icon-button { border: 0; background: transparent; color: var(--text-primary); font: inherit; cursor: pointer; }
@@ -451,7 +483,11 @@ const ElTableColumn = BaseTableColumn<MysqlInstance>
 :global(.tenant-region-mysql-menu .mysql-delete-action:not(.is-disabled)) { color: var(--status-danger); }
 .busy-status { margin: 12px 0 0; color: var(--text-secondary); font-size: var(--font-size-secondary); }
 @media (max-width: 760px) {
-  :global(.tenant-region-mysql-dialog) { max-height: calc(100dvh - 32px); overflow-y: auto; }
+  :global(.tenant-region-mysql-drawer .el-drawer__header) { padding: 16px 16px 14px; }
+  :global(.tenant-region-mysql-drawer .el-drawer__close-btn) { width: 44px; height: 44px; }
+  :global(.tenant-region-mysql-drawer .el-drawer__body) { padding: 14px 16px; }
+  .mysql-drawer-footer { padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); }
+  .mysql-drawer-footer :deep(button) { width: 100%; min-height: 44px; }
   .mysql-mobile-list { padding: 0; max-height: 58dvh; overflow-y: auto; overscroll-behavior: contain; }
   .mysql-mobile-empty { display: grid; place-items: center; min-height: 88px; padding: 16px; margin: 0; text-align: center; line-height: 1.6; }
   .mysql-mobile-list :deep(.btn) { min-height: 44px; white-space: normal; }
@@ -460,10 +496,13 @@ const ElTableColumn = BaseTableColumn<MysqlInstance>
   .mysql-mobile-list .icon-button { width: 44px; height: 44px; }
   .mysql-mobile-details { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
   .mysql-mobile-list button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: var(--r-sm); }
-  .mysql-toolbar { flex-wrap: wrap; min-width: 0; max-width: 100%; }
-  .tenant-label { flex-basis: 100%; white-space: normal; overflow-wrap: anywhere; }
+  .mysql-toolbar { flex-wrap: wrap; min-width: 0; max-width: 100%; padding: 12px; }
+  .mysql-summary { flex-basis: 100%; }
   .toolbar-actions { flex: 1 1 100%; width: 100%; max-width: 100%; flex-wrap: wrap; gap: 6px; min-width: 0; }
   .toolbar-actions :deep(.el-button) { flex: 0 1 auto; max-width: 100%; height: auto; min-height: 44px; white-space: normal; }
   .toolbar-actions :deep(.el-button > span) { min-width: 0; overflow-wrap: anywhere; }
+}
+@media (prefers-reduced-motion: reduce) {
+  :global(.tenant-region-mysql-drawer .el-drawer__close-btn) { transition: none; }
 }
 </style>

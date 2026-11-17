@@ -198,6 +198,10 @@ function close() {
   emit('close')
 }
 
+function guardClose(done: () => void) {
+  if (stage.value !== 'running') done()
+}
+
 onBeforeUnmount(() => {
   stopReading()
   disposed = true
@@ -208,70 +212,131 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <el-dialog :model-value="true" :title="t('instanceNetwork.dd.title')" width="660px" align-center class="instance-reinstall-dialog" :close-on-click-modal="false" @close="close">
-    <div class="reinstall-instance"><span>{{ t('instanceNetwork.common.instance') }}</span><strong>{{ row.displayName || row.instanceId }}</strong><code>{{ row.instanceId }}</code></div>
-    <template v-if="stage === 'form'">
-      <el-form label-position="top" @submit.prevent="review">
-        <el-form-item :label="t('instanceNetwork.dd.os')">
-          <el-select v-model="selectedOs" filterable :placeholder="t('instanceNetwork.dd.selectOs')" :aria-label="t('instanceNetwork.dd.os')" popper-class="instance-reinstall-os-popper" @change="validationKey = ''">
-            <el-option-group v-for="group in osGroups" :key="group.label" :label="group.other ? t('instanceNetwork.dd.otherOs') : group.label">
-              <el-option v-for="option in group.options" :key="option.value" :value="option.value" :label="option.label" />
-            </el-option-group>
-          </el-select>
-        </el-form-item>
-        <el-form-item :label="t('instanceNetwork.dd.password')">
-          <el-input v-model="password" type="password" show-password autocomplete="new-password" :placeholder="t('instanceNetwork.dd.passwordPlaceholder')" :aria-label="t('instanceNetwork.dd.password')" @input="validationKey = ''" />
-        </el-form-item>
-      </el-form>
-      <p v-if="validationKey" class="reinstall-error" role="alert">{{ t(`instanceNetwork.dd.${validationKey}`) }}</p>
-      <p class="reinstall-note">{{ t('instanceNetwork.dd.scriptPrefix') }} <a href="https://github.com/bin456789/reinstall" target="_blank" rel="noopener noreferrer">reinstall</a> {{ t('instanceNetwork.dd.scriptSuffix') }}</p>
-      <el-alert :title="t('instanceNetwork.dd.warning')" type="warning" :closable="false" show-icon />
-    </template>
-    <template v-else-if="stage === 'confirm'">
-      <h3 class="reinstall-confirm-title">{{ t('instanceNetwork.dd.confirmTitle') }}</h3>
-      <dl class="reinstall-summary"><dt>{{ t('instanceNetwork.dd.os') }}</dt><dd>{{ osLabel }}</dd></dl>
-      <el-alert :title="t('instanceNetwork.dd.confirmWarning')" type="warning" :closable="false" show-icon />
-    </template>
-    <template v-else>
-      <PageErrorNotice v-if="stage === 'failed'">{{ statusText }}</PageErrorNotice>
-      <el-alert v-else :title="statusText" :type="stage === 'success' ? 'success' : stage === 'running' ? 'info' : 'warning'" :closable="false" show-icon />
-      <div ref="logArea" class="reinstall-log" tabindex="0" role="log" aria-live="off" :aria-label="t('instanceNetwork.dd.logs')">
-        <p v-if="!logs.length">{{ t('instanceNetwork.dd.waitingLogs') }}</p>
-        <p v-for="(line, index) in logs" :key="index">{{ line }}</p>
+  <el-drawer
+    :model-value="true"
+    direction="rtl"
+    size="min(700px, 94vw)"
+    class="instance-reinstall-drawer"
+    append-to-body
+    destroy-on-close
+    :close-on-click-modal="stage !== 'running' && stage !== 'confirm'"
+    :close-on-press-escape="stage !== 'running'"
+    :before-close="guardClose"
+    @close="close"
+  >
+    <template #header>
+      <div class="reinstall-drawer-header">
+        <span class="reinstall-drawer-icon" aria-hidden="true"><i class="i-mdi-restore" /></span>
+        <div class="reinstall-drawer-heading">
+          <h2 class="reinstall-drawer-title">{{ t('instanceNetwork.dd.title') }}</h2>
+          <p class="reinstall-drawer-subtitle">{{ row.displayName || row.instanceId }}</p>
+        </div>
       </div>
-      <p v-if="logsTrimmed" class="reinstall-note">{{ t('instanceNetwork.dd.logsTrimmed') }}</p>
-      <p class="reinstall-note">{{ t('instanceNetwork.dd.closeHint') }}</p>
     </template>
+
+    <div class="reinstall-drawer-body" :aria-busy="stage === 'running'">
+      <div class="reinstall-instance">
+        <span>{{ t('instanceNetwork.common.instance') }}</span>
+        <strong>{{ row.displayName || row.instanceId }}</strong>
+        <code v-if="row.instanceId">{{ row.instanceId }}</code>
+      </div>
+
+      <template v-if="stage === 'form'">
+        <div class="reinstall-card">
+          <el-form label-position="top" @submit.prevent="review">
+            <el-form-item :label="t('instanceNetwork.dd.os')">
+              <el-select v-model="selectedOs" filterable :placeholder="t('instanceNetwork.dd.selectOs')" :aria-label="t('instanceNetwork.dd.os')" popper-class="instance-reinstall-os-popper" @change="validationKey = ''">
+                <el-option-group v-for="group in osGroups" :key="group.label" :label="group.other ? t('instanceNetwork.dd.otherOs') : group.label">
+                  <el-option v-for="option in group.options" :key="option.value" :value="option.value" :label="option.label" />
+                </el-option-group>
+              </el-select>
+            </el-form-item>
+            <el-form-item :label="t('instanceNetwork.dd.password')" class="reinstall-last-item">
+              <el-input v-model="password" type="password" show-password autocomplete="new-password" :placeholder="t('instanceNetwork.dd.passwordPlaceholder')" :aria-label="t('instanceNetwork.dd.password')" @input="validationKey = ''" />
+            </el-form-item>
+          </el-form>
+        </div>
+        <p v-if="validationKey" class="reinstall-error" role="alert">{{ t(`instanceNetwork.dd.${validationKey}`) }}</p>
+        <p class="reinstall-note">{{ t('instanceNetwork.dd.scriptPrefix') }} <a href="https://github.com/bin456789/reinstall" target="_blank" rel="noopener noreferrer">reinstall</a> {{ t('instanceNetwork.dd.scriptSuffix') }}</p>
+        <el-alert :title="t('instanceNetwork.dd.warning')" type="warning" :closable="false" show-icon />
+      </template>
+
+      <template v-else-if="stage === 'confirm'">
+        <div class="reinstall-card">
+          <h3 class="reinstall-confirm-title">{{ t('instanceNetwork.dd.confirmTitle') }}</h3>
+          <dl class="reinstall-summary"><dt>{{ t('instanceNetwork.dd.os') }}</dt><dd>{{ osLabel }}</dd></dl>
+        </div>
+        <el-alert :title="t('instanceNetwork.dd.confirmWarning')" type="warning" :closable="false" show-icon />
+      </template>
+
+      <template v-else>
+        <PageErrorNotice v-if="stage === 'failed'">{{ statusText }}</PageErrorNotice>
+        <el-alert v-else :title="statusText" :type="stage === 'success' ? 'success' : stage === 'running' ? 'info' : 'warning'" :closable="false" show-icon />
+        <div ref="logArea" class="reinstall-log" tabindex="0" role="log" aria-live="off" :aria-label="t('instanceNetwork.dd.logs')">
+          <p v-if="!logs.length">{{ t('instanceNetwork.dd.waitingLogs') }}</p>
+          <p v-for="(line, index) in logs" :key="index">{{ line }}</p>
+        </div>
+        <p v-if="logsTrimmed" class="reinstall-note">{{ t('instanceNetwork.dd.logsTrimmed') }}</p>
+        <p class="reinstall-note">{{ t('instanceNetwork.dd.closeHint') }}</p>
+      </template>
+    </div>
+
     <template #footer>
-      <GhostBtn v-if="logs.length" @click="copyLogs">{{ t('instanceNetwork.dd.copyLogs') }}</GhostBtn>
-      <GhostBtn v-if="stage === 'confirm'" @click="stage = 'form'">{{ t('instanceNetwork.common.back') }}</GhostBtn>
-      <GhostBtn @click="close">{{ stage === 'running' ? t('instanceNetwork.dd.stopReading') : t(`instanceNetwork.common.${isForm ? 'cancel' : 'close'}`) }}</GhostBtn>
-      <PrimaryBtn v-if="stage === 'form'" @click="review">{{ t('instanceNetwork.dd.continue') }}</PrimaryBtn>
-      <PrimaryBtn v-else-if="stage === 'confirm'" @click="start">{{ t('instanceNetwork.dd.start') }}</PrimaryBtn>
+      <div class="reinstall-drawer-footer">
+        <GhostBtn v-if="logs.length" @click="copyLogs">{{ t('instanceNetwork.dd.copyLogs') }}</GhostBtn>
+        <GhostBtn v-if="stage === 'confirm'" @click="stage = 'form'">{{ t('instanceNetwork.common.back') }}</GhostBtn>
+        <GhostBtn @click="close">{{ stage === 'running' ? t('instanceNetwork.dd.stopReading') : t(`instanceNetwork.common.${isForm ? 'cancel' : 'close'}`) }}</GhostBtn>
+        <PrimaryBtn v-if="stage === 'form'" @click="review">{{ t('instanceNetwork.dd.continue') }}</PrimaryBtn>
+        <PrimaryBtn v-else-if="stage === 'confirm'" @click="start">{{ t('instanceNetwork.dd.start') }}</PrimaryBtn>
+      </div>
     </template>
-  </el-dialog>
+  </el-drawer>
 </template>
 
-<style>
-.instance-reinstall-dialog { max-width: calc(100vw - 32px); padding: 26px; font-family: var(--sans); font-size: var(--font-size-body); color: var(--text-primary); }
-.instance-reinstall-dialog .el-dialog__title { font-size: var(--font-size-dialog-title); font-weight: 600; }
-.instance-reinstall-dialog .el-input, .instance-reinstall-dialog .el-select, .instance-reinstall-dialog .el-form-item__label, .instance-reinstall-dialog .el-alert__title, .instance-reinstall-os-popper .el-select-dropdown__item { font-size: var(--font-size-body); }
-.instance-reinstall-dialog .el-select { width: 100%; }
-.instance-reinstall-os-popper { font-family: var(--sans); }
-.instance-reinstall-os-popper .el-select-group__title { font-size: var(--font-size-secondary); }
-.instance-reinstall-dialog .reinstall-instance { display: grid; gap: 6px; margin-bottom: 22px; }
-.instance-reinstall-dialog .reinstall-instance span, .instance-reinstall-dialog .reinstall-note { color: var(--text-secondary); font-size: var(--font-size-secondary); line-height: 1.6; }
-.instance-reinstall-dialog .reinstall-instance strong { color: var(--text-primary); overflow-wrap: anywhere; }
-.instance-reinstall-dialog .reinstall-instance code { color: var(--text-secondary); font: var(--font-size-secondary)/1.6 var(--mono); overflow-wrap: anywhere; }
-.instance-reinstall-dialog .reinstall-note { margin: 14px 0; }
-.instance-reinstall-dialog .reinstall-note a { color: var(--brand); text-underline-offset: 3px; }
-.instance-reinstall-dialog .reinstall-error { color: var(--status-danger); font-size: var(--font-size-secondary); }
-.instance-reinstall-dialog .reinstall-confirm-title { font-size: var(--font-size-section); margin: 0 0 16px; }
-.instance-reinstall-dialog .reinstall-summary { display: grid; grid-template-columns: auto 1fr; gap: 10px 16px; padding: 16px; background: var(--bg-search); border-radius: var(--r-sm); }
-.instance-reinstall-dialog .reinstall-summary dt { color: var(--text-secondary); }
-.instance-reinstall-dialog .reinstall-summary dd { margin: 0; color: var(--text-primary); overflow-wrap: anywhere; }
-.instance-reinstall-dialog .reinstall-log { min-height: 180px; max-height: min(340px, 42vh); overflow: auto; margin-top: 16px; padding: 16px; border-radius: var(--r-sm); background: var(--bg-search); color: var(--text-primary); font: var(--font-size-body)/1.7 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
-.instance-reinstall-dialog .reinstall-log p { margin: 0 0 5px; }
-.instance-reinstall-dialog .reinstall-log:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
-.instance-reinstall-dialog .el-dialog__footer { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+<style scoped>
+:global(.instance-reinstall-drawer) { --el-drawer-bg-color: var(--bg-card); background: var(--bg-card); color: var(--text-primary); font-family: var(--sans); font-size: var(--font-size-body); }
+:global(.instance-reinstall-drawer .el-drawer__header) { margin: 0; padding: 18px 20px 14px; border-bottom: 1px solid var(--border); color: var(--text-primary); align-items: flex-start; gap: 12px; }
+:global(.instance-reinstall-drawer .el-drawer__close-btn) { width: 36px; height: 36px; border-radius: var(--r-pill); color: var(--text-secondary); flex-shrink: 0; transition: background-color 180ms ease, color 180ms ease; }
+:global(.instance-reinstall-drawer .el-drawer__close-btn:is(:hover, :focus-visible)) { color: var(--brand); background: var(--bg-hover); }
+:global(.instance-reinstall-drawer .el-drawer__body) { min-height: 0; padding: 18px 20px; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; background: var(--bg-card); }
+:global(.instance-reinstall-drawer .el-drawer__footer) { padding: 0; border-top: 1px solid var(--border); background: var(--bg-card); }
+:global(.instance-reinstall-os-popper) { font-family: var(--sans); }
+:global(.instance-reinstall-os-popper .el-select-dropdown__item) { font-size: var(--font-size-body); }
+:global(.instance-reinstall-os-popper .el-select-group__title) { font-size: var(--font-size-secondary); }
+.reinstall-drawer-header { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.reinstall-drawer-icon { width: 38px; height: 38px; border-radius: 10px; background: var(--brand-subtle); color: var(--brand); display: grid; place-items: center; font-size: 20px; flex-shrink: 0; }
+.reinstall-drawer-heading { min-width: 0; }
+.reinstall-drawer-title { margin: 0; font-size: var(--font-size-dialog-title); font-weight: 600; line-height: 1.35; color: var(--text-primary); }
+.reinstall-drawer-subtitle { margin: 2px 0 0; font-size: var(--font-size-secondary); color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reinstall-drawer-body { display: flex; flex-direction: column; gap: 14px; }
+.reinstall-drawer-body :deep(.el-input), .reinstall-drawer-body :deep(.el-select), .reinstall-drawer-body :deep(.el-form-item__label), .reinstall-drawer-body :deep(.el-alert__title) { font-size: var(--font-size-body); }
+.reinstall-drawer-body :deep(.el-select) { width: 100%; }
+.reinstall-instance { display: grid; gap: 6px; padding: 14px 16px; border-radius: var(--r-card); border: 1px solid var(--border); background: var(--bg-card-subtle); }
+.reinstall-instance span, .reinstall-note { color: var(--text-secondary); font-size: var(--font-size-secondary); line-height: 1.6; }
+.reinstall-instance strong { color: var(--text-primary); overflow-wrap: anywhere; }
+.reinstall-instance code { color: var(--text-secondary); font: var(--font-size-secondary)/1.6 var(--mono); overflow-wrap: anywhere; }
+.reinstall-card { padding: 16px; border-radius: var(--r-card); border: 1px solid var(--border); background: var(--bg-card-subtle); }
+.reinstall-last-item { margin-bottom: 0; }
+.reinstall-note { margin: 0; }
+.reinstall-note a { color: var(--brand); text-underline-offset: 3px; }
+.reinstall-error { margin: 0; color: var(--status-danger); font-size: var(--font-size-secondary); }
+.reinstall-confirm-title { font-size: var(--font-size-section); margin: 0 0 14px; }
+.reinstall-summary { display: grid; grid-template-columns: auto 1fr; gap: 10px 16px; margin: 0; padding: 14px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--r-sm); }
+.reinstall-summary dt { color: var(--text-secondary); }
+.reinstall-summary dd { margin: 0; color: var(--text-primary); overflow-wrap: anywhere; }
+.reinstall-log { min-height: 240px; max-height: calc(100dvh - 340px); overflow: auto; overscroll-behavior: contain; padding: 16px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--bg-search); color: var(--text-primary); font: var(--font-size-body)/1.7 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+.reinstall-log p { margin: 0 0 5px; }
+.reinstall-log:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+.reinstall-drawer-footer { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; padding: 12px 20px calc(12px + env(safe-area-inset-bottom)); }
+@media (max-width: 760px) {
+  :global(.instance-reinstall-drawer .el-drawer__header) { padding: 16px 16px 14px; }
+  :global(.instance-reinstall-drawer .el-drawer__close-btn) { width: 44px; height: 44px; }
+  :global(.instance-reinstall-drawer .el-drawer__body) { padding: 14px 16px; }
+  .reinstall-card { padding: 14px; }
+  .reinstall-drawer-footer { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 10px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); }
+  .reinstall-drawer-footer :deep(button) { width: 100%; min-height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  :global(.instance-reinstall-drawer .el-drawer__close-btn) { transition: none; }
+}
 </style>

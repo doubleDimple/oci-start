@@ -43,11 +43,30 @@ spring:
       max-request-size: 20MB
 
   datasource:
+    type: com.alibaba.druid.pool.DruidDataSource
     driverClassName: org.h2.Driver
     ##数据库的用户名和密码,目前只支持h2
     url: jdbc:h2:file:./data/vps_db;DB_CLOSE_ON_EXIT=FALSE
     username: oci-start-sa_admin
     password: QWWQE^$%#^20240190ghf
+    druid:
+      initial-size: 5
+      min-idle: 5
+      max-active: 20
+      max-wait: 60000
+      time-between-eviction-runs-millis: 60000
+      min-evictable-idle-time-millis: 300000
+      validation-query: SELECT 1
+      test-while-idle: true
+      test-on-borrow: false
+      test-on-return: false
+      pool-prepared-statements: true
+      max-pool-prepared-statement-per-connection-size: 20
+      filters: stat
+      stat-view-servlet:
+        enabled: false
+      web-stat-filter:
+        enabled: false
   jpa:
     hibernate:
       ddl-auto: update
@@ -118,8 +137,8 @@ openresty:
     token: ${OPENRESTY_API_TOKEN:}
 
 oci:
-  version: 5.7.96
-  ssh-version: v-5.7.96
+  version: 5.7.97
+  ssh-version: v-5.7.97
   web:
     # IDEA 点 OciServerApplication 时自动 pnpm run dev；生产 jar 找不到 oci-start-web 会跳过
     auto-start: true

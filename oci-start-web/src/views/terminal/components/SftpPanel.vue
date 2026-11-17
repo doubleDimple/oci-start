@@ -377,7 +377,7 @@ onBeforeUnmount(() => {
 .sftp-field { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
 .sftp-field input { box-sizing: border-box; width: 100%; min-width: 0; padding: 9px 11px; border: 1px solid var(--border); border-radius: 10px; color: var(--text-primary); background: var(--bg-card); font: inherit; }
 .sftp-field input::placeholder { color: var(--text-muted); opacity: 1; }
-.sftp-field input:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
+.sftp-field input:focus-visible { outline: none; }
 .sftp-field input:disabled { background: var(--bg-search); cursor: not-allowed; }
 .sftp-hint, .sftp-notice p { margin: 0; color: var(--text-secondary); font-size: var(--font-size-secondary); line-height: 1.6; }
 .sftp-file { display: flex; gap: 10px; align-items: center; padding: 12px; border: 1px dashed var(--border); border-radius: 12px; min-width: 0; }
@@ -387,8 +387,8 @@ onBeforeUnmount(() => {
 .sftp-file small { display: block; margin-top: 4px; color: var(--text-secondary); font-size: var(--font-size-secondary); }
 .sftp-button { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 36px; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--r-pill); color: var(--text-primary); background: var(--bg-card); font: inherit; cursor: pointer; }
 .sftp-button:hover:not(:disabled) { background: var(--bg-hover); }
-.sftp-primary { border-color: var(--brand); background: var(--brand); color: var(--nav-active-fg); }
-.sftp-primary:hover:not(:disabled) { background: var(--brand-hover); border-color: var(--brand-hover); }
+.sftp-primary { border-color: var(--brand-solid); background: var(--brand-solid); color: var(--text-on-solid); }
+.sftp-primary:hover:not(:disabled) { background: var(--brand-solid-hover); border-color: var(--brand-solid-hover); }
 .sftp-icon { display: grid; place-items: center; width: 30px; height: 30px; flex-shrink: 0; border: 0; border-radius: 50%; color: var(--text-primary); background: transparent; font-size: 18px; cursor: pointer; }
 .sftp-icon:hover:not(:disabled) { background: var(--bg-hover); }
 .sftp-button:disabled, .sftp-icon:disabled, .sftp-modes button:disabled { cursor: not-allowed; opacity: .55; }

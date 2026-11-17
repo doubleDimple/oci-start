@@ -25,9 +25,9 @@ html:root[data-content-theme] {
   --brand-hover: #963c11;
   --brand-deep: #963c11;
   --brand-subtle: #fff0e6;
-  --brand-solid: #f5a15d;
-  --brand-solid-hover: #ee9148;
-  --text-on-solid: #3b220f;
+  --brand-solid: #18181b;
+  --brand-solid-hover: #27272a;
+  --text-on-solid: #ffffff;
   --text-on-brand: #ffffff;
   --nav-selected-bg: #fff0e6;
   --nav-selected-fg: #b34814;
@@ -145,6 +145,7 @@ html:root[data-content-theme] {
   --el-text-color-disabled: var(--text-muted);
   --el-input-text-color: var(--text-primary);
   --el-input-placeholder-color: var(--text-muted);
+  --el-input-focus-border-color: var(--border-strong);
   --el-table-text-color: var(--text-primary);
   --el-table-header-text-color: var(--text-secondary);
   --el-border-color: var(--border);
@@ -206,6 +207,9 @@ html:root[data-theme="dark"]:not([data-content-theme]) {
   --icon-peach: #3a2a16;
   --btn-dark: #f5f5f7;
   --btn-dark-hover: #ffffff;
+  --brand-solid: #f4f4f5;
+  --brand-solid-hover: #ffffff;
+  --text-on-solid: #09090b;
   --el-bg-color: var(--bg-card);
   --el-bg-color-page: var(--bg-page);
   --el-text-color-primary: var(--text-primary);

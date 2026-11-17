@@ -7,7 +7,7 @@
   .storage-toolbar { display: flex; flex: none; align-items: center; flex-wrap: wrap; gap: 10px; padding: 12px 18px; border-bottom: 1px solid var(--border); }
   .storage-tenant { width: min(300px, 100%); }
   .storage-toolbar-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-left: auto; }
-  .btn { min-height: 36px; padding: 7px 12px; }
+  .btn { min-height: 32px; padding: 5px 12px; font-size: var(--font-size-secondary); }
   .storage-workspace { display: grid; grid-template-columns: minmax(240px, 28%) minmax(0, 1fr); flex: 1; min-height: 0; min-width: 0; }
   .storage-buckets { display: flex; flex-direction: column; min-height: 0; min-width: 0; border-right: 1px solid var(--border); }
   .storage-bucket-tools { display: grid; gap: 10px; padding: 16px; }
@@ -40,11 +40,11 @@
     flex: none;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
+    width: 28px;
+    height: 28px;
     box-sizing: border-box;
     border: 1px solid var(--border-color);
-    border-radius: 9px;
+    border-radius: 8px;
     background: var(--card-bg);
     color: var(--text-primary);
     cursor: pointer;

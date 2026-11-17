@@ -49,6 +49,8 @@ const templates: readonly BootTemplate[] = [
 const quickTemplates = templates.filter(template => template.id === 'arm-basic' || template.id === 'amd-basic')
 const intervalPresets = [10, 30, 60, 200, 500]
 const maxCount = 100
+const maxCustomOcpu = 128
+const maxCustomMemory = 1024
 const maxJavaInt = 2147483647
 // listRegions uses RegionEnum's Chinese short names, including three distinct suffixes.
 const regionNameOverrides: Record<string, string> = {
@@ -91,6 +93,49 @@ const templateId = computed({
 })
 const visibleTemplates = computed(() => mode.value === 'quick' ? quickTemplates : templates)
 const selectedTemplate = computed(() => visibleTemplates.value.find(template => template.id === templateId.value))
+const customOcpuInput = ref('')
+const customMemoryInput = ref('')
+const isFixedSpecShape = computed(() => selectedTemplate.value?.architecture === 'AMD')
+const ocpuPresets = computed<readonly number[]>(() => {
+  switch (selectedTemplate.value?.architecture) {
+    case 'AMD': return [1]
+    case 'ARM': return [1, 2, 4, 8]
+    case 'ARM_PAID_A2': return [2, 4, 8, 16]
+    default: return [1, 2, 4, 8, 16]
+  }
+})
+const memoryPresets = computed<readonly number[]>(() => {
+  switch (selectedTemplate.value?.architecture) {
+    case 'AMD': return [1]
+    case 'ARM': return [6, 12, 24, 48]
+    case 'ARM_PAID_A2': return [12, 24, 48, 96]
+    default: return [4, 8, 16, 24, 64]
+  }
+})
+const ocpuValid = computed(() => mode.value !== 'custom' || !selectedTemplate.value || isFixedSpecShape.value
+  || validInteger(customOcpuInput.value, maxCustomOcpu))
+const memoryValid = computed(() => mode.value !== 'custom' || !selectedTemplate.value || isFixedSpecShape.value
+  || validInteger(customMemoryInput.value, maxCustomMemory))
+const effectiveTemplate = computed<BootTemplate | undefined>(() => {
+  const base = selectedTemplate.value
+  if (!base) return undefined
+  if (mode.value !== 'custom' || isFixedSpecShape.value) return base
+  return {
+    ...base,
+    ocpu: ocpuValid.value ? Number(customOcpuInput.value) : base.ocpu,
+    memory: memoryValid.value ? Number(customMemoryInput.value) : base.memory,
+  }
+})
+const isCustomSpecModified = computed(() => {
+  const base = selectedTemplate.value
+  if (!base || mode.value !== 'custom' || isFixedSpecShape.value) return false
+  return customOcpuInput.value.trim() !== String(base.ocpu) || customMemoryInput.value.trim() !== String(base.memory)
+})
+watch(customTemplateId, id => {
+  const base = templates.find(template => template.id === id)
+  customOcpuInput.value = base ? String(base.ocpu) : ''
+  customMemoryInput.value = base ? String(base.memory) : ''
+}, { flush: 'sync' })
 const countInput = ref('1')
 const intervalInput = ref('60')
 const dayGap = ref('')
@@ -122,10 +167,10 @@ const dayGapValid = computed(() => validWindow(dayGap.value.trim()))
 const needsImage = computed(() => mode.value === 'custom' && !useDefaultImage.value)
 const imageValid = computed(() => !needsImage.value || Boolean(selectedImage.value))
 const hasErrors = computed(() => !selectedRegion.value || !selectedTemplate.value
-  || (mode.value === 'custom' && (!countValid.value || !intervalValid.value || !dayGapValid.value || !imageValid.value)))
+  || (mode.value === 'custom' && (!ocpuValid.value || !memoryValid.value || !countValid.value || !intervalValid.value || !dayGapValid.value || !imageValid.value)))
 const selectedPrice = computed(() => {
-  if (mode.value !== 'custom' || !selectedTemplate.value?.paid) return null
-  return estimateBootTemplatePrice(selectedTemplate.value, countValid.value ? Number(countInput.value) : 1)
+  if (mode.value !== 'custom' || !effectiveTemplate.value?.paid) return null
+  return estimateBootTemplatePrice(effectiveTemplate.value, countValid.value ? Number(countInput.value) : 1)
 })
 const confirmationPrice = computed(() => {
   if (!confirmation.value?.template.paid) return null
@@ -183,11 +228,18 @@ function setMode(value: Mode) {
   mode.value = value
   attempted.value = false
 }
+function restoreTemplateSpecs() {
+  if (locked.value || !selectedTemplate.value) return
+  customOcpuInput.value = String(selectedTemplate.value.ocpu)
+  customMemoryInput.value = String(selectedTemplate.value.memory)
+}
 function resetConfiguration() {
   if (locked.value) return
   mode.value = 'quick'
   quickTemplateId.value = 'arm-basic'
   customTemplateId.value = ''
+  customOcpuInput.value = ''
+  customMemoryInput.value = ''
   countInput.value = '1'
   intervalInput.value = '60'
   dayGap.value = ''
@@ -294,12 +346,12 @@ async function prepareSubmission() {
   riskVisible.value = false
   if (locked.value || regionsLoading.value || imagesLoading.value) return
   attempted.value = true
-  if (hasErrors.value || !selectedRegion.value || !selectedTemplate.value) {
+  if (hasErrors.value || !selectedRegion.value || !effectiveTemplate.value) {
     await nextTick()
     root.value?.querySelector<HTMLElement>('[data-template-invalid="true"] input, input[aria-invalid="true"], [aria-invalid="true"] input')?.focus()
     return
   }
-  const template = selectedTemplate.value
+  const template = effectiveTemplate.value
   const region = selectedRegion.value
   const image = needsImage.value ? selectedImage.value : undefined
   confirmation.value = {
@@ -484,7 +536,35 @@ onBeforeUnmount(() => {
               </template>
               <div v-else-if="!selectedTemplate" class="boot-empty"><i class="i-mdi-tune-variant" aria-hidden="true" /><p>{{ t('ociBoot.noTemplateHint') }}</p></div>
               <template v-else>
-                <div v-if="selectedPrice" class="boot-price-card" role="region" :aria-label="t('ociBoot.priceTitle')">
+                <div class="form-section">
+                  <div class="section-label">
+                    <h3>{{ t('ociBoot.computeSpecsTitle') }}</h3>
+                    <button v-if="!isFixedSpecShape && isCustomSpecModified" type="button" class="text-button" :disabled="locked" @click="restoreTemplateSpecs">{{ t('ociBoot.restoreTemplateSpecs') }}</button>
+                  </div>
+                  <div class="spec-fields">
+                    <div class="form-field">
+                      <label id="boot-ocpu-label" for="boot-ocpu">{{ t('ociBoot.ocpuLabel') }}</label>
+                      <div class="interval-options" role="group" aria-labelledby="boot-ocpu-label">
+                        <button v-for="cores in ocpuPresets" :key="cores" type="button" :aria-pressed="customOcpuInput.trim() === String(cores)" :disabled="locked || isFixedSpecShape" @click="customOcpuInput = String(cores)">{{ t('ociBoot.ocpuUnit', { count: number(cores) }) }}</button>
+                      </div>
+                      <input id="boot-ocpu" type="number" inputmode="numeric" min="1" :max="maxCustomOcpu" step="1" :value="customOcpuInput" :disabled="locked || isFixedSpecShape" :aria-invalid="attempted && !ocpuValid || undefined" :aria-describedby="attempted && !ocpuValid ? 'boot-ocpu-error' : 'boot-ocpu-hint'" @input="customOcpuInput = inputValue($event)" />
+                      <p v-if="attempted && !ocpuValid" id="boot-ocpu-error" class="field-error">{{ t('ociBoot.ocpuInvalid', { max: number(maxCustomOcpu) }) }}</p>
+                      <p v-else id="boot-ocpu-hint" class="field-hint">{{ t('ociBoot.ocpuHint', { max: number(maxCustomOcpu) }) }}</p>
+                    </div>
+                    <div class="form-field">
+                      <label id="boot-memory-label" for="boot-memory">{{ t('ociBoot.memoryLabel') }}</label>
+                      <div class="interval-options" role="group" aria-labelledby="boot-memory-label">
+                        <button v-for="gb in memoryPresets" :key="gb" type="button" :aria-pressed="customMemoryInput.trim() === String(gb)" :disabled="locked || isFixedSpecShape" @click="customMemoryInput = String(gb)">{{ t('ociBoot.memoryUnit', { size: number(gb) }) }}</button>
+                      </div>
+                      <input id="boot-memory" type="number" inputmode="numeric" min="1" :max="maxCustomMemory" step="1" :value="customMemoryInput" :disabled="locked || isFixedSpecShape" :aria-invalid="attempted && !memoryValid || undefined" :aria-describedby="attempted && !memoryValid ? 'boot-memory-error' : 'boot-memory-hint'" @input="customMemoryInput = inputValue($event)" />
+                      <p v-if="attempted && !memoryValid" id="boot-memory-error" class="field-error">{{ t('ociBoot.memoryInvalid', { max: number(maxCustomMemory) }) }}</p>
+                      <p v-else id="boot-memory-hint" class="field-hint">{{ t('ociBoot.memoryHint', { max: number(maxCustomMemory) }) }}</p>
+                    </div>
+                  </div>
+                  <p v-if="isFixedSpecShape" class="field-hint fixed-shape-hint">{{ t('ociBoot.fixedShapeSpecHint') }}</p>
+                </div>
+
+                <div v-if="selectedPrice && effectiveTemplate" class="boot-price-card" role="region" :aria-label="t('ociBoot.priceTitle')">
                   <div class="boot-price-head">
                     <div class="boot-price-title-wrap">
                       <span class="boot-price-icon" aria-hidden="true"><i class="i-mdi-cash-multiple" /></span>
@@ -510,15 +590,15 @@ onBeforeUnmount(() => {
                   <ul class="boot-price-breakdown">
                     <li>
                       <span>{{ t('ociBoot.priceOcpuLine') }}</span>
-                      <span>{{ t('ociBoot.priceHourUnit', { qty: number(selectedTemplate.ocpu), rate: formatUsd(selectedPrice.ocpuPerHourUsd, 4) }) }} = <strong>{{ formatUsd(selectedTemplate.ocpu * selectedPrice.ocpuPerHourUsd, 3) }}/h</strong></span>
+                      <span>{{ t('ociBoot.priceHourUnit', { qty: number(effectiveTemplate.ocpu), rate: formatUsd(selectedPrice.ocpuPerHourUsd, 4) }) }} = <strong>{{ formatUsd(effectiveTemplate.ocpu * selectedPrice.ocpuPerHourUsd, 3) }}/h</strong></span>
                     </li>
                     <li>
                       <span>{{ t('ociBoot.priceMemoryLine') }}</span>
-                      <span>{{ t('ociBoot.priceHourUnit', { qty: `${number(selectedTemplate.memory)} GB`, rate: formatUsd(selectedPrice.memoryPerGbHourUsd, 4) }) }} = <strong>{{ formatUsd(selectedTemplate.memory * selectedPrice.memoryPerGbHourUsd, 3) }}/h</strong></span>
+                      <span>{{ t('ociBoot.priceHourUnit', { qty: `${number(effectiveTemplate.memory)} GB`, rate: formatUsd(selectedPrice.memoryPerGbHourUsd, 4) }) }} = <strong>{{ formatUsd(effectiveTemplate.memory * selectedPrice.memoryPerGbHourUsd, 3) }}/h</strong></span>
                     </li>
                     <li>
                       <span>{{ t('ociBoot.priceStorageLine') }}</span>
-                      <span>{{ t('ociBoot.priceStorageUnit', { gb: number(selectedTemplate.disk), rate: formatUsd(selectedPrice.storagePerGbMonthUsd, 4) }) }} = <strong>{{ formatUsd(selectedPrice.perInstanceStorageMonthlyUsd, 2) }}</strong></span>
+                      <span>{{ t('ociBoot.priceStorageUnit', { gb: number(effectiveTemplate.disk), rate: formatUsd(selectedPrice.storagePerGbMonthUsd, 4) }) }} = <strong>{{ formatUsd(selectedPrice.perInstanceStorageMonthlyUsd, 2) }}</strong></span>
                     </li>
                   </ul>
                   <p class="boot-price-footnote">{{ t('ociBoot.priceFootnote', { hours: number(OCI_HOURS_PER_MONTH) }) }}</p>
@@ -567,8 +647,8 @@ onBeforeUnmount(() => {
       <div class="boot-footer" aria-live="polite">
         <span v-if="selectedRegion">{{ t('ociBoot.tenantContext', { name: selectedRegion.tenancyName || selectedRegion.userName || regionLabel(selectedRegion) }) }}</span>
         <span v-if="attempted && hasErrors" class="field-error">{{ t('ociBoot.validationSummary') }}</span>
-        <span v-else-if="selectedTemplate">
-          {{ t(`ociBoot.${selectedTemplate.label}`) }} · {{ templateSpecs(selectedTemplate) }}
+        <span v-else-if="effectiveTemplate">
+          {{ t(`ociBoot.${effectiveTemplate.label}`) }} · {{ templateSpecs(effectiveTemplate) }}
           <template v-if="selectedPrice"> · {{ t('ociBoot.pricePerHour', { price: formatUsd(selectedPrice.totalHourlyUsd, 3) }) }} ({{ t('ociBoot.pricePerMonth', { price: formatUsd(selectedPrice.totalMonthlyUsd, 2) }) }})</template>
         </span>
       </div>

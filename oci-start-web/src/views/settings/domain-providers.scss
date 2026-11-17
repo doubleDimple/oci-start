@@ -175,7 +175,7 @@
     > button:not(:disabled):hover { background: var(--bg-hover); }
     > button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
     > button:disabled { color: var(--text-muted); opacity: .6; cursor: default; }
-    &:focus-within { outline: 2px solid var(--brand); outline-offset: 2px; }
+    &:focus-within { outline: none; }
     &.is-disabled, &:has(> input:disabled) { background: var(--bg-search); }
   }
   .provider-secret-feedback {
@@ -215,12 +215,12 @@
 .domain-provider-discard-dialog {
   // Shared PageBackButton has no .btn class and keeps its original dimensions.
   .btn {
-    min-height: 36px;
-    height: 36px;
-    padding: 7px 12px;
-    font: 500 var(--font-size-body)/20px var(--sans);
+    min-height: 32px;
+    height: 32px;
+    padding: 5px 12px;
+    font: 500 var(--font-size-secondary)/18px var(--sans);
 
-    > i { flex: none; width: 18px; height: 18px; font-size: 18px; }
+    > i { flex: none; width: 16px; height: 16px; font-size: 16px; }
   }
   .domain-provider-notice {
     display: flex;

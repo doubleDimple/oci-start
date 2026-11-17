@@ -2,7 +2,7 @@
   display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; height: 100%; overflow: hidden;
   border: 1px solid var(--border); border-radius: var(--r-card); background: var(--bg-card); color: var(--text-primary);
   font: var(--font-size-body)/1.5 var(--sans);
-  .btn { min-height: 36px; padding: 7px 13px; }
+  .btn { min-height: 32px; padding: 5px 12px; font-size: var(--font-size-secondary); }
   i { flex: none; display: inline-block; width: 18px; height: 18px; }
 }
 .ip-bans-toolbar { display: flex; flex: none; flex-wrap: wrap; align-items: center; gap: 12px; min-height: 64px; padding: 13px 20px; border-bottom: 1px solid var(--border); }
@@ -14,7 +14,7 @@
   .ip-bans-status-filter { flex: 0 0 120px; width: 120px; }
   .btn { flex: none; }
   input { width: 100%; min-width: 0; min-height: 36px; box-sizing: border-box; padding: 7px 12px; border: 1px solid var(--border-strong); border-radius: var(--r-pill); background: var(--bg-card); color: var(--text-primary); font: var(--font-size-body)/1.5 var(--sans); }
-  input:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+  input:focus-visible { outline: none; }
   input:disabled { opacity: .6; }
   .el-select__wrapper { min-height: 36px; }
 }

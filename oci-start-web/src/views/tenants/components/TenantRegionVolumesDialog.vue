@@ -43,7 +43,6 @@ const tenantId = computed(() => String(props.tenant.id))
 const canManage = computed(() => hasTenantPermission(props.tenant, 'VOLUME_MANAGE'))
 const canDelete = computed(() => hasTenantPermission(props.tenant, 'BOOT_VOLUME_DELETE'))
 const tenantName = computed(() => props.tenant.defName || t('tenantRegions.common.currentTenant'))
-const heading = ref<HTMLElement>()
 const table = ref<TableInstance>()
 const volumes = ref<BootVolume[]>([])
 const loading = ref(false)
@@ -77,11 +76,8 @@ function close() {
   emit('close')
 }
 
-function resetSize() {
-  const dialog = heading.value?.closest<HTMLElement>('.tenant-region-volumes-dialog')
-  if (!dialog) return
-  dialog.style.removeProperty('width')
-  dialog.style.removeProperty('height')
+function guardClose(done: () => void) {
+  if (!busy.value) done()
 }
 
 function clampPage() {
@@ -219,9 +215,27 @@ const ElTableColumn = BaseTableColumn<BootVolume>
 </script>
 
 <template>
-  <el-dialog :model-value="true" :title="t('tenantRegions.volumes.title')" width="min(960px, calc(100vw - 32px))" class="tenant-region-volumes-dialog" align-center append-to-body :close-on-click-modal="false" :close-on-press-escape="!busy" :show-close="!busy" @close="close">
-    <template #header="{ titleId }">
-      <div ref="heading" class="volume-heading"><span :id="titleId" class="volume-title">{{ t('tenantRegions.volumes.title') }}</span><span class="volume-context">{{ tenantName }}<span v-if="tenant.region"> · {{ tenant.region }}</span></span></div>
+  <el-drawer
+    :model-value="true"
+    direction="rtl"
+    size="min(940px, 92vw)"
+    class="tenant-region-volumes-drawer"
+    append-to-body
+    destroy-on-close
+    :close-on-click-modal="!busy && !editing"
+    :close-on-press-escape="!busy"
+    :show-close="!busy"
+    :before-close="guardClose"
+    @close="close"
+  >
+    <template #header>
+      <div class="volume-drawer-header">
+        <span class="volume-drawer-icon" aria-hidden="true"><i class="i-mdi-harddisk" /></span>
+        <div class="volume-drawer-heading">
+          <h2 class="volume-title">{{ t('tenantRegions.volumes.title') }}</h2>
+          <p class="volume-context">{{ tenantName }}<span v-if="tenant.region"> · {{ tenant.region }}</span></p>
+        </div>
+      </div>
     </template>
 
     <Transition name="region-volume-switch" mode="out-in">
@@ -231,8 +245,8 @@ const ElTableColumn = BaseTableColumn<BootVolume>
           <div class="volume-toolbar-actions"><span v-if="!loading" class="volume-count">{{ t('tenantRegions.volumes.count', { count: number(volumes.length) }) }}<span v-if="orphanCount">{{ t('tenantRegions.volumes.orphanCount', { count: number(orphanCount) }) }}</span></span><GhostBtn :loading="loading" :disabled="!!busy" @click="loadVolumes"><span class="i-mdi-refresh" aria-hidden="true" />{{ t('tenantRegions.common.refresh') }}</GhostBtn></div>
         </div>
         <PageErrorNotice v-if="error">{{ message(error) }}</PageErrorNotice>
-      <MobileRecordList v-if="compact" drilldown :list-id="mobileListId" :record-keys="filteredVolumes.map(volume => volume.id)" :loading="loading" class="volume-mobile-list">
-        <MobileRecordCard v-for="volume in mobileVolumes" :key="volume.id" :record-key="volume.id" :summary-title="volume.displayName || '—'" :summary-meta="volume.instanceName || t('tenantRegions.volumes.unattached')" :summary-status="volume.sizeInGBs == null ? undefined : `${number(volume.sizeInGBs)} GB`">
+        <MobileRecordList v-if="compact" drilldown :list-id="mobileListId" :record-keys="filteredVolumes.map(volume => volume.id)" :loading="loading" class="volume-mobile-list">
+          <MobileRecordCard v-for="volume in mobileVolumes" :key="volume.id" :record-key="volume.id" :summary-title="volume.displayName || '—'" :summary-meta="volume.instanceName || t('tenantRegions.volumes.unattached')" :summary-status="volume.sizeInGBs == null ? undefined : `${number(volume.sizeInGBs)} GB`">
             <template #identity><h3 class="mobile-record-title">{{ volume.displayName || '—' }}</h3></template>
             <dl class="mobile-record-fields">
               <div class="mobile-record-wide"><dt>{{ t('tenantRegions.volumes.instance') }}</dt><dd>{{ volume.instanceName || t('tenantRegions.volumes.unattached') }}</dd></div>
@@ -261,42 +275,55 @@ const ElTableColumn = BaseTableColumn<BootVolume>
       <section v-else key="editor" class="volume-editor" :aria-label="t('tenantRegions.volumes.editTitle')">
         <button class="volume-back" type="button" :disabled="!!busy" @click="cancelEditing"><span aria-hidden="true">←</span> {{ t('tenantRegions.volumes.back') }}</button>
         <div class="volume-editor-intro"><h3>{{ t('tenantRegions.volumes.editHeading') }}</h3><p>{{ editing.instanceName || t('tenantRegions.volumes.unattached') }}<span> · {{ number(editing.sizeInGBs) }} GB</span></p></div>
-        <el-form label-position="top" :disabled="!!busy" @submit.prevent="saveVolume">
-          <el-form-item :label="t('tenantRegions.volumes.name')" required><el-input v-model="editName" :placeholder="t('tenantRegions.volumes.namePlaceholder')" /></el-form-item>
-          <div class="volume-performance"><div class="performance-heading"><label id="region-volume-performance-label">{{ t('tenantRegions.volumes.performance') }}</label><strong>{{ number(editVpus) }}</strong></div><el-slider v-model="editVpus" :min="minimumVpus" :max="120" :step="10" aria-labelledby="region-volume-performance-label" /><div class="performance-scale"><span>{{ number(minimumVpus) }} VPUs/GB</span><span>{{ number(120) }} VPUs/GB</span></div></div>
-          <el-alert v-if="['tenantRegions.volumes.nameRequired', 'tenantRegions.volumes.invalidPerformance'].includes(editError)" :title="message(editError)" type="error" :closable="false" show-icon class="volume-alert" />
-          <PageErrorNotice v-else-if="editError">{{ message(editError) }}</PageErrorNotice>
-          <div class="volume-edit-actions"><GhostBtn :disabled="!!busy" @click="cancelEditing">{{ t('tenantRegions.common.cancel') }}</GhostBtn><PrimaryBtn :loading="busy === 'save'" :disabled="!!busy && busy !== 'save'" @click="saveVolume">{{ t('tenantRegions.volumes.save') }}</PrimaryBtn></div>
-        </el-form>
+        <div class="volume-editor-card">
+          <el-form label-position="top" :disabled="!!busy" @submit.prevent="saveVolume">
+            <button type="submit" class="drawer-hidden-submit" tabindex="-1" aria-hidden="true" />
+            <el-form-item :label="t('tenantRegions.volumes.name')" required><el-input v-model="editName" :placeholder="t('tenantRegions.volumes.namePlaceholder')" /></el-form-item>
+            <div class="volume-performance"><div class="performance-heading"><label id="region-volume-performance-label">{{ t('tenantRegions.volumes.performance') }}</label><strong>{{ number(editVpus) }}</strong></div><el-slider v-model="editVpus" :min="minimumVpus" :max="120" :step="10" aria-labelledby="region-volume-performance-label" /><div class="performance-scale"><span>{{ number(minimumVpus) }} VPUs/GB</span><span>{{ number(120) }} VPUs/GB</span></div></div>
+            <el-alert v-if="['tenantRegions.volumes.nameRequired', 'tenantRegions.volumes.invalidPerformance'].includes(editError)" :title="message(editError)" type="error" :closable="false" show-icon class="volume-alert" />
+            <PageErrorNotice v-else-if="editError">{{ message(editError) }}</PageErrorNotice>
+          </el-form>
+        </div>
       </section>
     </Transition>
 
-    <template #footer><div class="volume-footer"><button v-if="!compact" type="button" class="volume-reset" :disabled="!!busy" @click="resetSize"><span class="i-mdi-arrow-expand-all" aria-hidden="true" />{{ t('tenantRegions.volumes.resetSize') }}</button><GhostBtn :disabled="!!busy" @click="close">{{ t('tenantRegions.common.close') }}</GhostBtn></div></template>
-  </el-dialog>
+    <template #footer>
+      <div class="volume-footer" :class="{ 'is-editing': !!editing }">
+        <template v-if="editing">
+          <GhostBtn :disabled="!!busy" @click="cancelEditing">{{ t('tenantRegions.common.cancel') }}</GhostBtn>
+          <PrimaryBtn :loading="busy === 'save'" :disabled="!!busy && busy !== 'save'" @click="saveVolume">{{ t('tenantRegions.volumes.save') }}</PrimaryBtn>
+        </template>
+        <GhostBtn v-else :disabled="!!busy" @click="close">{{ t('tenantRegions.common.close') }}</GhostBtn>
+      </div>
+    </template>
+  </el-drawer>
 </template>
 
 <style scoped>
-:global(.tenant-region-volumes-dialog) { font-family: var(--sans); font-size: var(--font-size-body); color: var(--text-primary); }
-:global(.tenant-region-volumes-dialog .el-button), :global(.tenant-region-volumes-dialog .el-input__inner), :global(.tenant-region-volumes-dialog .el-select__wrapper), :global(.tenant-region-volumes-dialog .el-form-item__label), :global(.tenant-region-volumes-dialog .el-table) { font-size: var(--font-size-body); }
-:global(.tenant-region-volumes-dialog .el-alert__title) { font-size: var(--font-size-body); }
-:global(.tenant-region-volumes-dialog .el-alert__description), :global(.tenant-region-volumes-dialog .el-form-item__error), :global(.tenant-region-volumes-dialog .el-empty__description p) { font-size: var(--font-size-secondary); }
-:global(.tenant-region-volumes-dialog) { display: flex; flex-direction: column; height: min(80dvh, 760px); min-height: min(480px, calc(100dvh - 32px)); min-width: min(360px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); max-width: calc(100vw - 32px); overflow: hidden; resize: both; padding: 26px; }
-:global(.tenant-region-volumes-dialog .el-dialog__body) { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: auto; }
-:global(.tenant-region-volumes-dialog .el-dialog__header) { padding-bottom: 12px; }
-:global(.tenant-region-volumes-dialog .el-dialog__footer) { flex-shrink: 0; padding-top: 18px; }
+:global(.tenant-region-volumes-drawer) { --el-drawer-bg-color: var(--bg-card); background: var(--bg-card); font-family: var(--sans); font-size: var(--font-size-body); color: var(--text-primary); }
+:global(.tenant-region-volumes-drawer .el-button), :global(.tenant-region-volumes-drawer .el-input__inner), :global(.tenant-region-volumes-drawer .el-select__wrapper), :global(.tenant-region-volumes-drawer .el-form-item__label), :global(.tenant-region-volumes-drawer .el-table) { font-size: var(--font-size-body); }
+:global(.tenant-region-volumes-drawer .el-alert__title) { font-size: var(--font-size-body); }
+:global(.tenant-region-volumes-drawer .el-alert__description), :global(.tenant-region-volumes-drawer .el-form-item__error), :global(.tenant-region-volumes-drawer .el-empty__description p) { font-size: var(--font-size-secondary); }
+:global(.tenant-region-volumes-drawer .el-drawer__header) { margin: 0; padding: 18px 20px 14px; border-bottom: 1px solid var(--border); color: var(--text-primary); align-items: flex-start; gap: 12px; }
+:global(.tenant-region-volumes-drawer .el-drawer__close-btn) { width: 36px; height: 36px; border-radius: var(--r-pill); color: var(--text-secondary); flex-shrink: 0; transition: background-color 180ms ease, color 180ms ease; }
+:global(.tenant-region-volumes-drawer .el-drawer__close-btn:is(:hover, :focus-visible)) { color: var(--brand); background: var(--bg-hover); }
+:global(.tenant-region-volumes-drawer .el-drawer__body) { display: flex; flex-direction: column; flex: 1; min-height: 0; padding: 18px 20px; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; background: var(--bg-card); }
+:global(.tenant-region-volumes-drawer .el-drawer__footer) { padding: 0; border-top: 1px solid var(--border); background: var(--bg-card); }
 :global(.tenant-region-volume-confirm) { font-family: var(--sans); --el-messagebox-title-color: var(--text-primary); --el-messagebox-content-color: var(--text-primary); --el-messagebox-font-size: var(--font-size-dialog-title); --el-messagebox-content-font-size: var(--font-size-body); }
 :global(.tenant-region-volume-confirm .el-message-box__title) { font-weight: 600; }
 :global(.tenant-region-volume-confirm .tenant-region-volume-delete-confirm) { --el-button-bg-color: var(--status-danger); --el-button-border-color: var(--status-danger); --el-button-hover-bg-color: var(--status-danger); --el-button-hover-border-color: var(--status-danger); }
-.volume-heading { display: flex; align-items: baseline; gap: 12px; padding-right: 28px; }
-.volume-title { flex-shrink: 0; font-size: var(--font-size-dialog-title); font-weight: 600; line-height: 1.4; color: var(--text-primary); }
-.volume-context { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--font-size-secondary); color: var(--text-secondary); }
+.volume-drawer-header { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.volume-drawer-icon { width: 38px; height: 38px; border-radius: 10px; background: var(--brand-subtle); color: var(--brand); display: grid; place-items: center; font-size: 20px; flex-shrink: 0; }
+.volume-drawer-heading { min-width: 0; }
+.volume-title { margin: 0; font-size: var(--font-size-dialog-title); font-weight: 600; line-height: 1.35; color: var(--text-primary); }
+.volume-context { margin: 2px 0 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--font-size-secondary); color: var(--text-secondary); }
 .volume-list { display: flex; flex-direction: column; flex: 1; min-height: 240px; }
 .volume-toolbar, .volume-toolbar-actions, .volume-footer, .volume-row-actions { display: flex; align-items: center; }
 .volume-toolbar { gap: 12px; justify-content: space-between; margin-bottom: 12px; }
 .volume-search { width: 270px; max-width: 100%; }
 .volume-toolbar-actions { gap: 14px; }
 .volume-count { color: var(--text-secondary); font-size: var(--font-size-secondary); white-space: nowrap; }
-.volume-table-wrap { flex: 1; min-height: 150px; overflow: hidden; border: 1px solid var(--border); border-radius: 14px; }
+.volume-table-wrap { flex: 1; min-height: 180px; overflow: hidden; border: 1px solid var(--border); border-radius: 14px; }
 .volume-table { font-family: var(--sans); }
 .volume-table :deep(th.el-table__cell) { background: var(--bg-search); color: var(--text-secondary); font-size: var(--font-size-body); font-weight: 600; }
 .volume-table :deep(td.el-table__cell) { height: 52px; padding-block: 8px; font-size: var(--font-size-body); }
@@ -306,46 +333,50 @@ const ElTableColumn = BaseTableColumn<BootVolume>
 .volume-number { font-variant-numeric: tabular-nums; }
 .unattached { display: inline-flex; align-items: center; gap: 6px; font-size: var(--font-size-body); color: var(--text-secondary); }
 .unattached > span { width: 5px; height: 5px; border-radius: 50%; background: var(--status-warn); }
-.volume-pagination { margin-top: 18px; }
-.volume-alert { margin-bottom: 16px; flex-shrink: 0; }
-.volume-editor { width: min(100%, 580px); margin: 0 auto; padding: 4px 0 16px; color: var(--text-primary); }
-.volume-back, .volume-reset { display: inline-flex; align-items: center; gap: 7px; border: 0; padding: 0; background: transparent; font: inherit; font-size: var(--font-size-body); color: var(--text-primary); cursor: pointer; }
-.volume-back { padding: 8px 0; }
-.volume-back:hover, .volume-reset:hover { color: var(--brand); }
-.volume-back:focus-visible, .volume-reset:focus-visible { outline: 2px solid var(--brand); outline-offset: 4px; border-radius: 4px; }
-.volume-back:disabled, .volume-reset:disabled { opacity: .5; cursor: default; }
-.volume-editor-intro { margin: 18px 0 24px; }
+.volume-pagination { margin-top: 16px; }
+.volume-alert { margin-bottom: 0; flex-shrink: 0; }
+.volume-editor { width: 100%; padding: 4px 0 16px; color: var(--text-primary); }
+.volume-back { display: inline-flex; align-items: center; gap: 7px; border: 0; padding: 8px 0; background: transparent; font: inherit; font-size: var(--font-size-body); color: var(--text-primary); cursor: pointer; }
+.volume-back:hover { color: var(--brand); }
+.volume-back:focus-visible { outline: 2px solid var(--brand); outline-offset: 4px; border-radius: 4px; }
+.volume-back:disabled { opacity: .5; cursor: default; }
+.volume-editor-intro { margin: 14px 0 18px; }
 .volume-editor-intro h3 { margin: 0 0 8px; font-size: var(--font-size-section); font-weight: 600; }
 .volume-editor-intro p { margin: 0; color: var(--text-secondary); font-size: var(--font-size-secondary); }
+.volume-editor-card { padding: 18px; border-radius: var(--r-card); border: 1px solid var(--border); background: var(--bg-card-subtle); }
+.drawer-hidden-submit { position: absolute; width: 0; height: 0; padding: 0; border: 0; opacity: 0; pointer-events: none; }
 .volume-editor :deep(.el-form-item__label) { font-family: var(--sans); font-size: var(--font-size-body); color: var(--text-primary); }
 .volume-editor :deep(.el-input__wrapper) { min-height: 42px; border-radius: 12px; }
-.volume-performance { padding: 20px 24px; margin: 22px 0; background: var(--bg-search); border-radius: 16px; }
+.volume-performance { padding: 18px 20px; margin: 18px 0 0; background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; }
 .performance-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .performance-heading label { font-size: var(--font-size-body); color: var(--text-primary); }
 .performance-heading strong { font-size: var(--font-size-body); font-weight: 600; color: var(--text-primary); font-variant-numeric: tabular-nums; }
 .performance-scale { display: flex; justify-content: space-between; margin-top: 2px; color: var(--text-secondary); font-size: var(--font-size-secondary); }
-.volume-edit-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
-.volume-footer { justify-content: space-between; gap: 16px; }
+.volume-footer { justify-content: flex-end; gap: 10px; padding: 12px 20px calc(12px + env(safe-area-inset-bottom)); }
 .region-volume-switch-enter-active { transition: opacity .18s ease, transform .22s cubic-bezier(.22, 1, .36, 1); }
 .region-volume-switch-leave-active { transition: opacity .12s ease; }
 .region-volume-switch-enter-from { opacity: 0; transform: translateY(6px); }
 .region-volume-switch-leave-to { opacity: 0; }
 @media (max-width: 760px) {
-  :global(.tenant-region-volumes-dialog) { padding: 18px; resize: none; height: auto !important; min-height: 0; min-width: 0; }
+  :global(.tenant-region-volumes-drawer .el-drawer__header) { padding: 16px 16px 14px; }
+  :global(.tenant-region-volumes-drawer .el-drawer__close-btn) { width: 44px; height: 44px; }
+  :global(.tenant-region-volumes-drawer .el-drawer__body) { padding: 14px 16px; }
   .volume-list { min-height: 0; }
-  .volume-heading { flex-wrap: wrap; gap: 6px; }
-  .volume-context { flex-basis: 100%; white-space: normal; overflow-wrap: anywhere; }
-  .volume-mobile-list { padding: 0; max-height: 48dvh; overflow-y: auto; overscroll-behavior: contain; }
+  .volume-editor-card { padding: 14px; }
+  .volume-mobile-list { padding: 0; max-height: 52dvh; overflow-y: auto; overscroll-behavior: contain; }
   .volume-mobile-empty { display: grid; place-items: center; min-height: 88px; padding: 16px; margin: 0; text-align: center; line-height: 1.6; }
   .volume-mobile-list :deep(.btn) { min-height: 44px; }
   .volume-pagination { margin-top: 12px; }
-  .volume-footer { justify-content: flex-end; }
+  .volume-footer { padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); }
+  .volume-footer.is-editing { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .volume-footer :deep(button) { width: 100%; min-height: 44px; }
   .volume-toolbar { align-items: stretch; flex-direction: column; gap: 12px; }
   .volume-search { width: 100%; }
   .volume-toolbar-actions { justify-content: space-between; flex-wrap: wrap; gap: 10px; }
   .volume-count { white-space: normal; overflow-wrap: anywhere; }
 }
 @media (prefers-reduced-motion: reduce) {
+  :global(.tenant-region-volumes-drawer .el-drawer__close-btn),
   .region-volume-switch-enter-active, .region-volume-switch-leave-active { transition: none; }
   .region-volume-switch-enter-from { transform: none; }
 }

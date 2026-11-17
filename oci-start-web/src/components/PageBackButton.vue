@@ -21,8 +21,12 @@ const teleportTarget = computed(() => (props.local ? null : headerBackSlot?.valu
 </template>
 
 <style scoped>
-.page-back-button { display: inline-flex; flex: none; align-self: center; align-items: center; justify-content: center; gap: 6px; box-sizing: border-box; height: 36px; min-height: 36px; padding: 7px 12px; margin: 0; border: 1px solid var(--border-strong); border-radius: var(--r-pill); background: var(--bg-card); color: var(--text-primary); font: 500 var(--font-size-body)/20px var(--sans); white-space: nowrap; cursor: pointer; touch-action: manipulation; transition: background-color 180ms ease; }
-.page-back-button > i { width: 18px; height: 18px; font-size: 18px; flex: none; }
+.page-back-button { display: inline-flex; flex: none; align-self: center; align-items: center; justify-content: center; gap: 5px; box-sizing: border-box; height: 32px; min-height: 32px; padding: 5px 11px; margin: 0; border: 1px solid var(--border-strong); border-radius: var(--r-pill); background: var(--bg-card); color: var(--text-primary); font: 500 var(--font-size-secondary)/18px var(--sans); white-space: nowrap; cursor: pointer; touch-action: manipulation; transition: background-color 180ms ease; }
+.page-back-button > i { width: 16px; height: 16px; font-size: 16px; flex: none; }
+@media (max-width: 760px) {
+  .page-back-button { height: 36px; min-height: 36px; padding: 7px 12px; font-size: var(--font-size-body); line-height: 20px; }
+  .page-back-button > i { width: 18px; height: 18px; font-size: 18px; }
+}
 .page-back-button:not(:disabled):hover { background: var(--bg-hover); }
 .page-back-button:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
 .page-back-button:disabled { opacity: .6; cursor: default; }

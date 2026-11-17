@@ -246,7 +246,7 @@ onBeforeUnmount(() => { disposed = true; selection = null; formatSelection = nul
 .memo-editor-entry > div { display: flex; gap: 8px; justify-content: flex-end; }
 .memo-editor-entry button { padding: 5px 12px; border: 1px solid var(--border-strong); }
 .memo-editor-body { min-height: 240px; max-height: 65vh; overflow: auto; padding: 16px; outline: none; overflow-wrap: anywhere; white-space: pre-wrap; }
-.memo-editor-body:focus { box-shadow: inset 0 0 0 2px var(--brand); }
+.memo-editor-body:focus { box-shadow: none; outline: none; }
 .memo-editor-body:empty::before { content: attr(data-placeholder); color: var(--text-muted); pointer-events: none; }
 .is-disabled .memo-editor-body { background: var(--bg-search); }
 .memo-editor-problem { margin: 0; padding: 10px 14px; border-top: 1px solid var(--border); color: var(--status-danger); font-size: var(--font-size-secondary); }
