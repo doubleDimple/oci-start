@@ -21,7 +21,13 @@
     .el-message-box { max-width: calc(100vw - 24px); max-height: calc(100dvh - 32px); overflow-y: auto; }
     .el-message-box__btns { flex-wrap: wrap; gap: 8px; }
     .el-dropdown-menu__item { min-height: 40px; }
-    .el-dialog__footer .el-button, .el-message-box__btns .el-button { min-height: 40px; margin-left: 0; }
+    .el-dialog__footer .el-button,
+    .el-drawer__footer .el-button,
+    .el-message-box__btns .el-button,
+    .mobile-record-footer .el-button { min-height: 40px; margin-left: 0; }
+    :is([class*='-toolbar'], [class*='-actions'], [class*='-footer'], .toolbar-actions, .actions) > .el-button + .el-button {
+      margin-left: 0;
+    }
   }
 }
 

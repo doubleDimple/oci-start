@@ -103,10 +103,10 @@
     border-color: color-mix(in srgb, var(--brand) 30%, transparent);
   }
   .toolbar-actions .tenant-import {
-    height: 32px !important;
-    min-height: 32px !important;
-    padding: 0 13px !important;
-    font-size: var(--font-size-secondary) !important;
+    height: 32px;
+    min-height: 32px;
+    padding: 0 13px;
+    font-size: var(--font-size-secondary);
   }
   .search-context { display: flex; align-items: center; flex-shrink: 0; gap: 10px; flex-wrap: wrap; margin: 0; padding: 0 18px 12px; color: var(--text-secondary); font-size: var(--font-size-secondary); }
   .search-context button { padding: 0; border: 0; background: none; color: var(--brand); font: inherit; font-size: var(--font-size-body); cursor: pointer; }
@@ -334,9 +334,9 @@
     .list-toolbar { padding: 12px; gap: 8px; }
     .tenant-search { flex-basis: 100%; width: 100%; max-width: none; height: 40px; }
     .tenant-search kbd { display: none; }
-    .toolbar-actions { width: 100%; flex-wrap: wrap; gap: 6px; }
+    .toolbar-actions { width: 100%; flex-wrap: wrap; align-items: center; gap: 8px; margin-left: 0; }
     .toolbar-button { width: 40px; height: 40px; }
-    .toolbar-actions .tenant-import { min-height: 40px; margin-left: auto; }
+    .toolbar-actions button.btn.tenant-import { height: 40px; min-height: 40px; padding: 0 14px; margin-left: auto; font-size: var(--font-size-body); }
     .search-context { padding: 0 12px 12px; }
     .list-error { margin: 0 12px 12px; }
     .row-actions-column { min-width: 96px; width: 96px; }
@@ -344,7 +344,8 @@
     .mobile-record-card .edit-name > i, .mobile-record-card .cost-link > i { opacity: 1; }
     .mobile-record-card .private-name { max-width: 100%; min-height: 36px; }
     .mobile-record-card .private-name span { white-space: normal; overflow-wrap: anywhere; }
-    .mobile-record-card .more-button, .mobile-record-card .proxy-button { width: 40px; height: 40px; }
+    .mobile-record-card .more-button { width: 40px; height: 40px; }
+    .mobile-record-card .proxy-button { width: 44px; height: 44px; }
     .mobile-record-card .cell-link { min-height: 32px; max-width: 100%; white-space: normal; text-align: left; }
     .mobile-record-card .task-state, .mobile-record-card .tenant-status { max-width: 100%; white-space: normal; }
     .mobile-record-card.row-saved { animation: tenant-row-saved 1400ms ease; }

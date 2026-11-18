@@ -371,6 +371,7 @@ onBeforeUnmount(() => { disposed = true; generation++; clearInterval(resendTimer
 .operation-last-note { margin-bottom: 0 !important; }
 .drawer-hidden-submit { position: absolute; width: 0; height: 0; padding: 0; border: 0; opacity: 0; pointer-events: none; }
 .operation-drawer-footer { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; padding: 12px 20px calc(12px + env(safe-area-inset-bottom)); }
+.operation-drawer-footer :deep(.el-button + .el-button) { margin-left: 0; }
 :global(.instance-operation-dialog) { max-width: calc(100vw - 32px); padding: 26px; font-family: var(--sans); font-size: var(--font-size-body); color: var(--text-primary); }
 :global(.instance-operation-dialog .el-dialog__title) { font-size: var(--font-size-dialog-title); font-weight: 600; }
 :global(:is(.instance-operation-dialog, .instance-operation-drawer) .el-form-item__label),
@@ -405,7 +406,7 @@ onBeforeUnmount(() => { disposed = true; generation++; clearInterval(resendTimer
   :global(.instance-operation-drawer .el-drawer__body) { padding: 14px 16px; }
   .operation-card { padding: 14px; }
   .operation-drawer-footer { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 10px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); }
-  .operation-drawer-footer :deep(button) { width: 100%; min-height: 44px; }
+  .operation-drawer-footer :deep(button) { width: 100%; min-height: 44px; margin-left: 0; }
 }
 @media (max-width: 480px) {
   :global(.instance-operation-dialog) { padding: 22px; }

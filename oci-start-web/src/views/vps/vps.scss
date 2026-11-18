@@ -763,8 +763,13 @@
   .btn.vps-danger-button:not(:disabled):hover { background: color-mix(in srgb, var(--status-danger) 85%, var(--text-primary)); box-shadow: none; }
 }
 @media (max-width: 760px) {
+  .vps-page, .vps-operation-dialog {
+    .btn { height: auto; min-height: 44px; padding: 8px 14px; font-size: var(--font-size-body); }
+    .vps-outline-button { min-height: 44px; }
+  }
   .vps-page {
     .vps-toolbar, .vps-statusbar, .vps-footnote { padding-inline: 12px; }
+    .vps-toolbar-actions { width: 100%; justify-content: flex-end; margin-left: 0; }
     > .vps-notice { padding-inline: 12px; }
     .vps-search { max-width: none; width: 100%; }
     .oci-filter-tabs { width: 100%; justify-content: space-between; }

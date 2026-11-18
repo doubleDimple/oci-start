@@ -668,7 +668,7 @@ onBeforeUnmount(cleanup)
   :global(.tenant-traffic-drawer .el-drawer__body) { padding: 14px 16px; }
   .traffic-card { padding: 14px; }
   .traffic-drawer-footer { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); }
-  .traffic-drawer-footer :deep(.el-button) { width: 100%; min-height: 44px; }
+  .traffic-drawer-footer :deep(.el-button) { width: 100%; min-height: 44px; margin-left: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
   :global(.tenant-traffic-drawer .el-drawer__close-btn),

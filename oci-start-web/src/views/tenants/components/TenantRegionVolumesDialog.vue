@@ -353,6 +353,7 @@ const ElTableColumn = BaseTableColumn<BootVolume>
 .performance-heading strong { font-size: var(--font-size-body); font-weight: 600; color: var(--text-primary); font-variant-numeric: tabular-nums; }
 .performance-scale { display: flex; justify-content: space-between; margin-top: 2px; color: var(--text-secondary); font-size: var(--font-size-secondary); }
 .volume-footer { justify-content: flex-end; gap: 10px; padding: 12px 20px calc(12px + env(safe-area-inset-bottom)); }
+.volume-footer :deep(.el-button + .el-button) { margin-left: 0; }
 .region-volume-switch-enter-active { transition: opacity .18s ease, transform .22s cubic-bezier(.22, 1, .36, 1); }
 .region-volume-switch-leave-active { transition: opacity .12s ease; }
 .region-volume-switch-enter-from { opacity: 0; transform: translateY(6px); }
@@ -369,7 +370,7 @@ const ElTableColumn = BaseTableColumn<BootVolume>
   .volume-pagination { margin-top: 12px; }
   .volume-footer { padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); }
   .volume-footer.is-editing { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .volume-footer :deep(button) { width: 100%; min-height: 44px; }
+  .volume-footer :deep(button) { width: 100%; min-height: 44px; margin-left: 0; }
   .volume-toolbar { align-items: stretch; flex-direction: column; gap: 12px; }
   .volume-search { width: 100%; }
   .volume-toolbar-actions { justify-content: space-between; flex-wrap: wrap; gap: 10px; }

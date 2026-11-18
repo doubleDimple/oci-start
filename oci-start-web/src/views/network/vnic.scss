@@ -97,9 +97,11 @@
     .mobile-record-card .vnic-count-button { min-height: 44px; }
     .vnic-mobile-empty { margin: 0; padding: 32px 16px; color: var(--text-secondary); text-align: center; }
     .vnic-toolbar, .vnic-notice, .vnic-footer { padding-inline: 12px; }
-    .vnic-search { max-width: none; min-width: 150px; }
-    .vnic-filter { width: 140px; }
-    .vnic-toolbar-actions { flex: 1 1 auto; justify-content: flex-end; }
+    .vnic-search { flex: 1 1 100%; max-width: none; min-width: 0; }
+    .vnic-filter { flex: 1 1 140px; width: auto; }
+    .vnic-toolbar-actions { flex: 1 1 100%; width: 100%; justify-content: flex-end; margin-left: 0; }
+    .vnic-toolbar .el-button { min-height: 40px; height: 40px; }
+    .vnic-toolbar .vnic-icon-button { width: 40px; height: 40px; }
     .vnic-footer .vnic-context { flex-basis: 100%; }
   }
 }

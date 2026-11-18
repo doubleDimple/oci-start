@@ -308,11 +308,17 @@
   .domain-providers-page .provider-secret .animate-spin { animation: none; }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 760px) {
   .domain-providers-page {
     .domain-providers-toolbar, .domain-providers-footer { padding-inline: 12px; }
+    .domain-providers-toolbar-actions { width: 100%; justify-content: flex-end; margin-left: 0; }
     > .domain-provider-notice { padding-inline: 12px; }
     .domain-provider { padding: 18px 16px; }
     .domain-providers-summary { flex-basis: 160px; }
+  }
+  .domain-providers-page,
+  .domain-provider-dialog,
+  .domain-provider-discard-dialog {
+    .btn { height: auto; min-height: 44px; padding: 8px 14px; font-size: var(--font-size-body); }
   }
 }

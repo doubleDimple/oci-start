@@ -392,12 +392,18 @@
   .provider-secret-feedback.is-error { color: var(--status-danger); }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 760px) {
   .cloudflare-page {
     .cloudflare-toolbar, .cloudflare-filters { padding-inline: 12px; }
     > .cloudflare-notice { padding-inline: 12px; }
     .cloudflare-zone-picker { max-width: none; }
     .cloudflare-search-field { max-width: none; }
+    .cloudflare-toolbar-actions, .cloudflare-filter-actions { width: 100%; justify-content: flex-end; margin-left: 0; }
+  }
+  .cloudflare-page,
+  .cloudflare-record-dialog,
+  .cloudflare-credentials-dialog {
+    .btn, .cloudflare-search-button { height: auto; min-height: 44px; padding: 8px 14px; font-size: var(--font-size-body); }
   }
 }
 

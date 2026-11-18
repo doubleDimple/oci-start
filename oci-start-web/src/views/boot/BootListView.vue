@@ -423,10 +423,12 @@ onBeforeUnmount(() => { disposed = true; listGeneration++; filterGeneration++; r
 :global(.boot-task-menu .el-dropdown-menu__item.danger) { color: var(--status-danger); }
 @media (max-width: 760px) {
   .filter-card { padding: 12px; }
+  .filters { gap: 8px; }
   .filter-field { flex: 1 1 100%; min-width: 0; }
   .filter-field label { min-width: 48px; }
-  .toolbar-actions { margin-left: 0; gap: 6px; }
-  .filters :deep(.btn), .icon-button { min-height: 40px; }
+  .toolbar-actions { flex: 1 1 100%; width: 100%; justify-content: flex-end; margin-left: 0; gap: 6px; }
+  .filters :deep(button.btn), .icon-button { height: 40px; min-height: 40px; padding: 0 12px; font-size: var(--font-size-body); }
+  .filters :deep(.toolbar-actions button.btn:has(> i:only-child)) { width: 40px; padding: 0; }
   .table-stage { overflow-y: auto; overscroll-behavior: contain; }
   .account-name span { white-space: normal; overflow-wrap: anywhere; }
   .mobile-empty { margin: 0; padding: 28px 12px; text-align: center; color: var(--text-secondary); }

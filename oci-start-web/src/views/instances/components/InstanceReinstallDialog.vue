@@ -328,13 +328,14 @@ onBeforeUnmount(() => {
 .reinstall-log p { margin: 0 0 5px; }
 .reinstall-log:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
 .reinstall-drawer-footer { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; padding: 12px 20px calc(12px + env(safe-area-inset-bottom)); }
+.reinstall-drawer-footer :deep(.el-button + .el-button) { margin-left: 0; }
 @media (max-width: 760px) {
   :global(.instance-reinstall-drawer .el-drawer__header) { padding: 16px 16px 14px; }
   :global(.instance-reinstall-drawer .el-drawer__close-btn) { width: 44px; height: 44px; }
   :global(.instance-reinstall-drawer .el-drawer__body) { padding: 14px 16px; }
   .reinstall-card { padding: 14px; }
   .reinstall-drawer-footer { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 10px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); }
-  .reinstall-drawer-footer :deep(button) { width: 100%; min-height: 44px; }
+  .reinstall-drawer-footer :deep(button) { width: 100%; min-height: 44px; margin-left: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
   :global(.instance-reinstall-drawer .el-drawer__close-btn) { transition: none; }

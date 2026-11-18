@@ -455,12 +455,19 @@
   .provider-secret-feedback.is-error { color: var(--status-danger); }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 760px) {
   .edgeone-page {
     .edgeone-toolbar, .edgeone-mode-switch, .edgeone-filters { padding-inline: 12px; }
     > .edgeone-notice { padding-inline: 12px; }
     .edgeone-zone-picker { max-width: none; }
     .edgeone-search-field { max-width: none; }
+    .edgeone-toolbar-actions, .edgeone-filter-actions { width: 100%; justify-content: flex-end; margin-left: 0; }
+  }
+  .edgeone-page,
+  .edgeone-record-dialog,
+  .edgeone-detail-dialog,
+  .edgeone-credentials-dialog {
+    .btn, .edgeone-search-button { height: auto; min-height: 44px; padding: 8px 14px; font-size: var(--font-size-body); }
   }
 }
 

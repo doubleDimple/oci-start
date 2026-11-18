@@ -79,7 +79,9 @@
     .instance-filter, .region-filter { flex: 1 1 100%; width: 100%; min-width: 0; }
     .instance-filter .el-select__wrapper { min-height: 40px; }
     .filter-submit { order: 3; }
-    .toolbar-actions { flex: 1; width: auto; order: 4; justify-content: flex-end; }
+    .list-toolbar button.btn.filter-submit,
+    .list-toolbar button.btn.tenant-details-entry { height: 40px; min-height: 40px; padding: 0 12px; font-size: var(--font-size-body); }
+    .toolbar-actions { flex: 1 1 200px; width: auto; order: 4; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px; margin-left: 0; }
     .instance-scope { max-width: 240px; }
     .mobile-record-card .instance-tenant-name { display: inline-flex; gap: 6px; max-width: 100%; min-height: 32px; white-space: normal; text-align: left; }
     .mobile-record-card .instance-address { max-width: 100%; min-height: 36px; white-space: normal; text-align: left; }

@@ -429,6 +429,9 @@ const ElTableColumn = BaseTableColumn<SecurityRule & { ruleIndex: number }>
 .security-drawer-title { margin: 0; font-size: var(--font-size-dialog-title); font-weight: 600; line-height: 1.35; color: var(--text-primary); }
 .security-drawer-subtitle { margin: 2px 0 0; font-size: var(--font-size-secondary); color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .security-drawer-footer { display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding: 12px 20px calc(12px + env(safe-area-inset-bottom)); }
+.security-drawer-footer :deep(.el-button + .el-button),
+.security-actions :deep(.el-button + .el-button),
+.security-editor-actions :deep(.el-button + .el-button) { margin-left: 0; }
 .security-content :deep(.el-button), .security-content :deep(.el-input__inner), .security-content :deep(.el-select__wrapper), .security-content :deep(.el-checkbox__label) { font-size: var(--font-size-body); }
 .security-content :deep(.el-empty__description p) { font-size: var(--font-size-secondary); }
 .security-toolbar, .security-actions, .security-editor-actions { display: flex; align-items: center; gap: 8px; }
@@ -457,7 +460,7 @@ const ElTableColumn = BaseTableColumn<SecurityRule & { ruleIndex: number }>
   :global(.region-security-drawer .el-drawer__close-btn) { width: 44px; height: 44px; }
   :global(.region-security-drawer .el-drawer__body) { padding: 14px 16px; }
   .security-drawer-footer { padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); }
-  .security-drawer-footer :deep(button) { width: 100%; min-height: 44px; }
+  .security-drawer-footer :deep(button) { width: 100%; min-height: 44px; margin-left: 0; }
   .security-mobile-list { padding: 0; max-height: 52dvh; overflow-y: auto; overscroll-behavior: contain; }
   .security-mobile-empty { display: grid; place-items: center; min-height: 88px; padding: 16px; margin: 0; text-align: center; line-height: 1.6; }
   .security-mobile-list :deep(.btn), .security-actions :deep(.btn), .security-editor-actions :deep(.btn) { min-height: 44px; }

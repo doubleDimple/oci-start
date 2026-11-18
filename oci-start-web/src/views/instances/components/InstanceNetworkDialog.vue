@@ -178,12 +178,13 @@ onBeforeUnmount(() => {
 .network-details dt { color: var(--text-secondary); }
 .network-details dd { margin: 0; color: var(--text-primary); overflow-wrap: anywhere; }
 .network-drawer-footer { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; padding: 12px 20px calc(12px + env(safe-area-inset-bottom)); }
+.network-drawer-footer :deep(.el-button + .el-button) { margin-left: 0; }
 @media (max-width: 760px) {
   :global(.instance-network-drawer .el-drawer__header) { padding: 16px 16px 14px; }
   :global(.instance-network-drawer .el-drawer__close-btn) { width: 44px; height: 44px; }
   :global(.instance-network-drawer .el-drawer__body) { padding: 14px 16px; }
   .network-drawer-footer { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 10px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); }
-  .network-drawer-footer :deep(button) { width: 100%; min-height: 44px; }
+  .network-drawer-footer :deep(button) { width: 100%; min-height: 44px; margin-left: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
   :global(.instance-network-drawer .el-drawer__close-btn) { transition: none; }
